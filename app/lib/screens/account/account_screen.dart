@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shopnova/screens/orders/orders_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -77,7 +78,7 @@ class AccountScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _buildDeliveryStatusSection(),
               const SizedBox(height: 12),
-              _buildMyOrdersSection(),
+              _buildMyOrdersSection(context),
               const SizedBox(height: 12),
               _buildAiBanner(),
               const SizedBox(height: 12),
@@ -355,7 +356,7 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMyOrdersSection() {
+  Widget _buildMyOrdersSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
@@ -378,11 +379,11 @@ class AccountScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildOrderIcon(Icons.assignment, 'Chờ xác nhận', '1'),
-              _buildOrderIcon(Icons.inventory_2, 'Chờ lấy hàng', '2'),
-              _buildOrderIcon(Icons.local_shipping, 'Đang giao', '1', isHighlight: true),
-              _buildOrderIcon(Icons.rate_review, 'Đánh giá', '5'),
-              _buildOrderIcon(Icons.replay, 'Trả hàng', ''),
+              _buildOrderIcon(context, Icons.assignment, 'Chờ xác nhận', '1', 0),
+              _buildOrderIcon(context, Icons.inventory_2, 'Chờ lấy hàng', '2', 1),
+              _buildOrderIcon(context, Icons.local_shipping, 'Đang giao', '1', 2, isHighlight: true),
+              _buildOrderIcon(context, Icons.rate_review, 'Đánh giá', '5', 3),
+              _buildOrderIcon(context, Icons.replay, 'Trả hàng', '', 4),
             ],
           )
         ],
@@ -390,36 +391,44 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderIcon(IconData icon, String label, String badge, {bool isHighlight = false}) {
-    return Column(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.grey[50], shape: BoxShape.circle),
-              child: Icon(icon, color: isHighlight ? Colors.red : Colors.black87, size: 24),
-            ),
-            if (badge.isNotEmpty)
-              Positioned(
-                right: -4, top: -4,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                  child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                ),
-              )
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(fontSize: 10, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal, color: isHighlight ? Colors.red : Colors.black87),
-          textAlign: TextAlign.center,
-        )
-      ],
+  Widget _buildOrderIcon(BuildContext context, IconData icon, String label, String badge, int tabIndex, {bool isHighlight = false}) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => OrdersScreen(initialTabIndex: tabIndex)),
+        );
+      },
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.grey[50], shape: BoxShape.circle),
+                child: Icon(icon, color: isHighlight ? Colors.red : Colors.black87, size: 24),
+              ),
+              if (badge.isNotEmpty)
+                Positioned(
+                  right: -4, top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  ),
+                )
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal, color: isHighlight ? Colors.red : Colors.black87),
+            textAlign: TextAlign.center,
+          )
+        ],
+      ),
     );
   }
 
