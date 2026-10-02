@@ -118,12 +118,22 @@ function parseAndValidateEnv() {
     process.exit(1)
   }
 
+  // 6. Kiểm tra JWT_SECRET (Bắt buộc, độ dài tối thiểu 32 ký tự, không được để trống hoặc dùng placeholder)
+  const jwtSecret = process.env.JWT_SECRET
+  if (!isValidSecret(jwtSecret) || jwtSecret.trim().length < 32) {
+    console.error(
+      '[Lỗi cấu hình] Biến môi trường JWT_SECRET không hợp lệ (phải có độ dài tối thiểu 32 ký tự và không dùng giá trị mẫu placeholder).',
+    )
+    process.exit(1)
+  }
+
   return Object.freeze({
     port,
     nodeEnv: rawNodeEnv,
     corsOrigins,
     dataApiUrl,
     dataApiKey: dataApiKey.trim(),
+    jwtSecret: jwtSecret.trim(),
   })
 }
 

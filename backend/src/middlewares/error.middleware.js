@@ -1,3 +1,5 @@
+import { DataApiClientError } from '../clients/data.client.js'
+
 /**
  * Middleware xử lý lỗi tập trung cho toàn bộ ứng dụng (Global Error Handler).
  * Express nhận diện middleware xử lý lỗi khi hàm có đúng 4 tham số: (err, req, res, next).
@@ -27,10 +29,21 @@ export function errorHandler(err, req, res, next) {
     })
   }
 
-  // 3. Ghi log mã sự kiện an toàn cho lỗi máy chủ không xác định (tuyệt đối không in err.message hay secret)
+  // 3. Lỗi từ HTTP client gọi dịch vụ Data API nội bộ (502, 503, 504)
+  if (err instanceof DataApiClientError) {
+    return res.status(err.status).json({
+      success: false,
+      message: err.message,
+      error: {
+        code: err.code,
+      },
+    })
+  }
+
+  // 4. Ghi log mã sự kiện an toàn cho lỗi máy chủ không xác định (tuyệt đối không in err.message hay secret)
   console.error('[Backend Error] Event: INTERNAL_SERVER_ERROR')
 
-  // 4. Lỗi máy chủ không xác định (Internal Server Error)
+  // 5. Lỗi máy chủ không xác định (Internal Server Error)
   return res.status(500).json({
     success: false,
     message: 'Đã xảy ra lỗi máy chủ nội bộ.',

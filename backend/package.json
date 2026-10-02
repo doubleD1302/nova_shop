@@ -9,12 +9,15 @@
     "start": "node src/server.js",
     "smoke": "node scripts/smoke-test.mjs",
     "check": "node scripts/test-integration-ready.mjs",
-    "check:ready": "node scripts/test-integration-ready.mjs"
+    "check:ready": "node scripts/test-integration-ready.mjs",
+    "check:auth": "node scripts/test-integration-auth.mjs",
+    "check:abort": "node scripts/test-abort-regression.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.0.1",
-    "helmet": "^8.0.0"
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.3"
   }
 }

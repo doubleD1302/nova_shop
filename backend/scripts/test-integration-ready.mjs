@@ -105,6 +105,7 @@ async function startBackendProduction(customEnv = {}) {
           ...process.env,
           PORT: String(port),
           NODE_ENV: 'test',
+          JWT_SECRET: 'test_backend_jwt_secret_min_32_characters_long_for_integration',
           ...customEnv,
         },
         stdio: ['ignore', 'pipe', 'pipe'],
