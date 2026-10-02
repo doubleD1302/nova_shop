@@ -1,0 +1,21 @@
+{
+  "name": "shopnova-data-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Data API nội bộ kết nối MySQL cho sàn thương mại điện tử ShopNova",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "smoke": "node scripts/smoke-test.mjs",
+    "check:db": "node scripts/check-db.mjs",
+    "check:timeout": "node scripts/test-timeout-hang.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "helmet": "^8.0.0",
+    "mysql2": "^3.12.0",
+    "sequelize": "^6.37.5"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "shopnova-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend API cho sàn thương mại điện tử ShopNova",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "smoke": "node scripts/smoke-test.mjs",
+    "check": "node scripts/test-integration-ready.mjs",
+    "check:ready": "node scripts/test-integration-ready.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1",
+    "helmet": "^8.0.0"
+  }
+}
