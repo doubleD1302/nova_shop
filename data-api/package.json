@@ -12,6 +12,7 @@
     "check:timeout": "node scripts/test-timeout-hang.mjs"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "express": "^5.0.1",
     "helmet": "^8.0.0",

@@ -113,6 +113,79 @@ function makeSelectResultPackets(startSeq = 1) {
   return Buffer.concat(packets)
 }
 
+/**
+ * Tạo gói tin ERR Packet chuẩn của MySQL
+ */
+function makeErrPacket(errorCode = 1054, sqlState = '42S22', errorMessage = "Unknown column 'timeout' in 'field list'", seq = 1) {
+  const parts = []
+  parts.push(Buffer.from([0xff])) // ERR packet marker
+  const codeBuf = Buffer.alloc(2)
+  codeBuf.writeUInt16LE(errorCode, 0)
+  parts.push(codeBuf)
+  parts.push(Buffer.from('#' + sqlState, 'ascii'))
+  parts.push(Buffer.from(errorMessage, 'utf8'))
+  return makePacket(Buffer.concat(parts), seq)
+}
+
+/**
+ * Tạo gói tin Result Set chuẩn cho truy vấn SELECT thông tin user từ bảng users
+ */
+function makeAuthProfileResultPackets(userId = '1', startSeq = 1) {
+  const packets = []
+  const columns = ['id', 'username', 'full_name', 'email', 'phone', 'avatar_url', 'role', 'status', 'shop_id']
+  packets.push(makePacket(Buffer.from([columns.length]), startSeq++))
+
+  for (const col of columns) {
+    const colDef = []
+    const writeLenStr = (s) => {
+      const b = Buffer.from(s, 'utf8')
+      colDef.push(Buffer.from([b.length]))
+      colDef.push(b)
+    }
+    writeLenStr('def')
+    writeLenStr('')
+    writeLenStr('')
+    writeLenStr('')
+    writeLenStr(col)
+    writeLenStr(col)
+    colDef.push(Buffer.from([0x0c]))
+    const charset = Buffer.alloc(2)
+    charset.writeUInt16LE(33, 0) // utf8
+    colDef.push(charset)
+    const colLen = Buffer.alloc(4)
+    colLen.writeUInt32LE(255, 0)
+    colDef.push(colLen)
+    colDef.push(Buffer.from([0xfd])) // VAR_STRING
+    const flags = Buffer.alloc(2)
+    flags.writeUInt16LE(0, 0)
+    colDef.push(flags)
+    colDef.push(Buffer.from([0x00]))
+    packets.push(makePacket(Buffer.concat(colDef), startSeq++))
+  }
+
+  // Intermediate EOF
+  packets.push(makePacket(Buffer.from([0xfe, 0x00, 0x00, 0x02, 0x00]), startSeq++))
+
+  // Row packet: user buyer1
+  const rowVals = [String(userId), 'buyer1', 'Người Mua 1', 'buyer1@shopnova.vn', '0901234567', null, 'buyer', 'active', null]
+  const rowBufs = []
+  for (const val of rowVals) {
+    if (val === null) {
+      rowBufs.push(Buffer.from([0xfb])) // NULL marker
+    } else {
+      const b = Buffer.from(val, 'utf8')
+      rowBufs.push(Buffer.from([b.length]))
+      rowBufs.push(b)
+    }
+  }
+  packets.push(makePacket(Buffer.concat(rowBufs), startSeq++))
+
+  // Final EOF
+  packets.push(makePacket(Buffer.from([0xfe, 0x00, 0x00, 0x02, 0x00]), startSeq++))
+
+  return Buffer.concat(packets)
+}
+
 function getAvailablePort() {
   return new Promise((resolve, reject) => {
     const srv = net.createServer()
@@ -384,6 +457,22 @@ async function runHangTests() {
           socket.write(makeSelectResultPackets(1))
           return
         }
+
+        if (queryText.includes('FROM users')) {
+          stagesReached.add('stage_auth_query_received')
+          if (serverMode === 'hang_auth_query') {
+            stagesReached.add('stage_auth_query_hang')
+            // Cố tình im lặng để driver mysql2 kích hoạt query timeout (PROTOCOL_SEQUENCE_TIMEOUT)
+            return
+          }
+          if (serverMode === 'sql_error_timeout_col') {
+            stagesReached.add('stage_sql_error_sent')
+            socket.write(makeErrPacket(1054, '42S22', "Unknown column 'timeout' in 'field list'", 1))
+            return
+          }
+          socket.write(makeAuthProfileResultPackets('1', 1))
+          return
+        }
       }
     })
   })
@@ -418,6 +507,15 @@ async function runHangTests() {
       const duration = Date.now() - t0
       const data = await res.json()
       return { status: res.status, duration, data }
+    }
+
+    const requestAuthProfile = async (userId = '1') => {
+      const res = await fetch(`${prodService.baseUrl}/internal/v1/users/${userId}/auth-profile`, {
+        headers: { 'x-service-key': serviceKey },
+        signal: AbortSignal.timeout(testTimeoutBudgetMs + 3000),
+      })
+      const data = await res.json().catch(() => null)
+      return { status: res.status, data }
     }
 
     // -----------------------------------------------------------------
@@ -660,16 +758,56 @@ async function runHangTests() {
     }
 
     // -----------------------------------------------------------------
-    // KỊCH BẢN 10: Phục hồi tổng thể
+    // KỊCH BẢN 10: Phục hồi kiểm tra sau kịch bản 9
     // -----------------------------------------------------------------
-    console.log('\n[10/10] Xác nhận service phục hồi hoàn toàn sau toàn bộ các bài test...')
+    console.log('\n[10/13] Xác nhận service phục hồi sau kịch bản 9...')
     serverMode = 'normal'
     stagesReached.clear()
     {
       const { status, data } = await requestReady()
-      assert(status === 200, 'Service production trên CÙNG TIẾN TRÌNH phục hồi hoàn toàn: trả HTTP 200')
+      assert(status === 200, 'Service production trên CÙNG TIẾN TRÌNH phục hồi: trả HTTP 200')
       assert(data.success === true, 'Phản hồi phục hồi có success === true')
       assert(data.data?.database === 'connected', 'Trạng thái CSDL phục hồi thành "connected"')
+    }
+
+    // -----------------------------------------------------------------
+    // KỊCH BẢN 11: [REGRESSION mysql2 QUERY TIMEOUT] SELECT auth/profile bị treo qua endpoint production
+    // -----------------------------------------------------------------
+    console.log('\n[11/13] [Regression mysql2 Query Timeout] SELECT auth-profile bị treo qua endpoint production...')
+    serverMode = 'hang_auth_query'
+    stagesReached.clear()
+    for (let i = 1; i <= 3; i++) {
+      const { status, data } = await requestAuthProfile('1')
+      assert(status === 503, `Lần ${i}: SELECT auth-profile bị treo trả về HTTP 503 đúng hạn`)
+      assert(data?.error?.code === 'DATABASE_UNAVAILABLE', `Lần ${i}: Mã lỗi chuẩn hóa thành DATABASE_UNAVAILABLE`)
+    }
+
+    // -----------------------------------------------------------------
+    // KỊCH BẢN 12: [REGRESSION SQL ERROR] Lỗi ER_BAD_FIELD_ERROR có chữ 'timeout' trong tên cột vẫn trả HTTP 500
+    // -----------------------------------------------------------------
+    console.log('\n[12/13] [Regression SQL Error] Lỗi ER_BAD_FIELD_ERROR có chữ "timeout" vẫn trả HTTP 500...')
+    serverMode = 'sql_error_timeout_col'
+    stagesReached.clear()
+    {
+      const { status, data } = await requestAuthProfile('1')
+      assert(status === 500, 'Lỗi SQL ER_BAD_FIELD_ERROR có chữ timeout trả về HTTP 500')
+      assert(data?.error?.code === 'INTERNAL_SERVER_ERROR', 'Mã lỗi là INTERNAL_SERVER_ERROR (không bị biến thành 503)')
+    }
+
+    // -----------------------------------------------------------------
+    // KỊCH BẢN 13: Thu hồi đúng connection của yêu cầu lỗi, giữ connection khỏe và phục hồi trên cùng tiến trình
+    // -----------------------------------------------------------------
+    console.log('\n[13/13] Thu hồi đúng connection lỗi, giữ connection khỏe và phục hồi trên cùng tiến trình...')
+    serverMode = 'normal'
+    stagesReached.clear()
+    {
+      const readyRes = await requestReady()
+      assert(readyRes.status === 200, 'Endpoint /ready phục hồi thành công trên CÙNG TIẾN TRÌNH (HTTP 200)')
+      assert(readyRes.data?.data?.database === 'connected', 'Trạng thái CSDL phục hồi thành "connected"')
+
+      const authRes = await requestAuthProfile('1')
+      assert(authRes.status === 200, 'Endpoint auth-profile phục hồi thành công trên CÙNG TIẾN TRÌNH (HTTP 200)')
+      assert(authRes.data?.data?.user?.id === '1', 'Dữ liệu auth profile trả về chính xác')
     }
   } finally {
     if (prodService?.child) {

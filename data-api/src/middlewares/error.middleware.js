@@ -1,7 +1,10 @@
+import { isDatabaseUnavailableError } from '../config/database.js'
+
 /**
  * Middleware xử lý lỗi tập trung cho Data API.
  * - Xử lý payload vượt quá giới hạn dung lượng (BODY_TOO_LARGE -> HTTP 413).
  * - Xử lý lỗi phân tích cú pháp JSON body (BAD_JSON -> HTTP 400).
+ * - Xử lý lỗi CSDL không sẵn sàng / timeout (DATABASE_UNAVAILABLE -> HTTP 503).
  * - Xử lý các lỗi ngoại lệ chưa bắt (INTERNAL_SERVER_ERROR -> HTTP 500).
  *
  * Nguyên tắc bảo mật nhật ký (Log Security):
@@ -35,7 +38,19 @@ export function errorHandler(err, req, res, next) {
     })
   }
 
-  // 3. Các lỗi hệ thống khác (500 Internal Server Error)
+  // 3. Lỗi kết nối CSDL hoặc timeout thao tác (503 Service Unavailable)
+  if (isDatabaseUnavailableError(err)) {
+    console.error('[Data API Error] Event: DATABASE_UNAVAILABLE')
+    return res.status(503).json({
+      success: false,
+      message: 'Không thể kết nối đến cơ sở dữ liệu MySQL hoặc thao tác đã quá thời gian xử lý.',
+      error: {
+        code: 'DATABASE_UNAVAILABLE',
+      },
+    })
+  }
+
+  // 4. Các lỗi hệ thống khác (500 Internal Server Error)
   // Chỉ ghi nhận mã sự kiện cố định, tuyệt đối không in err.message/err.sql/parameters/stack
   console.error('[Data API Error] Event: INTERNAL_SERVER_ERROR')
 

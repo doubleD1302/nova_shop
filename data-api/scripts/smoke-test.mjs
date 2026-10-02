@@ -24,6 +24,7 @@ const { spawn } = await import('node:child_process')
 const { default: app } = await import('../src/app.js')
 const { env } = await import('../src/config/env.js')
 const { errorHandler } = await import('../src/middlewares/error.middleware.js')
+const { isDatabaseUnavailableError } = await import('../src/config/database.js')
 
 let passed = 0
 let failed = 0
@@ -349,6 +350,52 @@ async function runSmokeTests() {
     {
       const { exitCode } = await runEnvValidationTest(baseValidTestEnv)
       assert(exitCode === 0, 'Cấu hình test hợp lệ vượt qua thẩm định khởi động (exit code 0)')
+    }
+
+    // -------------------------------------------------------------
+    // 4. Kiểm tra phân loại lỗi isDatabaseUnavailableError (Mục 3)
+    // -------------------------------------------------------------
+    console.log('\n--- Kiểm tra phân loại lỗi isDatabaseUnavailableError ---')
+    {
+      // 4.1 TypeError có chữ 'timeout' trong message -> KHÔNG PHẢI lỗi 503 (trả false)
+      const typeErrorWithTimeout = new TypeError("Cannot read properties of undefined (reading 'timeout')")
+      assert(
+        isDatabaseUnavailableError(typeErrorWithTimeout) === false,
+        'TypeError có chữ timeout trong message trả về false (không xem là 503)',
+      )
+
+      // 4.2 Lỗi SQL thiếu cột / sai cú pháp có tên cột là 'timeout' -> KHÔNG PHẢI lỗi 503 (trả false)
+      const sqlErrorWithTimeoutCol = {
+        name: 'SequelizeDatabaseError',
+        code: 'ER_BAD_FIELD_ERROR',
+        message: "Unknown column 'timeout' in 'field list'",
+      }
+      assert(
+        isDatabaseUnavailableError(sqlErrorWithTimeoutCol) === false,
+        'Lỗi SQL ER_BAD_FIELD_ERROR có chữ timeout trả về false (không xem là 503)',
+      )
+
+      // 4.3 SyntaxError có chữ 'deadline' trong message -> KHÔNG PHẢI lỗi 503 (trả false)
+      const syntaxErrorWithDeadline = new SyntaxError('Unexpected token in deadline parser')
+      assert(
+        isDatabaseUnavailableError(syntaxErrorWithDeadline) === false,
+        'SyntaxError có chữ deadline trả về false (không xem là 503)',
+      )
+
+      // 4.4 Các mã lỗi connection / acquire / timeout driver chuẩn -> LÀ lỗi 503 (trả true)
+      assert(isDatabaseUnavailableError({ code: 'DATABASE_UNAVAILABLE' }) === true, 'Mã DATABASE_UNAVAILABLE trả về true')
+      assert(isDatabaseUnavailableError({ code: 'ETIMEDOUT' }) === true, 'Mã ETIMEDOUT trả về true')
+      assert(isDatabaseUnavailableError({ code: 'ECONNREFUSED' }) === true, 'Mã ECONNREFUSED trả về true')
+      assert(isDatabaseUnavailableError({ code: 'ECONNRESET' }) === true, 'Mã ECONNRESET trả về true')
+      assert(isDatabaseUnavailableError({ code: 'PROTOCOL_CONNECTION_LOST' }) === true, 'Mã PROTOCOL_CONNECTION_LOST trả về true')
+      assert(isDatabaseUnavailableError({ code: 'PROTOCOL_SEQUENCE_TIMEOUT' }) === true, 'Mã PROTOCOL_SEQUENCE_TIMEOUT (mysql2 query timeout) trả về true')
+      assert(isDatabaseUnavailableError({ code: 'ER_CON_COUNT_ERROR' }) === true, 'Mã ER_CON_COUNT_ERROR trả về true')
+      assert(isDatabaseUnavailableError({ code: 'RESOURCE_REQUEST_TIMEOUT' }) === true, 'Mã RESOURCE_REQUEST_TIMEOUT trả về true')
+
+      // 4.5 Các class lỗi Sequelize Connection / Timeout chuẩn -> LÀ lỗi 503 (trả true)
+      assert(isDatabaseUnavailableError({ name: 'SequelizeConnectionError' }) === true, 'SequelizeConnectionError trả về true')
+      assert(isDatabaseUnavailableError({ name: 'SequelizeConnectionTimedOutError' }) === true, 'SequelizeConnectionTimedOutError trả về true')
+      assert(isDatabaseUnavailableError({ name: 'SequelizeTimeoutError' }) === true, 'SequelizeTimeoutError trả về true')
     }
   } finally {
     // Đảm bảo đóng server kiểm thử giải phóng socket
