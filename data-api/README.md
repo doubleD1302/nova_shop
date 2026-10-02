@@ -27,18 +27,25 @@ MySQL 8.4 Server (Port 3306)
 - **Mục đích:** Đóng vai trò tầng truy xuất dữ liệu độc lập, tách biệt Backend nghiệp vụ khỏi kết nối trực tiếp vào CSDL MySQL.
 - **Bảo mật dịch vụ:** Mọi endpoint `/internal/v1/*` bắt buộc phải kèm header `x-service-key` khớp với `DATA_API_KEY`.
 - **An toàn CSDL:** Chỉ mở các endpoint nghiệp vụ cố định đã được thiết kế; tuyệt đối không mở endpoint nhận câu lệnh SQL tùy ý.
-- **Trạng thái:** Các endpoint hệ thống (`health`, `ready`) đã **implemented** và kiểm chứng toàn diện (hoàn thiện quyền sở hữu connection theo vòng đời và thu hồi các kết nối pool đang khởi tạo trong DB-002-R4); client Backend (`backend/src/clients/data.client.js`) đã kết nối và bổ sung readiness cho Backend trong DB-003; các endpoint nghiệp vụ (catalog, shops, orders...) vẫn ở trạng thái **planned** (sẽ triển khai từ BE-003 / BE-004).
+- **Trạng thái:**
+  - Các endpoint hệ thống (`health`, `ready`) đã **implemented** và kiểm chứng toàn diện (hoàn thiện quyền sở hữu connection theo vòng đời và thu hồi các kết nối pool đang khởi tạo trong DB-002-R4).
+  - Client Backend (`backend/src/clients/data.client.js`) đã kết nối và bổ sung readiness cho Backend trong DB-003.
+  - Các endpoint xác thực nội bộ BE-003A (`/internal/v1/auth/verify-credentials` và `/internal/v1/users/:userId/auth-profile`) đã **implemented** với bcrypt so sánh bất đồng bộ, dummy hash chống timing attack, giới hạn mật khẩu 72 bytes và truy vấn có tham số an toàn qua helper `executeWithConnection`.
+  - Các endpoint nghiệp vụ khác (catalog, shops, orders...) vẫn ở trạng thái **planned** (sẽ triển khai từ BE-003B / BE-004).
 
 ---
 
 ## 2. Cấu hình môi trường và Thư viện phụ thuộc
 
-### 2.1 Phiên bản Dependency thực tế (Khóa theo `package-lock.json`)
-- `sequelize`: **6.37.8** (Sequelize ORM v6)
-- `mysql2`: **3.24.5** (MySQL driver hiệu năng cao cho Node.js)
-- `express`: **5.2.1** (Express framework v5)
-- `dotenv`: **16.6.1**
-- `helmet`: **8.3.0**
+### 2.1 Phiên bản Dependency thực tế (Đối chiếu giữa khai báo và lockfile)
+- `sequelize`: Khai báo `^6.37.5` trong `package.json`, khóa chính xác tại **6.37.8** trong `package-lock.json`
+- `mysql2`: Khai báo `^3.12.0` trong `package.json`, khóa chính xác tại **3.24.5** trong `package-lock.json`
+- `express`: **5.0.1** (Express framework v5)
+- `bcryptjs`: **3.0.3** (Thư viện băm và so khớp bcrypt an toàn, không phụ thuộc C++ build tool)
+- `dotenv`: **16.4.7**
+- `helmet`: **8.0.0**
+
+> **Quy định quyền CSDL runtime:** Tài khoản `shopnova_data_api@127.0.0.1` chỉ cần quyền `GRANT SELECT` trên CSDL `shopnova_dev.*` cho các endpoint hiện tại (`health`, `ready`, `verify-credentials`, `auth-profile`). Các tác vụ migration schema, nạp seed mẫu hoặc ghi fixture test sử dụng tài khoản bootstrap/fixture riêng có quyền ghi (`INSERT, UPDATE, DELETE`).
 
 ### 2.2 Cấu hình môi trường
 Tạo file `.env` tại thư mục gốc của `data-api/` (tham khảo mẫu tại `.env.example`):
@@ -112,17 +119,23 @@ Mọi yêu cầu đến các route `/internal/v1/*` bắt buộc phải kèm hea
 |---|---|---|---|---|
 | `GET` | `/internal/v1/health` | Bắt buộc `x-service-key` | Kiểm tra tiến trình Data API (Liveness). Không truy vấn CSDL. Vẫn trả 200 ngay cả khi MySQL ngắt kết nối. | `200 OK`<br>`{ "success": true, "message": "...", "data": { "service": "shopnova-data-api", "status": "ok" } }` |
 | `GET` | `/internal/v1/ready` | Bắt buộc `x-service-key` | Kiểm tra kết nối CSDL MySQL (Readiness) với ngân sách thời gian `DB_READINESS_TIMEOUT_MS` (3000ms). | `200 OK` khi CSDL sẵn sàng (`"database": "connected"`).<br>`503 Service Unavailable` khi CSDL lỗi/timeout (`error.code: "DATABASE_UNAVAILABLE"`). |
+| `POST` | `/internal/v1/auth/verify-credentials` | Bắt buộc `x-service-key` | Xác thực đăng nhập: tra cứu MySQL theo username, so sánh mật khẩu bcrypt bất đồng bộ, dùng dummy hash chống timing attack. | `200 OK` khi thông tin hợp lệ (`"user": { ... }`).<br>`401 Unauthorized` (`INVALID_CREDENTIALS`) khi sai user/pass hoặc tài khoản bị khóa (`blocked`). |
+| `GET` | `/internal/v1/users/:userId/auth-profile` | Bắt buộc `x-service-key` | Đọc hồ sơ phục vụ xác thực/phân quyền: lấy role/status hiện tại và shopId nếu có. | `200 OK` (`"user": { ... }`).<br>`404 Not Found` (`USER_NOT_FOUND`) khi không tìm thấy user. |
 
-### Cơ chế Quản lý Quyền Sở Hữu Connection & Deadline Khởi Tạo Pool (DB-002-R4):
-1. **Quản lý quyền sở hữu socket/connection theo vòng đời thực tế (`socketDescriptors`):**
+### Cơ chế Quản lý Quyền Sở Hữu Connection & Helper Database Chung:
+1. **Helper `executeWithConnection(workFn, timeoutMs)` & `executeQuery(sql, values, timeoutMs)`:**
+   - Cung cấp cơ chế thực thi truy vấn an toàn dựa trên cùng một Sequelize pool instance dùng chung.
+   - Quản lý vòng đời connection độc lập cho từng request: connection được acquire từ pool, gắn vào request session hiện tại (`desc.currentSession = session`), chạy truy vấn có tham số và luôn release về pool trong `finally`.
+   - Timeout độc lập cho từng request: một request timeout hoặc bị hủy chỉ đóng socket/connection thuộc sở hữu của request đó, tuyệt đối không ảnh hưởng đến các request khác đang chạy khỏe.
+2. **Quản lý quyền sở hữu socket/connection theo vòng đời thực tế (`socketDescriptors`):**
    - Phân biệt 4 trạng thái rõ ràng: `INITIALIZING` (đang mở TCP/handshake/SET time_zone), `IDLE` (khỏe và rảnh rỗi trong pool), `IN_USE` (được một request cụ thể sử dụng độc quyền), `DESTROYED` (đã đóng).
    - Tách rời ngữ cảnh AsyncLocalStorage lúc tạo socket khỏi quyền sở hữu connection thực tế. Khi pool cấp connection cho Request B, nó được gỡ khỏi session cũ trước khi gắn cho B (`desc.currentSession = sessionB`). Khi release về pool, xóa quyền sở hữu của request (`currentSession = null`, `state = 'IDLE'`). Callback/timer cũ không thể hủy connection đã chuyển giao cho request khác.
-2. **Deadline khởi tạo độc lập cho mọi socket mới:** Gán `initTimer` độc lập ngay khi `net.connect()`, bao trùm toàn bộ giai đoạn TCP, handshake và câu lệnh `SET time_zone`. Giải phóng timer và chuyển sang `IDLE` ngay khi hook `afterConnect` chạy xong. Khi quá hạn, socket lập tức bị hủy để giải phóng slot cho pool.
-3. **Thu hồi hàng đợi acquire (`_pendingAcquires`) và socket bỏ rơi:**
+3. **Deadline khởi tạo độc lập cho mọi socket mới:** Gán `initTimer` độc lập ngay khi `net.connect()`, bao trùm toàn bộ giai đoạn TCP, handshake và câu lệnh `SET time_zone`. Giải phóng timer và chuyển sang `IDLE` ngay khi hook `afterConnect` chạy xong. Khi quá hạn, socket lập tức bị hủy để giải phóng slot cho pool.
+4. **Thu hồi hàng đợi acquire (`_pendingAcquires`) và socket bỏ rơi:**
    - Khi một request timeout, `session.deferred` lập tức bị loại bỏ khỏi `pool._pendingAcquires` và `reject()` để ngăn pool tự bổ sung connection mới vô tận sau khi request đã chết. Hủy các socket `INITIALIZING` bị bỏ rơi nếu không còn request nào khác đang đợi.
    - *Lưu ý kỹ thuật:* Pool kết nối thực tế trong Sequelize 6 là `sequelize-pool` (không phải `generic-pool`). Cơ chế dọn dẹp hàng đợi readiness đang tương tác với API nội bộ `_pendingAcquires` của `sequelize-pool`. Do đó, cần giữ nguyên lockfile (`package-lock.json`) và bắt buộc chạy lại toàn bộ test regression (`check:timeout`) trước khi nâng cấp các dependency liên quan.
-4. **Ngân sách Master Deadline duy nhất bao trùm toàn bộ:** Một master timer `deadline = Date.now() + timeoutMs` bao trùm toàn bộ chuỗi: acquire từ pool, query ping và release connection. Query ping lấy thời gian còn lại (`remainingTime = Math.max(50, deadline - Date.now())`), không bị cộng dồn.
-5. **Giữ nguyên một Sequelize/Pool dùng chung:** Cố định `databaseVersion: '8.4.4'`, không hủy toàn bộ pool hoặc tạo pool riêng mỗi request, đảm bảo phục hồi ngay về `200 OK` trên cùng một tiến trình khi transport hoạt động bình thường trở lại.
+5. **Ngân sách Master Deadline duy nhất bao trùm toàn bộ:** Một master timer `deadline = Date.now() + timeoutMs` bao trùm toàn bộ chuỗi: acquire từ pool, query ping và release connection. Query ping lấy thời gian còn lại (`remainingTime = Math.max(50, deadline - Date.now())`), không bị cộng dồn.
+6. **Giữ nguyên một Sequelize/Pool dùng chung:** Cố định `databaseVersion: '8.4.4'`, không hủy toàn bộ pool hoặc tạo pool riêng mỗi request, đảm bảo phục hồi ngay về `200 OK` trên cùng một tiến trình khi transport hoạt động bình thường trở lại.
 
 ### Quy chuẩn mã lỗi hệ thống:
 - `400 BAD_JSON`: JSON body sai cú pháp.
