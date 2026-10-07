@@ -63,6 +63,12 @@ DB_NAME=shopnova_dev
 DB_USER=shopnova_data_api
 DB_PASSWORD=
 
+# Cấu hình kết nối bảo mật TLS/SSL (cho Aiven MySQL hoặc nhà cung cấp đám mây)
+# DB_SSL_ENABLED: chỉ nhận true hoặc false, mặc định false (khi false, kết nối MySQL local thông thường)
+DB_SSL_ENABLED=false
+# DB_SSL_CA: đường dẫn file chứng chỉ CA định dạng PEM (bắt buộc, tồn tại và hợp lệ khi DB_SSL_ENABLED=true)
+DB_SSL_CA=
+
 # Khóa xác thực dịch vụ nội bộ (giữa Backend và Data API)
 DATA_API_KEY=
 
@@ -75,6 +81,8 @@ DB_READINESS_TIMEOUT_MS=3000
 > **Lưu ý bảo mật:**
 > - Tuyệt đối không commit file `.env` thật lên Git. File này đã được khai báo trong `.gitignore`.
 > - Các biến `DB_PASSWORD` và `DATA_API_KEY` là bắt buộc. Hệ thống chặn các chuỗi rỗng, chuỗi chỉ chứa khoảng trắng hoặc các placeholder mẫu như `your_db_password_here`, `your_service_key_here`.
+> - Biến `DB_SSL_ENABLED` chỉ chấp nhận giá trị nghiêm ngặt là `true` hoặc `false` (không nhận `yes`, `1` hay chuỗi tùy ý). Khi bật `DB_SSL_ENABLED=true`, yêu cầu `DB_SSL_CA` phải trỏ tới file chứng chỉ CA tồn tại, đọc được và có nội dung PEM hợp lệ.
+> - Cấu hình SSL cho Sequelize/mysql2 luôn bật `rejectUnauthorized: true` và `verifyIdentity: true` để ngăn chặn tấn công Man-in-the-Middle. Khi tắt SSL (`DB_SSL_ENABLED=false`), hệ thống giữ nguyên kết nối local không dùng TLS.
 > - Biến `DB_READINESS_TIMEOUT_MS` nếu cấu hình `>= 5000` sẽ bị validator từ chối ngay lập tức lúc khởi động.
 > - Khi thiếu hoặc sai cấu hình, tiến trình dừng ngay lập tức và chỉ in tên biến môi trường bị lỗi, tuyệt đối không in giá trị secret ra màn hình/log.
 
@@ -127,10 +135,12 @@ Mọi yêu cầu đến các route `/internal/v1/*` bắt buộc phải kèm hea
    - Cung cấp cơ chế thực thi truy vấn an toàn dựa trên cùng một Sequelize pool instance dùng chung.
    - Quản lý vòng đời connection độc lập cho từng request: connection được acquire từ pool, gắn vào request session hiện tại (`desc.currentSession = session`), chạy truy vấn có tham số và luôn release về pool trong `finally`.
    - Timeout độc lập cho từng request: một request timeout hoặc bị hủy chỉ đóng socket/connection thuộc sở hữu của request đó, tuyệt đối không ảnh hưởng đến các request khác đang chạy khỏe.
-2. **Quản lý quyền sở hữu socket/connection theo vòng đời thực tế (`socketDescriptors`):**
-   - Phân biệt 4 trạng thái rõ ràng: `INITIALIZING` (đang mở TCP/handshake/SET time_zone), `IDLE` (khỏe và rảnh rỗi trong pool), `IN_USE` (được một request cụ thể sử dụng độc quyền), `DESTROYED` (đã đóng).
+2. **Quản lý quyền sở hữu socket/connection theo vòng đời thực tế (`socketDescriptors` & `configDescriptors`):**
+   - Phân biệt 4 trạng thái rõ ràng: `INITIALIZING` (đang mở TCP/handshake TLS/SET time_zone), `IDLE` (khỏe và rảnh rỗi trong pool), `IN_USE` (được một request cụ thể sử dụng độc quyền), `DESTROYED` (đã đóng).
+   - Khi bật TLS, driver `mysql2` thay thế stream kết nối ban đầu bằng đối tượng `tls.TLSSocket`. Do đó, hệ thống liên kết descriptor với đối tượng cấu hình ổn định `conn.config` (`opts.config`), cho phép tra cứu descriptor tin cậy cả qua raw socket ban đầu lẫn TLS socket mới tạo sau bắt tay.
+   - Hook `afterConnect` tự động giải phóng `initTimer`, cập nhật tham chiếu `desc.tlsSocket = conn.stream` và chuyển trạng thái sang `IDLE`. Nhờ đó, các kết nối đã khởi tạo thành công được bảo vệ tuyệt đối, không bị timer khởi tạo cũ vô tình hủy nhầm.
    - Tách rời ngữ cảnh AsyncLocalStorage lúc tạo socket khỏi quyền sở hữu connection thực tế. Khi pool cấp connection cho Request B, nó được gỡ khỏi session cũ trước khi gắn cho B (`desc.currentSession = sessionB`). Khi release về pool, xóa quyền sở hữu của request (`currentSession = null`, `state = 'IDLE'`). Callback/timer cũ không thể hủy connection đã chuyển giao cho request khác.
-3. **Deadline khởi tạo độc lập cho mọi socket mới:** Gán `initTimer` độc lập ngay khi `net.connect()`, bao trùm toàn bộ giai đoạn TCP, handshake và câu lệnh `SET time_zone`. Giải phóng timer và chuyển sang `IDLE` ngay khi hook `afterConnect` chạy xong. Khi quá hạn, socket lập tức bị hủy để giải phóng slot cho pool.
+3. **Deadline khởi tạo độc lập cho mọi socket mới:** Gán `initTimer` độc lập ngay khi `net.connect()`, bao trùm toàn bộ giai đoạn TCP, handshake TLS và câu lệnh `SET time_zone`. Giải phóng timer và chuyển sang `IDLE` ngay khi hook `afterConnect` chạy xong. Khi quá hạn, socket lập tức bị hủy để giải phóng slot cho pool.
 4. **Thu hồi hàng đợi acquire (`_pendingAcquires`) và socket bỏ rơi:**
    - Khi một request timeout, `session.deferred` lập tức bị loại bỏ khỏi `pool._pendingAcquires` và `reject()` để ngăn pool tự bổ sung connection mới vô tận sau khi request đã chết. Hủy các socket `INITIALIZING` bị bỏ rơi nếu không còn request nào khác đang đợi.
    - *Lưu ý kỹ thuật:* Pool kết nối thực tế trong Sequelize 6 là `sequelize-pool` (không phải `generic-pool`). Cơ chế dọn dẹp hàng đợi readiness đang tương tác với API nội bộ `_pendingAcquires` của `sequelize-pool`. Do đó, cần giữ nguyên lockfile (`package-lock.json`) và bắt buộc chạy lại toàn bộ test regression (`check:timeout`) trước khi nâng cấp các dependency liên quan.
@@ -188,4 +198,15 @@ Khởi chạy tiến trình `src/server.js` production thật, kiểm tra tài k
 
 ```cmd
 npm run check:db
+```
+
+### 5.4 Kiểm tra Kết nối TLS & Quản lý Socket (Độc lập, Mock TLS Server)
+
+Kiểm tra toàn diện 3 khía cạnh của kết nối TLS (44 assertions PASS):
+1. **Thẩm định cấu hình TLS trong `env.js`:** Kiểm tra giá trị mặc định của `DB_SSL_ENABLED` (false), ép kiểu boolean nghiêm ngặt, từ chối giá trị không hợp lệ (`yes`, `1`...), yêu cầu file CA tồn tại, đọc được, có nội dung PEM và bảo mật tuyệt đối không in secret.
+2. **Xác minh SSL qua Mock MySQL TLS Server:** Sử dụng cặp khóa và chứng chỉ X.509 tự ký để xác thực handshake TLS, kiểm chứng `conn.stream` là `tls.TLSSocket` đã được mã hóa an toàn (`encrypted: true`), thực thi query SQL thành công qua TLS, và xác minh cơ chế `rejectUnauthorized: true` từ chối ngay lập tức khi CA không khớp server.
+3. **Quản lý kết nối & Vòng đời Socket khi bật TLS:** Tra cứu descriptor qua `conn.config`, hủy `initTimer` khi bắt tay hoàn tất, xác minh timer cũ không hủy kết nối đã sẵn sàng, gán/giải phóng quyền sở hữu request (`currentSession`), và dọn dẹp triệt để cả TLS socket lẫn raw socket khi timeout.
+
+```cmd
+npm run check:tls
 ```

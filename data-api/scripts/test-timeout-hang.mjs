@@ -206,6 +206,7 @@ function startProductionService(customEnv = {}) {
         env: {
           ...process.env,
           PORT: String(httpPort),
+          DB_SSL_ENABLED: 'false',
           ...customEnv,
         },
         stdio: ['ignore', 'pipe', 'pipe'],

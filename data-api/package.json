@@ -9,7 +9,8 @@
     "start": "node src/server.js",
     "smoke": "node scripts/smoke-test.mjs",
     "check:db": "node scripts/check-db.mjs",
-    "check:timeout": "node scripts/test-timeout-hang.mjs"
+    "check:timeout": "node scripts/test-timeout-hang.mjs",
+    "check:tls": "node scripts/test-tls.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

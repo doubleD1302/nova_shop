@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import { EventEmitter } from 'node:events'
+import dotenv from 'dotenv'
 import jwt from 'jsonwebtoken'
 import mysql from '../../data-api/node_modules/mysql2/promise.js'
 import bcrypt from '../../data-api/node_modules/bcryptjs/index.js'
@@ -167,43 +168,54 @@ function stopProcess(child, timeoutMs = 6000) {
  */
 function loadDatabaseTestConfig() {
   const dataApiEnvPath = path.resolve(dataApiRootDir, '.env')
-  let dataApiEnvContent = ''
+  let parsedEnv = {}
   if (fs.existsSync(dataApiEnvPath)) {
-    dataApiEnvContent = fs.readFileSync(dataApiEnvPath, 'utf8')
+    const dataApiEnvContent = fs.readFileSync(dataApiEnvPath, 'utf8')
+    parsedEnv = dotenv.parse(dataApiEnvContent)
   }
 
-  let dbHost = '127.0.0.1'
-  let dbPort = 3306
-  let dataApiUser = 'shopnova_data_api'
-  let dataApiPassword = ''
+  const dbHost = process.env.DB_HOST || parsedEnv.DB_HOST || '127.0.0.1'
+  const dbPort = Number(process.env.DB_PORT || parsedEnv.DB_PORT) || 3306
+  const dataApiUser = process.env.DATA_API_DB_USER || process.env.DB_USER || parsedEnv.DB_USER || 'shopnova_data_api'
+  const resolvedDataApiPassword = process.env.DATA_API_DB_PASSWORD || process.env.DB_PASSWORD || parsedEnv.DB_PASSWORD || ''
 
-  for (const line of dataApiEnvContent.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    const eqIdx = trimmed.indexOf('=')
-    if (eqIdx === -1) continue
-    const key = trimmed.slice(0, eqIdx).trim()
-    const val = trimmed.slice(eqIdx + 1).trim()
-    if (key === 'DB_HOST') dbHost = val
-    if (key === 'DB_PORT') dbPort = Number(val)
-    if (key === 'DB_USER') dataApiUser = val
-    if (key === 'DB_PASSWORD') dataApiPassword = val
+  const rawSsl = (process.env.DB_SSL_ENABLED ?? parsedEnv.DB_SSL_ENABLED ?? 'false').trim().toLowerCase()
+  const sslEnabled = rawSsl === 'true'
+
+  const caPath = process.env.DB_SSL_CA ?? parsedEnv.DB_SSL_CA ?? ''
+  let ssl = undefined
+  let resolvedCaPath = null
+  if (sslEnabled) {
+    if (!caPath) {
+      throw new Error('THIẾU CẤU HÌNH BẮT BUỘC: DB_SSL_ENABLED=true nhưng thiếu DB_SSL_CA trong .env hoặc môi trường.')
+    }
+    resolvedCaPath = path.isAbsolute(caPath) ? caPath : path.resolve(dataApiRootDir, caPath)
+    if (!fs.existsSync(resolvedCaPath)) {
+      throw new Error(`FILE CHỨNG CHỈ KHÔNG TỒN TẠI: DB_SSL_CA không tồn tại tại đường dẫn: ${resolvedCaPath}`)
+    }
+    const caContent = fs.readFileSync(resolvedCaPath, 'utf8')
+    ssl = {
+      ca: caContent,
+      rejectUnauthorized: true,
+      verifyIdentity: true,
+    }
   }
 
   const testDbName = process.env.TEST_DB_NAME || 'shopnova_auth_test'
   const fixtureUser = process.env.TEST_FIXTURE_USER || process.env.FIXTURE_DB_USER || 'shopnova_fixture'
   const fixturePassword = process.env.TEST_FIXTURE_PASSWORD || process.env.FIXTURE_DB_PASSWORD || process.env.TEST_DB_PASSWORD
 
-  const resolvedDataApiPassword = process.env.DATA_API_DB_PASSWORD || process.env.DB_PASSWORD || dataApiPassword
-
   return {
-    host: process.env.DB_HOST || dbHost,
-    port: Number(process.env.DB_PORT) || dbPort,
+    host: dbHost,
+    port: dbPort,
     database: testDbName,
     fixtureUser,
     fixturePassword,
-    dataApiUser: process.env.DATA_API_DB_USER || dataApiUser,
+    dataApiUser,
     dataApiPassword: resolvedDataApiPassword,
+    sslEnabled,
+    caPath: resolvedCaPath || caPath,
+    ssl,
   }
 }
 
@@ -473,6 +485,7 @@ async function runAllAuthTests() {
         user: dbConfig.dataApiUser,
         password: dbConfig.dataApiPassword,
         database: 'shopnova_dev',
+        ssl: dbConfig.ssl,
       })
       const [rows] = await devConn.query('SELECT COUNT(*) AS userCount FROM users')
       const [tableStatus] = await devConn.query(
@@ -501,6 +514,7 @@ async function runAllAuthTests() {
       database: dbConfig.database,
       supportBigNumbers: true,
       bigNumberStrings: true,
+      ssl: dbConfig.ssl,
     })
 
     // Dọn dẹp trước nếu còn dữ liệu sót từ lần chạy trước
@@ -599,6 +613,10 @@ async function runAllAuthTests() {
       DB_USER: dbConfig.dataApiUser,
       DB_PASSWORD: dbConfig.dataApiPassword,
       DATA_API_KEY: TEST_SERVICE_KEY,
+      DB_HOST: dbConfig.host,
+      DB_PORT: String(dbConfig.port),
+      DB_SSL_ENABLED: dbConfig.sslEnabled ? 'true' : 'false',
+      ...(dbConfig.sslEnabled && dbConfig.caPath ? { DB_SSL_CA: dbConfig.caPath } : {}),
     })
     const dataApiPort = dataApiProc.port
     console.log(`  -> Data API đang chạy tại: ${dataApiProc.baseUrl} (PID: ${dataApiProc.child.pid})`)
@@ -1912,6 +1930,10 @@ async function runAllAuthTests() {
       DB_USER: dbConfig.dataApiUser,
       DB_PASSWORD: dbConfig.dataApiPassword,
       DATA_API_KEY: TEST_SERVICE_KEY,
+      DB_HOST: dbConfig.host,
+      DB_PORT: String(dbConfig.port),
+      DB_SSL_ENABLED: dbConfig.sslEnabled ? 'true' : 'false',
+      ...(dbConfig.sslEnabled && dbConfig.caPath ? { DB_SSL_CA: dbConfig.caPath } : {}),
     })
 
     const resRecover = await fetch(`${backendUrl}/api/v1/auth/login`, {
@@ -1979,6 +2001,7 @@ async function runAllAuthTests() {
           user: dbConfig.dataApiUser,
           password: dbConfig.dataApiPassword,
           database: 'shopnova_dev',
+          ssl: dbConfig.ssl,
         })
         const [rows] = await devConn.query('SELECT COUNT(*) AS userCount FROM users')
         const [tableStatus] = await devConn.query(
