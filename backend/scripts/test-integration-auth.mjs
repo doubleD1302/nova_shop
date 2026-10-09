@@ -166,7 +166,7 @@ function stopProcess(child, timeoutMs = 6000) {
  * - TUYỆT ĐỐI TỪ CHỐI CHẠY nếu cấu hình trỏ vào 'shopnova_dev'.
  * - Bỏ mật khẩu hardcode: bắt buộc nhận qua biến môi trường.
  */
-function loadDatabaseTestConfig() {
+function loadDatabaseTestConfig(sourceEnv = process.env) {
   const dataApiEnvPath = path.resolve(dataApiRootDir, '.env')
   let parsedEnv = {}
   if (fs.existsSync(dataApiEnvPath)) {
@@ -174,15 +174,25 @@ function loadDatabaseTestConfig() {
     parsedEnv = dotenv.parse(dataApiEnvContent)
   }
 
-  const dbHost = process.env.DB_HOST || parsedEnv.DB_HOST || '127.0.0.1'
-  const dbPort = Number(process.env.DB_PORT || parsedEnv.DB_PORT) || 3306
-  const dataApiUser = process.env.DATA_API_DB_USER || process.env.DB_USER || parsedEnv.DB_USER || 'shopnova_data_api'
-  const resolvedDataApiPassword = process.env.DATA_API_DB_PASSWORD || process.env.DB_PASSWORD || parsedEnv.DB_PASSWORD || ''
+  const dbHost = sourceEnv.DB_HOST || parsedEnv.DB_HOST || '127.0.0.1'
+  const dbPort = Number(sourceEnv.DB_PORT || parsedEnv.DB_PORT) || 3306
+  const dataApiUser = sourceEnv.DATA_API_DB_USER || sourceEnv.DB_USER || parsedEnv.DB_USER || 'shopnova_data_api'
+  const resolvedDataApiPassword = sourceEnv.DATA_API_DB_PASSWORD || sourceEnv.DB_PASSWORD || parsedEnv.DB_PASSWORD || ''
 
-  const rawSsl = (process.env.DB_SSL_ENABLED ?? parsedEnv.DB_SSL_ENABLED ?? 'false').trim().toLowerCase()
-  const sslEnabled = rawSsl === 'true'
+  const rawSslValue = (sourceEnv.DB_SSL_ENABLED !== undefined && sourceEnv.DB_SSL_ENABLED !== '')
+    ? String(sourceEnv.DB_SSL_ENABLED).trim().toLowerCase()
+    : ((parsedEnv.DB_SSL_ENABLED !== undefined && parsedEnv.DB_SSL_ENABLED !== '')
+      ? String(parsedEnv.DB_SSL_ENABLED).trim().toLowerCase()
+      : 'false')
 
-  const caPath = process.env.DB_SSL_CA ?? parsedEnv.DB_SSL_CA ?? ''
+  if (rawSslValue !== 'true' && rawSslValue !== 'false') {
+    throw new Error(
+      '[Lỗi cấu hình] Biến môi trường DB_SSL_ENABLED không hợp lệ. Chỉ chấp nhận giá trị: "true" hoặc "false".'
+    )
+  }
+  const sslEnabled = rawSslValue === 'true'
+
+  const caPath = sourceEnv.DB_SSL_CA ?? parsedEnv.DB_SSL_CA ?? ''
   let ssl = undefined
   let resolvedCaPath = null
   if (sslEnabled) {
@@ -363,10 +373,27 @@ async function startDataApiProduction(customEnv = {}) {
 async function runAllAuthTests() {
   console.log('=== BẮT ĐẦU KIỂM THỬ TÍCH HỢP TOÀN DIỆN CHO BE-003A-R1 ===\n')
 
+  // 0. Kiểm thử thẩm định cấu hình DB_SSL_ENABLED nhất quán với Data API
+  console.log('[Phần 0: Kiểm thử thẩm định cấu hình DB_SSL_ENABLED]')
+  for (const invalidVal of ['yes', '1', 'tru']) {
+    let rejected = false
+    let errMsg = ''
+    try {
+      loadDatabaseTestConfig({ ...process.env, DB_SSL_ENABLED: invalidVal })
+    } catch (err) {
+      rejected = true
+      errMsg = err.message
+    }
+    assertMock(
+      rejected && errMsg.includes('DB_SSL_ENABLED'),
+      `DB_SSL_ENABLED="${invalidVal}" bị từ chối trước khi mở kết nối hoặc khởi động service`
+    )
+  }
+
   const dbConfig = loadDatabaseTestConfig()
 
   // 1. Kiểm tra cấu hình và từ chối chạy trên shopnova_dev
-  console.log('[Kiểm tra Cấu hình Môi trường]')
+  console.log('\n[Kiểm tra Cấu hình Môi trường]')
   console.log(`  - Target Test Database: ${dbConfig.database}`)
   console.log(`  - Writer (Fixture): ${dbConfig.fixtureUser}`)
   console.log(`  - Reader (Data API): ${dbConfig.dataApiUser}`)

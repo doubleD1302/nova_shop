@@ -5,8 +5,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import os from 'node:os'
 import { Duplex } from 'node:stream'
-import { fileURLToPath } from 'node:url'
-import { Sequelize } from 'sequelize'
+import { spawn } from 'node:child_process'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import Handshake from '../node_modules/mysql2/lib/packets/handshake.js'
 import ClientConstants from '../node_modules/mysql2/lib/constants/client.js'
 
@@ -152,15 +152,9 @@ class SocketDuplex extends Duplex {
     this.rawSocket.on('error', (err) => this.destroy(err))
     this.rawSocket.on('close', () => this.destroy())
   }
-  _read() {
-    this.rawSocket.resume()
-  }
-  _write(chunk, encoding, callback) {
-    this.rawSocket.write(chunk, encoding, callback)
-  }
-  _final(callback) {
-    this.rawSocket.end(callback)
-  }
+  _read() { this.rawSocket.resume() }
+  _write(chunk, encoding, callback) { this.rawSocket.write(chunk, encoding, callback) }
+  _final(callback) { this.rawSocket.end(callback) }
 }
 
 function makePacket(payload, seq = 0) {
@@ -208,6 +202,100 @@ function createSelectResultPackets(startSeq = 1) {
   return Buffer.concat([p1, p2, p3, p4, p5])
 }
 
+function createMockTlsServer(creds) {
+  const serverActiveSockets = new Set()
+  const secureContext = tls.createSecureContext({
+    cert: creds.certPem,
+    key: creds.keyPem,
+  })
+
+  const server = net.createServer((socket) => {
+    serverActiveSockets.add(socket)
+    socket.write(getHandshakePacket())
+
+    socket.once('data', (d) => {
+      const payloadLen = d.readUIntLE(0, 3)
+      const sslReqTotalLen = 4 + payloadLen
+      const leftover = d.length > sslReqTotalLen ? d.subarray(sslReqTotalLen) : null
+
+      const duplex = new SocketDuplex(socket, leftover)
+      const tlsSocket = new tls.TLSSocket(duplex, {
+        isServer: true,
+        secureContext,
+      })
+      serverActiveSockets.add(tlsSocket)
+
+      tlsSocket.on('error', () => {})
+      tlsSocket.on('data', (td) => {
+        const seq = td[3]
+        if (td[4] === 0x03) {
+          // COM_QUERY
+          const queryText = td.subarray(5).toString('utf8')
+          if (queryText.includes('HANG_QUERY')) {
+            // Cố tình treo query, không phản hồi để client kích hoạt deadline timeout
+            return
+          }
+          if (queryText.includes('SET time_zone') || queryText.includes('SELECT VERSION()')) {
+            tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
+          } else if (queryText.includes('SELECT 1+1') || queryText.includes('SELECT 1')) {
+            tlsSocket.write(createSelectResultPackets(seq + 1))
+          } else {
+            tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
+          }
+        } else if (td[4] === 0x01) {
+          // COM_QUIT
+          tlsSocket.end()
+        } else {
+          // Auth response -> Trả OK packet với seq + 1
+          tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
+        }
+      })
+    })
+  })
+
+  return { server, serverActiveSockets }
+}
+
+/**
+ * Khởi chạy worker child process thực thi trực tiếp module runtime database.js
+ */
+function runRuntimeWorkerScript(workerScriptContent, customEnv = {}, tempDir) {
+  return new Promise((resolve, reject) => {
+    const workerFile = path.join(tempDir, `worker-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`)
+    fs.writeFileSync(workerFile, workerScriptContent, 'utf8')
+
+    let stdout = ''
+    let stderr = ''
+    const child = spawn(process.execPath, [workerFile], {
+      cwd: rootDir,
+      env: {
+        ...process.env,
+        ...customEnv,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+
+    const timeout = setTimeout(() => {
+      try { child.kill('SIGKILL') } catch {}
+      reject(new Error(`Worker timeout after 10000ms: ${stderr}`))
+    }, 10000)
+
+    child.on('exit', (code, sig) => {
+      clearTimeout(timeout)
+      try { fs.unlinkSync(workerFile) } catch {}
+      resolve({ code, sig, stdout, stderr })
+    })
+
+    child.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(err)
+    })
+  })
+}
+
 // ============================================================================
 // CHẠY CÁC BÀI KIỂM TRA
 // ============================================================================
@@ -218,17 +306,27 @@ async function runAllTlsTests() {
   const validCaPath = path.join(tempDir, 'valid-ca.pem')
   const emptyCaPath = path.join(tempDir, 'empty-ca.pem')
   const invalidContentCaPath = path.join(tempDir, 'invalid-ca.pem')
+  const missingEndCaPath = path.join(tempDir, 'missing-end-ca.pem')
+  const bundleCaPath = path.join(tempDir, 'bundle-ca.pem')
+  const untrustedCaPath = path.join(tempDir, 'untrusted-ca.pem')
 
   const serverCreds = generateSelfSignedCert({ commonName: '127.0.0.1', altNames: ['127.0.0.1', 'localhost'] })
   const otherUntrustedCreds = generateSelfSignedCert({ commonName: 'other.domain.test', altNames: ['other.domain.test'] })
+  const secondValidCreds = generateSelfSignedCert({ commonName: 'ca2.shopnova.test', altNames: ['ca2.shopnova.test'] })
+  const mismatchServerCreds = generateSelfSignedCert({ commonName: 'other.domain.shopnova', altNames: ['other.domain.shopnova'] })
+  const mismatchCaPath = path.join(tempDir, 'mismatch-ca.pem')
+  fs.writeFileSync(mismatchCaPath, mismatchServerCreds.certPem, 'utf8')
 
   fs.writeFileSync(validCaPath, serverCreds.certPem, 'utf8')
   fs.writeFileSync(emptyCaPath, '', 'utf8')
-  fs.writeFileSync(invalidContentCaPath, 'NOT A CERTIFICATE CONTENT', 'utf8')
+  fs.writeFileSync(invalidContentCaPath, '-----BEGIN CERTIFICATE-----\nNOT_BASE64_CERT_CONTENT_HERE\n-----END CERTIFICATE-----\n', 'utf8')
+  fs.writeFileSync(missingEndCaPath, serverCreds.certPem.replace('-----END CERTIFICATE-----', ''), 'utf8')
+  fs.writeFileSync(bundleCaPath, `${serverCreds.certPem}\n${secondValidCreds.certPem}`, 'utf8')
+  fs.writeFileSync(untrustedCaPath, otherUntrustedCreds.certPem, 'utf8')
 
   try {
     // ------------------------------------------------------------------------
-    // PHẦN 1: Kiểm thử thẩm định cấu hình TLS (Config Validation)
+    // PHẦN 1: Kiểm thử thẩm định cấu hình TLS (Config Validation) trong env.js
     // ------------------------------------------------------------------------
     console.log('[PHẦN 1: Kiểm thử thẩm định cấu hình TLS trong env.js]')
     const { parseAndValidateEnv } = await import('../src/config/env.js')
@@ -262,9 +360,9 @@ async function runAllTlsTests() {
       assert(parsedUpper.dbSslEnabled === false, 'DB_SSL_ENABLED="FALSE" được parse thành boolean false')
     }
 
-    // 1.3 DB_SSL_ENABLED nhận giá trị không hợp lệ (ví dụ: "yes", "1", "invalid") -> ném lỗi
+    // 1.3 DB_SSL_ENABLED nhận giá trị không hợp lệ (yes, 1, tru, enabled, invalid_val) -> ném lỗi
     {
-      for (const val of ['yes', '1', 'enabled', 'invalid_val', 'true_false']) {
+      for (const val of ['yes', '1', 'tru', 'enabled', 'invalid_val', 'true_false']) {
         let errCaught = null
         try {
           parseAndValidateEnv({ ...baseEnv, DB_SSL_ENABLED: val }, false)
@@ -303,7 +401,7 @@ async function runAllTlsTests() {
       assert(errNonExistent?.message?.includes('DB_SSL_CA'), 'Thông báo lỗi chỉ rõ biến DB_SSL_CA khi file không tồn tại')
     }
 
-    // 1.6 DB_SSL_CA trỏ đến file rỗng hoặc không có định dạng PEM -> ném lỗi
+    // 1.6 DB_SSL_CA trỏ đến file rỗng -> ném lỗi
     {
       let errEmpty = null
       try {
@@ -312,17 +410,45 @@ async function runAllTlsTests() {
         errEmpty = e
       }
       assert(errEmpty !== null, 'DB_SSL_CA trỏ đến file rỗng bị từ chối')
+    }
 
-      let errInvalidPem = null
+    // 1.7 DB_SSL_CA thiếu thẻ END CERTIFICATE -> ném lỗi
+    {
+      let errMissingEnd = null
+      try {
+        parseAndValidateEnv({ ...baseEnv, DB_SSL_ENABLED: 'true', DB_SSL_CA: missingEndCaPath }, false)
+      } catch (e) {
+        errMissingEnd = e
+      }
+      assert(errMissingEnd !== null, 'DB_SSL_CA thiếu thẻ END CERTIFICATE bị từ chối')
+      assert(errMissingEnd?.message?.includes('DB_SSL_CA'), 'Thông báo lỗi chỉ rõ biến DB_SSL_CA khi thiếu thẻ kết thúc')
+    }
+
+    // 1.8 DB_SSL_CA có nội dung không parse được bằng X.509 (chứng chỉ hỏng) -> ném lỗi an toàn
+    {
+      let errCorrupted = null
       try {
         parseAndValidateEnv({ ...baseEnv, DB_SSL_ENABLED: 'true', DB_SSL_CA: invalidContentCaPath }, false)
       } catch (e) {
-        errInvalidPem = e
+        errCorrupted = e
       }
-      assert(errInvalidPem !== null, 'DB_SSL_CA không chứa -----BEGIN CERTIFICATE----- bị từ chối')
+      assert(errCorrupted !== null, 'DB_SSL_CA có nội dung chứng chỉ X.509 bị hỏng bị từ chối')
+      assert(errCorrupted?.message?.includes('DB_SSL_CA'), 'Thông báo lỗi chỉ rõ biến DB_SSL_CA khi chứng chỉ hỏng')
     }
 
-    // 1.7 DB_SSL_ENABLED=true với file CA hợp lệ -> parse thành công
+    // 1.9 DB_SSL_ENABLED=true với file CA bundle hợp lệ (2 chứng chỉ) -> parse thành công
+    {
+      const parsedBundle = parseAndValidateEnv({ ...baseEnv, DB_SSL_ENABLED: 'true', DB_SSL_CA: bundleCaPath }, false)
+      assert(parsedBundle.dbSslEnabled === true, 'DB_SSL_ENABLED=true với CA bundle được parse thành boolean true')
+      assert(parsedBundle.dbSslCa === bundleCaPath, 'dbSslCa lưu đúng đường dẫn file CA bundle')
+      assert(
+        typeof parsedBundle.dbSslCaContent === 'string' &&
+        parsedBundle.dbSslCaContent.includes(secondValidCreds.certPem.trim()),
+        'dbSslCaContent đọc đầy đủ nội dung CA bundle hợp lệ'
+      )
+    }
+
+    // 1.10 DB_SSL_ENABLED=true với file CA đơn hợp lệ -> parse thành công
     {
       const parsed = parseAndValidateEnv({ ...baseEnv, DB_SSL_ENABLED: 'true', DB_SSL_CA: validCaPath }, false)
       assert(parsed.dbSslEnabled === true, 'DB_SSL_ENABLED=true được parse thành boolean true')
@@ -331,339 +457,224 @@ async function runAllTlsTests() {
     }
 
     // ------------------------------------------------------------------------
-    // PHẦN 2: Kiểm thử xác minh SSL qua Mock MySQL TLS Server
+    // PHẦN 2: Kiểm thử xác minh TLS và Module Runtime Data API (database.js)
     // ------------------------------------------------------------------------
-    console.log('\n[PHẦN 2: Kiểm thử xác minh SSL qua Mock MySQL TLS Server]')
+    console.log('\n[PHẦN 2: Kiểm thử Module Runtime Data API (src/config/database.js) qua Mock MySQL TLS Server]')
 
-    let mockTlsServer = null
-    const serverActiveSockets = new Set()
-    let mockTlsPort = 0
-
-    const secureContext = tls.createSecureContext({
-      cert: serverCreds.certPem,
-      key: serverCreds.keyPem,
-    })
-
-    mockTlsServer = net.createServer((socket) => {
-      serverActiveSockets.add(socket)
-      socket.write(getHandshakePacket())
-
-      socket.once('data', (d) => {
-        const payloadLen = d.readUIntLE(0, 3)
-        const sslReqTotalLen = 4 + payloadLen
-        const leftover = d.length > sslReqTotalLen ? d.subarray(sslReqTotalLen) : null
-
-        const duplex = new SocketDuplex(socket, leftover)
-        const tlsSocket = new tls.TLSSocket(duplex, {
-          isServer: true,
-          secureContext,
-        })
-        serverActiveSockets.add(tlsSocket)
-
-        tlsSocket.on('error', () => {})
-        tlsSocket.on('data', (td) => {
-          const seq = td[3]
-          if (td[4] === 0x03) {
-            // COM_QUERY
-            const queryText = td.subarray(5).toString('utf8')
-            if (queryText.includes('SET time_zone') || queryText.includes('SELECT VERSION()')) {
-              tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
-            } else if (queryText.includes('SELECT 1+1')) {
-              tlsSocket.write(createSelectResultPackets(seq + 1))
-            } else {
-              tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
-            }
-          } else if (td[4] === 0x01) {
-            // COM_QUIT
-            tlsSocket.end()
-          } else {
-            // Auth response -> Trả OK packet với seq + 1
-            tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
-          }
-        })
-      })
-    })
-
+    // Khởi động Mock MySQL TLS Server chính (cấp chứng chỉ hợp lệ cho 127.0.0.1)
+    const { server: mockTlsServer, serverActiveSockets } = createMockTlsServer(serverCreds)
     await new Promise((resolve) => mockTlsServer.listen(0, '127.0.0.1', resolve))
-    mockTlsPort = mockTlsServer.address().port
+    const mockTlsPort = mockTlsServer.address().port
 
-    // 2.1 Kết nối với CA tin cậy và rejectUnauthorized=true, verifyIdentity=true -> Thành công
+    // Khởi động Mock MySQL TLS Server phụ dùng cert mismatch (cấp chứng chỉ cho other.domain.shopnova)
+    const { server: mismatchTlsServer, serverActiveSockets: mismatchSockets } = createMockTlsServer(mismatchServerCreds)
+    await new Promise((resolve) => mismatchTlsServer.listen(0, '127.0.0.1', resolve))
+    const mismatchTlsPort = mismatchTlsServer.address().port
+
+    const dbModuleUrl = pathToFileURL(path.resolve(rootDir, 'src/config/database.js')).href
+
+    const baseWorkerEnv = {
+      DB_HOST: '127.0.0.1',
+      DB_PORT: String(mockTlsPort),
+      DB_NAME: 'shopnova_dev',
+      DB_USER: 'shopnova_data_api',
+      DB_PASSWORD: 'test_db_password_123',
+      DATA_API_KEY: 'test_service_key_456',
+      DB_SSL_ENABLED: 'true',
+      DB_SSL_CA: validCaPath,
+      DB_READINESS_TIMEOUT_MS: '2000',
+      DOTENV_CONFIG_PATH: path.join(tempDir, 'empty.env'),
+    }
+
+    // 2.1 Truy vấn qua TLS thành công trên chính module runtime Data API
     {
-      const seqValidTls = new Sequelize('shopnova_mock', 'user', 'pass', {
-        host: '127.0.0.1',
-        port: mockTlsPort,
-        dialect: 'mysql',
-        timezone: '+00:00',
-        databaseVersion: '8.4.4',
-        logging: false,
-        pool: { max: 1, min: 0, acquire: 3000 },
-        dialectOptions: {
-          connectTimeout: 3000,
-          ssl: {
-            ca: serverCreds.certPem,
-            rejectUnauthorized: true,
-            verifyIdentity: true,
-          },
-        },
-      })
+      const workerCode = `
+import { checkDatabaseReadiness, executeQuery, closeDatabase } from '${dbModuleUrl}'
 
-      let connectSuccess = false
-      let queryResult = null
-      let isTlsSocket = false
-      try {
-        const conn = await seqValidTls.connectionManager.getConnection()
-        connectSuccess = true
-        isTlsSocket = conn.stream instanceof tls.TLSSocket && conn.stream.encrypted === true
-
-        queryResult = await new Promise((resolve, reject) => {
-          conn.query({ sql: 'SELECT 1+1 AS result' }, (err, rows) => {
-            if (err) return reject(err)
-            resolve(rows)
-          })
-        })
-        await seqValidTls.connectionManager.releaseConnection(conn)
-      } finally {
-        await seqValidTls.close().catch(() => {})
-      }
-
-      assert(connectSuccess, 'Kết nối MySQL TLS với CA hợp lệ và rejectUnauthorized=true thành công')
-      assert(isTlsSocket, 'conn.stream là tls.TLSSocket được mã hóa an toàn (encrypted: true)')
-      assert(queryResult && queryResult[0]?.result === 2, 'Thực thi câu truy vấn SQL qua kênh TLS thành công (result: 2)')
+try {
+  const readyResult = await checkDatabaseReadiness()
+  const rows = await executeQuery('SELECT 1+1 AS result')
+  await closeDatabase()
+  if (rows && rows[0]?.result === 2) {
+    console.log('SUCCESS_QUERY_TLS')
+    process.exit(0)
+  }
+  process.exit(2)
+} catch (err) {
+  console.error('ERROR:', err)
+  process.exit(1)
+}
+`
+      const res = await runRuntimeWorkerScript(workerCode, baseWorkerEnv, tempDir)
+      assert(res.code === 0, 'Worker runtime kết thúc thành công với exit code 0')
+      assert(res.stdout.includes('SUCCESS_QUERY_TLS'), 'Truy vấn qua TLS thành công bằng chính module runtime Data API (result: 2)')
     }
 
-    // 2.2 Kết nối với CA không tin cậy -> Bị từ chối ngay lập tức bởi rejectUnauthorized=true
+    // 2.2 Từ chối CA không tin cậy qua chính module runtime Data API
     {
-      const seqUntrustedTls = new Sequelize('shopnova_mock', 'user', 'pass', {
-        host: '127.0.0.1',
-        port: mockTlsPort,
-        dialect: 'mysql',
-        timezone: '+00:00',
-        databaseVersion: '8.4.4',
-        logging: false,
-        pool: { max: 1, min: 0, acquire: 3000 },
-        dialectOptions: {
-          connectTimeout: 3000,
-          ssl: {
-            ca: otherUntrustedCreds.certPem, // Chứng chỉ CA khác, không khớp server!
-            rejectUnauthorized: true,
-            verifyIdentity: true,
-          },
-        },
-      })
+      const workerCodeUntrusted = `
+import { checkDatabaseReadiness, closeDatabase, isDatabaseUnavailableError } from '${dbModuleUrl}'
 
-      let errUntrusted = null
-      try {
-        await seqUntrustedTls.connectionManager.getConnection()
-      } catch (err) {
-        errUntrusted = err
-      } finally {
-        await seqUntrustedTls.close().catch(() => {})
-      }
-
-      assert(errUntrusted !== null, 'Kết nối với CA không tin cậy bị từ chối kết nối')
-      const isSslVerifyError =
-        errUntrusted?.code === 'HANDSHAKE_SSL_ERROR' ||
-        errUntrusted?.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
-        errUntrusted?.message?.includes('self-signed') ||
-        errUntrusted?.message?.includes('certificate')
-      assert(isSslVerifyError, 'Lỗi ném ra là lỗi xác minh chứng chỉ SSL (HANDSHAKE_SSL_ERROR / self-signed cert)')
+try {
+  await checkDatabaseReadiness()
+  await closeDatabase()
+  process.exit(2) // Lẽ ra phải thất bại!
+} catch (err) {
+  await closeDatabase().catch(() => {})
+  const isUnavailable = isDatabaseUnavailableError(err)
+  const isSslHandshake =
+    err.code === 'HANDSHAKE_SSL_ERROR' ||
+    err.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+    (err.message && err.message.toLowerCase().includes('certificate'))
+  if (isUnavailable && isSslHandshake) {
+    console.log('REJECTED_UNTRUSTED_CA')
+    process.exit(0)
+  }
+  console.error('Unexpected error details:', err)
+  process.exit(1)
+}
+`
+      const res = await runRuntimeWorkerScript(workerCodeUntrusted, { ...baseWorkerEnv, DB_SSL_CA: untrustedCaPath }, tempDir)
+      assert(res.code === 0, 'Kết nối với CA không tin cậy bị từ chối bởi rejectUnauthorized: true trên runtime')
+      assert(res.stdout.includes('REJECTED_UNTRUSTED_CA'), 'Lỗi xác minh CA không tin cậy được phân loại chuẩn xác thành DATABASE_UNAVAILABLE')
     }
 
-    // ------------------------------------------------------------------------
-    // PHẦN 3: Kiểm thử Quản lý Kết nối và Vòng đời Socket khi bật TLS trong database.js
-    // ------------------------------------------------------------------------
-    console.log('\n[PHẦN 3: Kiểm thử Quản lý Kết nối và Vòng đời Socket khi bật TLS trong database.js]')
+    // 2.3 Từ chối hostname không khớp qua chính module runtime Data API
+    {
+      const workerCodeMismatch = `
+import { checkDatabaseReadiness, closeDatabase, isDatabaseUnavailableError } from '${dbModuleUrl}'
 
-    // Tái hiện cơ chế database.js với TLS socket stream hook
-    const testDescriptors = new Map()
-    const testConfigDescriptors = new Map()
-    const testActiveSockets = new Set()
-    let connCounter = 1
-
-    function getTestDescriptor(connOrSocket) {
-      if (!connOrSocket) return null
-      if (connOrSocket.config && testConfigDescriptors.has(connOrSocket.config)) {
-        return testConfigDescriptors.get(connOrSocket.config)
-      }
-      if (testConfigDescriptors.has(connOrSocket)) {
-        return testConfigDescriptors.get(connOrSocket)
-      }
-      if (testDescriptors.has(connOrSocket)) {
-        return testDescriptors.get(connOrSocket)
-      }
-      if (connOrSocket.stream && testDescriptors.has(connOrSocket.stream)) {
-        return testDescriptors.get(connOrSocket.stream)
-      }
-      return null
+try {
+  await checkDatabaseReadiness()
+  await closeDatabase()
+  process.exit(2) // Lẽ ra phải thất bại!
+} catch (err) {
+  await closeDatabase().catch(() => {})
+  const isUnavailable = isDatabaseUnavailableError(err)
+  const isAltNameError =
+    err.code === 'ERR_TLS_CERT_ALTNAME_INVALID' ||
+    (err.original && err.original.code === 'ERR_TLS_CERT_ALTNAME_INVALID') ||
+    (err.parent && err.parent.code === 'ERR_TLS_CERT_ALTNAME_INVALID') ||
+    (err.message && (err.message.includes('altnames') || err.message.includes('Hostname') || err.message.includes('does not match')))
+  if (isUnavailable && isAltNameError) {
+    console.log('REJECTED_HOSTNAME_MISMATCH')
+    process.exit(0)
+  }
+  console.error('Unexpected error details for hostname mismatch:', err)
+  process.exit(1)
+}
+`
+      const res = await runRuntimeWorkerScript(workerCodeMismatch, { ...baseWorkerEnv, DB_PORT: String(mismatchTlsPort), DB_SSL_CA: mismatchCaPath }, tempDir)
+      assert(res.code === 0, 'Kết nối bị từ chối khi hostname không khớp cert SAN bởi verifyIdentity: true')
+      assert(res.stdout.includes('REJECTED_HOSTNAME_MISMATCH'), 'Lỗi hostname không khớp (ERR_TLS_CERT_ALTNAME_INVALID) được phân loại chuẩn xác')
     }
 
-    const testTlsSequelize = new Sequelize('shopnova_mock', 'user', 'pass', {
-      host: '127.0.0.1',
-      port: mockTlsPort,
-      dialect: 'mysql',
-      timezone: '+00:00',
-      databaseVersion: '8.4.4',
-      logging: false,
-      pool: { max: 2, min: 0, acquire: 2000, idle: 5000 },
-      dialectOptions: {
-        connectTimeout: 2000,
-        ssl: {
-          ca: serverCreds.certPem,
-          rejectUnauthorized: true,
-          verifyIdentity: true,
-        },
-        stream: (opts) => {
-          const socket = net.connect(opts.config.port, opts.config.host)
-          const connId = connCounter++
-          const desc = {
-            id: connId,
-            config: opts.config,
-            rawSocket: socket,
-            tlsSocket: null,
-            conn: null,
-            state: 'INITIALIZING',
-            currentSession: null,
-            initTimer: null,
-            createdAt: Date.now(),
-          }
+    // 2.4 Kết nối khỏe vẫn hoạt động sau deadline khởi tạo trên chính module runtime Data API
+    {
+      const workerCodeInitTimer = `
+import { executeQuery, closeDatabase } from '${dbModuleUrl}'
 
-          if (opts.config) {
-            testConfigDescriptors.set(opts.config, desc)
-          }
-          testDescriptors.set(socket, desc)
-          testActiveSockets.add(socket)
+try {
+  // 1. Truy vấn ban đầu để khởi tạo connection vào pool
+  const rows1 = await executeQuery('SELECT 1+1 AS result')
+  if (!rows1 || rows1[0]?.result !== 2) process.exit(2)
 
-          desc.initTimer = setTimeout(() => {
-            if (desc.state === 'INITIALIZING') {
-              desc.state = 'DESTROYED'
-              if (desc.tlsSocket && !desc.tlsSocket.destroyed) desc.tlsSocket.destroy()
-              if (socket && !socket.destroyed) socket.destroy()
-            }
-          }, 2000)
+  // 2. Chờ 1800ms (vượt quá ngân sách khởi tạo DB_READINESS_TIMEOUT_MS = 1200ms)
+  await new Promise((res) => setTimeout(res, 1800))
 
-          const cleanup = () => {
-            if (desc.initTimer) {
-              clearTimeout(desc.initTimer)
-              desc.initTimer = null
-            }
-            desc.state = 'DESTROYED'
-            if (opts.config) testConfigDescriptors.delete(opts.config)
-            testDescriptors.delete(socket)
-            testActiveSockets.delete(socket)
-            if (desc.tlsSocket) {
-              testDescriptors.delete(desc.tlsSocket)
-              testActiveSockets.delete(desc.tlsSocket)
-            }
-          }
-          socket.once('close', cleanup)
-          socket.once('error', cleanup)
+  // 3. Thực thi truy vấn tiếp theo trên connection sẵn có
+  const rows2 = await executeQuery('SELECT 1+1 AS result')
+  await closeDatabase()
 
-          return socket
-        },
-      },
-    })
+  if (rows2 && rows2[0]?.result === 2) {
+    console.log('ACTIVE_AFTER_INIT_DEADLINE')
+    process.exit(0)
+  }
+  process.exit(3)
+} catch (err) {
+  console.error('Error in init deadline test:', err)
+  await closeDatabase().catch(() => {})
+  process.exit(1)
+}
+`
+      const res = await runRuntimeWorkerScript(workerCodeInitTimer, { ...baseWorkerEnv, DB_READINESS_TIMEOUT_MS: '1200' }, tempDir)
+      assert(res.code === 0, 'Kết nối khỏe vẫn hoạt động bình thường sau deadline khởi tạo trên runtime')
+      assert(res.stdout.includes('ACTIVE_AFTER_INIT_DEADLINE'), 'Hook afterConnect đã giải phóng initTimer, kết nối không bị hủy nhầm')
+    }
 
-    testTlsSequelize.afterConnect((conn) => {
-      const desc = getTestDescriptor(conn)
-      if (desc) {
-        if (desc.initTimer) {
-          clearTimeout(desc.initTimer)
-          desc.initTimer = null
-        }
-        desc.conn = conn
+    // 2.5 Request timeout không hủy connection của request đồng thời
+    // 2.6 Thu hồi connection lỗi và phục hồi trên cùng tiến trình
+    {
+      const workerCodeConcurrent = `
+import { executeQuery, closeDatabase, isDatabaseUnavailableError } from '${dbModuleUrl}'
 
-        if (conn?.stream && conn.stream !== desc.rawSocket) {
-          desc.tlsSocket = conn.stream
-          testDescriptors.set(conn.stream, desc)
-          testActiveSockets.add(conn.stream)
+try {
+  let reqATimedOut = false
+  let reqBSuccess = false
+  let reqCRecovered = false
 
-          const cleanupTls = () => {
-            desc.state = 'DESTROYED'
-            testDescriptors.delete(conn.stream)
-            testActiveSockets.delete(conn.stream)
-          }
-          conn.stream.once('close', cleanupTls)
-          conn.stream.once('error', cleanupTls)
-        }
-
-        if (desc.state === 'INITIALIZING') {
-          desc.state = 'IDLE'
-        }
+  // Đồng thời chạy Request A (bị treo truy vấn ở Mock Server) và Request B (truy vấn bình thường)
+  const promiseA = executeQuery('SELECT /* HANG_QUERY */ 1', [], 1000)
+    .then(() => { process.exit(2) })
+    .catch((err) => {
+      if (isDatabaseUnavailableError(err)) {
+        reqATimedOut = true
       }
     })
 
-    // 3.1 Kiểm tra sau khi kết nối TLS: Descriptor tìm được qua conn.config, initTimer đã giải phóng, state là IDLE
-    {
-      const conn = await testTlsSequelize.connectionManager.getConnection()
-      const desc = getTestDescriptor(conn)
+  const promiseB = executeQuery('SELECT 1+1 AS result', [], 3000)
+    .then((rows) => {
+      if (rows && rows[0]?.result === 2) {
+        reqBSuccess = true
+      }
+    })
 
-      assert(desc !== null, 'Descriptor được tra cứu thành công qua conn.config')
-      assert(desc.id === 1, 'Descriptor ID khớp chính xác kết nối đầu tiên')
-      assert(desc.initTimer === null, 'desc.initTimer đã được giải phóng trong afterConnect')
-      assert(desc.state === 'IDLE', 'desc.state chuyển thành IDLE sau khi bắt tay TLS hoàn tất')
-      assert(desc.tlsSocket instanceof tls.TLSSocket, 'desc.tlsSocket được lưu trữ là đối tượng TLSSocket')
-      assert(desc.tlsSocket === conn.stream, 'desc.tlsSocket khớp chính xác với conn.stream hiện tại')
+  await Promise.all([promiseA, promiseB])
 
-      // Chờ quá 2000ms (thời hạn cũ của initTimer) để kiểm chứng kết nối KHÔNG bị timer hủy
-      await new Promise((res) => setTimeout(res, 2100))
-      assert(desc.state === 'IDLE', 'Kết nối đã khởi tạo KHÔNG bị timer cũ hủy sau thời hạn initTimeout')
-      assert(!desc.tlsSocket.destroyed, 'TLS socket vẫn sống nguyên vẹn và sẵn sàng sử dụng')
+  if (!reqATimedOut || !reqBSuccess) {
+    console.error('ReqA or ReqB failed status:', { reqATimedOut, reqBSuccess })
+    process.exit(3)
+  }
 
-      await testTlsSequelize.connectionManager.releaseConnection(conn)
+  // Chạy Request C trên CÙNG TIẾN TRÌNH để xác nhận phục hồi hoàn toàn sau lỗi
+  const rowsC = await executeQuery('SELECT 1+1 AS result', [], 3000)
+  if (rowsC && rowsC[0]?.result === 2) {
+    reqCRecovered = true
+  }
+
+  await closeDatabase()
+
+  if (reqATimedOut && reqBSuccess && reqCRecovered) {
+    console.log('CONCURRENT_ISOLATION_AND_RECOVERY_SUCCESS')
+    process.exit(0)
+  }
+  process.exit(4)
+} catch (err) {
+  console.error('Concurrent test error:', err)
+  await closeDatabase().catch(() => {})
+  process.exit(1)
+}
+`
+      const res = await runRuntimeWorkerScript(workerCodeConcurrent, baseWorkerEnv, tempDir)
+      assert(res.code === 0, 'Kiểm thử đồng thời và phục hồi hoàn tất thành công')
+      assert(
+        res.stdout.includes('CONCURRENT_ISOLATION_AND_RECOVERY_SUCCESS'),
+        'Request A timeout không hủy connection của Request B đồng thời; Request C phục hồi thành công trên cùng tiến trình'
+      )
     }
 
-    // 3.2 Kiểm tra session ownership và trả kết nối về pool khi dùng TLS
-    {
-      const sessionA = { id: 101, name: 'request_A' }
-      const conn = await testTlsSequelize.connectionManager.getConnection()
-      const desc = getTestDescriptor(conn)
-
-      // Gắn quyền sở hữu
-      desc.currentSession = sessionA
-      desc.state = 'IN_USE'
-
-      assert(desc.currentSession === sessionA, 'Session A nắm quyền sở hữu độc quyền trên kết nối TLS')
-      assert(desc.state === 'IN_USE', 'Trạng thái chuyển sang IN_USE')
-
-      // Giải phóng quyền sở hữu khi trả kết nối về pool
-      desc.currentSession = null
-      desc.state = 'IDLE'
-      await testTlsSequelize.connectionManager.releaseConnection(conn)
-
-      assert(desc.currentSession === null, 'Quyền sở hữu được giải phóng thành công khi trả về pool')
-      assert(desc.state === 'IDLE', 'Trạng thái trở lại IDLE trong pool')
-    }
-
-    // 3.3 Kiểm tra dọn dẹp kết nối TLS khi timeout/hủy bỏ
-    {
-      const connToAbort = await testTlsSequelize.connectionManager.getConnection()
-      const desc = getTestDescriptor(connToAbort)
-
-      // Giả lập timeout hủy kết nối
-      desc.state = 'DESTROYED'
-      if (desc.tlsSocket && !desc.tlsSocket.destroyed) desc.tlsSocket.destroy(new Error('Timeout test'))
-      if (desc.rawSocket && !desc.rawSocket.destroyed) desc.rawSocket.destroy(new Error('Timeout test'))
-      if (typeof connToAbort.destroy === 'function') connToAbort.destroy()
-      testTlsSequelize.connectionManager.pool.destroy(connToAbort)
-
-      await new Promise((res) => setTimeout(res, 100))
-
-      assert(desc.state === 'DESTROYED', 'Kết nối bị timeout chuyển thành trạng thái DESTROYED')
-      assert(desc.tlsSocket.destroyed === true, 'TLS socket bị tiêu hủy hoàn toàn khi timeout')
-      assert(desc.rawSocket.destroyed === true, 'Raw socket ban đầu cũng bị tiêu hủy hoàn toàn')
-    }
-
-    // Dọn dẹp test sequelize và mock server
-    for (const s of testActiveSockets) {
-      try { s.destroy() } catch {}
-    }
-    await testTlsSequelize.close().catch(() => {})
-
+    // Dọn dẹp Mock Servers
     for (const s of serverActiveSockets) {
       try { s.destroy() } catch {}
     }
     serverActiveSockets.clear()
     await new Promise((res) => mockTlsServer.close(res)).catch(() => {})
+
+    for (const s of mismatchSockets) {
+      try { s.destroy() } catch {}
+    }
+    mismatchSockets.clear()
+    await new Promise((res) => mismatchTlsServer.close(res)).catch(() => {})
 
   } finally {
     // Dọn dẹp thư mục tạm thời

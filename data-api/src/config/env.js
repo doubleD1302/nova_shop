@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import dotenv from 'dotenv'
 
 // Nạp các biến môi trường từ file .env nếu có (cho phép override đường dẫn khi chạy test cô lập)
@@ -150,12 +151,31 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
       fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không tồn tại hoặc không đọc được.')
     }
 
-    if (
-      !fileContent ||
-      fileContent.trim().length === 0 ||
-      !fileContent.includes('-----BEGIN CERTIFICATE-----')
-    ) {
+    if (!fileContent || typeof fileContent !== 'string' || fileContent.trim().length === 0) {
       fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    const beginMatches = fileContent.match(/-----BEGIN CERTIFICATE-----/g) || []
+    const endMatches = fileContent.match(/-----END CERTIFICATE-----/g) || []
+
+    if (beginMatches.length === 0 || beginMatches.length !== endMatches.length) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    const certRegex = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g
+    const certBlocks = fileContent.match(certRegex)
+
+    if (!certBlocks || certBlocks.length !== beginMatches.length) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    // Thẩm định từng chứng chỉ trong bundle bằng crypto.X509Certificate của Node
+    for (const block of certBlocks) {
+      try {
+        new crypto.X509Certificate(block)
+      } catch {
+        fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+      }
     }
 
     dbSslCa = trimmedCa

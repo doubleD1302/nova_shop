@@ -486,7 +486,8 @@ export function isDatabaseUnavailableError(err) {
     code === 'HANDSHAKE_NO_SSL_SUPPORT' ||
     code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
     code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
-    code === 'CERT_HAS_EXPIRED'
+    code === 'CERT_HAS_EXPIRED' ||
+    code === 'ERR_TLS_CERT_ALTNAME_INVALID'
   ) {
     return true
   }

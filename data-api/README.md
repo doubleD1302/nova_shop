@@ -81,7 +81,7 @@ DB_READINESS_TIMEOUT_MS=3000
 > **Lưu ý bảo mật:**
 > - Tuyệt đối không commit file `.env` thật lên Git. File này đã được khai báo trong `.gitignore`.
 > - Các biến `DB_PASSWORD` và `DATA_API_KEY` là bắt buộc. Hệ thống chặn các chuỗi rỗng, chuỗi chỉ chứa khoảng trắng hoặc các placeholder mẫu như `your_db_password_here`, `your_service_key_here`.
-> - Biến `DB_SSL_ENABLED` chỉ chấp nhận giá trị nghiêm ngặt là `true` hoặc `false` (không nhận `yes`, `1` hay chuỗi tùy ý). Khi bật `DB_SSL_ENABLED=true`, yêu cầu `DB_SSL_CA` phải trỏ tới file chứng chỉ CA tồn tại, đọc được và có nội dung PEM hợp lệ.
+> - Biến `DB_SSL_ENABLED` chỉ chấp nhận giá trị nghiêm ngặt là `true` hoặc `false` (không nhận `yes`, `1`, `tru` hay chuỗi tùy ý). Khi bật `DB_SSL_ENABLED=true`, yêu cầu `DB_SSL_CA` phải trỏ tới file chứng chỉ CA tồn tại, đọc được; hệ thống thẩm định chứng chỉ bằng `crypto.X509Certificate`, hỗ trợ CA bundle hợp lệ và từ chối chứng chỉ thiếu thẻ kết thúc `-----END CERTIFICATE-----` hoặc bị hỏng nội dung.
 > - Cấu hình SSL cho Sequelize/mysql2 luôn bật `rejectUnauthorized: true` và `verifyIdentity: true` để ngăn chặn tấn công Man-in-the-Middle. Khi tắt SSL (`DB_SSL_ENABLED=false`), hệ thống giữ nguyên kết nối local không dùng TLS.
 > - Biến `DB_READINESS_TIMEOUT_MS` nếu cấu hình `>= 5000` sẽ bị validator từ chối ngay lập tức lúc khởi động.
 > - Khi thiếu hoặc sai cấu hình, tiến trình dừng ngay lập tức và chỉ in tên biến môi trường bị lỗi, tuyệt đối không in giá trị secret ra màn hình/log.
@@ -200,13 +200,26 @@ Khởi chạy tiến trình `src/server.js` production thật, kiểm tra tài k
 npm run check:db
 ```
 
-### 5.4 Kiểm tra Kết nối TLS & Quản lý Socket (Độc lập, Mock TLS Server)
+### 5.4 Kiểm tra Kết nối TLS & Quản lý Kết nối Runtime (Mock TLS Server)
 
-Kiểm tra toàn diện 3 khía cạnh của kết nối TLS (44 assertions PASS):
-1. **Thẩm định cấu hình TLS trong `env.js`:** Kiểm tra giá trị mặc định của `DB_SSL_ENABLED` (false), ép kiểu boolean nghiêm ngặt, từ chối giá trị không hợp lệ (`yes`, `1`...), yêu cầu file CA tồn tại, đọc được, có nội dung PEM và bảo mật tuyệt đối không in secret.
-2. **Xác minh SSL qua Mock MySQL TLS Server:** Sử dụng cặp khóa và chứng chỉ X.509 tự ký để xác thực handshake TLS, kiểm chứng `conn.stream` là `tls.TLSSocket` đã được mã hóa an toàn (`encrypted: true`), thực thi query SQL thành công qua TLS, và xác minh cơ chế `rejectUnauthorized: true` từ chối ngay lập tức khi CA không khớp server.
-3. **Quản lý kết nối & Vòng đời Socket khi bật TLS:** Tra cứu descriptor qua `conn.config`, hủy `initTimer` khi bắt tay hoàn tất, xác minh timer cũ không hủy kết nối đã sẵn sàng, gán/giải phóng quyền sở hữu request (`currentSession`), và dọn dẹp triệt để cả TLS socket lẫn raw socket khi timeout.
+Bộ kiểm thử `check:tls` chạy trực tiếp trên **chính module runtime Data API** (`src/config/database.js` và `src/config/env.js`) qua Mock MySQL TLS Server (42 assertions PASS):
+1. **Thẩm định cấu hình TLS trong `env.js`:** Kiểm tra giá trị mặc định của `DB_SSL_ENABLED` (false), ép kiểu boolean nghiêm ngặt (từ chối `yes`, `1`, `tru`...), yêu cầu file CA tồn tại, đọc được; thẩm định từng chứng chỉ bằng `crypto.X509Certificate` của Node.js, hỗ trợ CA bundle hợp lệ gồm nhiều chứng chỉ, từ chối chứng chỉ thiếu thẻ kết thúc `-----END CERTIFICATE-----` hoặc có nội dung hỏng, bảo mật tuyệt đối không in secret ra log.
+2. **Kiểm tra trực tiếp module runtime Data API (`src/config/database.js`):**
+   - **Truy vấn qua TLS thành công:** Thực thi `checkDatabaseReadiness()` và `executeQuery('SELECT 1+1 AS result')` qua kênh TLS được mã hóa an toàn.
+   - **Từ chối CA không tin cậy:** Cơ chế `rejectUnauthorized: true` từ chối kết nối khi CA không khớp server, chuẩn hóa thành `DATABASE_UNAVAILABLE`.
+   - **Từ chối hostname không khớp:** Cơ chế `verifyIdentity: true` từ chối kết nối khi hostname không khớp SAN của chứng chỉ (`ERR_TLS_CERT_ALTNAME_INVALID`).
+   - **Bảo toàn kết nối sau deadline khởi tạo:** Kết nối khỏe sau khi bắt tay TLS đã giải phóng `initTimer` trong `afterConnect`, tiếp tục phục vụ truy vấn bình thường sau khi vượt quá thời gian `dbReadinessTimeoutMs`.
+   - **Cô lập timeout giữa các request đồng thời:** Request A bị timeout không làm ảnh hưởng hay hủy connection của Request B đang chạy đồng thời.
+   - **Thu hồi connection lỗi và phục hồi:** Sau khi Request A timeout, connection lỗi được thu hồi hoàn toàn và Request C tiếp theo phục hồi thành công trên cùng tiến trình.
 
 ```cmd
 npm run check:tls
 ```
+
+### 5.5 Giới hạn kiểm chứng và Lưu ý môi trường mạng
+
+- **Phiên bản thư viện & Lockfile:** Giữ nguyên lockfile `package-lock.json` (`express: ^5.0.1`, `sequelize: ^6.37.5`, `mysql2: ^3.12.0`, `dotenv: ^16.4.7`, `helmet: ^8.0.0`, `bcryptjs: ^3.0.3`).
+- **Hiện trạng kết nối tới CSDL MySQL Aiven thật:**
+  - Lệnh kiểm tra mạng: `Test-NetConnection -ComputerName shopnova-mysql-shopnova.k.aivencloud.com -Port 19099`.
+  - Kết quả: Ping ICMP phản hồi bình thường (RTT ~26ms), nhưng kết nối TCP tới cổng 19099 thất bại (`TcpTestSucceeded: False`), dẫn tới truy vấn bị timeout sau 5000ms.
+  - *Giới hạn kiểm chứng:* Hiện tại chưa thể xác định nguyên nhân cụ thể phía Aiven (do chưa có quyền truy cập kiểm tra trạng thái hoạt động của dịch vụ, cấu hình cổng hoặc IP allowlist trên Aiven Console). Do đó, các bài kiểm tra yêu cầu kết nối tới MySQL Aiven thật (`check:db` phần MySQL thật, `check:ready` phần live stack và `check:auth`) ghi nhận ở trạng thái **BLOCKED / NOT RUN** có kiểm soát; không tự ý thay đổi quyền CSDL hoặc báo PASS giả lập.
