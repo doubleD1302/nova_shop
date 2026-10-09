@@ -42,17 +42,6 @@ export default function RegisterPage() {
       return
     }
 
-    let shop = null
-    if (role === 'seller') {
-      shop = addShop({
-        name: form.shopName.trim(),
-        tagline: form.shopTagline.trim() || 'Gian hàng mới trên ShopNova',
-        location: 'TP. Hồ Chí Minh',
-        emoji: '🏪',
-        hue: form.shopName.length * 13 % 360,
-      })
-    }
-
     const res = register({
       fullName: form.fullName,
       username: form.username,
@@ -60,7 +49,6 @@ export default function RegisterPage() {
       email: form.email,
       phone: form.phone,
       role,
-      shopId: shop?.id || null,
     })
 
     if (!res.ok) {

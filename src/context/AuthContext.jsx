@@ -1,100 +1,201 @@
-import { createContext, useCallback, useContext, useMemo } from 'react'
-import { DEFAULT_BUYER_ID, users as seedUsers } from '../data/users'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { users as seedUsers } from '../data/users'
 import { shopAvatar } from '../utils/image'
-import { makeId } from '../utils/format'
-import { useLocalStorageState } from '../hooks/useLocalStorageState'
+import { apiGetMe, apiLogin } from '../utils/api'
 
 const AuthContext = createContext(null)
+const TOKEN_KEY = 'novashop_token'
 
 /**
- * Quản lý phiên đăng nhập (mock).
- * - Người mua: xem sản phẩm, giỏ hàng, đặt hàng, xem đơn hàng.
- * - Người bán: có shopId => vào được Kênh Người Bán để quản lý sản phẩm & đơn.
+ * Chuẩn hóa đối tượng người dùng từ Backend API để tương thích hoàn toàn với giao diện.
+ * - Giữ ID và shopId dạng chuỗi.
+ * - Sử dụng trực tiếp user, role, shopId từ Backend.
+ */
+function normalizeUser(apiUser) {
+  if (!apiUser) return null
+  const id = String(apiUser.id)
+  const shopId = apiUser.shopId != null ? String(apiUser.shopId) : null
+  const role = apiUser.role || 'buyer'
+  const username = apiUser.username || ''
+  const fullName = apiUser.fullName || username
+
+  return {
+    ...apiUser,
+    id,
+    shopId,
+    role,
+    username,
+    fullName,
+    email: apiUser.email || '',
+    phone: apiUser.phone || '',
+    avatarUrl: apiUser.avatarUrl || null,
+    rank: role === 'seller' ? 'Người bán' : 'Thành viên',
+    avatarEmoji: role === 'seller' ? '🏪' : '🙂',
+    hue: (username.length * 37) % 360,
+    address: apiUser.address || {
+      fullName,
+      phone: apiUser.phone || '',
+      province: '',
+      district: '',
+      ward: '',
+      detail: '',
+    },
+  }
+}
+
+/**
+ * Quản lý xác thực Auth tích hợp Backend API.
+ * - Khởi tạo từ sessionStorage (nếu có token).
+ * - Khôi phục phiên bằng GET /api/v1/auth/me với Bearer token.
+ * - Token hết hạn hoặc không hợp lệ -> xóa phiên.
+ * - Đăng nhập async/await qua POST /api/v1/auth/login.
+ * - Đăng xuất xóa token và xóa phiên.
  */
 export function AuthProvider({ children }) {
-  const [extraUsers, setExtraUsers] = useLocalStorageState('users:extra', [])
-  const [session, setSession] = useLocalStorageState('session', { userId: DEFAULT_BUYER_ID })
+  const [user, setUser] = useState(null)
+  const [isInitializing, setIsInitializing] = useState(true)
 
-  const allUsers = useMemo(() => [...seedUsers, ...extraUsers], [extraUsers])
-  const user = useMemo(() => allUsers.find((u) => u.id === session?.userId) || null, [allUsers, session])
+  // Khôi phục phiên từ sessionStorage khi khởi tạo
+  useEffect(() => {
+    let isMounted = true
 
-  const login = useCallback(
-    (username, password) => {
-      const found = allUsers.find(
-        (u) => u.username.toLowerCase() === String(username).trim().toLowerCase() && u.password === password,
-      )
-      if (!found) return { ok: false, error: 'Tên đăng nhập hoặc mật khẩu không đúng.' }
-      setSession({ userId: found.id })
-      return { ok: true, user: found }
-    },
-    [allUsers, setSession],
-  )
-
-  /** Đăng nhập nhanh 1 tài khoản có sẵn (dùng cho demo, không cần nhập mật khẩu) */
-  const loginAs = useCallback(
-    (userId) => {
-      const found = allUsers.find((u) => u.id === userId)
-      if (!found) return { ok: false, error: 'Không tìm thấy tài khoản.' }
-      setSession({ userId: found.id })
-      return { ok: true, user: found }
-    },
-    [allUsers, setSession],
-  )
-
-  const register = useCallback(
-    ({ fullName, username, password, role = 'buyer', shopId = null, email = '', phone = '' }) => {
-      const uname = String(username).trim().toLowerCase()
-      if (!uname || !password) return { ok: false, error: 'Vui lòng nhập đầy đủ thông tin.' }
-      if (allUsers.some((u) => u.username.toLowerCase() === uname)) {
-        return { ok: false, error: 'Tên đăng nhập đã tồn tại, vui lòng chọn tên khác.' }
+    const restoreSession = async () => {
+      const token = sessionStorage.getItem(TOKEN_KEY)
+      if (!token) {
+        if (isMounted) setIsInitializing(false)
+        return
       }
-      const newUser = {
-        id: makeId('u'),
-        username: uname,
-        password,
-        fullName: fullName || username,
-        role,
-        shopId,
-        rank: role === 'seller' ? 'Người bán mới' : 'Thành viên Mới',
-        email: email || `${uname}@shopnova.vn`,
-        phone: phone || '',
-        avatarEmoji: role === 'seller' ? '🏪' : '🙂',
-        hue: (uname.length * 37) % 360,
-        address: {
-          fullName: fullName || username,
-          phone: phone || '',
-          province: '',
-          district: '',
-          ward: '',
-          detail: '',
-        },
+
+      try {
+        const res = await apiGetMe(token)
+        if (res.ok) {
+          const data = await res.json().catch(() => null)
+          if (data?.success && data?.data?.user) {
+            if (isMounted) {
+              setUser(normalizeUser(data.data.user))
+            }
+            return
+          }
+        }
+
+        // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi)
+        sessionStorage.removeItem(TOKEN_KEY)
+        if (isMounted) {
+          setUser(null)
+        }
+      } catch (err) {
+        console.error('Lỗi khi khôi phục phiên qua /auth/me:', err)
+      } finally {
+        if (isMounted) setIsInitializing(false)
       }
-      setExtraUsers((list) => [...list, newUser])
-      setSession({ userId: newUser.id })
-      return { ok: true, user: newUser }
-    },
-    [allUsers, setExtraUsers, setSession],
-  )
+    }
 
-  const logout = useCallback(() => setSession({ userId: null }), [setSession])
+    restoreSession()
 
-  const updateProfile = useCallback(
-    (patch) => {
-      if (!user) return
-      const apply = (u) => (u.id === user.id ? { ...u, ...patch } : u)
-      setExtraUsers((list) => {
-        if (list.some((u) => u.id === user.id)) return list.map(apply)
-        // người dùng seed -> chuyển thành bản ghi "extra" để lưu được thay đổi
-        return [...list, { ...seedUsers.find((u) => u.id === user.id), ...patch }]
-      })
-    },
-    [user, setExtraUsers],
-  )
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  /**
+   * Đăng nhập async/await bằng tên đăng nhập và mật khẩu qua Backend API.
+   */
+  const login = useCallback(async (username, password) => {
+    const u = String(username || '').trim()
+    const p = String(password || '')
+
+    if (!u || !p) {
+      return { ok: false, error: 'Vui lòng nhập tên đăng nhập và mật khẩu.' }
+    }
+
+    try {
+      const res = await apiLogin(u, p)
+      const data = await res.json().catch(() => null)
+
+      if (res.ok && data?.success && data?.data?.token) {
+        const { token, user: apiUser } = data.data
+        sessionStorage.setItem(TOKEN_KEY, token)
+        const normalized = normalizeUser(apiUser)
+        setUser(normalized)
+        return { ok: true, user: normalized }
+      }
+
+      if (res.status === 401) {
+        return {
+          ok: false,
+          error: data?.message || 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+        }
+      }
+
+      if (res.status === 400) {
+        return {
+          ok: false,
+          error: data?.message || 'Dữ liệu đăng nhập không hợp lệ.',
+        }
+      }
+
+      if (res.status === 429) {
+        return {
+          ok: false,
+          error: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.',
+        }
+      }
+
+      return {
+        ok: false,
+        error: data?.message || `Lỗi máy chủ (${res.status}). Vui lòng thử lại sau.`,
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        error: 'Không thể kết nối đến máy chủ Backend. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      }
+    }
+  }, [])
+
+  /**
+   * Đăng nhập nhanh tài khoản mẫu đã bị loại bỏ khỏi luồng auth thật.
+   */
+  const loginAs = useCallback(() => {
+    return {
+      ok: false,
+      error: 'Đăng nhập nhanh mẫu không khả dụng với API thực tế. Vui lòng đăng nhập bằng tài khoản và mật khẩu.',
+    }
+  }, [])
+
+  /**
+   * Đăng ký chưa có API Backend: không tạo phiên hoặc báo lưu thành công local.
+   */
+  const register = useCallback(() => {
+    return {
+      ok: false,
+      error: 'Tính năng đăng ký tài khoản trực tuyến chưa được hỗ trợ trên Backend API.',
+    }
+  }, [])
+
+  /**
+   * Cập nhật hồ sơ chưa có API Backend: không báo lưu thành công local.
+   */
+  const updateProfile = useCallback(() => {
+    return {
+      ok: false,
+      error: 'Tính năng cập nhật thông tin hồ sơ chưa được hỗ trợ trên Backend API.',
+    }
+  }, [])
+
+  /**
+   * Đăng xuất: xóa token và xóa toàn bộ phiên.
+   */
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(TOKEN_KEY)
+    setUser(null)
+  }, [])
 
   const value = useMemo(
     () => ({
       user,
-      allUsers,
+      allUsers: seedUsers,
+      isInitializing,
       isAuthenticated: Boolean(user),
       isSeller: user?.role === 'seller',
       avatar: user
@@ -106,7 +207,7 @@ export function AuthProvider({ children }) {
       logout,
       updateProfile,
     }),
-    [user, allUsers, login, loginAs, register, logout, updateProfile],
+    [user, isInitializing, login, loginAs, register, logout, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

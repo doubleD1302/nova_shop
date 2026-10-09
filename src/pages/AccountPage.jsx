@@ -120,8 +120,8 @@ export default function AccountPage() {
                   name: user.fullName,
                 }}
                 onChange={(patch) => {
-                  updateProfile(patch)
-                  pushToast('Đã cập nhật ảnh đại diện', 'success')
+                  const res = updateProfile(patch)
+                  pushToast(res?.error || 'Tính năng đổi ảnh đại diện chưa được hỗ trợ trên Backend API.', 'info')
                 }}
                 title="Ảnh đại diện của bạn"
                 note="Tải ảnh từ máy tính, hoặc chọn biểu tượng và màu nền. Ảnh đổi ngay trên header và đơn hàng."
@@ -163,7 +163,7 @@ export default function AccountPage() {
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => pushToast('Đã lưu thông tin hồ sơ', 'success')}
+                  onClick={() => pushToast('Tính năng cập nhật hồ sơ chưa được hỗ trợ trên Backend API.', 'info')}
                   className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
                   Lưu thay đổi
