@@ -289,6 +289,8 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
 
 ---
 
+Hướng dẫn triển khai frontend trên Vercel, Backend/Data API trên Render và MySQL Aiven: [Triển khai web](docs/web/HOSTING.md).
+
 ### 5.5. Khởi Chạy Mobile App (`app/`)
 
 1. **Cài đặt thư viện phụ thuộc:**

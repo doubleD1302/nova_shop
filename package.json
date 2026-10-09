@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:hosting": "node scripts/host.mjs",
+    "check:hosting": "node scripts/check-hosting.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
