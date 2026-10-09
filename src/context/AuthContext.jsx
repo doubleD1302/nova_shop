@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { users as seedUsers } from '../data/users'
 import { shopAvatar } from '../utils/image'
 import { apiGetMe, apiLogin } from '../utils/api'
@@ -47,13 +47,19 @@ function normalizeUser(apiUser) {
  * Quản lý xác thực Auth tích hợp Backend API.
  * - Khởi tạo từ sessionStorage (nếu có token).
  * - Khôi phục phiên bằng GET /api/v1/auth/me với Bearer token.
- * - Token hết hạn hoặc không hợp lệ -> xóa phiên.
+ * - Có cơ chế chống race condition: dùng authVersionRef và AbortController để ngăn phản hồi /me cũ
+ *   ghi đè user hoặc xóa token khi đã có lần đăng nhập mới hoặc đăng xuất.
+ * - Token hết hạn hoặc không hợp lệ -> xóa phiên (nếu vẫn ở cùng version).
  * - Đăng nhập async/await qua POST /api/v1/auth/login.
  * - Đăng xuất xóa token và xóa phiên.
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isInitializing, setIsInitializing] = useState(true)
+
+  // Version của hành động auth để ngăn chặn race condition từ các request bất đồng bộ cũ
+  const authVersionRef = useRef(0)
+  const restoreAbortRef = useRef(null)
 
   // Khôi phục phiên từ sessionStorage khi khởi tạo
   useEffect(() => {
@@ -66,10 +72,26 @@ export function AuthProvider({ children }) {
         return
       }
 
+      // Tạo version mới và AbortController cho lần restore này
+      const version = ++authVersionRef.current
+      restoreAbortRef.current?.abort()
+      const controller = new AbortController()
+      restoreAbortRef.current = controller
+
       try {
-        const res = await apiGetMe(token)
+        const res = await apiGetMe(token, { signal: controller.signal })
+
+        // Nếu đã có hành động auth mới hơn (login mới hoặc logout) hoặc token trong sessionStorage đã đổi: hủy bỏ xử lý
+        if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
+          return
+        }
+
         if (res.ok) {
           const data = await res.json().catch(() => null)
+          // Kiểm tra lại version sau khi await json
+          if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
+            return
+          }
           if (data?.success && data?.data?.user) {
             if (isMounted) {
               setUser(normalizeUser(data.data.user))
@@ -78,15 +100,23 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi)
-        sessionStorage.removeItem(TOKEN_KEY)
-        if (isMounted) {
-          setUser(null)
+        // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi):
+        // Chỉ xóa token và đặt user null nếu version vẫn khớp và token chưa bị thay thế
+        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === token) {
+          sessionStorage.removeItem(TOKEN_KEY)
+          if (isMounted) {
+            setUser(null)
+          }
         }
       } catch (err) {
+        if (err.name === 'AbortError') {
+          return // Bỏ qua nếu bị abort chủ động
+        }
         console.error('Lỗi khi khôi phục phiên qua /auth/me:', err)
       } finally {
-        if (isMounted) setIsInitializing(false)
+        if (isMounted && authVersionRef.current === version) {
+          setIsInitializing(false)
+        }
       }
     }
 
@@ -94,6 +124,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       isMounted = false
+      restoreAbortRef.current?.abort()
     }
   }, [])
 
@@ -113,6 +144,10 @@ export function AuthProvider({ children }) {
       const data = await res.json().catch(() => null)
 
       if (res.ok && data?.success && data?.data?.token) {
+        // Hủy bỏ bất kỳ restoreSession cũ nào đang chờ và tăng version auth
+        restoreAbortRef.current?.abort()
+        authVersionRef.current += 1
+
         const { token, user: apiUser } = data.data
         sessionStorage.setItem(TOKEN_KEY, token)
         const normalized = normalizeUser(apiUser)
@@ -184,9 +219,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   /**
-   * Đăng xuất: xóa token và xóa toàn bộ phiên.
+   * Đăng xuất: hủy bỏ restoreSession đang bay, tăng version auth, xóa token và xóa toàn bộ phiên.
    */
   const logout = useCallback(() => {
+    restoreAbortRef.current?.abort()
+    authVersionRef.current += 1
     sessionStorage.removeItem(TOKEN_KEY)
     setUser(null)
   }, [])
