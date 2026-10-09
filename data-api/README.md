@@ -45,10 +45,10 @@ Hệ thống phân biệt rõ ràng giữa dải phiên bản khai báo (Depende
 |---|---|---|---|
 | `sequelize` | `^6.37.5` | `6.37.8` | ORM quản lý mô hình và pool kết nối (`sequelize-pool`) |
 | `mysql2` | `^3.12.0` | `3.24.5` | MySQL database driver hỗ trợ SSL/TLS và kết nối mạng |
-| `express` | `^5.0.1` | `5.0.1` | HTTP web framework xử lý các endpoint nội bộ |
+| `express` | `^5.0.1` | `5.2.1` | HTTP web framework xử lý các endpoint nội bộ |
 | `bcryptjs` | `^3.0.3` | `3.0.3` | Băm và so khớp mật khẩu bcrypt an toàn, thuần JavaScript |
-| `dotenv` | `^16.4.7` | `16.4.7` | Tải biến môi trường từ file `.env` |
-| `helmet` | `^8.0.0` | `8.0.0` | Thiết lập các HTTP security headers cơ bản |
+| `dotenv` | `^16.4.7` | `16.6.1` | Tải biến môi trường từ file `.env` |
+| `helmet` | `^8.0.0` | `8.3.0` | Thiết lập các HTTP security headers cơ bản |
 
 > **Quy định triển khai:** Luôn sử dụng lệnh `npm ci` khi triển khai hoặc chạy kiểm thử CI/CD để đảm bảo sử dụng chính xác các phiên bản đã được khóa trong `package-lock.json`. Bắt buộc chạy lại toàn bộ test suite (`npm run smoke`, `npm run check:timeout`, `npm run check:tls`, `npm run check:db`) trước khi cập nhật bất kỳ dependency nào.
 
