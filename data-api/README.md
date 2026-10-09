@@ -37,13 +37,20 @@ MySQL 8.4 Server (Port 3306)
 
 ## 2. Cấu hình môi trường và Thư viện phụ thuộc
 
-### 2.1 Phiên bản Dependency thực tế (Đối chiếu giữa khai báo và lockfile)
-- `sequelize`: Khai báo `^6.37.5` trong `package.json`, khóa chính xác tại **6.37.8** trong `package-lock.json`
-- `mysql2`: Khai báo `^3.12.0` trong `package.json`, khóa chính xác tại **3.24.5** trong `package-lock.json`
-- `express`: **5.0.1** (Express framework v5)
-- `bcryptjs`: **3.0.3** (Thư viện băm và so khớp bcrypt an toàn, không phụ thuộc C++ build tool)
-- `dotenv`: **16.4.7**
-- `helmet`: **8.0.0**
+### 2.1 Quản lý Thư viện phụ thuộc (Dependency Range vs. Phiên bản khóa trong Lockfile)
+
+Hệ thống phân biệt rõ ràng giữa dải phiên bản khai báo (Dependency Range) trong `package.json` và phiên bản chính xác được khóa (Locked Version) trong `package-lock.json`:
+
+| Gói thư viện | Dải phiên bản (`package.json`) | Phiên bản khóa (`package-lock.json`) | Vai trò kỹ thuật |
+|---|---|---|---|
+| `sequelize` | `^6.37.5` | `6.37.8` | ORM quản lý mô hình và pool kết nối (`sequelize-pool`) |
+| `mysql2` | `^3.12.0` | `3.24.5` | MySQL database driver hỗ trợ SSL/TLS và kết nối mạng |
+| `express` | `^5.0.1` | `5.0.1` | HTTP web framework xử lý các endpoint nội bộ |
+| `bcryptjs` | `^3.0.3` | `3.0.3` | Băm và so khớp mật khẩu bcrypt an toàn, thuần JavaScript |
+| `dotenv` | `^16.4.7` | `16.4.7` | Tải biến môi trường từ file `.env` |
+| `helmet` | `^8.0.0` | `8.0.0` | Thiết lập các HTTP security headers cơ bản |
+
+> **Quy định triển khai:** Luôn sử dụng lệnh `npm ci` khi triển khai hoặc chạy kiểm thử CI/CD để đảm bảo sử dụng chính xác các phiên bản đã được khóa trong `package-lock.json`. Bắt buộc chạy lại toàn bộ test suite (`npm run smoke`, `npm run check:timeout`, `npm run check:tls`, `npm run check:db`) trước khi cập nhật bất kỳ dependency nào.
 
 > **Quy định quyền CSDL runtime:** Tài khoản `shopnova_data_api@127.0.0.1` chỉ cần quyền `GRANT SELECT` trên CSDL `shopnova_dev.*` cho các endpoint hiện tại (`health`, `ready`, `verify-credentials`, `auth-profile`). Các tác vụ migration schema, nạp seed mẫu hoặc ghi fixture test sử dụng tài khoản bootstrap/fixture riêng có quyền ghi (`INSERT, UPDATE, DELETE`).
 
@@ -202,24 +209,22 @@ npm run check:db
 
 ### 5.4 Kiểm tra Kết nối TLS & Quản lý Kết nối Runtime (Mock TLS Server)
 
-Bộ kiểm thử `check:tls` chạy trực tiếp trên **chính module runtime Data API** (`src/config/database.js` và `src/config/env.js`) qua Mock MySQL TLS Server (42 assertions PASS):
+Bộ kiểm thử `check:tls` chạy trực tiếp trên **chính module runtime Data API** (`src/config/database.js` và `src/config/env.js`) qua Mock MySQL TLS Server (45 assertions PASS):
 1. **Thẩm định cấu hình TLS trong `env.js`:** Kiểm tra giá trị mặc định của `DB_SSL_ENABLED` (false), ép kiểu boolean nghiêm ngặt (từ chối `yes`, `1`, `tru`...), yêu cầu file CA tồn tại, đọc được; thẩm định từng chứng chỉ bằng `crypto.X509Certificate` của Node.js, hỗ trợ CA bundle hợp lệ gồm nhiều chứng chỉ, từ chối chứng chỉ thiếu thẻ kết thúc `-----END CERTIFICATE-----` hoặc có nội dung hỏng, bảo mật tuyệt đối không in secret ra log.
 2. **Kiểm tra trực tiếp module runtime Data API (`src/config/database.js`):**
    - **Truy vấn qua TLS thành công:** Thực thi `checkDatabaseReadiness()` và `executeQuery('SELECT 1+1 AS result')` qua kênh TLS được mã hóa an toàn.
    - **Từ chối CA không tin cậy:** Cơ chế `rejectUnauthorized: true` từ chối kết nối khi CA không khớp server, chuẩn hóa thành `DATABASE_UNAVAILABLE`.
    - **Từ chối hostname không khớp:** Cơ chế `verifyIdentity: true` từ chối kết nối khi hostname không khớp SAN của chứng chỉ (`ERR_TLS_CERT_ALTNAME_INVALID`).
-   - **Bảo toàn kết nối sau deadline khởi tạo:** Kết nối khỏe sau khi bắt tay TLS đã giải phóng `initTimer` trong `afterConnect`, tiếp tục phục vụ truy vấn bình thường sau khi vượt quá thời gian `dbReadinessTimeoutMs`.
-   - **Cô lập timeout giữa các request đồng thời:** Request A bị timeout không làm ảnh hưởng hay hủy connection của Request B đang chạy đồng thời.
-   - **Thu hồi connection lỗi và phục hồi:** Sau khi Request A timeout, connection lỗi được thu hồi hoàn toàn và Request C tiếp theo phục hồi thành công trên cùng tiến trình.
+   - **Bảo toàn kết nối sau deadline khởi tạo:** Hook `afterConnect` giải phóng `initTimer` ngay khi hoàn tất. Kiểm thử xác nhận 2 truy vấn trước và sau deadline sử dụng **cùng một connection/socket TLS**, chỉ phát sinh 1 handshake duy nhất, không bị hủy kết nối khỏe và không phát sinh connection thay thế.
+   - **Điều phối tín hiệu kiểm thử đồng thời (Concurrent Isolation):** Mock server xác nhận Request A và B được nhận trên hai connection khác nhau. Mock server giữ Request B chưa hoàn tất cho đến sau khi Request A timeout và socket A đã đóng; xác nhận connection B vẫn sống, trả lời kết quả cho B thành công, và Request C tiếp theo phục hồi hoàn toàn trên cùng tiến trình.
 
 ```cmd
 npm run check:tls
 ```
 
-### 5.5 Giới hạn kiểm chứng và Lưu ý môi trường mạng
+### 5.5 Hướng dẫn Kiểm tra và Vận hành Kết nối Cơ sở Dữ liệu Đám mây
 
-- **Phiên bản thư viện & Lockfile:** Giữ nguyên lockfile `package-lock.json` (`express: ^5.0.1`, `sequelize: ^6.37.5`, `mysql2: ^3.12.0`, `dotenv: ^16.4.7`, `helmet: ^8.0.0`, `bcryptjs: ^3.0.3`).
-- **Hiện trạng kết nối tới CSDL MySQL Aiven thật:**
-  - Lệnh kiểm tra mạng: `Test-NetConnection -ComputerName shopnova-mysql-shopnova.k.aivencloud.com -Port 19099`.
-  - Kết quả: Ping ICMP phản hồi bình thường (RTT ~26ms), nhưng kết nối TCP tới cổng 19099 thất bại (`TcpTestSucceeded: False`), dẫn tới truy vấn bị timeout sau 5000ms.
-  - *Giới hạn kiểm chứng:* Hiện tại chưa thể xác định nguyên nhân cụ thể phía Aiven (do chưa có quyền truy cập kiểm tra trạng thái hoạt động của dịch vụ, cấu hình cổng hoặc IP allowlist trên Aiven Console). Do đó, các bài kiểm tra yêu cầu kết nối tới MySQL Aiven thật (`check:db` phần MySQL thật, `check:ready` phần live stack và `check:auth`) ghi nhận ở trạng thái **BLOCKED / NOT RUN** có kiểm soát; không tự ý thay đổi quyền CSDL hoặc báo PASS giả lập.
+- **Cấu hình bảo mật đám mây:** Khi kết nối tới cụm MySQL có bật bảo mật (như Aiven MySQL), thiết lập `DB_SSL_ENABLED=true` và chỉ định đường dẫn file chứng chỉ CA hợp lệ tại `DB_SSL_CA`.
+- **Kiểm tra khả năng tiếp cận mạng:** Trước khi khởi động dịch vụ trong môi trường mới, cần kiểm tra kết nối TCP tới máy chủ CSDL qua cổng quy định (ví dụ lệnh PowerShell `Test-NetConnection -ComputerName <DB_HOST> -Port <DB_PORT>` trên Windows hoặc `nc -zv <DB_HOST> <DB_PORT>` trên Linux).
+- **Hành vi khi mạng gián đoạn:** Nếu cổng TCP bị đóng hoặc chưa được cấp quyền qua IP allowlist, Data API sẽ kích hoạt cơ chế timeout và từ chối an toàn với mã HTTP 503 `DATABASE_UNAVAILABLE` trong phạm vi ngân sách `DB_READINESS_TIMEOUT_MS`, bảo vệ Backend và người dùng khỏi hiện tượng treo yêu cầu.
+- **Lưu ý báo cáo kiểm thử:** Nhật ký đo kiểm chi tiết của từng phiên làm việc (kết quả ping, RTT, trace lỗi của từng thời điểm) được ghi nhận trong các báo cáo review kỹ thuật đặt ngoài Git; tài liệu README của dự án chỉ lưu trữ các quy chuẩn kiến trúc và hướng dẫn kỹ thuật lâu dài.

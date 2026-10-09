@@ -204,6 +204,15 @@ function createSelectResultPackets(startSeq = 1) {
 
 function createMockTlsServer(creds) {
   const serverActiveSockets = new Set()
+  const state = {
+    totalHandshakes: 0,
+    deadlineQ1ConnId: null,
+    deadlineQ2ConnId: null,
+    concurrentSockA: null,
+    concurrentSockB: null,
+    sendDelayedResponseB: null,
+  }
+
   const secureContext = tls.createSecureContext({
     cert: creds.certPem,
     key: creds.keyPem,
@@ -223,7 +232,24 @@ function createMockTlsServer(creds) {
         isServer: true,
         secureContext,
       })
+      tlsSocket.connId = ++state.totalHandshakes
       serverActiveSockets.add(tlsSocket)
+
+      tlsSocket.once('close', () => {
+        tlsSocket.isClosed = true
+        serverActiveSockets.delete(tlsSocket)
+
+        // Khi socket của Request A bị đóng do timeout ở client:
+        if (tlsSocket === state.concurrentSockA) {
+          if (state.concurrentSockB && !state.concurrentSockB.destroyed && !state.concurrentSockB.isClosed) {
+            if (typeof state.sendDelayedResponseB === 'function') {
+              const fn = state.sendDelayedResponseB
+              state.sendDelayedResponseB = null
+              setTimeout(fn, 50)
+            }
+          }
+        }
+      })
 
       tlsSocket.on('error', () => {})
       tlsSocket.on('data', (td) => {
@@ -231,10 +257,40 @@ function createMockTlsServer(creds) {
         if (td[4] === 0x03) {
           // COM_QUERY
           const queryText = td.subarray(5).toString('utf8')
-          if (queryText.includes('HANG_QUERY')) {
-            // Cố tình treo query, không phản hồi để client kích hoạt deadline timeout
+
+          // Kịch bản Post-Deadline: ghi nhận connection ID của 2 truy vấn
+          if (queryText.includes('TEST_DEADLINE_Q1')) {
+            state.deadlineQ1ConnId = tlsSocket.connId
+            tlsSocket.write(createSelectResultPackets(seq + 1))
             return
           }
+          if (queryText.includes('TEST_DEADLINE_Q2')) {
+            state.deadlineQ2ConnId = tlsSocket.connId
+            tlsSocket.write(createSelectResultPackets(seq + 1))
+            return
+          }
+
+          // Kịch bản Concurrent Isolation: điều phối tín hiệu giữa A và B
+          if (queryText.includes('CONCURRENT_A_HANG')) {
+            state.concurrentSockA = tlsSocket
+            // Không phản hồi để Request A bị timeout tại client
+            return
+          }
+          if (queryText.includes('CONCURRENT_B_DELAYED')) {
+            state.concurrentSockB = tlsSocket
+            // Giữ B chưa hoàn tất cho tới khi socket A đóng
+            state.sendDelayedResponseB = () => {
+              tlsSocket.write(createSelectResultPackets(seq + 1))
+            }
+            return
+          }
+
+          // Truy vấn phục hồi C sau lỗi
+          if (queryText.includes('RECOVER_C')) {
+            tlsSocket.write(createSelectResultPackets(seq + 1))
+            return
+          }
+
           if (queryText.includes('SET time_zone') || queryText.includes('SELECT VERSION()')) {
             tlsSocket.write(makePacket(Buffer.from([0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]), seq + 1))
           } else if (queryText.includes('SELECT 1+1') || queryText.includes('SELECT 1')) {
@@ -253,7 +309,7 @@ function createMockTlsServer(creds) {
     })
   })
 
-  return { server, serverActiveSockets }
+  return { server, serverActiveSockets, state }
 }
 
 /**
@@ -462,7 +518,7 @@ async function runAllTlsTests() {
     console.log('\n[PHẦN 2: Kiểm thử Module Runtime Data API (src/config/database.js) qua Mock MySQL TLS Server]')
 
     // Khởi động Mock MySQL TLS Server chính (cấp chứng chỉ hợp lệ cho 127.0.0.1)
-    const { server: mockTlsServer, serverActiveSockets } = createMockTlsServer(serverCreds)
+    const { server: mockTlsServer, serverActiveSockets, state: mockState } = createMockTlsServer(serverCreds)
     await new Promise((resolve) => mockTlsServer.listen(0, '127.0.0.1', resolve))
     const mockTlsPort = mockTlsServer.address().port
 
@@ -571,19 +627,23 @@ try {
 
     // 2.4 Kết nối khỏe vẫn hoạt động sau deadline khởi tạo trên chính module runtime Data API
     {
+      mockState.totalHandshakes = 0
+      mockState.deadlineQ1ConnId = null
+      mockState.deadlineQ2ConnId = null
+
       const workerCodeInitTimer = `
 import { executeQuery, closeDatabase } from '${dbModuleUrl}'
 
 try {
   // 1. Truy vấn ban đầu để khởi tạo connection vào pool
-  const rows1 = await executeQuery('SELECT 1+1 AS result')
+  const rows1 = await executeQuery('SELECT /* TEST_DEADLINE_Q1 */ 1+1 AS result')
   if (!rows1 || rows1[0]?.result !== 2) process.exit(2)
 
   // 2. Chờ 1800ms (vượt quá ngân sách khởi tạo DB_READINESS_TIMEOUT_MS = 1200ms)
   await new Promise((res) => setTimeout(res, 1800))
 
   // 3. Thực thi truy vấn tiếp theo trên connection sẵn có
-  const rows2 = await executeQuery('SELECT 1+1 AS result')
+  const rows2 = await executeQuery('SELECT /* TEST_DEADLINE_Q2 */ 1+1 AS result')
   await closeDatabase()
 
   if (rows2 && rows2[0]?.result === 2) {
@@ -600,11 +660,21 @@ try {
       const res = await runRuntimeWorkerScript(workerCodeInitTimer, { ...baseWorkerEnv, DB_READINESS_TIMEOUT_MS: '1200' }, tempDir)
       assert(res.code === 0, 'Kết nối khỏe vẫn hoạt động bình thường sau deadline khởi tạo trên runtime')
       assert(res.stdout.includes('ACTIVE_AFTER_INIT_DEADLINE'), 'Hook afterConnect đã giải phóng initTimer, kết nối không bị hủy nhầm')
+      assert(
+        mockState.totalHandshakes === 1 &&
+          mockState.deadlineQ1ConnId !== null &&
+          mockState.deadlineQ1ConnId === mockState.deadlineQ2ConnId,
+        'Hai truy vấn dùng cùng một connection/socket TLS, không phát sinh handshake mới và không tạo connection thay thế'
+      )
     }
 
     // 2.5 Request timeout không hủy connection của request đồng thời
     // 2.6 Thu hồi connection lỗi và phục hồi trên cùng tiến trình
     {
+      mockState.concurrentSockA = null
+      mockState.concurrentSockB = null
+      mockState.sendDelayedResponseB = null
+
       const workerCodeConcurrent = `
 import { executeQuery, closeDatabase, isDatabaseUnavailableError } from '${dbModuleUrl}'
 
@@ -613,8 +683,8 @@ try {
   let reqBSuccess = false
   let reqCRecovered = false
 
-  // Đồng thời chạy Request A (bị treo truy vấn ở Mock Server) và Request B (truy vấn bình thường)
-  const promiseA = executeQuery('SELECT /* HANG_QUERY */ 1', [], 1000)
+  // Đồng thời chạy Request A (bị treo truy vấn ở Mock Server) và Request B (bị giữ lại đến sau khi A timeout)
+  const promiseA = executeQuery('SELECT /* CONCURRENT_A_HANG */ 1', [], 1000)
     .then(() => { process.exit(2) })
     .catch((err) => {
       if (isDatabaseUnavailableError(err)) {
@@ -622,7 +692,7 @@ try {
       }
     })
 
-  const promiseB = executeQuery('SELECT 1+1 AS result', [], 3000)
+  const promiseB = executeQuery('SELECT /* CONCURRENT_B_DELAYED */ 1+1 AS result', [], 4000)
     .then((rows) => {
       if (rows && rows[0]?.result === 2) {
         reqBSuccess = true
@@ -637,7 +707,7 @@ try {
   }
 
   // Chạy Request C trên CÙNG TIẾN TRÌNH để xác nhận phục hồi hoàn toàn sau lỗi
-  const rowsC = await executeQuery('SELECT 1+1 AS result', [], 3000)
+  const rowsC = await executeQuery('SELECT /* RECOVER_C */ 1+1 AS result', [], 3000)
   if (rowsC && rowsC[0]?.result === 2) {
     reqCRecovered = true
   }
@@ -658,8 +728,18 @@ try {
       const res = await runRuntimeWorkerScript(workerCodeConcurrent, baseWorkerEnv, tempDir)
       assert(res.code === 0, 'Kiểm thử đồng thời và phục hồi hoàn tất thành công')
       assert(
+        mockState.concurrentSockA !== null &&
+          mockState.concurrentSockB !== null &&
+          mockState.concurrentSockA.connId !== mockState.concurrentSockB.connId,
+        'Mock server xác nhận Request A và B được nhận trên hai connection/socket TLS khác nhau'
+      )
+      assert(
+        mockState.concurrentSockA.isClosed === true,
+        'Connection A bị đóng sau timeout trong khi connection B vẫn sống và hoàn tất kết quả'
+      )
+      assert(
         res.stdout.includes('CONCURRENT_ISOLATION_AND_RECOVERY_SUCCESS'),
-        'Request A timeout không hủy connection của Request B đồng thời; Request C phục hồi thành công trên cùng tiến trình'
+        'Request A timeout không hủy connection của Request B; Request C phục hồi thành công trên cùng tiến trình'
       )
     }
 
