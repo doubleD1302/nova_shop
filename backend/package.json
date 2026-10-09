@@ -11,6 +11,7 @@
     "check": "node scripts/test-integration-ready.mjs",
     "check:ready": "node scripts/test-integration-ready.mjs",
     "check:auth": "node scripts/test-integration-auth.mjs",
+    "check:catalog": "node scripts/test-integration-catalog.mjs",
     "check:abort": "node scripts/test-abort-regression.mjs"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import { env } from './config/env.js'
 import healthRouter from './routes/health.routes.js'
 import authRouter from './routes/auth.routes.js'
+import catalogRouter from './routes/catalog.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -39,6 +40,7 @@ app.use(express.json({ limit: '1mb' }))
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1', catalogRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

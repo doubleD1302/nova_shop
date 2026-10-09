@@ -665,3 +665,257 @@ export async function getUserAuthProfile(userId) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Lấy danh sách ngành hàng / danh mục từ Data API:
+ * GET /internal/v1/categories
+ */
+export async function getCategories() {
+  const { status, data: json } = await requestDataApi('/internal/v1/categories')
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      !Array.isArray(json.data)
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi danh mục từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return json.data
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm kèm lọc và phân trang từ Data API:
+ * GET /internal/v1/products
+ */
+export async function getProducts(params = {}) {
+  const searchParams = new URLSearchParams()
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== '') {
+      searchParams.append(key, String(val))
+    }
+  }
+
+  const queryString = searchParams.toString()
+  const endpoint = queryString ? `/internal/v1/products?${queryString}` : '/internal/v1/products'
+
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      !Array.isArray(json.data) ||
+      typeof json.meta !== 'object' ||
+      json.meta === null
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi danh sách sản phẩm từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return {
+      data: json.data,
+      meta: json.meta,
+    }
+  }
+
+  if (status === 400) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'INVALID_QUERY'
+    ) {
+      throw new DataApiClientError(
+        400,
+        'INVALID_QUERY',
+        json.message || 'Tham số truy vấn không hợp lệ.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 400 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy chi tiết sản phẩm theo ID hoặc Slug từ Data API:
+ * GET /internal/v1/products/:idOrSlug
+ */
+export async function getProductByIdOrSlug(idOrSlug) {
+  const endpoint = `/internal/v1/products/${encodeURIComponent(idOrSlug)}`
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      typeof json.data !== 'object' ||
+      json.data === null
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi chi tiết sản phẩm từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return json.data
+  }
+
+  if (status === 404) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'PRODUCT_NOT_FOUND'
+    ) {
+      throw new DataApiClientError(
+        404,
+        'PRODUCT_NOT_FOUND',
+        json.message || 'Không tìm thấy sản phẩm.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 404 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'INVALID_PARAMS'
+    ) {
+      throw new DataApiClientError(
+        400,
+        'INVALID_PARAMS',
+        json.message || 'Mã định danh sản phẩm không hợp lệ.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 400 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}

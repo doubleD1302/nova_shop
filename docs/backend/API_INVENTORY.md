@@ -5,7 +5,7 @@
 > *Trạng thái tài liệu: Bản nháp kỹ thuật (Draft) — Đã đồng bộ với schema thực tế `database/schema.sql`*
 > *Kiến trúc áp dụng: Frontend (Web/App) → Backend HTTP API (/api/v1/*) → Data API Nội bộ (/internal/v1/*) → Sequelize 6 + mysql2 → MySQL 8.4*
 > *Tham chiếu kiến trúc: Xem tại [ARCHITECTURE.md](./ARCHITECTURE.md) và mô hình dữ liệu tại [DATA_MODEL.md](./DATA_MODEL.md)*
-> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); tất cả endpoint nghiệp vụ (catalog, auth, cart, orders) đang ở trạng thái `planned`.*
+> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); xác thực auth đã implemented (BE-003A); 3 API đọc catalog công khai và Data API tương ứng đã implemented (BE-004A); các endpoint còn lại (cart, orders, seller) đang ở trạng thái `planned`.*
 
 ---
 
@@ -23,12 +23,15 @@
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/RegisterPage.jsx` | `POST /api/v1/auth/register` | `public` | Request: `{ username, password, fullName, email, phone, role, shopName? }`<br>Response: `{ token, user }` | `planned` |
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/AccountPage.jsx` | `GET /api/v1/auth/me` | `buyer` / `seller` | Response: Thông tin tài khoản đăng nhập và hồ sơ (Bearer JWT) | **implemented** (BE-003A) |
 | **Auth & Hồ sơ** | `src/pages/AccountPage.jsx`<br>`app/lib/screens/account/` | `PUT /api/v1/auth/profile` | `buyer` / `seller` | Request: `{ fullName, phone, email, address }`<br>Response: Profile cập nhật | `planned` |
-| **Danh mục (Catalog)** | `src/context/CatalogContext.jsx`<br>`src/data/categories.js` | `GET /api/v1/categories` | `public` | Danh sách cây ngành hàng, slug, icon (Xem Mục 3.1) | `planned` |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/categories` | `x-service-key` | Đọc danh sách tất cả các danh mục đang hoạt động | **implemented** (BE-004A) |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/products` | `x-service-key` | Đọc danh sách sản phẩm công khai kèm phân trang và lọc | **implemented** (BE-004A) |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/products/:idOrSlug` | `x-service-key` | Chi tiết sản phẩm kèm SKU biến thể, thông số kỹ thuật | **implemented** (BE-004A) |
+| **Danh mục (Catalog)** | `src/context/CatalogContext.jsx`<br>`src/data/categories.js` | `GET /api/v1/categories` | `public` | Danh sách cây ngành hàng, slug, icon (Xem Mục 3.1) | **implemented** (BE-004A) |
 | **Gian hàng (Shop)** | `src/pages/ShopsPage.jsx`<br>`src/data/shops.js` | `GET /api/v1/shops` | `public` | Danh sách các gian hàng trên sàn kèm rating tính toán, Mall, tỉnh/thành (Xem Mục 3.2) | `planned` |
 | **Gian hàng (Shop)** | `src/pages/ShopPage.jsx`<br>`src/components/shop/` | `GET /api/v1/shops/:shopId` | `public` | Chi tiết gian hàng: logo, banner, rating tính toán, số followers (Xem Mục 3.3) | `planned` |
 | **Gian hàng (Shop)** | `src/pages/ShopPage.jsx` | `GET /api/v1/shops/:shopId/products` | `public` | Danh sách sản phẩm thuộc một shop cụ thể, có lọc ngành hàng (Xem Mục 3.4) | `planned` |
-| **Sản phẩm (Catalog)** | `src/pages/SearchPage.jsx`<br>`src/components/search/` | `GET /api/v1/products` | `public` | Tìm kiếm, lọc theo giá, ngành hàng, sắp xếp, phân trang (Xem Mục 3.5) | `planned` |
-| **Sản phẩm (Catalog)** | `src/pages/ProductDetailPage.jsx`<br>`app/lib/screens/product_detail/` | `GET /api/v1/products/:idOrSlug` | `public` | Chi tiết sản phẩm, gallery ảnh, SKU biến thể, thông số kỹ thuật (Xem Mục 3.6) | `planned` |
+| **Sản phẩm (Catalog)** | `src/pages/SearchPage.jsx`<br>`src/components/search/` | `GET /api/v1/products` | `public` | Tìm kiếm, lọc theo giá, ngành hàng, sắp xếp, phân trang (Xem Mục 3.5) | **implemented** (BE-004A) |
+| **Sản phẩm (Catalog)** | `src/pages/ProductDetailPage.jsx`<br>`app/lib/screens/product_detail/` | `GET /api/v1/products/:idOrSlug` | `public` | Chi tiết sản phẩm, gallery ảnh, SKU biến thể, thông số kỹ thuật (Xem Mục 3.6) | **implemented** (BE-004A) |
 | **Sản phẩm & Khuyến mãi** | `src/pages/HomePage.jsx`<br>`src/data/homeContent.js` | `GET /api/v1/products/featured` | `public` | Banners, Flash Sale, sản phẩm gợi ý trang chủ | `planned` |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | `planned` |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | `planned` |
@@ -78,7 +81,7 @@
 ---
 
 ### 3.1. API `GET /api/v1/categories` (Đọc danh sách ngành hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/categories` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/categories` (implemented - BE-004A)
 - **Quyền:** `public`
 - **Query Parameters:** `parentId` (chuỗi ID cha), `includeChildren` (boolean, mặc định `true`).
 - **Response Data:** Mảng các danh mục có `id` (chuỗi), `name`, `slug`, `imageUrl`, `sortOrder`, `children`.
@@ -108,14 +111,14 @@
 ---
 
 ### 3.5. API `GET /api/v1/products` (Tìm kiếm và lọc danh sách sản phẩm)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/products` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/products` (implemented - BE-004A)
 - **Query Parameters:** `q`, `categoryId`, `shopId`, `minPrice`, `maxPrice`, `province`, `mall`, `freeship`, `sort`, `page`, `limit`.
 - **Sắp xếp ổn định (Stable Sort):** Luôn kết hợp secondary sort là `id DESC`.
 
 ---
 
 ### 3.6. API `GET /api/v1/products/:idOrSlug` (Chi tiết sản phẩm)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/products/:idOrSlug` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/products/:idOrSlug` (implemented - BE-004A)
 - **Path Parameter:** `idOrSlug` (chuỗi ID số hoặc slug).
 
 ---
