@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import crypto from 'node:crypto'
 import dotenv from 'dotenv'
 
 // Nạp các biến môi trường từ file .env nếu có (cho phép override đường dẫn khi chạy test cô lập)
@@ -33,84 +36,150 @@ function isValidSecret(value) {
  * Các biến secret bắt buộc phải có giá trị thực, không chấp nhận placeholder hoặc chuỗi rỗng.
  * Thông báo lỗi chỉ nêu tên biến môi trường, tuyệt đối không in giá trị secret ra console/log.
  */
-function parseAndValidateEnv() {
+export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError = true) {
+  const fail = (message) => {
+    if (shouldExitOnError) {
+      console.error(message)
+      process.exit(1)
+    }
+    throw new Error(message)
+  }
+
   // 1. Kiểm tra HOST (Mặc định: '127.0.0.1')
-  const host = (process.env.HOST || '127.0.0.1').trim()
+  const host = (sourceEnv.HOST || '127.0.0.1').trim()
   if (!host) {
-    console.error('[Lỗi cấu hình] HOST không được để trống.')
-    process.exit(1)
+    fail('[Lỗi cấu hình] HOST không được để trống.')
   }
 
   // 2. Kiểm tra PORT (Mặc định: 3001)
-  const rawPort = process.env.PORT || '3001'
+  const rawPort = sourceEnv.PORT || '3001'
   const port = Number(rawPort)
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    console.error(`[Lỗi cấu hình] PORT không hợp lệ: "${rawPort}". PORT phải là số nguyên từ 1 đến 65535.`)
-    process.exit(1)
+    fail(`[Lỗi cấu hình] PORT không hợp lệ: "${rawPort}". PORT phải là số nguyên từ 1 đến 65535.`)
   }
 
   // 3. Kiểm tra NODE_ENV (Mặc định: 'development')
-  const rawNodeEnv = (process.env.NODE_ENV || 'development').trim()
+  const rawNodeEnv = (sourceEnv.NODE_ENV || 'development').trim()
   const allowedNodeEnvs = ['development', 'test', 'production']
   if (!allowedNodeEnvs.includes(rawNodeEnv)) {
-    console.error(
+    fail(
       `[Lỗi cấu hình] NODE_ENV không hợp lệ: "${rawNodeEnv}". Chỉ chấp nhận: ${allowedNodeEnvs.join(', ')}.`,
     )
-    process.exit(1)
   }
 
   // 4. Kiểm tra cấu hình CSDL MySQL (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD)
-  const dbHost = (process.env.DB_HOST || '127.0.0.1').trim()
+  const dbHost = (sourceEnv.DB_HOST || '127.0.0.1').trim()
   if (!dbHost) {
-    console.error('[Lỗi cấu hình] DB_HOST không được để trống.')
-    process.exit(1)
+    fail('[Lỗi cấu hình] DB_HOST không được để trống.')
   }
 
-  const rawDbPort = process.env.DB_PORT || '3306'
+  const rawDbPort = sourceEnv.DB_PORT || '3306'
   const dbPort = Number(rawDbPort)
   if (!Number.isInteger(dbPort) || dbPort < 1 || dbPort > 65535) {
-    console.error(`[Lỗi cấu hình] DB_PORT không hợp lệ: "${rawDbPort}". DB_PORT phải là số nguyên từ 1 đến 65535.`)
-    process.exit(1)
+    fail(`[Lỗi cấu hình] DB_PORT không hợp lệ: "${rawDbPort}". DB_PORT phải là số nguyên từ 1 đến 65535.`)
   }
 
-  const dbName = (process.env.DB_NAME || 'shopnova_dev').trim()
+  const dbName = (sourceEnv.DB_NAME || 'shopnova_dev').trim()
   if (!dbName) {
-    console.error('[Lỗi cấu hình] DB_NAME không được để trống.')
-    process.exit(1)
+    fail('[Lỗi cấu hình] DB_NAME không được để trống.')
   }
 
-  const dbUser = (process.env.DB_USER || '').trim()
+  const dbUser = (sourceEnv.DB_USER || '').trim()
   if (!dbUser) {
-    console.error('[Lỗi cấu hình] Thiếu biến môi trường bắt buộc: DB_USER.')
-    process.exit(1)
+    fail('[Lỗi cấu hình] Thiếu biến môi trường bắt buộc: DB_USER.')
   }
 
   // Secret bắt buộc: DB_PASSWORD (không rỗng, không placeholder)
-  const dbPassword = process.env.DB_PASSWORD
+  const dbPassword = sourceEnv.DB_PASSWORD
   if (!isValidSecret(dbPassword)) {
-    console.error(
+    fail(
       '[Lỗi cấu hình] Biến môi trường DB_PASSWORD không hợp lệ (không được để trống, chỉ chứa khoảng trắng hoặc dùng giá trị mẫu placeholder).',
     )
-    process.exit(1)
   }
 
   // Secret bắt buộc: DATA_API_KEY (không rỗng, không placeholder)
-  const dataApiKey = process.env.DATA_API_KEY
+  const dataApiKey = sourceEnv.DATA_API_KEY
   if (!isValidSecret(dataApiKey)) {
-    console.error(
+    fail(
       '[Lỗi cấu hình] Biến môi trường DATA_API_KEY không hợp lệ (không được để trống, chỉ chứa khoảng trắng hoặc dùng giá trị mẫu placeholder).',
     )
-    process.exit(1)
   }
 
   // 5. Ngân sách thời gian kiểm tra readiness CSDL (Mặc định: 3000 ms, bắt buộc < 5000 ms của Backend)
-  const rawReadinessTimeout = process.env.DB_READINESS_TIMEOUT_MS || '3000'
+  const rawReadinessTimeout = sourceEnv.DB_READINESS_TIMEOUT_MS || '3000'
   const dbReadinessTimeoutMs = Number(rawReadinessTimeout)
   if (!Number.isInteger(dbReadinessTimeoutMs) || dbReadinessTimeoutMs < 200 || dbReadinessTimeoutMs >= 5000) {
-    console.error(
+    fail(
       `[Lỗi cấu hình] DB_READINESS_TIMEOUT_MS không hợp lệ: "${rawReadinessTimeout}". Phải là số nguyên từ 200 đến 4999 (ms) để đảm bảo nhỏ hơn timeout Backend 5000ms.`,
     )
-    process.exit(1)
+  }
+
+  // 6. Kiểm tra cấu hình kết nối TLS / SSL cho CSDL (DB_SSL_ENABLED, DB_SSL_CA)
+  const rawSslEnabled = (sourceEnv.DB_SSL_ENABLED !== undefined && sourceEnv.DB_SSL_ENABLED !== '')
+    ? String(sourceEnv.DB_SSL_ENABLED).trim().toLowerCase()
+    : 'false'
+
+  if (rawSslEnabled !== 'true' && rawSslEnabled !== 'false') {
+    fail(
+      '[Lỗi cấu hình] Biến môi trường DB_SSL_ENABLED không hợp lệ. Chỉ chấp nhận giá trị: "true" hoặc "false".',
+    )
+  }
+  const dbSslEnabled = rawSslEnabled === 'true'
+
+  let dbSslCa = null
+  let dbSslCaContent = null
+
+  if (dbSslEnabled) {
+    const rawCa = sourceEnv.DB_SSL_CA
+    if (!rawCa || typeof rawCa !== 'string' || rawCa.trim().length === 0) {
+      fail('[Lỗi cấu hình] Thiếu biến môi trường bắt buộc: DB_SSL_CA khi DB_SSL_ENABLED là true.')
+    }
+
+    const trimmedCa = rawCa.trim()
+    const resolvedCaPath = path.isAbsolute(trimmedCa)
+      ? trimmedCa
+      : path.resolve(process.cwd(), trimmedCa)
+
+    if (!fs.existsSync(resolvedCaPath)) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không tồn tại hoặc không đọc được.')
+    }
+
+    let fileContent = ''
+    try {
+      fileContent = fs.readFileSync(resolvedCaPath, 'utf8')
+    } catch {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không tồn tại hoặc không đọc được.')
+    }
+
+    if (!fileContent || typeof fileContent !== 'string' || fileContent.trim().length === 0) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    const beginMatches = fileContent.match(/-----BEGIN CERTIFICATE-----/g) || []
+    const endMatches = fileContent.match(/-----END CERTIFICATE-----/g) || []
+
+    if (beginMatches.length === 0 || beginMatches.length !== endMatches.length) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    const certRegex = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g
+    const certBlocks = fileContent.match(certRegex)
+
+    if (!certBlocks || certBlocks.length !== beginMatches.length) {
+      fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+    }
+
+    // Thẩm định từng chứng chỉ trong bundle bằng crypto.X509Certificate của Node
+    for (const block of certBlocks) {
+      try {
+        new crypto.X509Certificate(block)
+      } catch {
+        fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không hợp lệ (yêu cầu định dạng chứng chỉ PEM).')
+      }
+    }
+
+    dbSslCa = trimmedCa
+    dbSslCaContent = fileContent
   }
 
   return Object.freeze({
@@ -124,6 +193,9 @@ function parseAndValidateEnv() {
     dbPassword,
     dataApiKey: dataApiKey.trim(),
     dbReadinessTimeoutMs,
+    dbSslEnabled,
+    dbSslCa,
+    dbSslCaContent,
   })
 }
 

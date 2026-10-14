@@ -6,6 +6,7 @@ dist-ssr/
 .astro/
 .next/
 .turbo/
+.vercel/
 coverage/
 .nyc_output/
 *.tsbuildinfo

@@ -54,6 +54,15 @@ const checkDbSequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
   pool: { max: 3, min: 0, acquire: 5000, idle: 10000 },
   dialectOptions: {
     connectTimeout: 5000,
+    ...(env.dbSslEnabled
+      ? {
+          ssl: {
+            ca: env.dbSslCaContent,
+            rejectUnauthorized: true,
+            verifyIdentity: true,
+          },
+        }
+      : {}),
     stream: (opts) => {
       const sock = net.connect(opts.config.port, opts.config.host)
       checkDbSockets.add(sock)
@@ -62,6 +71,15 @@ const checkDbSequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
       return sock
     },
   },
+})
+
+// Khi bật SSL, mysql2 nâng cấp kết nối sang TLS socket, bổ sung theo dõi socket TLS này
+checkDbSequelize.afterConnect((conn) => {
+  if (conn?.stream && !checkDbSockets.has(conn.stream)) {
+    checkDbSockets.add(conn.stream)
+    conn.stream.once('close', () => checkDbSockets.delete(conn.stream))
+    conn.stream.once('error', () => checkDbSockets.delete(conn.stream))
+  }
 })
 
 /**
@@ -370,6 +388,7 @@ async function testMockQueryHangDeadline() {
     pool: { max: 1, min: 0, acquire: 2000 },
     dialectOptions: {
       connectTimeout: 2000,
+      ssl: false,
       stream: (opts) => {
         const sock = net.connect(opts.config.port, opts.config.host)
         mockClientSockets.add(sock)
@@ -564,6 +583,8 @@ async function runDatabaseChecks() {
       liveService = await startProductionService({
         DB_HOST: env.dbHost,
         DB_PORT: String(env.dbPort),
+        DB_SSL_ENABLED: env.dbSslEnabled ? 'true' : 'false',
+        ...(env.dbSslEnabled && env.dbSslCa ? { DB_SSL_CA: env.dbSslCa } : {}),
       })
 
       // 3.1 Thiếu x-service-key -> HTTP 401
@@ -631,6 +652,7 @@ async function runDatabaseChecks() {
         DB_HOST: '127.0.0.1',
         DB_PORT: String(deadDbPort),
         DB_READINESS_TIMEOUT_MS: '2000',
+        DB_SSL_ENABLED: 'false',
       })
 
       // 4.1 Thiếu x-service-key khi DB không hoạt động -> HTTP 401

@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
 import { formatNumber } from '../../utils/format'
@@ -17,9 +17,10 @@ const NAV = [
  * Chỉ tài khoản có role 'seller' mới truy cập được.
  */
 export default function SellerLayout() {
-  const { user, loginAs, allUsers } = useAuth()
+  const { user, allUsers } = useAuth()
   const { getShop, getProductsByShop } = useCatalog()
   const location = useLocation()
+  const navigate = useNavigate()
 
   if (!user || user.role !== 'seller') {
     const sellers = allUsers.filter((u) => u.role === 'seller')
@@ -39,7 +40,7 @@ export default function SellerLayout() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => loginAs(s.id)}
+                onClick={() => navigate('/dang-nhap')}
                 className="flex items-center gap-2 rounded-sm border border-line px-3 py-2 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
               >
                 <span>{s.avatarEmoji}</span>

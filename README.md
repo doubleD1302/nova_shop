@@ -196,14 +196,18 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
    DB_NAME=shopnova_dev
    DB_USER=shopnova_data_api
    DB_PASSWORD=MatKhauDataApiCuaBan!
+   DB_SSL_ENABLED=false
+   DB_SSL_CA=
    DATA_API_KEY=KhoaDichVuNoiBoCuaBan_ToiThieu32KyTu!
    DB_READINESS_TIMEOUT_MS=3000
    ```
+   *(Khi kết nối dịch vụ CSDL đám mây Aiven MySQL, đặt `DB_SSL_ENABLED=true` và trỏ `DB_SSL_CA` tới file chứng chỉ CA định dạng PEM).*
 
 3. **Chạy kiểm thử tự động:**
    ```bash
    npm run smoke          # Kiểm tra cấu hình và mã lỗi độc lập CSDL
    npm run check:timeout  # Kiểm tra timeout, deadline và thu hồi socket
+   npm run check:tls      # Kiểm tra xác thực chứng chỉ TLS và quản lý kết nối
    npm run check:db       # Kiểm tra kết nối MySQL 8.4 thật và dữ liệu seed
    ```
 
@@ -284,6 +288,8 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
    ```
 
 ---
+
+Hướng dẫn triển khai frontend trên Vercel, Backend/Data API trên Render và MySQL Aiven: [Triển khai web](docs/web/HOSTING.md).
 
 ### 5.5. Khởi Chạy Mobile App (`app/`)
 

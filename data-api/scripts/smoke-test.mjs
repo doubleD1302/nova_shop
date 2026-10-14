@@ -16,6 +16,7 @@ process.env.DB_USER = 'shopnova_mock_user'
 process.env.DB_PASSWORD = 'mock_smoke_password_valid_123'
 process.env.DATA_API_KEY = 'mock_smoke_service_key_valid_456'
 process.env.DB_READINESS_TIMEOUT_MS = '3000'
+process.env.DB_SSL_ENABLED = 'false'
 process.env.DOTENV_CONFIG_PATH = path.join(__dirname, 'non-existent-smoke.env')
 
 // Import các thành phần production thật
@@ -230,6 +231,7 @@ async function runSmokeTests() {
       DB_PASSWORD: 'valid-test-password-123',
       DATA_API_KEY: 'valid-test-data-api-key-456',
       DB_READINESS_TIMEOUT_MS: '3000',
+      DB_SSL_ENABLED: 'false',
       DOTENV_CONFIG_PATH: path.join(__dirname, 'non-existent.env'),
     }
 
@@ -246,6 +248,8 @@ async function runSmokeTests() {
       delete cleanEnv.HOST
       delete cleanEnv.NODE_ENV
       delete cleanEnv.DB_READINESS_TIMEOUT_MS
+      delete cleanEnv.DB_SSL_ENABLED
+      delete cleanEnv.DB_SSL_CA
       delete cleanEnv.DOTENV_CONFIG_PATH
 
       return new Promise((resolve) => {

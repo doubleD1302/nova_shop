@@ -15,12 +15,42 @@ const allActiveSockets = new Set()
 
 /**
  * Bảng theo dõi trạng thái và quyền sở hữu (ownership) chi tiết của từng socket/connection theo vòng đời:
- * - INITIALIZING: Đang mở TCP, bắt tay handshake hoặc chạy 'SET time_zone'. Có deadline khởi tạo riêng.
+ * - INITIALIZING: Đang mở TCP, bắt tay handshake, nâng cấp TLS hoặc chạy 'SET time_zone'. Có deadline khởi tạo riêng.
  * - IDLE: Kết nối khỏe, đã khởi tạo xong và đang rảnh rỗi trong pool.
  * - IN_USE: Đang được một request cụ thể sử dụng độc quyền (currentSession trỏ tới request đó).
  * - DESTROYED: Đã bị đóng hoặc hủy.
+ *
+ * Lưu ý kiến trúc TLS:
+ * Khi bật SSL, mysql2 nâng cấp kết nối bằng cách thay thế conn.stream (raw net.Socket)
+ * bằng một tls.TLSSocket mới. Để định danh ổn định, ta liên kết descriptor với đối tượng
+ * conn.config (đối tượng cấu hình duy nhất gắn liền với mỗi connection) thay vì chỉ tra bằng socket.
  */
 const socketDescriptors = new Map()
+const configDescriptors = new Map()
+
+/**
+ * Tra cứu descriptor của kết nối từ đối tượng connection, config hoặc socket.
+ */
+function getDescriptor(connOrSocket) {
+  if (!connOrSocket) return null
+  // 1. Kiểm tra qua conn.config (đối tượng ổn định xuyên suốt nâng cấp TLS)
+  if (connOrSocket.config && configDescriptors.has(connOrSocket.config)) {
+    return configDescriptors.get(connOrSocket.config)
+  }
+  // 2. Kiểm tra nếu đối tượng truyền vào chính là config
+  if (configDescriptors.has(connOrSocket)) {
+    return configDescriptors.get(connOrSocket)
+  }
+  // 3. Kiểm tra qua socket hoặc TLS socket
+  if (socketDescriptors.has(connOrSocket)) {
+    return socketDescriptors.get(connOrSocket)
+  }
+  // 4. Kiểm tra qua conn.stream
+  if (connOrSocket.stream && socketDescriptors.has(connOrSocket.stream)) {
+    return socketDescriptors.get(connOrSocket.stream)
+  }
+  return null
+}
 
 /**
  * Tập hợp theo dõi các session đang hoạt động đồng thời trên tiến trình (readiness và auth queries).
@@ -36,6 +66,7 @@ let sessionCounter = 1
  * - acquire và connectTimeout được giới hạn bởi dbReadinessTimeoutMs (< 5000ms).
  * - Timezone cố định UTC (+00:00).
  * - Khai báo databaseVersion '8.4.4' cố định để Sequelize không bao giờ cần tạo versionPromise.
+ * - Hỗ trợ TLS qua cấu hình SSL khi env.dbSslEnabled = true; giữ nguyên chạy local khi tắt.
  */
 export const sequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
   host: env.dbHost,
@@ -52,29 +83,52 @@ export const sequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
   },
   dialectOptions: {
     connectTimeout: env.dbReadinessTimeoutMs,
+    ...(env.dbSslEnabled
+      ? {
+          ssl: {
+            ca: env.dbSslCaContent,
+            rejectUnauthorized: true,
+            verifyIdentity: true,
+          },
+        }
+      : {}),
     stream: (opts) => {
       const socket = net.connect(opts.config.port, opts.config.host)
       const connId = socketCounter++
 
       const desc = {
         id: connId,
-        socket,
+        config: opts.config,
+        rawSocket: socket,
+        tlsSocket: null,
         conn: null,
         state: 'INITIALIZING',
         currentSession: null,
         initTimer: null,
         createdAt: Date.now(),
       }
+
+      // Liên kết descriptor với đối tượng config ổn định của connection
+      if (opts.config) {
+        configDescriptors.set(opts.config, desc)
+      }
       socketDescriptors.set(socket, desc)
       allActiveSockets.add(socket)
 
-      // Deadline khởi tạo độc lập cho mọi kết nối mới (bao phủ TCP connect, handshake và SET time_zone)
+      // Deadline khởi tạo độc lập cho mọi kết nối mới (bao phủ TCP connect, handshake, TLS upgrade và SET time_zone)
       const initTimeoutMs = env.dbReadinessTimeoutMs
       desc.initTimer = setTimeout(() => {
         if (desc.state === 'INITIALIZING') {
           desc.state = 'DESTROYED'
-          if (!socket.destroyed) {
-            socket.destroy(new Error('Connection initialization deadline exceeded'))
+          if (desc.tlsSocket && !desc.tlsSocket.destroyed) {
+            try {
+              desc.tlsSocket.destroy(new Error('Connection initialization deadline exceeded'))
+            } catch {}
+          }
+          if (socket && !socket.destroyed) {
+            try {
+              socket.destroy(new Error('Connection initialization deadline exceeded'))
+            } catch {}
           }
         }
       }, initTimeoutMs)
@@ -91,8 +145,15 @@ export const sequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
           }
           desc.currentSession = null
         }
+        if (opts.config) {
+          configDescriptors.delete(opts.config)
+        }
         socketDescriptors.delete(socket)
         allActiveSockets.delete(socket)
+        if (desc.tlsSocket) {
+          socketDescriptors.delete(desc.tlsSocket)
+          allActiveSockets.delete(desc.tlsSocket)
+        }
       }
 
       socket.once('close', cleanupSocket)
@@ -105,14 +166,41 @@ export const sequelize = new Sequelize(env.dbName, env.dbUser, env.dbPassword, {
 
 // Hook afterConnect: giải phóng timer khởi tạo ngay khi kết nối hoàn tất SET time_zone
 sequelize.afterConnect((conn) => {
-  const socket = conn?.stream
-  const desc = socket ? socketDescriptors.get(socket) : null
+  const desc = getDescriptor(conn)
   if (desc) {
+    // 1. Giải phóng timer khởi tạo để bảo đảm kết nối đã khởi tạo KHÔNG bị timer cũ hủy
     if (desc.initTimer) {
       clearTimeout(desc.initTimer)
       desc.initTimer = null
     }
     desc.conn = conn
+
+    // 2. Khi bật SSL, mysql2 thay thế conn.stream bằng TLS socket. Theo dõi thêm TLS socket này.
+    if (conn?.stream && conn.stream !== desc.rawSocket) {
+      desc.tlsSocket = conn.stream
+      socketDescriptors.set(conn.stream, desc)
+      allActiveSockets.add(conn.stream)
+
+      const cleanupTls = () => {
+        if (desc.initTimer) {
+          clearTimeout(desc.initTimer)
+          desc.initTimer = null
+        }
+        desc.state = 'DESTROYED'
+        if (desc.currentSession) {
+          if (desc.currentSession.conn === desc.conn) {
+            desc.currentSession.conn = null
+          }
+          desc.currentSession = null
+        }
+        socketDescriptors.delete(conn.stream)
+        allActiveSockets.delete(conn.stream)
+      }
+
+      conn.stream.once('close', cleanupTls)
+      conn.stream.once('error', cleanupTls)
+    }
+
     if (desc.state === 'INITIALIZING') {
       desc.state = 'IDLE'
     }
@@ -177,17 +265,30 @@ export async function executeWithConnection(operationFn, timeoutMs = env.dbReadi
       const connToDestroy = session.conn
       session.conn = null
 
-      const socket = connToDestroy.stream
-      const desc = socket ? socketDescriptors.get(socket) : null
+      const desc = getDescriptor(connToDestroy)
 
       if (!desc || desc.currentSession === session) {
         if (desc) {
           desc.state = 'DESTROYED'
           desc.currentSession = null
+          if (desc.initTimer) {
+            clearTimeout(desc.initTimer)
+            desc.initTimer = null
+          }
+          if (desc.tlsSocket && !desc.tlsSocket.destroyed) {
+            try {
+              desc.tlsSocket.destroy(new Error('Operation deadline exceeded'))
+            } catch {}
+          }
+          if (desc.rawSocket && !desc.rawSocket.destroyed) {
+            try {
+              desc.rawSocket.destroy(new Error('Operation deadline exceeded'))
+            } catch {}
+          }
         }
         try {
-          if (socket && !socket.destroyed) {
-            socket.destroy(new Error('Operation deadline exceeded'))
+          if (connToDestroy.stream && !connToDestroy.stream.destroyed) {
+            connToDestroy.stream.destroy(new Error('Operation deadline exceeded'))
           }
         } catch {}
         try {
@@ -208,7 +309,17 @@ export async function executeWithConnection(operationFn, timeoutMs = env.dbReadi
             desc.initTimer = null
           }
           try {
-            if (!sock.destroyed) {
+            if (desc.tlsSocket && !desc.tlsSocket.destroyed) {
+              desc.tlsSocket.destroy(new Error('Abandoned connection initialization after session timeout'))
+            }
+          } catch {}
+          try {
+            if (desc.rawSocket && !desc.rawSocket.destroyed) {
+              desc.rawSocket.destroy(new Error('Abandoned connection initialization after session timeout'))
+            }
+          } catch {}
+          try {
+            if (sock && !sock.destroyed) {
               sock.destroy(new Error('Abandoned connection initialization after session timeout'))
             }
           } catch {}
@@ -234,16 +345,28 @@ export async function executeWithConnection(operationFn, timeoutMs = env.dbReadi
       .getConnection()
       .then((acquiredConn) => {
         session.deferred = null
+        const desc = getDescriptor(acquiredConn)
+
         if (session.isDone) {
           // Đã hết deadline trước khi acquire xong: tiêu hủy ngay kết nối đến muộn
           try {
-            const sock = acquiredConn.stream
-            const desc = sock ? socketDescriptors.get(sock) : null
             if (desc) {
               desc.state = 'DESTROYED'
               desc.currentSession = null
+              if (desc.initTimer) {
+                clearTimeout(desc.initTimer)
+                desc.initTimer = null
+              }
+              if (desc.tlsSocket && !desc.tlsSocket.destroyed) {
+                desc.tlsSocket.destroy(new Error('Late connection after deadline'))
+              }
+              if (desc.rawSocket && !desc.rawSocket.destroyed) {
+                desc.rawSocket.destroy(new Error('Late connection after deadline'))
+              }
             }
-            if (sock && !sock.destroyed) sock.destroy(new Error('Late connection after deadline'))
+            if (acquiredConn.stream && !acquiredConn.stream.destroyed) {
+              acquiredConn.stream.destroy(new Error('Late connection after deadline'))
+            }
             if (typeof acquiredConn.destroy === 'function') acquiredConn.destroy()
             sequelize.connectionManager.pool.destroy(acquiredConn)
           } catch {}
@@ -252,8 +375,6 @@ export async function executeWithConnection(operationFn, timeoutMs = env.dbReadi
 
         // Gắn quyền sở hữu độc quyền cho session hiện tại
         session.conn = acquiredConn
-        const sock = acquiredConn.stream
-        const desc = sock ? socketDescriptors.get(sock) : null
         if (desc) {
           if (desc.currentSession && desc.currentSession !== session) {
             if (desc.currentSession.conn === acquiredConn) {
@@ -300,8 +421,7 @@ export async function executeWithConnection(operationFn, timeoutMs = env.dbReadi
       session.deferred = null
 
       if (connToRelease) {
-        const sock = connToRelease.stream
-        const desc = sock ? socketDescriptors.get(sock) : null
+        const desc = getDescriptor(connToRelease)
         if (desc && desc.currentSession === session) {
           desc.currentSession = null
           desc.state = 'IDLE' // trở về trạng thái rảnh rỗi trong pool
@@ -361,7 +481,13 @@ export function isDatabaseUnavailableError(err) {
     code === 'PROTOCOL_CONNECTION_LOST' ||
     code === 'PROTOCOL_SEQUENCE_TIMEOUT' ||
     code === 'ER_CON_COUNT_ERROR' ||
-    code === 'RESOURCE_REQUEST_TIMEOUT'
+    code === 'RESOURCE_REQUEST_TIMEOUT' ||
+    code === 'HANDSHAKE_SSL_ERROR' ||
+    code === 'HANDSHAKE_NO_SSL_SUPPORT' ||
+    code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+    code === 'CERT_HAS_EXPIRED' ||
+    code === 'ERR_TLS_CERT_ALTNAME_INVALID'
   ) {
     return true
   }
@@ -430,6 +556,7 @@ export async function closeDatabase() {
     }
     allActiveSockets.clear()
     socketDescriptors.clear()
+    configDescriptors.clear()
     activeSessions.clear()
     await sequelize.close()
   } catch {

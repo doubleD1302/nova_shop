@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: novashop-api
+    runtime: node
+    region: singapore
+    plan: free
+    autoDeployTrigger: "off"
+    buildCommand: npm --prefix backend ci --omit=dev && npm --prefix data-api ci --omit=dev
+    startCommand: npm run start:hosting
+    healthCheckPath: /api/v1/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 24.12.0
+      - key: NODE_ENV
+        value: production
+      - key: DATA_API_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_ENABLED
+        value: "true"
+      - key: DB_SSL_CA
+        value: /etc/secrets/aiven-ca.pem

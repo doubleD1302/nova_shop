@@ -6,21 +6,40 @@ import AuthLayout, { DemoAccounts } from '../components/auth/AuthLayout'
 
 /** TRANG ĐĂNG NHẬP */
 export default function LoginPage() {
-  const { login, loginAs, user } = useAuth()
+  const { login, user } = useAuth()
   const { pushToast } = useToast()
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    const res = login(form.username, form.password)
-    if (!res.ok) {
-      setError(res.error)
+    if (loading) return
+    setError('')
+
+    const username = form.username.trim()
+    const password = form.password
+
+    if (!username || !password) {
+      setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.')
       return
     }
-    pushToast(`Xin chào ${res.user.fullName}!`, 'success')
-    navigate(res.user.role === 'seller' ? '/nguoi-ban' : '/')
+
+    setLoading(true)
+    try {
+      const res = await login(username, password)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      pushToast(`Xin chào ${res.user.fullName || res.user.username}!`, 'success')
+      navigate(res.user.role === 'seller' ? '/nguoi-ban' : '/')
+    } catch (err) {
+      setError('Đã xảy ra lỗi không thể kết nối tới máy chủ.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -37,7 +56,8 @@ export default function LoginPage() {
             value={form.username}
             onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
             placeholder="minhanh / ankerseller / cocoonseller"
-            className="w-full rounded-sm border border-line px-3 py-2.5 text-[14px] outline-none focus:border-brand"
+            disabled={loading}
+            className="w-full rounded-sm border border-line px-3 py-2.5 text-[14px] outline-none focus:border-brand disabled:bg-gray-50"
           />
         </div>
 
@@ -47,8 +67,9 @@ export default function LoginPage() {
             type="password"
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            placeholder="123456"
-            className="w-full rounded-sm border border-line px-3 py-2.5 text-[14px] outline-none focus:border-brand"
+            placeholder="Mật khẩu tài khoản"
+            disabled={loading}
+            className="w-full rounded-sm border border-line px-3 py-2.5 text-[14px] outline-none focus:border-brand disabled:bg-gray-50"
           />
         </div>
 
@@ -56,9 +77,10 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="w-full rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] py-2.5 text-[14px] font-medium text-white transition hover:brightness-105"
+          disabled={loading}
+          className="w-full rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] py-2.5 text-[14px] font-medium text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Đăng Nhập
+          {loading ? 'Đang Đăng Nhập...' : 'Đăng Nhập'}
         </button>
       </form>
 
@@ -77,9 +99,9 @@ export default function LoginPage() {
 
       <DemoAccounts
         onPick={(u) => {
-          loginAs(u.id)
-          pushToast(`Đăng nhập nhanh: ${u.fullName}`, 'success')
-          navigate(u.role === 'seller' ? '/nguoi-ban' : '/')
+          setForm((f) => ({ ...f, username: u.username, password: '' }))
+          setError('')
+          pushToast(`Đã chọn tài khoản: ${u.fullName} (@${u.username}). Vui lòng nhập mật khẩu.`, 'info')
         }}
       />
     </AuthLayout>

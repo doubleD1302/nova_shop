@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
 import { IconChevronDown, IconLogout, IconPackage, IconStore, IconUser } from '../ui/Icons'
 import SmartImage from '../ui/SmartImage'
 
 /** Khối tài khoản góc phải header (đăng nhập / menu người dùng) */
 export default function AccountMenu() {
-  const { user, avatar, logout, loginAs, allUsers } = useAuth()
+  const { user, avatar, logout, allUsers } = useAuth()
+  const { pushToast } = useToast()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -97,8 +99,8 @@ export default function AccountMenu() {
                   key={u.id}
                   type="button"
                   onClick={() => {
-                    loginAs(u.id)
                     setOpen(false)
+                    pushToast('Đăng nhập nhanh mẫu không khả dụng với API thực tế. Vui lòng đăng xuất để chuyển tài khoản.', 'info')
                   }}
                   className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
                     u.id === user.id
