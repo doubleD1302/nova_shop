@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shopnova/screens/orders/orders_screen.dart';
+import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
+import 'package:shopnova/screens/wallet/deposit_screen.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -72,9 +74,9 @@ class AccountScreen extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Column(
             children: [
-              _buildProfileSection(),
+              _buildProfileSection(context),
               const SizedBox(height: 12),
-              _buildFinanceSection(),
+              _buildFinanceSection(context),
               const SizedBox(height: 12),
               _buildDeliveryStatusSection(),
               const SizedBox(height: 12),
@@ -95,75 +97,80 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Stack(
-                children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 40, color: Colors.white),
-                  ),
-                  Positioned(
-                    right: 0, bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const Icon(Icons.verified, color: Colors.red, size: 16),
-                    ),
-                  )
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildProfileSection(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const shopnova_auth.LoginScreen()));
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Stack(
                   children: [
-                    const Text('Nguyễn Văn A', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12)),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.workspace_premium, color: Colors.red, size: 12),
-                          SizedBox(width: 4),
-                          Text('Thành viên Vàng', style: TextStyle(color: Color(0xFF003366), fontSize: 10, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
+                    const CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.grey,
+                      child: Icon(Icons.person, size: 40, color: Colors.white),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Text('Mã giới thiệu: ', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        const Text('NOVA9882', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.copy, size: 12, color: primaryColor),
-                      ],
+                    Positioned(
+                      right: 0, bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: const Icon(Icons.verified, color: Colors.red, size: 16),
+                      ),
                     )
                   ],
                 ),
-              ),
-              IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatItem('24', 'Đã mua'),
-              _buildStatItem('15', 'Yêu thích'),
-              _buildStatItem('3', 'Theo dõi Shop'),
-            ],
-          )
-        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Nguyễn Văn A', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.workspace_premium, color: Colors.red, size: 12),
+                            SizedBox(width: 4),
+                            Text('Thành viên Vàng', style: TextStyle(color: Color(0xFF003366), fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text('Mã giới thiệu: ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const Text('NOVA9882', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(width: 4),
+                          Icon(Icons.copy, size: 12, color: primaryColor),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+                IconButton(icon: const Icon(Icons.help_outline), onPressed: () {}),
+                IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildStatItem('24', 'Đã mua'),
+                _buildStatItem('15', 'Yêu thích'),
+                _buildStatItem('3', 'Theo dõi Shop'),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -185,7 +192,7 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFinanceSection() {
+  Widget _buildFinanceSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
@@ -213,7 +220,9 @@ class AccountScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildFinanceCard('Ví NovaPay', Icons.credit_card, '350.000', 'đ', 'Nạp tiền', Colors.red[800]!),
+              _buildFinanceCard('Ví NovaPay', Icons.credit_card, '350.000', 'đ', 'Nạp tiền', Colors.red[800]!, onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositScreen()));
+              }),
               _buildFinanceCard('Kho Nova Xu', Icons.monetization_on, '1.420', ' Xu', 'Nhận xu', Colors.blue[100]!, btnTextColor: Colors.blue[900]!),
               _buildFinanceCard('Kho Voucher', Icons.local_activity, '12', ' Mã còn', 'Dùng ngay', const Color(0xFF003366)),
             ],
@@ -223,46 +232,49 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFinanceCard(String title, IconData icon, String amount, String unit, String btnText, Color btnColor, {Color btnTextColor = Colors.white}) {
+  Widget _buildFinanceCard(String title, IconData icon, String amount, String unit, String btnText, Color btnColor, {Color btnTextColor = Colors.white, VoidCallback? onTap}) {
     return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[200]!)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text(title, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                Icon(icon, size: 12, color: primaryColor),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(unit, style: const TextStyle(fontSize: 10)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(color: btnColor, borderRadius: BorderRadius.circular(4)),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[200]!)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Icon(Icons.add_circle_outline, size: 10, color: btnTextColor),
-                  const SizedBox(width: 2),
-                  Text(btnText, style: TextStyle(color: btnTextColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Expanded(child: Text(title, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Icon(icon, size: 12, color: primaryColor),
                 ],
               ),
-            )
-          ],
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(unit, style: const TextStyle(fontSize: 10)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(color: btnColor, borderRadius: BorderRadius.circular(4)),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 10, color: btnTextColor),
+                    const SizedBox(width: 2),
+                    Text(btnText, style: TextStyle(color: btnTextColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );

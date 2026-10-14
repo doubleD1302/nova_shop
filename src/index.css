@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   ShopNova Design Tokens (Tailwind CSS v4 @theme)
+   ============================================================ */
+@theme {
+  --color-brand: #ee4d2d;
+  --color-brand-dark: #d73211;
+  --color-brand-light: #f86041;
+  --color-brand-soft: #fff2ee;
+  --color-mall: #153a9c;
+  --color-topbar: #f0f5ff;
+  --color-page: #f5f5f5;
+  --color-ink: #222222;
+  --color-ink-soft: #4a4a4a;
+  --color-muted: #757575;
+  --color-line: #e8e8e8;
+  --color-free: #26aa99;
+  --color-footer: #16243d;
+
+  --font-sans: 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-pop: 0 6px 24px rgba(0, 0, 0, 0.14);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Utilities ---------- */
+.container-shop {
+  width: 100%;
+  max-width: 1232px;
+  margin-inline: auto;
+  padding-inline: 12px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #c9c9c9;
+  border-radius: 999px;
+}
+
+.line-clamp-1,
+.line-clamp-2,
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-1 {
+  -webkit-line-clamp: 1;
+}
+.line-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+.line-clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
+/* Superscript currency symbol used in prices */
+.currency-symbol {
+  font-size: 0.68em;
+  vertical-align: super;
+  text-decoration: none;
+}
+
+/* ---------- Animations ---------- */
+@keyframes sn-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: sn-fade-up 0.25s ease-out both;
+}
+
+@keyframes sn-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-slide-in {
+  animation: sn-slide-in 0.22s ease-out both;
+}
+
+@keyframes sn-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: sn-marquee 18s linear infinite;
+}
+
+@keyframes sn-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.animate-pulse-dot {
+  animation: sn-pulse-dot 1.4s ease-in-out infinite;
+}

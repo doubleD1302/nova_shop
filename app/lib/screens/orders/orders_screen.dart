@@ -97,8 +97,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           _buildPendingConfirmationTab(),
           _buildPendingPickupTab(),
           _buildInTransitTab(),
-          const Center(child: Text('Đánh giá')),
-          const Center(child: Text('Trả hàng/Hoàn tiền')),
+          _buildReviewTab(),
+          _buildReturnRefundTab(),
         ],
       ),
     );
@@ -1643,6 +1643,1260 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             ),
           )
         ],
+      ),
+    );
+  }
+
+  Widget _buildReviewTab() {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            children: [
+              _buildReviewCoinsBanner(),
+              _buildReviewOrderContext(),
+              _buildReviewProduct1(),
+              _buildReviewProduct2(),
+              _buildReviewServiceQuality(),
+              _buildReviewPrivacyToggle(),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        _buildReviewBottomBar(),
+      ],
+    );
+  }
+
+  Widget _buildReviewCoinsBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFEE4D2D), Color(0xFFD63C1E), Colors.orange]),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                child: const Icon(Icons.monetization_on, color: Colors.amberAccent, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(child: Text('Đánh giá nhận ngay +200 Xu!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.amber[400], borderRadius: BorderRadius.circular(12)),
+                          child: Text('Thưởng nóng', style: TextStyle(color: Colors.brown[900], fontSize: 10, fontWeight: FontWeight.bold)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Thêm ít nhất 1 ảnh/video & 50 ký tự để nhận trọn vẹn 200 Nova Xu tích lũy.', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, height: 1.4)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2)))),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Tiến độ nhận xu: Đã đạt 100/200 Xu', style: TextStyle(color: Colors.white.withOpacity(0.95), fontSize: 10)),
+                    const Text('50%', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 6, width: double.infinity,
+                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.2), borderRadius: BorderRadius.circular(3)),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: 0.5,
+                    child: Container(decoration: BoxDecoration(color: Colors.amber[300], borderRadius: BorderRadius.circular(3))),
+                  ),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewOrderContext() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.verified, color: Colors.green, size: 16),
+                  const SizedBox(width: 4),
+                  const Text('Mã đơn: ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text('#SN20241025-8849', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                child: const Text('Giao thành công', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(2)),
+                    child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Shop Nova Official Store', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ],
+              ),
+              const Text('16:15 hôm nay', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewProduct1() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.image, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Áo Croptop Linen Cổ Vuông Thanh Lịch', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text('Phân loại: Trắng Tinh Khôi, Size M', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                  ],
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                const Text('Chất lượng sản phẩm', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) => const Icon(Icons.star, color: Colors.amber, size: 34)),
+                ),
+                const SizedBox(height: 8),
+                Text('Rất hài lòng ⭐⭐⭐⭐⭐', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('ĐÁNH GIÁ NHANH ẤN TƯỢNG', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8, runSpacing: 8,
+            children: [
+              _buildQuickTag('Chất vải đẹp', true),
+              _buildQuickTag('Đúng mô tả', true),
+              _buildQuickTag('Đóng gói cẩn thận', true),
+              _buildQuickTag('+ Giao hàng siêu nhanh', false),
+              _buildQuickTag('+ Đáng tiền', false),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey[200]!)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Áo mặc vừa vặn, vải linen mát mịn không bị mỏng, đường may rất chỉn chu và đẹp, đóng gói hộp cứng cẩn thận. Rất ưng ý! ✨',
+                  style: TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                        const SizedBox(width: 4),
+                        const Text('Đạt chuẩn nhận thêm 100 Xu', style: TextStyle(color: Colors.green, fontSize: 10)),
+                      ],
+                    ),
+                    const Text('68/500 ký tự', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                  ],
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('HÌNH ẢNH & VIDEO THỰC TẾ', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+              Text('2/5 phương tiện', style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildMediaThumbnail(true),
+              const SizedBox(width: 8),
+              _buildMediaThumbnail(true),
+              const SizedBox(width: 8),
+              _buildAddMediaBtn(Icons.add_a_photo, '0/5 ảnh', primaryColor),
+              const SizedBox(width: 8),
+              _buildAddMediaBtn(Icons.videocam, '0/1 video', Colors.grey),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const SizedBox(height: 12),
+          _buildSurveyRow('Đúng với mô tả?', _buildSurveyToggle('Có', 'Không')),
+          _buildSurveyRow('Cảm nhận chất liệu', _buildSurveyValue('Thoáng mát, mềm mại')),
+          _buildSurveyRow('Độ chuẩn màu sắc', _buildSurveyValue('Chuẩn hình ảnh 100%')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickTag(String text, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isSelected ? primaryColor.withOpacity(0.1) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isSelected) Icon(Icons.check, color: primaryColor, size: 14),
+          if (isSelected) const SizedBox(width: 4),
+          Text(text, style: TextStyle(color: isSelected ? primaryColor : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaThumbnail(bool hasMedia) {
+    return Expanded(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
+          child: Stack(
+            children: [
+              if (hasMedia) const Center(child: Icon(Icons.image, color: Colors.grey)),
+              Positioned(
+                top: 4, right: 4,
+                child: Container(
+                  width: 20, height: 20,
+                  decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 12),
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddMediaBtn(IconData icon, String text, Color color) {
+    return Expanded(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid), // dashed ideally, but solid for now
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 4),
+              Text(text, style: const TextStyle(fontSize: 10)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSurveyRow(String label, Widget action) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13)),
+          action,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSurveyToggle(String opt1, String opt2) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+          child: Text(opt1, style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(16)),
+          child: Text(opt2, style: const TextStyle(fontSize: 12)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSurveyValue(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+      child: Text(value, style: const TextStyle(fontSize: 12)),
+    );
+  }
+
+  Widget _buildReviewProduct2() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('SẢN PHẨM TIẾP THEO (2/2)', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome, color: Colors.green, size: 14),
+                  const SizedBox(width: 4),
+                  const Text('Nhận thêm +50 Xu', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              )
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.image, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Quần Tây Ống Rộng Cạp Cao Xếp Ly', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    const Text('Màu Be Cát, Size M', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: List.generate(5, (index) => const Icon(Icons.star, color: Colors.amber, size: 26)),
+              ),
+              Row(
+                children: [
+                  Text('Viết đánh giá', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                  Icon(Icons.chevron_right, color: primaryColor, size: 16),
+                ],
+              )
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewServiceQuality() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.storefront, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              const Text('Dịch vụ nhà bán & Đơn vị vận chuyển', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Dịch vụ người bán', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                    Text('Tuyệt vời', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(5, (index) => const Icon(Icons.star, color: Colors.amber, size: 28)),
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Tốc độ giao hàng & Tài xế', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                        const Text('Shipper: Phạm Văn Đức (Nova Express 2H)', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ],
+                    ),
+                    Text('Thân thiện', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(5, (index) => const Icon(Icons.star, color: Colors.amber, size: 28)),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewPrivacyToggle() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Row(
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(color: Colors.grey[100], shape: BoxShape.circle),
+            child: const Icon(Icons.visibility_off, color: Colors.grey, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Đánh giá ẩn danh', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 2),
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(color: Colors.grey, fontSize: 11),
+                    children: [
+                      TextSpan(text: 'Tên của bạn sẽ hiển thị dưới dạng '),
+                      TextSpan(text: 'n***a', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                      TextSpan(text: ' trên trang công khai'),
+                    ]
+                  )
+                )
+              ],
+            ),
+          ),
+          Switch(
+            value: true,
+            onChanged: (val) {},
+            activeColor: primaryColor,
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewBottomBar() {
+    return Positioned(
+      bottom: 0, left: 0, right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.95),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))]
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Phần thưởng đánh giá:', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Row(
+                  children: [
+                    const Icon(Icons.monetization_on, color: Colors.amber, size: 18),
+                    const SizedBox(width: 4),
+                    Text('+200 Nova Xu', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                )
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.send, size: 20),
+              label: const Text('Gửi Đánh Giá & Nhận 200 Xu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 2,
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReturnRefundTab() {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 140),
+          child: Column(
+            children: [
+              _buildReturnPolicyBanner(),
+              _buildReturnProductSelection(),
+              _buildReturnReasonSection(),
+              _buildReturnSolutionsSection(),
+              _buildReturnEvidenceSection(),
+              _buildReturnShippingMethod(),
+              _buildRefundSummary(),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        _buildReturnBottomBar(),
+      ],
+    );
+  }
+
+  Widget _buildReturnPolicyBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: primaryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle),
+                child: const Icon(Icons.verified_user, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('Bảo Vệ Người Mua ShopNova', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(12)),
+                          child: Row(
+                            children: [
+                              Icon(Icons.bolt, color: Colors.green[700], size: 12),
+                              Text('Hoàn 100% Nhanh', style: TextStyle(color: Colors.green[800], fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.black54, fontSize: 12, height: 1.4),
+                        children: [
+                          const TextSpan(text: 'Chính sách đổi trả miễn phí '),
+                          const TextSpan(text: '15 ngày', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                          const TextSpan(text: ' (ShopNova Mall). Bạn còn '),
+                          TextSpan(text: '14 ngày', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
+                          const TextSpan(text: ' để gửi yêu cầu cho đơn hàng này.'),
+                        ]
+                      ),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.local_shipping, color: primaryColor, size: 16),
+                  const SizedBox(width: 6),
+                  Text('Miễn 100% phí bưu tá lấy hàng thu hồi', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+              Icon(Icons.chevron_right, color: primaryColor, size: 16),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnProductSelection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(2)),
+                    child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Nova Official Store', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                ],
+              ),
+              const Text('#SN20241025-8849', style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'monospace')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24, height: 24,
+                  child: Checkbox(value: true, onChanged: (val) {}, activeColor: primaryColor),
+                ),
+                const SizedBox(width: 12),
+                Stack(
+                  children: [
+                    Container(
+                      width: 72, height: 72,
+                      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
+                    Positioned(
+                      bottom: 0, right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: const BorderRadius.only(topLeft: Radius.circular(8))),
+                        child: const Text('x1', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Áo Croptop Linen Cổ Vuông Thanh Lịch Co Giãn Nhẹ', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
+                        child: const Text('Phân loại: Trắng Tinh Khôi, Size M', style: TextStyle(color: Colors.black87, fontSize: 11)),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('318.000₫', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                          const Text('Đã giao 24/10', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      )
+                    ],
+                  ),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnReasonSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                  children: [
+                    const TextSpan(text: 'Lý do yêu cầu '),
+                    TextSpan(text: '*', style: TextStyle(color: primaryColor)),
+                  ]
+                )
+              ),
+              const Text('Bắt buộc', style: TextStyle(color: Colors.grey, fontSize: 10)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: Icon(Icons.inventory_2, color: primaryColor, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Hàng bị rách, sứt chỉ hoặc lỗi sản xuất', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text('Khuyết tật vật lý ảnh hưởng thẩm mỹ sản phẩm', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ],
+                    ),
+                  ],
+                ),
+                const Icon(Icons.expand_more, color: Colors.grey, size: 20),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 2)]),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.check, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text('Lỗi sản xuất', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
+                  child: const Text('Giao sai mẫu / size', style: TextStyle(color: Colors.black87, fontSize: 11)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
+                  child: const Text('Thiếu phụ kiện', style: TextStyle(color: Colors.black87, fontSize: 11)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
+                  child: const Text('Bể vỡ khi vận chuyển', style: TextStyle(color: Colors.black87, fontSize: 11)),
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnSolutionsSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Phương án xử lý mong muốn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 20, height: 20,
+                  child: Radio(value: true, groupValue: true, onChanged: (val) {}, activeColor: primaryColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Trả hàng & Hoàn tiền', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('Khuyên dùng', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 10)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('Bưu tá đến nhận hàng trả về kho ShopNova. Bạn sẽ nhận hoàn 100% tiền sau khi kiện hàng được kiểm tra.', style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.4)),
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 20, height: 20,
+                  child: Radio(value: false, groupValue: true, onChanged: (val) {}, activeColor: primaryColor),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Chỉ hoàn tiền (Không gửi trả)', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87)),
+                      SizedBox(height: 4),
+                      Text('Chỉ áp dụng khi đơn hàng chưa giao, giao thiếu món, hoặc sản phẩm đã bị vỡ nát hoàn toàn không thể tái sử dụng.', style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.4)),
+                    ],
+                  ),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnEvidenceSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                        children: [
+                          const TextSpan(text: 'Bằng chứng hình ảnh & video '),
+                          TextSpan(text: '*', style: TextStyle(color: primaryColor)),
+                        ]
+                      )
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Cung cấp cận cảnh chỗ hỏng để duyệt hoàn tiền ngay', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Text('2/6 ảnh', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildEvidenceThumbnail('Rách chỉ'),
+              const SizedBox(width: 8),
+              _buildEvidenceThumbnail('Vết ố'),
+              const SizedBox(width: 8),
+              _buildAddEvidenceBtn(Icons.add_a_photo, 'Thêm ảnh', primaryColor),
+              const SizedBox(width: 8),
+              _buildAddEvidenceBtn(Icons.videocam, 'Video mở hộp', Colors.grey),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'Đường may dưới gấu áo bị bung chỉ dài khoảng 5cm và có vết ố nhỏ ở tay áo, đề nghị shop kiểm tra và hoàn tiền giúp mình.',
+                  style: TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+                ),
+                const SizedBox(height: 8),
+                const Text('85/500 ký tự', style: TextStyle(color: Colors.grey, fontSize: 10)),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEvidenceThumbnail(String label) {
+    return Expanded(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
+          child: Stack(
+            children: [
+              const Center(child: Icon(Icons.image, color: Colors.grey)),
+              Positioned(
+                top: 4, right: 4,
+                child: Container(
+                  width: 20, height: 20,
+                  decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, color: Colors.white, size: 12),
+                ),
+              ),
+              Positioned(
+                bottom: 4, left: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                  child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 9)),
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddEvidenceBtn(IconData icon, String text, Color color) {
+    return Expanded(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 4),
+              Text(text, style: const TextStyle(fontSize: 9)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReturnShippingMethod() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Phương thức thu hồi hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(12)),
+                child: const Text('Miễn phí 100%', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(color: primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: Icon(Icons.local_shipping, color: primaryColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Nova Express lấy hàng tận nơi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('Đổi', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      RichText(
+                        text: const TextSpan(
+                          style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.4),
+                          children: [
+                            TextSpan(text: 'Bưu tá mang sẵn phiếu gửi đến nhận tại địa chỉ đã giao. Dự kiến lấy hàng vào '),
+                            TextSpan(text: 'Ngày mai, 26/10 (08:00 - 18:00).', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                          ]
+                        )
+                      )
+                    ],
+                  ),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRefundSummary() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Chi tiết số tiền hoàn lại', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Giá trị sản phẩm (1 món)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const Text('318.000₫', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Text('Phí vận chuyển trả hàng ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Icon(Icons.info_outline, color: Colors.grey, size: 14),
+                ],
+              ),
+              Text('0₫ (Được tài trợ)', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.w500, fontSize: 13)),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tổng tiền hoàn dự kiến', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text('Đã bao gồm khuyến mãi & voucher', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                ],
+              ),
+              Text('318.000₫', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 20)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle),
+                  child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Hoàn về Ví NovaPay (Khuyên dùng)', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.bolt, color: Colors.green[700], size: 12),
+                          const SizedBox(width: 2),
+                          Text('Nhận tiền ngay khi bưu tá xác nhận lấy hàng', style: TextStyle(color: Colors.green[800], fontSize: 10)),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnBottomBar() {
+    return Positioned(
+      bottom: 0, left: 0, right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.95),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))]
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(value: true, onChanged: (val) {}, activeColor: primaryColor),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('Tôi cam kết thông tin và hình ảnh chứng minh sự cố là chính xác 100%.', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                )
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat, color: primaryColor, size: 18),
+                      const SizedBox(height: 2),
+                      const Text('Hỗ trợ', style: TextStyle(color: Colors.grey, fontSize: 9)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.arrow_forward, size: 18),
+                    label: const Text('Gửi Yêu Cầu Trả Hàng & Hoàn Tiền', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 2,
+                    ),
+                  ),
+                )
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
