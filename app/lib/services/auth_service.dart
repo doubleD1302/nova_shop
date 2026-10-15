@@ -142,6 +142,35 @@ class AuthService {
     return token != null && token.isNotEmpty;
   }
 
+  /// Cập nhật thông tin hồ sơ người dùng
+  /// PUT /api/v1/auth/profile
+  Future<User?> updateProfile({
+    String? fullName,
+    String? phone,
+    String? email,
+    String? avatarUrl,
+  }) async {
+    final body = <String, dynamic>{
+      if (fullName != null) 'fullName': fullName.trim(),
+      if (phone != null) 'phone': phone.trim(),
+      if (email != null) 'email': email.trim(),
+      if (avatarUrl != null) 'avatarUrl': avatarUrl.trim(),
+    };
+
+    final response = await _client.put('/api/v1/auth/profile', body: body);
+
+    if (response.success && response.data is Map<String, dynamic>) {
+      final data = response.data as Map<String, dynamic>;
+      if (data['user'] is Map<String, dynamic>) {
+        _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+        await _saveUserToLocal(_currentUser!);
+        return _currentUser;
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _saveUserToLocal(User user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, jsonEncode(user.toJson()));

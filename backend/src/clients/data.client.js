@@ -1729,3 +1729,306 @@ export async function cancelOrder(orderIdOrCode, { userId, reason }) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Cập nhật thông tin hồ sơ người dùng:
+ * PUT /internal/v1/users/:userId/profile
+ */
+export async function updateUserProfile(userId, profileData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/profile`,
+    {
+      method: 'PUT',
+      body: profileData,
+    },
+  )
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data?.user === 'object'
+    ) {
+      return json.data.user
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi cập nhật hồ sơ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin hồ sơ không hợp lệ.',
+    )
+  }
+
+  if (status === 409) {
+    throw new DataApiClientError(
+      409,
+      json?.error?.code || 'EMAIL_EXISTS',
+      json?.message || 'Email đã được sử dụng bởi tài khoản khác.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'USER_NOT_FOUND',
+      json?.message || 'Không tìm thấy thông tin người dùng.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách địa chỉ nhận hàng của người dùng:
+ * GET /internal/v1/users/:userId/addresses
+ */
+export async function fetchUserAddresses(userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses`,
+  )
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách địa chỉ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_USER_ID',
+      json?.message || 'Mã tài khoản không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Thêm địa chỉ nhận hàng mới:
+ * POST /internal/v1/users/:userId/addresses
+ */
+export async function createUserAddress(userId, addressData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses`,
+    {
+      method: 'POST',
+      body: addressData,
+    },
+  )
+
+  if (status === 200 || status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi tạo địa chỉ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin địa chỉ không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Đặt địa chỉ làm mặc định:
+ * PATCH /internal/v1/users/:userId/addresses/:addressId/default
+ */
+export async function setDefaultUserAddress(userId, addressId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses/${encodeURIComponent(addressId)}/default`,
+    {
+      method: 'PATCH',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || {}
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ADDRESS_NOT_FOUND',
+      json?.message || 'Không tìm thấy địa chỉ nhận hàng.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PARAMS',
+      json?.message || 'Tham số yêu cầu không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa địa chỉ nhận hàng:
+ * DELETE /internal/v1/users/:userId/addresses/:addressId
+ */
+export async function deleteUserAddress(userId, addressId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses/${encodeURIComponent(addressId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { deleted: true }
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ADDRESS_NOT_FOUND',
+      json?.message || 'Không tìm thấy địa chỉ cần xóa.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PARAMS',
+      json?.message || 'Tham số yêu cầu không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}

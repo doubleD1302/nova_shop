@@ -1,4 +1,4 @@
-import { verifyCredentials, registerUser, DataApiClientError } from '../clients/data.client.js'
+import { verifyCredentials, registerUser, updateUserProfile, DataApiClientError } from '../clients/data.client.js'
 import { signAccessToken, ACCESS_TOKEN_EXPIRES_IN } from '../middlewares/auth.middleware.js'
 
 /**
@@ -257,6 +257,49 @@ export async function register(req, res, next) {
       },
     })
   } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * PUT /api/v1/auth/profile
+ * Cập nhật thông tin hồ sơ của người dùng hiện tại (Bearer JWT).
+ */
+export async function updateProfile(req, res, next) {
+  try {
+    const userId = req.user?.id
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Yêu cầu bắt buộc phải có token xác thực.',
+        error: { code: 'AUTH_REQUIRED' },
+      })
+    }
+
+    const { fullName, phone, email, avatarUrl } = req.body || {}
+
+    const updatedUser = await updateUserProfile(userId, {
+      fullName,
+      phone,
+      email,
+      avatarUrl,
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật thông tin hồ sơ thành công.',
+      data: {
+        user: sanitizePublicUser(updatedUser),
+      },
+    })
+  } catch (err) {
+    if (err instanceof DataApiClientError) {
+      return res.status(err.status).json({
+        success: false,
+        message: err.message,
+        error: { code: err.code },
+      })
+    }
     next(err)
   }
 }
