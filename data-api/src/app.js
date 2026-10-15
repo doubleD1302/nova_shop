@@ -8,6 +8,7 @@ import cartRouter from './routes/cart.routes.js'
 import { orderRouter } from './routes/order.routes.js'
 import { userRouter } from './routes/user.routes.js'
 import { engagementRouter } from './routes/engagement.routes.js'
+import { sellerOrderRouter } from './routes/seller-order.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
@@ -34,6 +35,7 @@ app.use(
   cartRouter,
   orderRouter,
   userRouter,
+  sellerOrderRouter,
 )
 
 // 4. Middleware xử lý khi client gọi route không tồn tại (404)
