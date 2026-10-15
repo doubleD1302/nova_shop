@@ -41,10 +41,10 @@
 | **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `GET /api/v1/favorites` | `buyer` / `seller` | Lấy danh sách sản phẩm yêu thích của tài khoản | **implemented** (BE-008) |
 | **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `POST /api/v1/favorites/:productId` | `buyer` / `seller` | Thêm sản phẩm vào danh sách yêu thích | **implemented** (BE-008) |
 | **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `DELETE /api/v1/favorites/:productId` | `buyer` / `seller` | Xóa sản phẩm khỏi danh sách yêu thích | **implemented** (BE-008) |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `hidden` hoặc `archived` | `planned` |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `archived` | **implemented** (BE-005) |
 | **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | `planned` |
 | **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, sản phẩm bán chạy | `planned` |
 | **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` / `seller` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** (BE-006) |
