@@ -45,8 +45,10 @@
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | **implemented** (BE-005) |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | **implemented** (BE-005) |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `archived` | **implemented** (BE-005) |
-| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | `planned` |
-| **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, sản phẩm bán chạy | `planned` |
+| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `GET /api/v1/seller/shop` | `seller` | Lấy thông tin cấu hình gian hàng của seller đang đăng nhập | **implemented** (BE-005B) |
+| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | **implemented** (BE-005B) |
+| **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, số lượng sản phẩm | **implemented** (BE-005B) |
+| **Theo dõi Shop** | `src/components/shop/ShopHeader.jsx` | `GET/POST/DELETE /api/v1/shops/:shopId/follow` | `buyer` / `seller` | Kiểm tra, theo dõi hoặc hủy theo dõi gian hàng trên sàn | **implemented** (BE-004B2) |
 | **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` / `seller` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` / `seller` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` / `seller` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** (BE-006) |

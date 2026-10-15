@@ -13,6 +13,7 @@ import { reviewRouter } from './routes/review.routes.js'
 import { favoriteRouter } from './routes/favorite.routes.js'
 import { sellerOrderRouter } from './routes/seller-order.routes.js'
 import { sellerProductRouter } from './routes/seller-product.routes.js'
+import { sellerHubRouter } from './routes/seller-hub.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -57,6 +58,7 @@ app.use('/api/v1', reviewRouter)
 app.use('/api/v1', favoriteRouter)
 app.use('/api/v1/seller', sellerOrderRouter)
 app.use('/api/v1/seller', sellerProductRouter)
+app.use('/api/v1/seller', sellerHubRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

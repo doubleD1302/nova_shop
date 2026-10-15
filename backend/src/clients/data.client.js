@@ -2585,3 +2585,155 @@ export async function deleteSellerProduct(productId, shopId) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Lấy thông tin shop của người bán:
+ * GET /internal/v1/seller/shop?shopId=...
+ */
+export async function fetchSellerShop(shopId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/shop?shopId=${encodeURIComponent(shopId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(404, 'SHOP_NOT_FOUND', 'Không tìm thấy gian hàng.')
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Cập nhật thông tin shop của người bán:
+ * PUT /internal/v1/seller/shop
+ */
+export async function updateSellerShop(shopId, data) {
+  const { status, data: json } = await requestDataApi('/internal/v1/seller/shop', {
+    method: 'PUT',
+    body: { ...data, shopId },
+  })
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(400, json?.error?.code || 'VALIDATION_ERROR', json?.message || 'Dữ liệu cập nhật gian hàng không hợp lệ.')
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Lấy số liệu thống kê Dashboard cho người bán:
+ * GET /internal/v1/seller/dashboard?shopId=...
+ */
+export async function fetchSellerDashboard(shopId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/dashboard?shopId=${encodeURIComponent(shopId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Kiểm tra trạng thái theo dõi shop:
+ * GET /internal/v1/shops/:shopId/follow?userId=...
+ */
+export async function checkShopFollow(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow?userId=${encodeURIComponent(userId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data?.isFollowing ?? false
+  }
+
+  return false
+}
+
+/**
+ * Người dùng theo dõi shop:
+ * POST /internal/v1/shops/:shopId/follow
+ */
+export async function followShop(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow`,
+    {
+      method: 'POST',
+      body: { userId },
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { shopId, isFollowing: true }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Người dùng hủy theo dõi shop:
+ * DELETE /internal/v1/shops/:shopId/follow?userId=...
+ */
+export async function unfollowShop(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow?userId=${encodeURIComponent(userId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { shopId, isFollowing: false }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}

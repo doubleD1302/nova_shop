@@ -2,6 +2,9 @@ import {
   fetchShops,
   fetchShopDetail,
   fetchShopProducts,
+  checkShopFollow,
+  followShop as submitFollowShop,
+  unfollowShop as submitUnfollowShop,
   DataApiClientError,
 } from '../clients/data.client.js'
 
@@ -149,6 +152,71 @@ export async function getShopProducts(req, res, next) {
         error: { code: err.code },
       })
     }
+    next(err)
+  }
+}
+
+/**
+ * GET /api/v1/shops/:shopId/follow
+ * Kiểm tra trạng thái theo dõi của người dùng đối với shop.
+ */
+export async function getFollowStatus(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const userId = req.user.id
+
+    const isFollowing = await checkShopFollow(shopId, userId)
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        shopId,
+        isFollowing,
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * POST /api/v1/shops/:shopId/follow
+ * Theo dõi một gian hàng.
+ */
+export async function followShopAction(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const userId = req.user.id
+
+    const result = await submitFollowShop(shopId, userId)
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã theo dõi gian hàng thành công.',
+      data: result,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * DELETE /api/v1/shops/:shopId/follow
+ * Hủy theo dõi gian hàng.
+ */
+export async function unfollowShopAction(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const userId = req.user.id
+
+    const result = await submitUnfollowShop(shopId, userId)
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã hủy theo dõi gian hàng.',
+      data: result,
+    })
+  } catch (err) {
     next(err)
   }
 }
