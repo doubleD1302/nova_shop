@@ -89,22 +89,22 @@
 ---
 
 ### 3.2. API `GET /api/v1/shops` (Đọc danh sách gian hàng trên sàn)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops` (implemented - BE-004B)
 - **Quyền:** `public`
 - **Query Parameters:** `mall` (boolean), `keyword` (string), `province` (string), `sort` (`popular` | `rating` | `newest`), `page`, `limit`.
-- **Response Data:** Mảng shop gồm `id` (chuỗi), `name`, `slug`, `logoUrl`, `bannerUrl`, `tagline`, `province`, `isMall`, `rating`, `ratingCount`, `followersCount`.
+- **Response Data:** Mảng shop gồm `id` (chuỗi), `name`, `slug`, `logoUrl`, `bannerUrl`, `tagline`, `province`, `isMall`, `rating`, `ratingCount`, `followersCount`, `productsCount`.
 
 ---
 
 ### 3.3. API `GET /api/v1/shops/:shopId` (Chi tiết gian hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:shopId` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:idOrSlug` (implemented - BE-004B)
 - **Path Parameter:** `shopId` (chuỗi ID hoặc slug).
 - **Response Data:** Thông tin chi tiết shop kèm số liệu thống kê được tính toán từ `reviews` và `shop_follows`.
 
 ---
 
 ### 3.4. API `GET /api/v1/shops/:shopId/products` (Sản phẩm trong gian hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:shopId/products` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:idOrSlug/products` (implemented - BE-004B)
 - **Path Parameter:** `shopId` (chuỗi ID hoặc slug).
 - **Query Parameters:** `categoryId`, `sort`, `page`, `limit`.
 
