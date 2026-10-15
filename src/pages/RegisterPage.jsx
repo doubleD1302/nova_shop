@@ -24,13 +24,24 @@ export default function RegisterPage() {
     shopTagline: '',
   })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
+    setError('')
+
     if (!form.fullName.trim() || !form.username.trim() || !form.password) {
       setError('Vui lòng nhập họ tên, tên đăng nhập và mật khẩu.')
+      return
+    }
+    if (form.username.trim().length < 3) {
+      setError('Tên đăng nhập phải có ít nhất 3 ký tự.')
+      return
+    }
+    if (form.password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự.')
       return
     }
     if (form.password !== form.confirm) {
@@ -42,22 +53,29 @@ export default function RegisterPage() {
       return
     }
 
-    const res = register({
-      fullName: form.fullName,
-      username: form.username,
-      password: form.password,
-      email: form.email,
-      phone: form.phone,
-      role,
-    })
+    setLoading(true)
+    try {
+      const res = await register({
+        fullName: form.fullName,
+        username: form.username,
+        password: form.password,
+        email: form.email,
+        phone: form.phone,
+        role,
+        shopName: form.shopName,
+        shopTagline: form.shopTagline,
+      })
 
-    if (!res.ok) {
-      setError(res.error)
-      return
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+
+      pushToast('Đăng ký thành công!', 'success')
+      navigate(role === 'seller' ? '/nguoi-ban' : '/')
+    } finally {
+      setLoading(false)
     }
-
-    pushToast('Đăng ký thành công!', 'success')
-    navigate(role === 'seller' ? '/nguoi-ban' : '/')
   }
 
   const inputClass =
@@ -133,9 +151,10 @@ export default function RegisterPage() {
 
         <button
           type="submit"
-          className="w-full rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] py-2.5 text-[14px] font-medium text-white transition hover:brightness-105"
+          disabled={loading}
+          className="w-full rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] py-2.5 text-[14px] font-medium text-white transition hover:brightness-105 disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          Đăng Ký {role === 'seller' ? '& Mở Gian Hàng' : 'Tài Khoản'}
+          {loading ? 'Đang xử lý đăng ký...' : `Đăng Ký ${role === 'seller' ? '& Mở Gian Hàng' : 'Tài Khoản'}`}
         </button>
 
         <p className="text-center text-[13px] text-muted">

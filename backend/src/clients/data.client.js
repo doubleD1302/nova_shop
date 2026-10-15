@@ -919,3 +919,69 @@ export async function getProductByIdOrSlug(idOrSlug) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Gọi POST /internal/v1/auth/register sang Data API để tạo tài khoản mới.
+ * @param {Object} userData Thông tin tài khoản người mua hoặc người bán
+ * @returns {Promise<Object>} Thông tin người dùng đã tạo
+ */
+export async function registerUser(userData) {
+  const { status, json } = await requestDataApi('/internal/v1/auth/register', {
+    method: 'POST',
+    body: userData,
+  })
+
+  if (status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      json.data?.user
+    ) {
+      return json.data.user
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 409) {
+    throw new DataApiClientError(
+      409,
+      json.error?.code || 'CONFLICT',
+      json.message || 'Tên đăng nhập hoặc email đã tồn tại.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json.error?.code || 'VALIDATION_ERROR',
+      json.message || 'Dữ liệu đăng ký không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}

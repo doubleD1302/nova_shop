@@ -124,7 +124,20 @@ async function runTests() {
       assert(data.error?.code === 'VALIDATION_ERROR', 'Mã lỗi là VALIDATION_ERROR')
     }
 
-    // 6.2. Auth endpoints smoke: GET /api/v1/auth/me thiếu header Authorization trả 401 AUTH_REQUIRED
+    // 6.2. Auth endpoints smoke: POST /api/v1/auth/register thiếu body trả 400 VALIDATION_ERROR
+    {
+      const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      assert(res.status === 400, 'POST /api/v1/auth/register thiếu thông tin trả HTTP 400')
+      assert(data.success === false, 'Phản hồi register thiếu thông tin có success === false')
+      assert(data.error?.code === 'VALIDATION_ERROR', 'Mã lỗi register là VALIDATION_ERROR')
+    }
+
+    // 6.3. Auth endpoints smoke: GET /api/v1/auth/me thiếu header Authorization trả 401 AUTH_REQUIRED
     {
       const res = await fetch(`${baseUrl}/api/v1/auth/me`)
       const data = await res.json()

@@ -154,6 +154,23 @@ async function runSmokeTests() {
       assert(data.error?.code === 'BODY_TOO_LARGE', 'Mã lỗi payload quá lớn là BODY_TOO_LARGE')
     }
 
+    // 1.8 POST /internal/v1/auth/register thiếu thông tin trả về HTTP 400
+    {
+      const res = await fetch(`${baseUrl}/internal/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-key': env.dataApiKey,
+        },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(4000),
+      })
+      const data = await res.json()
+      assert(res.status === 400, 'POST /internal/v1/auth/register thiếu dữ liệu trả HTTP 400')
+      assert(data.success === false, 'Phản hồi thất bại có success === false')
+      assert(data.error?.code === 'INVALID_USERNAME', 'Mã lỗi là INVALID_USERNAME')
+    }
+
     // -------------------------------------------------------------
     // 2. Kiểm tra bảo mật errorHandler với 5 trường nhạy cảm
     //    (Không thêm bất kỳ route test nào vào production app)
