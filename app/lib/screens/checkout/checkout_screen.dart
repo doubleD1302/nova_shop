@@ -350,7 +350,7 @@ class CheckoutScreen extends StatelessWidget {
               Switch(
                 value: true,
                 onChanged: (val) {},
-                activeColor: const Color(0xFFEE4D2D),
+                activeThumbColor: const Color(0xFFEE4D2D),
               ),
             ],
           ),

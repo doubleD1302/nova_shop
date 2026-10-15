@@ -520,7 +520,7 @@ class AccountScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.blue[50]?.withOpacity(0.5), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: Colors.blue[50]?.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
           Container(

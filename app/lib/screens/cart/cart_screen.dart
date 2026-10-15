@@ -373,7 +373,7 @@ class _CartScreenState extends State<CartScreen> {
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFFEE4D2D).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: const Color(0xFFEE4D2D).withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
                   child: const Text('TỐI ƯU TIẾT KIỆM', style: TextStyle(color: Color(0xFF6B1B1B), fontSize: 10, fontWeight: FontWeight.bold)),
                 )
               ],
@@ -460,7 +460,7 @@ class _CartScreenState extends State<CartScreen> {
               Switch(
                 value: true,
                 onChanged: (val) {},
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               ),
             ],
           ),
