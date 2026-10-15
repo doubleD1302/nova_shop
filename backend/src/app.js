@@ -7,6 +7,7 @@ import authRouter from './routes/auth.routes.js'
 import catalogRouter from './routes/catalog.routes.js'
 import { shopRouter } from './routes/shop.routes.js'
 import cartRouter from './routes/cart.routes.js'
+import { orderRouter } from './routes/order.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -45,6 +46,7 @@ app.use('/api/v1/auth', authRouter)
 app.use('/api/v1', catalogRouter)
 app.use('/api/v1/shops', shopRouter)
 app.use('/api/v1/cart', cartRouter)
+app.use('/api/v1/orders', orderRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

@@ -43,10 +43,10 @@
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` / `seller` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` / `seller` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` / `seller` | Xóa sản phẩm khỏi giỏ hàng | **implemented** (BE-006) |
-| **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn hàng mới (Master Order + Shop Orders). Tính lại giá và trừ kho | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn hàng đã mua của khách, lọc theo status | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Xem chi tiết tiến trình đơn tổng và các đơn con của shop | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `POST /api/v1/orders/:orderId/cancel` | `buyer` | Hủy đơn hàng khi shop chưa xác nhận giao | `planned` |
+| **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn hàng mới (Master Order + Shop Orders). Tính lại giá và trừ kho | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn hàng đã mua của khách, lọc theo status | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Xem chi tiết tiến trình đơn tổng và các đơn con của shop | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `PATCH /api/v1/orders/:orderId/cancel` | `buyer` | Hủy đơn hàng khi shop chưa xác nhận giao | **implemented** (BE-007) |
 | **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx` | `GET /api/v1/seller/orders` | `seller` | Danh sách đơn con (`shop_orders`) chứa sản phẩm thuộc shop mình | `planned` |
 | **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx` | `PATCH /api/v1/seller/orders/:shopOrderId/status` | `seller` | Đổi trạng thái xử lý đơn (Chờ xác nhận -> Đang giao...) cho riêng shop | `planned` |
 

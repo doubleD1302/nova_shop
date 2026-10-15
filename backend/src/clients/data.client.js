@@ -1473,3 +1473,259 @@ export async function fetchShopProducts(idOrSlug, query = {}) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Tạo đơn hàng mới qua Data API:
+ * POST /internal/v1/orders
+ */
+export async function createOrder(orderData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/orders', {
+    method: 'POST',
+    body: orderData,
+  })
+
+  if (status === 200 || status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi tạo đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin tạo đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'NOT_FOUND',
+      json?.message || 'Không tìm thấy dữ liệu yêu cầu.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách đơn hàng của người mua:
+ * GET /internal/v1/orders
+ */
+export async function fetchOrders(query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.userId) searchParams.set('userId', String(query.userId))
+  if (query.status) searchParams.set('status', String(query.status))
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+
+  const queryString = searchParams.toString()
+  const path = queryString ? `/internal/v1/orders?${queryString}` : '/internal/v1/orders'
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return { data: json.data, meta: json.meta }
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy chi tiết đơn hàng:
+ * GET /internal/v1/orders/:orderIdOrCode
+ */
+export async function fetchOrderDetail(orderIdOrCode, userId) {
+  const searchParams = new URLSearchParams()
+  if (userId) searchParams.set('userId', String(userId))
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}?${queryString}`
+    : `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}`
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi chi tiết đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ORDER_NOT_FOUND',
+      json?.message || 'Không tìm thấy đơn hàng yêu cầu.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_ORDER_ID',
+      json?.message || 'Định danh đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Hủy đơn hàng:
+ * PATCH /internal/v1/orders/:orderIdOrCode/cancel
+ */
+export async function cancelOrder(orderIdOrCode, { userId, reason }) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}/cancel`,
+    {
+      method: 'PATCH',
+      body: { userId, reason },
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { cancelled: true }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'ORDER_CANNOT_BE_CANCELLED',
+      json?.message || 'Không thể hủy đơn hàng ở trạng thái hiện tại.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ORDER_NOT_FOUND',
+      json?.message || 'Không tìm thấy đơn hàng cần hủy.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
