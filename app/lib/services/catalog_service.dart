@@ -84,6 +84,18 @@ class CatalogService {
 
     return null;
   }
+
+  /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ
+  /// GET /api/v1/products/featured
+  Future<Map<String, dynamic>> getFeaturedHomeData() async {
+    final response = await _client.get('/api/v1/products/featured');
+
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+
+    return {'flashSale': [], 'featuredProducts': []};
+  }
 }
 
 /// Kết quả phân trang danh sách sản phẩm

@@ -35,8 +35,12 @@
 | **Gian hàng (Shop)** | `src/pages/ShopPage.jsx`<br>`src/components/shop/` | `GET /api/v1/shops/:shopId` | `public` | Chi tiết gian hàng: logo, banner, rating tính toán, số followers (Xem Mục 3.3) | **implemented** (BE-004B) |
 | **Gian hàng (Shop)** | `src/pages/ShopPage.jsx` | `GET /api/v1/shops/:shopId/products` | `public` | Danh sách sản phẩm thuộc một shop cụ thể, có lọc ngành hàng (Xem Mục 3.4) | **implemented** (BE-004B) |
 | **Sản phẩm (Catalog)** | `src/pages/SearchPage.jsx`<br>`src/components/search/` | `GET /api/v1/products` | `public` | Tìm kiếm, lọc theo giá, ngành hàng, sắp xếp, phân trang (Xem Mục 3.5) | **implemented** (BE-004A) |
-| **Sản phẩm (Catalog)** | `src/pages/ProductDetailPage.jsx`<br>`app/lib/screens/product_detail/` | `GET /api/v1/products/:idOrSlug` | `public` | Chi tiết sản phẩm, gallery ảnh, SKU biến thể, thông số kỹ thuật (Xem Mục 3.6) | **implemented** (BE-004A) |
-| **Sản phẩm & Khuyến mãi** | `src/pages/HomePage.jsx`<br>`src/data/homeContent.js` | `GET /api/v1/products/featured` | `public` | Banners, Flash Sale, sản phẩm gợi ý trang chủ | `planned` |
+| **Sản phẩm & Khuyến mãi** | `src/pages/HomePage.jsx`<br>`src/data/homeContent.js` | `GET /api/v1/products/featured` | `public` | Banners, Flash Sale, sản phẩm gợi ý trang chủ | **implemented** (BE-004C) |
+| **Đánh giá (Review)** | `app/lib/services/review_service.dart` | `GET /api/v1/products/:productId/reviews` | `public` | Xem danh sách đánh giá sản phẩm, rating trung bình và ảnh | **implemented** (BE-008) |
+| **Đánh giá (Review)** | `app/lib/services/review_service.dart` | `POST /api/v1/reviews` | `buyer` | Người mua gửi đánh giá sản phẩm sau khi đã nhận hàng | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `GET /api/v1/favorites` | `buyer` / `seller` | Lấy danh sách sản phẩm yêu thích của tài khoản | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `POST /api/v1/favorites/:productId` | `buyer` / `seller` | Thêm sản phẩm vào danh sách yêu thích | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `DELETE /api/v1/favorites/:productId` | `buyer` / `seller` | Xóa sản phẩm khỏi danh sách yêu thích | **implemented** (BE-008) |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | `planned` |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | `planned` |
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | `planned` |

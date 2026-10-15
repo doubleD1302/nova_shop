@@ -2032,3 +2032,270 @@ export async function deleteUserAddress(userId, addressId) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ:
+ * GET /internal/v1/products/featured
+ */
+export async function getFeaturedHomeData() {
+  const { status, data: json } = await requestDataApi('/internal/v1/products/featured')
+
+  if (status === 200) {
+    return json?.data || { flashSale: [], featuredProducts: [] }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách đánh giá của sản phẩm:
+ * GET /internal/v1/products/:productId/reviews
+ */
+export async function getProductReviews(productId, query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+  const qs = searchParams.toString()
+  const endpoint = qs
+    ? `/internal/v1/products/${encodeURIComponent(productId)}/reviews?${qs}`
+    : `/internal/v1/products/${encodeURIComponent(productId)}/reviews`
+
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    return json || { success: true, data: { reviews: [], averageRating: 5.0, totalReviews: 0 } }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PRODUCT_ID',
+      json?.message || 'Mã sản phẩm không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Tạo đánh giá sản phẩm mới:
+ * POST /internal/v1/reviews
+ */
+export async function createProductReview(reviewData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/reviews', {
+    method: 'POST',
+    body: reviewData,
+  })
+
+  if (status === 201) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 403 || status === 404 || status === 409) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'REVIEW_ERROR',
+      json?.message || 'Không thể tạo đánh giá sản phẩm.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm yêu thích của người dùng:
+ * GET /internal/v1/users/:userId/favorites
+ */
+export async function getUserFavorites(userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites`,
+  )
+
+  if (status === 200) {
+    return json?.data || []
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_USER_ID',
+      json?.message || 'Mã người dùng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Thêm sản phẩm vào danh sách yêu thích:
+ * POST /internal/v1/users/:userId/favorites/:productId
+ */
+export async function addUserFavorite(userId, productId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites/${encodeURIComponent(productId)}`,
+    {
+      method: 'POST',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { favorited: true, productId }
+  }
+
+  if (status === 400 || status === 404) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'FAVORITE_ERROR',
+      json?.message || 'Không thể thêm vào danh sách yêu thích.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa sản phẩm khỏi danh sách yêu thích:
+ * DELETE /internal/v1/users/:userId/favorites/:productId
+ */
+export async function removeUserFavorite(userId, productId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites/${encodeURIComponent(productId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { favorited: false, productId }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'FAVORITE_ERROR',
+      json?.message || 'Không thể xóa khỏi danh sách yêu thích.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}

@@ -1,4 +1,10 @@
-import { getCategories as fetchCategories, getProducts as fetchProducts, getProductByIdOrSlug as fetchProductDetail, DataApiClientError } from '../clients/data.client.js'
+import {
+  getCategories as fetchCategories,
+  getProducts as fetchProducts,
+  getProductByIdOrSlug as fetchProductDetail,
+  getFeaturedHomeData as fetchFeaturedHomeData,
+  DataApiClientError,
+} from '../clients/data.client.js'
 
 /**
  * GET /api/v1/categories
@@ -107,6 +113,24 @@ export async function getProductDetail(req, res, next) {
       success: true,
       message: 'Lấy chi tiết sản phẩm thành công.',
       data: product,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * GET /api/v1/products/featured
+ * Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ.
+ */
+export async function getFeaturedProducts(req, res, next) {
+  try {
+    const data = await fetchFeaturedHomeData()
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lấy dữ liệu trang chủ thành công.',
+      data,
     })
   } catch (err) {
     next(err)
