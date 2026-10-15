@@ -174,6 +174,23 @@ class ApiClient {
     }
   }
 
+  /// Gửi HTTP PATCH
+  Future<ApiResponse> patch(String endpoint, {dynamic body, Map<String, String>? headers}) async {
+    try {
+      final uri = _buildUri(endpoint);
+      final reqHeaders = await _buildHeaders(headers);
+      final jsonBody = body != null ? jsonEncode(body) : null;
+      final res = await http.patch(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
+      return ApiResponse.fromResponse(res);
+    } on SocketException {
+      return ApiResponse.error('Không thể kết nối đến máy chủ.');
+    } on TimeoutException {
+      return ApiResponse.error('Kết nối quá thời gian chờ.');
+    } catch (e) {
+      return ApiResponse.error('Đã xảy ra lỗi: $e');
+    }
+  }
+
   /// Ghép base URL với endpoint và query parameters
   Uri _buildUri(String endpoint, [Map<String, String>? queryParams]) {
     final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';

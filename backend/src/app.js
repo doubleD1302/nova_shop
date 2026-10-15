@@ -5,6 +5,7 @@ import { env } from './config/env.js'
 import healthRouter from './routes/health.routes.js'
 import authRouter from './routes/auth.routes.js'
 import catalogRouter from './routes/catalog.routes.js'
+import cartRouter from './routes/cart.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -41,6 +42,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1', catalogRouter)
+app.use('/api/v1/cart', cartRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

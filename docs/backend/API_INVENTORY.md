@@ -5,7 +5,7 @@
 > *Trạng thái tài liệu: Bản nháp kỹ thuật (Draft) — Đã đồng bộ với schema thực tế `database/schema.sql`*
 > *Kiến trúc áp dụng: Frontend (Web/App) → Backend HTTP API (/api/v1/*) → Data API Nội bộ (/internal/v1/*) → Sequelize 6 + mysql2 → MySQL 8.4*
 > *Tham chiếu kiến trúc: Xem tại [ARCHITECTURE.md](./ARCHITECTURE.md) và mô hình dữ liệu tại [DATA_MODEL.md](./DATA_MODEL.md)*
-> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); xác thực auth đã implemented (BE-003A); 3 API đọc catalog công khai và Data API tương ứng đã implemented (BE-004A); các endpoint còn lại (cart, orders, seller) đang ở trạng thái `planned`.*
+> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); xác thực auth đã implemented (BE-003A); 3 API đọc catalog công khai và Data API tương ứng đã implemented (BE-004A); Giỏ hàng Cart API đã implemented (BE-006); các endpoint còn lại (orders, seller) đang ở trạng thái `planned`.*
 
 ---
 
@@ -39,10 +39,10 @@
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `hidden` hoặc `archived` | `planned` |
 | **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | `planned` |
 | **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, sản phẩm bán chạy | `planned` |
-| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` | Thêm SKU vào giỏ: `{ variantId, qty }` | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` | Xóa sản phẩm khỏi giỏ hàng | `planned` |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` / `seller` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` / `seller` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` / `seller` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` / `seller` | Xóa sản phẩm khỏi giỏ hàng | **implemented** (BE-006) |
 | **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn hàng mới (Master Order + Shop Orders). Tính lại giá và trừ kho | `planned` |
 | **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn hàng đã mua của khách, lọc theo status | `planned` |
 | **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Xem chi tiết tiến trình đơn tổng và các đơn con của shop | `planned` |
