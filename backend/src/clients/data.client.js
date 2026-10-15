@@ -926,7 +926,7 @@ export async function getProductByIdOrSlug(idOrSlug) {
  * @returns {Promise<Object>} Thông tin người dùng đã tạo
  */
 export async function registerUser(userData) {
-  const { status, json } = await requestDataApi('/internal/v1/auth/register', {
+  const { status, data: json } = await requestDataApi('/internal/v1/auth/register', {
     method: 'POST',
     body: userData,
   })
@@ -938,7 +938,7 @@ export async function registerUser(userData) {
       json.success === true &&
       json.data?.user
     ) {
-      return json.data.user
+      return validateAuthUserProfile(json.data.user)
     }
     throw new DataApiClientError(
       502,
