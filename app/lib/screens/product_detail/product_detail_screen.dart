@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:shopnova/models/product.dart';
+import 'package:shopnova/services/catalog_service.dart';
+import 'package:shopnova/services/cart_service.dart';
+import 'package:shopnova/screens/cart/cart_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key});
+  final String? productId;
+  final Product? initialProduct;
+
+  const ProductDetailScreen({super.key, this.productId, this.initialProduct});
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -9,10 +17,35 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final Color primaryColor = const Color(0xFFEE4D2D);
+  final CatalogService _catalogService = CatalogService();
+  Product? _product;
+  bool _isLoading = false;
   
   String selectedColor = 'Trắng Basic';
   String selectedSize = 'L (55-65kg)';
   int quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _product = widget.initialProduct;
+    if (widget.productId != null) {
+      _loadProduct(widget.productId!);
+    }
+  }
+
+  Future<void> _loadProduct(String id) async {
+    setState(() => _isLoading = _product == null);
+    final p = await _catalogService.getProductDetail(id);
+    if (mounted && p != null) {
+      setState(() {
+        _product = p;
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   final List<String> colors = ['Trắng Basic', 'Đen Classic', 'Be Vintage', 'Xanh Sage'];
   final List<String> sizes = ['M', 'L (55-65kg)', 'XL', 'XXL'];
@@ -90,12 +123,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Column(
           children: [
             _buildImageSection(),
-            _buildFlashSaleBanner(),
+            if (_product?.discount != null && _product!.discount > 0)
+              _buildFlashSaleBanner(),
             _buildPriceAndTitleSection(),
-            _buildAiStylistBanner(),
             _buildVariantsSection(),
             _buildShopInfoSection(),
-            _buildReviewsPreview(),
             _buildDescriptionSection(),
             const SizedBox(height: 100),
           ],
@@ -113,9 +145,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           AspectRatio(
             aspectRatio: 1,
             child: Container(
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.image, size: 100, color: Colors.grey),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFFF5F2), Color(0xFFFFEAE3)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Center(
+                child: _product?.imageUrl != null && _product!.imageUrl.startsWith('http')
+                    ? Image.network(
+                        _product!.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Text(
+                          _product?.emoji.isNotEmpty == true ? _product!.emoji : '🛍️',
+                          style: const TextStyle(fontSize: 100),
+                        ),
+                      )
+                    : Text(
+                        _product?.emoji.isNotEmpty == true ? _product!.emoji : '🛍️',
+                        style: const TextStyle(fontSize: 100),
+                      ),
               ),
             ),
           ),
@@ -213,15 +263,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('đ 99.000', style: TextStyle(color: primaryColor, fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
-              const Text('180.000đ', style: TextStyle(color: Colors.grey, fontSize: 14, decoration: TextDecoration.lineThrough)),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(2)),
-                child: Text('-45%', style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(_product?.price ?? 99000.0),
+                style: TextStyle(color: primaryColor, fontSize: 24, fontWeight: FontWeight.bold),
               ),
+              if ((_product?.originalPrice ?? 180000.0) > (_product?.price ?? 99000.0)) ...[
+                const SizedBox(width: 8),
+                Text(
+                  NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(_product?.originalPrice ?? 180000.0),
+                  style: const TextStyle(color: Colors.grey, fontSize: 14, decoration: TextDecoration.lineThrough),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(2)),
+                  child: Text('-${_product?.discount ?? 45}%', style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -234,9 +292,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: const Text('Freeship Xtra', style: TextStyle(color: Colors.green, fontSize: 10)),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Áo Thun Cotton Unisex Form Rộng Trơn Thoáng Khí ShopNova Official Co Dãn 4 Chiều Cao Cấp',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4),
+          Text(
+            _product?.name ?? 'Áo Thun Cotton Unisex Form Rộng Trơn Thoáng Khí ShopNova Official Co Dãn 4 Chiều Cao Cấp',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4),
           ),
           const SizedBox(height: 12),
           Row(
@@ -263,61 +321,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildAiStylistBanner() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.auto_awesome, color: primaryColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Nova AI Stylist [TRỢ LÝ ẢO]',
-                style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Phối cùng Quần Short Kaki và Túi Tote để được giảm thêm 15% trọn bộ combo!',
-            style: TextStyle(fontSize: 13, color: Colors.black87),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: primaryColor,
-                    side: BorderSide(color: primaryColor),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  child: const Text('Ướm thử đồ ảo (AI Try-on)', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  child: const Text('Xem Combo', style: TextStyle(fontSize: 12)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildVariantsSection() {
     return Container(
@@ -455,7 +459,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Nova Official Store [MALL]', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text('${_product?.shopName.isNotEmpty == true ? _product!.shopName : "Nova Official Store"} [MALL]', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 4),
                     Text('Online 5 phút trước', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                   ],
@@ -506,83 +510,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildReviewsPreview() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Đánh giá sản phẩm ⭐ 4.9 (3.4k)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text('Xem tất cả >', style: TextStyle(color: primaryColor, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const CircleAvatar(radius: 12, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 16, color: Colors.white)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('nguyen_van_a', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                    const Row(children: [
-                      Icon(Icons.star, color: Colors.amber, size: 12),
-                      Icon(Icons.star, color: Colors.amber, size: 12),
-                      Icon(Icons.star, color: Colors.amber, size: 12),
-                      Icon(Icons.star, color: Colors.amber, size: 12),
-                      Icon(Icons.star, color: Colors.amber, size: 12),
-                    ]),
-                    const SizedBox(height: 4),
-                    const Text('Áo đẹp, chất vải dày dặn mát mẻ, giao hàng nhanh.', style: TextStyle(fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image, size: 20, color: Colors.grey),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image, size: 20, color: Colors.grey),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              )
-            ],
-          )
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildDescriptionSection() {
+    final desc = _product?.description.isNotEmpty == true ? _product!.description : 'Chất liệu 100% cotton cao cấp, thấm hút mồ hôi, co giãn 4 chiều.';
+    final specs = _product?.specs ?? {};
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
       width: double.infinity,
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Mô tả sản phẩm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          SizedBox(height: 12),
-          Text('Chất liệu: 100% Cotton Compact 240GSM', style: TextStyle(fontSize: 13, height: 1.5)),
-          Text('Xuất xứ: Việt Nam', style: TextStyle(fontSize: 13, height: 1.5)),
-          Text('Kiểu dáng: Oversized Relaxed Fit', style: TextStyle(fontSize: 13, height: 1.5)),
-          Text('Chính sách bảo hành: Đổi trả 15 ngày miễn phí', style: TextStyle(fontSize: 13, height: 1.5)),
+          const Text('Mô tả sản phẩm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 12),
+          Text(desc, style: const TextStyle(fontSize: 13, height: 1.5)),
+          if (specs.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('Chi tiết thông số', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            ...specs.entries.map((e) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text('• ${e.key}: ${e.value}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
+            )),
+          ],
         ],
       ),
     );
@@ -614,7 +566,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 2,
             child: InkWell(
-              onTap: () {},
+              onTap: () {
+                final p = _product;
+                CartService().addToCart(
+                  productId: widget.productId ?? p?.id ?? '1',
+                  productName: p?.name ?? 'Sản phẩm ShopNova',
+                  productSlug: p?.id ?? '1',
+                  variantName: '$selectedColor - $selectedSize',
+                  price: p?.price ?? 180000,
+                  originalPrice: p?.originalPrice,
+                  qty: quantity,
+                  imageUrl: p?.images.isNotEmpty == true ? p!.images.first : (p?.imageUrl ?? ''),
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã thêm sản phẩm vào giỏ hàng thành công!'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -627,7 +598,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 5,
             child: InkWell(
-              onTap: () {},
+              onTap: () {
+                final p = _product;
+                CartService().addToCart(
+                  productId: widget.productId ?? p?.id ?? '1',
+                  productName: p?.name ?? 'Sản phẩm ShopNova',
+                  productSlug: p?.id ?? '1',
+                  variantName: '$selectedColor - $selectedSize',
+                  price: p?.price ?? 180000,
+                  originalPrice: p?.originalPrice,
+                  qty: quantity,
+                  imageUrl: p?.images.isNotEmpty == true ? p!.images.first : (p?.imageUrl ?? ''),
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CartScreen()),
+                );
+              },
               child: Container(
                 color: primaryColor,
                 child: const Column(

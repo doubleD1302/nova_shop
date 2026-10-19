@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
+import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
 import 'package:shopnova/theme/app_colors.dart';
 
 class FlashSaleItemCard extends StatelessWidget {
@@ -15,9 +16,18 @@ class FlashSaleItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 130,
-      child: Column(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(productId: item.id),
+          ),
+        );
+      },
+      child: SizedBox(
+        width: 130,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
@@ -26,8 +36,21 @@ class FlashSaleItemCard extends StatelessWidget {
                 width: 130,
                 height: 130,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFF0EC), Color(0xFFFFDDD2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(4),
+                ),
+                child: Center(
+                  child: item.imageUrl.isNotEmpty && item.imageUrl.startsWith('http')
+                      ? Image.network(
+                          item.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(item.emoji, style: const TextStyle(fontSize: 48)),
+                        )
+                      : Text(item.emoji, style: const TextStyle(fontSize: 48)),
                 ),
               ),
               if (item.discount > 0)
@@ -99,6 +122,7 @@ class FlashSaleItemCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

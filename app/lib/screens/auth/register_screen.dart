@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../services/auth_service.dart';
+import '../main_screen.dart';
 import 'login_screen.dart' as shopnova_auth;
 import 'otp_screen.dart';
 
@@ -11,9 +13,92 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _agreeTerms = true;
+  bool _isLoading = false;
   String _password = "";
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    final fullName = _fullNameController.text.trim();
+    final phone = _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
+    final password = _passwordController.text;
+
+    if (fullName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập họ và tên của bạn.')),
+      );
+      return;
+    }
+
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập số điện thoại hoặc tên đăng nhập.')),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mật khẩu phải có ít nhất 6 ký tự.')),
+      );
+      return;
+    }
+
+    if (!_agreeTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bạn cần đồng ý với Điều khoản dịch vụ & Chính sách bảo mật.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Dùng số điện thoại hoặc username đã chuẩn hóa
+    final username = phone.toLowerCase();
+    final authService = AuthService();
+    final success = await authService.register(
+      username: username,
+      password: password,
+      fullName: fullName,
+      phone: phone,
+      role: 'buyer',
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng ký thành công! Chào mừng ${authService.currentUser?.fullName ?? fullName}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authService.lastError ?? 'Đăng ký không thành công.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget _buildAppBar() {
@@ -262,8 +347,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey[200]!)
             ),
-            child: const TextField(
-              decoration: InputDecoration(
+            child: TextField(
+              controller: _fullNameController,
+              decoration: const InputDecoration(
                 hintText: 'Nhập họ và tên của bạn',
                 hintStyle: TextStyle(color: Colors.grey),
                 prefixIcon: Icon(Icons.person, color: Colors.grey),
@@ -273,7 +359,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Số điện thoại', style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)),
+          const Text('Số điện thoại / Tên đăng nhập', style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
@@ -288,11 +374,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(width: 6),
                 const Text('+84', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 Container(width: 1, height: 16, color: Colors.grey[300], margin: const EdgeInsets.symmetric(horizontal: 8)),
-                const Expanded(
+                Expanded(
                   child: TextField(
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      hintText: '912 345 678',
+                    controller: _phoneController,
+                    keyboardType: TextInputType.text,
+                    decoration: const InputDecoration(
+                      hintText: '0912345678 hoặc username',
                       hintStyle: TextStyle(color: Colors.grey),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 14),
@@ -318,6 +405,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               border: Border.all(color: Colors.grey[200]!)
             ),
             child: TextField(
+              controller: _passwordController,
               obscureText: _obscurePassword,
               onChanged: (val) {
                 setState(() { _password = val; });
@@ -444,9 +532,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const OtpScreen()));
-            },
+            onPressed: _isLoading ? null : _handleRegister,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -454,14 +540,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Đăng Ký Tài Khoản & Nhận Quà', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                SizedBox(width: 8),
-                Icon(Icons.arrow_forward, size: 20),
-              ],
-            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Đăng Ký Tài Khoản & Nhận Quà', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      SizedBox(width: 8),
+                      Icon(Icons.arrow_forward, size: 20),
+                    ],
+                  ),
           ),
         ],
       ),

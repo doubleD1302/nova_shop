@@ -18,7 +18,15 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductDetailScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(
+              productId: product.id,
+              initialProduct: product,
+            ),
+          ),
+        );
       },
       child: Container(
       decoration: BoxDecoration(
@@ -33,8 +41,8 @@ class ProductCard extends StatelessWidget {
             aspectRatio: 1.0,
             child: Stack(
               children: [
-                Container(
-                  color: Colors.grey[200],
+                Positioned.fill(
+                  child: _buildThumbnail(product),
                 ),
                 Positioned(
                   top: 0,
@@ -185,5 +193,51 @@ class ProductCard extends StatelessWidget {
         ],
       ),
     ));
+  }
+
+  Widget _buildThumbnail(Product p) {
+    if (p.imageUrl.isNotEmpty && p.imageUrl.startsWith('http')) {
+      return Image.network(
+        p.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildEmojiFallback(p),
+      );
+    }
+    return _buildEmojiFallback(p);
+  }
+
+  Widget _buildEmojiFallback(Product p) {
+    final Map<String, List<Color>> categoryPalette = {
+      'thoi-trang-nam': [const Color(0xFFDBEAFE), const Color(0xFFBFDBFE)],
+      'thoi-trang-nu': [const Color(0xFFFCE7F3), const Color(0xFFFBCFE8)],
+      'dien-thoai': [const Color(0xFFE0E7FF), const Color(0xFFC7D2FE)],
+      'may-tinh': [const Color(0xFFE2E8F0), const Color(0xFFCBD5E1)],
+      'thiet-bi-gia-dung': [const Color(0xFFCFFAFE), const Color(0xFFA5F3FC)],
+      'sac-dep': [const Color(0xFFFFE4E6), const Color(0xFFFECDD3)],
+      'nha-cua': [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)],
+      'me-be': [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)],
+      'bach-hoa': [const Color(0xFFECFCCB), const Color(0xFFD9F99D)],
+      'the-thao': [const Color(0xFFFFEDD5), const Color(0xFFFED7AA)],
+      'o-to-xe-may': [const Color(0xFFE5E7EB), const Color(0xFFD1D5DB)],
+      'may-anh': [const Color(0xFFEDE9FE), const Color(0xFFDDD6FE)],
+    };
+
+    final colors = categoryPalette[p.categoryId] ?? [const Color(0xFFFFF0ED), const Color(0xFFFFDDD6)];
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          p.emoji.isNotEmpty ? p.emoji : '🛍️',
+          style: const TextStyle(fontSize: 48),
+        ),
+      ),
+    );
   }
 }

@@ -11,28 +11,36 @@ class SuggestionTabBar extends StatelessWidget {
     required this.onTabChanged,
   });
 
+  static const List<String> tabs = [
+    'GỢI Ý HÔM NAY',
+    'FREESHIP EXTRA',
+    'GIẢM GIÁ 50%',
+    'HÀNG HIỆU OUTLET',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      child: Row(
-        children: [
-          _buildTab(0, 'GỢI Ý HÔM NAY'),
-          _buildTab(1, 'NOVA MALL'),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(tabs.length, (index) {
+            return _buildTab(index, tabs[index]);
+          }),
+        ),
       ),
     );
   }
 
   Widget _buildTab(int index, String title) {
     final isSelected = selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => onTabChanged(index),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: () => onTabChanged(index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
@@ -51,8 +59,7 @@ class SuggestionTabBar extends StatelessWidget {
                 )
               else
                 const SizedBox(height: 3),
-            ],
-          ),
+          ],
         ),
       ),
     );
