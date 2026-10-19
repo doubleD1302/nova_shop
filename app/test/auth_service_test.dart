@@ -4,6 +4,8 @@ import 'package:shopnova/services/api_config.dart';
 import 'package:shopnova/services/auth_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ApiConfig Tests', () {
     test('Default endpoints are formatted correctly', () {
       ApiConfig.resetBaseUrl();

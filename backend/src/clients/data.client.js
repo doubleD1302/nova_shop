@@ -665,3 +665,2075 @@ export async function getUserAuthProfile(userId) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Lấy danh sách ngành hàng / danh mục từ Data API:
+ * GET /internal/v1/categories
+ */
+export async function getCategories() {
+  const { status, data: json } = await requestDataApi('/internal/v1/categories')
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      !Array.isArray(json.data)
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi danh mục từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return json.data
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm kèm lọc và phân trang từ Data API:
+ * GET /internal/v1/products
+ */
+export async function getProducts(params = {}) {
+  const searchParams = new URLSearchParams()
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== '') {
+      searchParams.append(key, String(val))
+    }
+  }
+
+  const queryString = searchParams.toString()
+  const endpoint = queryString ? `/internal/v1/products?${queryString}` : '/internal/v1/products'
+
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      !Array.isArray(json.data) ||
+      typeof json.meta !== 'object' ||
+      json.meta === null
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi danh sách sản phẩm từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return {
+      data: json.data,
+      meta: json.meta,
+    }
+  }
+
+  if (status === 400) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'INVALID_QUERY'
+    ) {
+      throw new DataApiClientError(
+        400,
+        'INVALID_QUERY',
+        json.message || 'Tham số truy vấn không hợp lệ.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 400 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy chi tiết sản phẩm theo ID hoặc Slug từ Data API:
+ * GET /internal/v1/products/:idOrSlug
+ */
+export async function getProductByIdOrSlug(idOrSlug) {
+  const endpoint = `/internal/v1/products/${encodeURIComponent(idOrSlug)}`
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      json.success !== true ||
+      typeof json.data !== 'object' ||
+      json.data === null
+    ) {
+      throw new DataApiClientError(
+        502,
+        'DATA_API_BAD_RESPONSE',
+        'Phản hồi chi tiết sản phẩm từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+      )
+    }
+
+    return json.data
+  }
+
+  if (status === 404) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'PRODUCT_NOT_FOUND'
+    ) {
+      throw new DataApiClientError(
+        404,
+        'PRODUCT_NOT_FOUND',
+        json.message || 'Không tìm thấy sản phẩm.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 404 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'INVALID_PARAMS'
+    ) {
+      throw new DataApiClientError(
+        400,
+        'INVALID_PARAMS',
+        json.message || 'Mã định danh sản phẩm không hợp lệ.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 400 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === false &&
+      json.error?.code === 'DATABASE_UNAVAILABLE'
+    ) {
+      throw new DataApiClientError(
+        503,
+        'DATA_API_UNAVAILABLE',
+        'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+      )
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi lỗi 503 từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Gọi POST /internal/v1/auth/register sang Data API để tạo tài khoản mới.
+ * @param {Object} userData Thông tin tài khoản người mua hoặc người bán
+ * @returns {Promise<Object>} Thông tin người dùng đã tạo
+ */
+export async function registerUser(userData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/auth/register', {
+    method: 'POST',
+    body: userData,
+  })
+
+  if (status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      json.data?.user
+    ) {
+      return validateAuthUserProfile(json.data.user)
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 409) {
+    throw new DataApiClientError(
+      409,
+      json.error?.code || 'CONFLICT',
+      json.message || 'Tên đăng nhập hoặc email đã tồn tại.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json.error?.code || 'VALIDATION_ERROR',
+      json.message || 'Dữ liệu đăng ký không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy giỏ hàng của người dùng từ Data API:
+ * GET /internal/v1/cart?userId=:userId
+ */
+export async function fetchCart(userId) {
+  const { status, data: json } = await requestDataApi(`/internal/v1/cart?userId=${encodeURIComponent(userId)}`)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi giỏ hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_USER_ID',
+      json?.message || 'Mã người dùng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Thêm sản phẩm vào giỏ hàng qua Data API:
+ * POST /internal/v1/cart/items
+ */
+export async function addItemToCart(data) {
+  const { status, data: json } = await requestDataApi('/internal/v1/cart/items', {
+    method: 'POST',
+    body: data,
+  })
+
+  if (status === 200 || status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi thêm giỏ hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'VARIANT_NOT_FOUND',
+      json?.message || 'Biến thể sản phẩm không tồn tại.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Dữ liệu thêm vào giỏ không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Cập nhật số lượng hoặc trạng thái chọn trong giỏ hàng:
+ * PATCH /internal/v1/cart/items/:itemId
+ */
+export async function updateCartItem(itemId, data) {
+  const { status, data: json } = await requestDataApi(`/internal/v1/cart/items/${encodeURIComponent(itemId)}`, {
+    method: 'PATCH',
+    body: data,
+  })
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi cập nhật giỏ hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'CART_ITEM_NOT_FOUND',
+      json?.message || 'Không tìm thấy sản phẩm trong giỏ hàng.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Dữ liệu cập nhật giỏ hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa một sản phẩm khỏi giỏ hàng:
+ * DELETE /internal/v1/cart/items/:itemId
+ */
+export async function removeCartItem(itemId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/cart/items/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(userId)}`,
+    {
+      method: 'DELETE',
+    }
+  )
+
+  if (status === 200) {
+    return json?.data || { itemId }
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'CART_ITEM_NOT_FOUND',
+      json?.message || 'Không tìm thấy dòng sản phẩm trong giỏ hàng.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_ITEM_ID',
+      json?.message || 'Mã dòng giỏ hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa nhiều sản phẩm hoặc xóa sạch giỏ hàng:
+ * DELETE /internal/v1/cart/items
+ */
+export async function clearOrRemoveCartItems(data) {
+  const { status, data: json } = await requestDataApi('/internal/v1/cart/items', {
+    method: 'DELETE',
+    body: data,
+  })
+
+  if (status === 200) {
+    return json?.data || {}
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_REQUEST',
+      json?.message || 'Yêu cầu không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách gian hàng trên sàn:
+ * GET /internal/v1/shops
+ */
+export async function fetchShops(query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+  if (query.mall !== undefined) searchParams.set('mall', String(query.mall))
+  if (query.keyword) searchParams.set('keyword', String(query.keyword))
+  if (query.province) searchParams.set('province', String(query.province))
+  if (query.sort) searchParams.set('sort', String(query.sort))
+
+  const queryString = searchParams.toString()
+  const path = queryString ? `/internal/v1/shops?${queryString}` : '/internal/v1/shops'
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return { data: json.data, meta: json.meta }
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách gian hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn gian hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy chi tiết gian hàng theo ID hoặc Slug:
+ * GET /internal/v1/shops/:idOrSlug
+ */
+export async function fetchShopDetail(idOrSlug) {
+  const { status, data: json } = await requestDataApi(`/internal/v1/shops/${encodeURIComponent(idOrSlug)}`)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi chi tiết gian hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'SHOP_NOT_FOUND',
+      json?.message || 'Không tìm thấy gian hàng yêu cầu.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_SHOP_ID',
+      json?.message || 'Định danh gian hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm của gian hàng:
+ * GET /internal/v1/shops/:idOrSlug/products
+ */
+export async function fetchShopProducts(idOrSlug, query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+  if (query.categoryId) searchParams.set('categoryId', String(query.categoryId))
+  if (query.sort) searchParams.set('sort', String(query.sort))
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/internal/v1/shops/${encodeURIComponent(idOrSlug)}/products?${queryString}`
+    : `/internal/v1/shops/${encodeURIComponent(idOrSlug)}/products`
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return { data: json.data, meta: json.meta }
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách sản phẩm gian hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'SHOP_NOT_FOUND',
+      json?.message || 'Không tìm thấy gian hàng yêu cầu.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn sản phẩm của gian hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Tạo đơn hàng mới qua Data API:
+ * POST /internal/v1/orders
+ */
+export async function createOrder(orderData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/orders', {
+    method: 'POST',
+    body: orderData,
+  })
+
+  if (status === 200 || status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi tạo đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin tạo đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'NOT_FOUND',
+      json?.message || 'Không tìm thấy dữ liệu yêu cầu.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách đơn hàng của người mua:
+ * GET /internal/v1/orders
+ */
+export async function fetchOrders(query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.userId) searchParams.set('userId', String(query.userId))
+  if (query.status) searchParams.set('status', String(query.status))
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+
+  const queryString = searchParams.toString()
+  const path = queryString ? `/internal/v1/orders?${queryString}` : '/internal/v1/orders'
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return { data: json.data, meta: json.meta }
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy chi tiết đơn hàng:
+ * GET /internal/v1/orders/:orderIdOrCode
+ */
+export async function fetchOrderDetail(orderIdOrCode, userId) {
+  const searchParams = new URLSearchParams()
+  if (userId) searchParams.set('userId', String(userId))
+
+  const queryString = searchParams.toString()
+  const path = queryString
+    ? `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}?${queryString}`
+    : `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}`
+
+  const { status, data: json } = await requestDataApi(path)
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi chi tiết đơn hàng từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ORDER_NOT_FOUND',
+      json?.message || 'Không tìm thấy đơn hàng yêu cầu.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_ORDER_ID',
+      json?.message || 'Định danh đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Hủy đơn hàng:
+ * PATCH /internal/v1/orders/:orderIdOrCode/cancel
+ */
+export async function cancelOrder(orderIdOrCode, { userId, reason }) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/orders/${encodeURIComponent(orderIdOrCode)}/cancel`,
+    {
+      method: 'PATCH',
+      body: { userId, reason },
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { cancelled: true }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'ORDER_CANNOT_BE_CANCELLED',
+      json?.message || 'Không thể hủy đơn hàng ở trạng thái hiện tại.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ORDER_NOT_FOUND',
+      json?.message || 'Không tìm thấy đơn hàng cần hủy.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Cập nhật thông tin hồ sơ người dùng:
+ * PUT /internal/v1/users/:userId/profile
+ */
+export async function updateUserProfile(userId, profileData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/profile`,
+    {
+      method: 'PUT',
+      body: profileData,
+    },
+  )
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data?.user === 'object'
+    ) {
+      return json.data.user
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi cập nhật hồ sơ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin hồ sơ không hợp lệ.',
+    )
+  }
+
+  if (status === 409) {
+    throw new DataApiClientError(
+      409,
+      json?.error?.code || 'EMAIL_EXISTS',
+      json?.message || 'Email đã được sử dụng bởi tài khoản khác.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'USER_NOT_FOUND',
+      json?.message || 'Không tìm thấy thông tin người dùng.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách địa chỉ nhận hàng của người dùng:
+ * GET /internal/v1/users/:userId/addresses
+ */
+export async function fetchUserAddresses(userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses`,
+  )
+
+  if (status === 200) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      Array.isArray(json.data)
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi danh sách địa chỉ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_USER_ID',
+      json?.message || 'Mã tài khoản không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Thêm địa chỉ nhận hàng mới:
+ * POST /internal/v1/users/:userId/addresses
+ */
+export async function createUserAddress(userId, addressData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses`,
+    {
+      method: 'POST',
+      body: addressData,
+    },
+  )
+
+  if (status === 200 || status === 201) {
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      json.success === true &&
+      typeof json.data === 'object' &&
+      json.data !== null
+    ) {
+      return json.data
+    }
+    throw new DataApiClientError(
+      502,
+      'DATA_API_BAD_RESPONSE',
+      'Phản hồi tạo địa chỉ từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin địa chỉ không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Đặt địa chỉ làm mặc định:
+ * PATCH /internal/v1/users/:userId/addresses/:addressId/default
+ */
+export async function setDefaultUserAddress(userId, addressId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses/${encodeURIComponent(addressId)}/default`,
+    {
+      method: 'PATCH',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || {}
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ADDRESS_NOT_FOUND',
+      json?.message || 'Không tìm thấy địa chỉ nhận hàng.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PARAMS',
+      json?.message || 'Tham số yêu cầu không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa địa chỉ nhận hàng:
+ * DELETE /internal/v1/users/:userId/addresses/:addressId
+ */
+export async function deleteUserAddress(userId, addressId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/addresses/${encodeURIComponent(addressId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { deleted: true }
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'ADDRESS_NOT_FOUND',
+      json?.message || 'Không tìm thấy địa chỉ cần xóa.',
+    )
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PARAMS',
+      json?.message || 'Tham số yêu cầu không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ:
+ * GET /internal/v1/products/featured
+ */
+export async function getFeaturedHomeData() {
+  const { status, data: json } = await requestDataApi('/internal/v1/products/featured')
+
+  if (status === 200) {
+    return json?.data || { flashSale: [], featuredProducts: [] }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách đánh giá của sản phẩm:
+ * GET /internal/v1/products/:productId/reviews
+ */
+export async function getProductReviews(productId, query = {}) {
+  const searchParams = new URLSearchParams()
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+  const qs = searchParams.toString()
+  const endpoint = qs
+    ? `/internal/v1/products/${encodeURIComponent(productId)}/reviews?${qs}`
+    : `/internal/v1/products/${encodeURIComponent(productId)}/reviews`
+
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    return json || { success: true, data: { reviews: [], averageRating: 5.0, totalReviews: 0 } }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_PRODUCT_ID',
+      json?.message || 'Mã sản phẩm không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Tạo đánh giá sản phẩm mới:
+ * POST /internal/v1/reviews
+ */
+export async function createProductReview(reviewData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/reviews', {
+    method: 'POST',
+    body: reviewData,
+  })
+
+  if (status === 201) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 403 || status === 404 || status === 409) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'REVIEW_ERROR',
+      json?.message || 'Không thể tạo đánh giá sản phẩm.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm yêu thích của người dùng:
+ * GET /internal/v1/users/:userId/favorites
+ */
+export async function getUserFavorites(userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites`,
+  )
+
+  if (status === 200) {
+    return json?.data || []
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_USER_ID',
+      json?.message || 'Mã người dùng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Thêm sản phẩm vào danh sách yêu thích:
+ * POST /internal/v1/users/:userId/favorites/:productId
+ */
+export async function addUserFavorite(userId, productId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites/${encodeURIComponent(productId)}`,
+    {
+      method: 'POST',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { favorited: true, productId }
+  }
+
+  if (status === 400 || status === 404) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'FAVORITE_ERROR',
+      json?.message || 'Không thể thêm vào danh sách yêu thích.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa sản phẩm khỏi danh sách yêu thích:
+ * DELETE /internal/v1/users/:userId/favorites/:productId
+ */
+export async function removeUserFavorite(userId, productId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/favorites/${encodeURIComponent(productId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { favorited: false, productId }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'FAVORITE_ERROR',
+      json?.message || 'Không thể xóa khỏi danh sách yêu thích.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách đơn hàng con thuộc shop của seller:
+ * GET /internal/v1/seller/orders?shopId=...
+ */
+export async function fetchSellerOrders(shopId, query = {}) {
+  const searchParams = new URLSearchParams()
+  searchParams.set('shopId', String(shopId))
+  if (query.status) searchParams.set('status', String(query.status))
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+
+  const endpoint = `/internal/v1/seller/orders?${searchParams.toString()}`
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    return json || { success: true, data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 1 } }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn đơn hàng không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Cập nhật trạng thái đơn hàng con của người bán:
+ * PATCH /internal/v1/seller/orders/:shopOrderId/status
+ */
+export async function updateSellerOrderStatus(shopOrderId, updateData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/orders/${encodeURIComponent(shopOrderId)}/status`,
+    {
+      method: 'PATCH',
+      body: updateData,
+    },
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 404) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'ORDER_UPDATE_ERROR',
+      json?.message || 'Không thể cập nhật trạng thái đơn hàng.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy danh sách sản phẩm của shop:
+ * GET /internal/v1/seller/products?shopId=...
+ */
+export async function fetchSellerProducts(shopId, query = {}) {
+  const searchParams = new URLSearchParams()
+  searchParams.set('shopId', String(shopId))
+  if (query.status) searchParams.set('status', String(query.status))
+  if (query.page) searchParams.set('page', String(query.page))
+  if (query.limit) searchParams.set('limit', String(query.limit))
+
+  const endpoint = `/internal/v1/seller/products?${searchParams.toString()}`
+  const { status, data: json } = await requestDataApi(endpoint)
+
+  if (status === 200) {
+    return json || { success: true, data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 1 } }
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'INVALID_QUERY',
+      json?.message || 'Tham số truy vấn không hợp lệ.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Tạo mới sản phẩm cho shop:
+ * POST /internal/v1/seller/products
+ */
+export async function createSellerProduct(productData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/seller/products', {
+    method: 'POST',
+    body: productData,
+  })
+
+  if (status === 201) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 409) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Không thể tạo sản phẩm.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Cập nhật thông tin sản phẩm:
+ * PUT /internal/v1/seller/products/:productId
+ */
+export async function updateSellerProduct(productId, updateData) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/products/${encodeURIComponent(productId)}`,
+    {
+      method: 'PUT',
+      body: updateData,
+    },
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 404) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'UPDATE_ERROR',
+      json?.message || 'Không thể cập nhật sản phẩm.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Xóa/lưu trữ sản phẩm:
+ * DELETE /internal/v1/seller/products/:productId?shopId=...
+ */
+export async function deleteSellerProduct(productId, shopId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/products/${encodeURIComponent(productId)}?shopId=${encodeURIComponent(shopId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { archived: true }
+  }
+
+  if (status === 400 || status === 404) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'DELETE_ERROR',
+      json?.message || 'Không thể xóa sản phẩm.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
+  )
+}
+
+/**
+ * Lấy thông tin shop của người bán:
+ * GET /internal/v1/seller/shop?shopId=...
+ */
+export async function fetchSellerShop(shopId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/shop?shopId=${encodeURIComponent(shopId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(404, 'SHOP_NOT_FOUND', 'Không tìm thấy gian hàng.')
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Cập nhật thông tin shop của người bán:
+ * PUT /internal/v1/seller/shop
+ */
+export async function updateSellerShop(shopId, data) {
+  const { status, data: json } = await requestDataApi('/internal/v1/seller/shop', {
+    method: 'PUT',
+    body: { ...data, shopId },
+  })
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(400, json?.error?.code || 'VALIDATION_ERROR', json?.message || 'Dữ liệu cập nhật gian hàng không hợp lệ.')
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Lấy số liệu thống kê Dashboard cho người bán:
+ * GET /internal/v1/seller/dashboard?shopId=...
+ */
+export async function fetchSellerDashboard(shopId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/seller/dashboard?shopId=${encodeURIComponent(shopId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Kiểm tra trạng thái theo dõi shop:
+ * GET /internal/v1/shops/:shopId/follow?userId=...
+ */
+export async function checkShopFollow(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow?userId=${encodeURIComponent(userId)}`,
+  )
+
+  if (status === 200) {
+    return json?.data?.isFollowing ?? false
+  }
+
+  return false
+}
+
+/**
+ * Người dùng theo dõi shop:
+ * POST /internal/v1/shops/:shopId/follow
+ */
+export async function followShop(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow`,
+    {
+      method: 'POST',
+      body: { userId },
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { shopId, isFollowing: true }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+
+/**
+ * Người dùng hủy theo dõi shop:
+ * DELETE /internal/v1/shops/:shopId/follow?userId=...
+ */
+export async function unfollowShop(shopId, userId) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/shops/${encodeURIComponent(shopId)}/follow?userId=${encodeURIComponent(userId)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  if (status === 200) {
+    return json?.data || { shopId, isFollowing: false }
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}

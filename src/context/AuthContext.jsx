@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { users as seedUsers } from '../data/users'
 import { shopAvatar } from '../utils/image'
-import { apiGetMe, apiLogin } from '../utils/api'
+import { apiGetMe, apiLogin, apiRegister } from '../utils/api'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'novashop_token'
@@ -199,12 +199,47 @@ export function AuthProvider({ children }) {
   }, [])
 
   /**
-   * Đăng ký chưa có API Backend: không tạo phiên hoặc báo lưu thành công local.
+   * Đăng ký tài khoản mới qua Backend API.
    */
-  const register = useCallback(() => {
-    return {
-      ok: false,
-      error: 'Tính năng đăng ký tài khoản trực tuyến chưa được hỗ trợ trên Backend API.',
+  const register = useCallback(async (formData) => {
+    try {
+      const res = await apiRegister(formData)
+      const data = await res.json().catch(() => null)
+
+      if (res.ok && data?.success && data?.data?.token) {
+        restoreAbortRef.current?.abort()
+        authVersionRef.current += 1
+
+        const { token, user: apiUser } = data.data
+        sessionStorage.setItem(TOKEN_KEY, token)
+        const normalized = normalizeUser(apiUser)
+        setUser(normalized)
+        return { ok: true, user: normalized }
+      }
+
+      if (res.status === 409) {
+        return {
+          ok: false,
+          error: data?.message || 'Tên đăng nhập hoặc email đã tồn tại.',
+        }
+      }
+
+      if (res.status === 400) {
+        return {
+          ok: false,
+          error: data?.message || 'Thông tin đăng ký không hợp lệ.',
+        }
+      }
+
+      return {
+        ok: false,
+        error: data?.message || `Lỗi máy chủ (${res.status}). Vui lòng thử lại sau.`,
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        error: 'Không thể kết nối đến máy chủ Backend. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      }
     }
   }, [])
 

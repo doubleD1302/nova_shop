@@ -1,4 +1,4 @@
-class UserModel {
+class User {
   final String id;
   final String username;
   final String fullName;
@@ -9,7 +9,7 @@ class UserModel {
   final String status;
   final String? shopId;
 
-  const UserModel({
+  const User({
     required this.id,
     required this.username,
     required this.fullName,
@@ -17,20 +17,23 @@ class UserModel {
     this.phone,
     this.avatarUrl,
     required this.role,
-    required this.status,
+    this.status = 'active',
     this.shopId,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
+  bool get isSeller => role == 'seller';
+  bool get isBuyer => role == 'buyer';
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
       id: json['id']?.toString() ?? '',
-      username: json['username'] as String? ?? '',
-      fullName: (json['fullName'] ?? json['full_name'] ?? '') as String,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      avatarUrl: (json['avatarUrl'] ?? json['avatar_url']) as String?,
-      role: json['role'] as String? ?? 'buyer',
-      status: json['status'] as String? ?? 'active',
+      username: json['username']?.toString() ?? '',
+      fullName: (json['fullName'] ?? json['full_name'] ?? json['username'] ?? '').toString(),
+      email: json['email']?.toString(),
+      phone: json['phone']?.toString(),
+      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'])?.toString(),
+      role: json['role']?.toString() ?? 'buyer',
+      status: json['status']?.toString() ?? 'active',
       shopId: json['shopId']?.toString() ?? json['shop_id']?.toString(),
     );
   }
@@ -47,7 +50,7 @@ class UserModel {
     'shopId': shopId,
   };
 
-  UserModel copyWith({
+  User copyWith({
     String? id,
     String? username,
     String? fullName,
@@ -58,7 +61,7 @@ class UserModel {
     String? status,
     String? shopId,
   }) {
-    return UserModel(
+    return User(
       id: id ?? this.id,
       username: username ?? this.username,
       fullName: fullName ?? this.fullName,
@@ -71,3 +74,5 @@ class UserModel {
     );
   }
 }
+
+typedef UserModel = User;

@@ -1,24 +1,36 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
+/// Service xử lý xác thực tài khoản (Đăng nhập, Đăng ký, Hồ sơ cá nhân)
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
+  final ApiClient _client = ApiClient();
+  static const String _userKey = 'novashop_current_user';
+
   String? _token;
-  UserModel? _currentUser;
+  User? _currentUser;
   bool _isLoading = false;
   String? _lastError;
 
   String? get token => _token;
-  UserModel? get currentUser => _currentUser;
+  User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
   bool get isAuthenticated => _token != null && _currentUser != null;
+
+  /// Kiểm tra trạng thái đã đăng nhập
+  Future<bool> isLoggedIn() async {
+    final t = _token ?? await _client.getToken();
+    return t != null && t.isNotEmpty;
+  }
 
   /// Kiểm tra kết nối Liveness của Backend (tự động thử dự phòng nếu rút cáp USB)
   Future<bool> checkHealth() async {
@@ -31,7 +43,6 @@ class AuthService extends ChangeNotifier {
         return data['success'] == true;
       }
     } catch (_) {
-      // Nếu cổng hiện tại bị đứt (ví dụ vừa tháo cáp USB), tự động dò tìm
       try {
         final workingUrl = await ApiConfig.autoDetectBaseUrl();
         final response = await http
@@ -95,8 +106,12 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200 && body['success'] == true) {
         final data = body['data'] as Map<String, dynamic>;
         _token = data['token'] as String?;
+        if (_token != null) {
+          await _client.saveToken(_token!);
+        }
         if (data['user'] != null) {
-          _currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
         }
         _isLoading = false;
         notifyListeners();
@@ -124,24 +139,30 @@ class AuthService extends ChangeNotifier {
     String? email,
     String? phone,
     String role = 'buyer',
+    String? shopName,
   }) async {
     _isLoading = true;
     _lastError = null;
     notifyListeners();
 
     try {
+      final payload = <String, dynamic>{
+        'username': username.trim().toLowerCase(),
+        'password': password,
+        'fullName': fullName.trim(),
+        'role': role,
+      };
+      if (email != null && email.trim().isNotEmpty) payload['email'] = email.trim();
+      if (phone != null && phone.trim().isNotEmpty) payload['phone'] = phone.trim();
+      if (role == 'seller' && shopName != null && shopName.trim().isNotEmpty) {
+        payload['shopName'] = shopName.trim();
+      }
+
       final response = await http
           .post(
             Uri.parse(ApiConfig.registerUrl),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'username': username.trim().toLowerCase(),
-              'password': password,
-              'fullName': fullName.trim(),
-              'email': email,
-              'phone': phone,
-              'role': role,
-            }),
+            body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 10));
 
@@ -150,8 +171,12 @@ class AuthService extends ChangeNotifier {
       if ((response.statusCode == 200 || response.statusCode == 201) && body['success'] == true) {
         final data = body['data'] as Map<String, dynamic>;
         _token = data['token'] as String?;
+        if (_token != null) {
+          await _client.saveToken(_token!);
+        }
         if (data['user'] != null) {
-          _currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
         }
         _isLoading = false;
         notifyListeners();
@@ -171,16 +196,22 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Lấy thông tin tài khoản hiện tại từ Backend qua JWT token
+  Future<User?> getMe() async {
+    return fetchCurrentUser();
+  }
+
   /// Lấy thông tin tài khoản hiện tại với JWT Token
-  Future<UserModel?> fetchCurrentUser() async {
-    if (_token == null) return null;
+  Future<User?> fetchCurrentUser() async {
+    final t = _token ?? await _client.getToken();
+    if (t == null || t.isEmpty) return null;
 
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.meUrl),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
+          'Authorization': 'Bearer $t',
         },
       ).timeout(const Duration(seconds: 5));
 
@@ -188,7 +219,9 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200 && body['success'] == true) {
         final data = body['data'] as Map<String, dynamic>;
         if (data['user'] != null) {
-          _currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+          _token = t;
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
           notifyListeners();
           return _currentUser;
         }
@@ -199,14 +232,47 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
+  /// Khôi phục thông tin user đã lưu trong máy khi mở app
+  Future<User?> restoreSession() async {
+    final t = await _client.getToken();
+    if (t == null || t.isEmpty) {
+      _currentUser = null;
+      _token = null;
+      return null;
+    }
+    _token = t;
+
+    // Nạp tạm user từ SharedPreferences để hiển thị UI nhanh
+    final prefs = await SharedPreferences.getInstance();
+    final userJsonStr = prefs.getString(_userKey);
+    if (userJsonStr != null) {
+      try {
+        _currentUser = User.fromJson(jsonDecode(userJsonStr));
+        notifyListeners();
+      } catch (_) {}
+    }
+
+    // Đồng bộ thông tin mới nhất từ server
+    try {
+      final freshUser = await fetchCurrentUser();
+      if (freshUser != null) {
+        _currentUser = freshUser;
+        notifyListeners();
+      }
+    } catch (_) {}
+
+    return _currentUser;
+  }
+
   /// Cập nhật thông tin hồ sơ tài khoản
   Future<bool> updateProfile({
     String? fullName,
-    String? email,
     String? phone,
+    String? email,
     String? avatarUrl,
   }) async {
-    if (_token == null) {
+    final t = _token ?? await _client.getToken();
+    if (t == null) {
       _lastError = 'Phiên đăng nhập đã hết hạn.';
       return false;
     }
@@ -227,7 +293,7 @@ class AuthService extends ChangeNotifier {
             Uri.parse(ApiConfig.updateProfileUrl),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $_token',
+              'Authorization': 'Bearer $t',
             },
             body: jsonEncode(payload),
           )
@@ -237,7 +303,8 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200 && body['success'] == true) {
         final data = body['data'] as Map<String, dynamic>;
         if (data['user'] != null) {
-          _currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
         }
         _isLoading = false;
         notifyListeners();
@@ -262,7 +329,8 @@ class AuthService extends ChangeNotifier {
     required String currentPassword,
     required String newPassword,
   }) async {
-    if (_token == null) {
+    final t = _token ?? await _client.getToken();
+    if (t == null) {
       _lastError = 'Phiên đăng nhập đã hết hạn.';
       return false;
     }
@@ -277,7 +345,7 @@ class AuthService extends ChangeNotifier {
             Uri.parse(ApiConfig.changePasswordUrl),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $_token',
+              'Authorization': 'Bearer $t',
             },
             body: jsonEncode({
               'currentPassword': currentPassword,
@@ -308,14 +376,15 @@ class AuthService extends ChangeNotifier {
 
   /// Lấy thống kê tài khoản (số đơn hàng, tổng chi tiêu)
   Future<Map<String, dynamic>?> fetchUserStats() async {
-    if (_token == null) return null;
+    final t = _token ?? await _client.getToken();
+    if (t == null) return null;
 
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.userStatsUrl),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
+          'Authorization': 'Bearer $t',
         },
       ).timeout(const Duration(seconds: 5));
 
@@ -334,6 +403,21 @@ class AuthService extends ChangeNotifier {
     _token = null;
     _currentUser = null;
     _lastError = null;
+    try {
+      _client.clearToken().catchError((_) {});
+    } catch (_) {}
+    try {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.remove(_userKey);
+      }).catchError((_) {});
+    } catch (_) {}
     notifyListeners();
+  }
+
+  Future<void> _saveUserToLocal(User user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userKey, jsonEncode(user.toJson()));
+    } catch (_) {}
   }
 }

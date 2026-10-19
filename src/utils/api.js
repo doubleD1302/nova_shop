@@ -45,3 +45,22 @@ export async function apiGetMe(token, options = {}) {
     signal: options.signal,
   })
 }
+
+/**
+ * Gọi POST /api/v1/auth/register để đăng ký tài khoản mới.
+ * @param {Object} userData Dữ liệu đăng ký
+ * @param {RequestInit} [options] Tùy chọn fetch bổ sung
+ * @returns {Promise<Response>}
+ */
+export async function apiRegister(userData, options = {}) {
+  const url = `${API_BASE_URL}/api/v1/auth/register`
+  return await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    body: JSON.stringify(userData),
+    signal: options.signal,
+  })
+}

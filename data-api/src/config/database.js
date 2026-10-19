@@ -545,6 +545,34 @@ export async function executeQuery(sql, values = [], timeoutMs = env.dbReadiness
 }
 
 /**
+ * Thực thi một khối thao tác trong Transaction với tự động COMMIT và ROLLBACK.
+ */
+export async function executeTransaction(callback, timeoutMs = env.dbReadinessTimeoutMs) {
+  return executeWithConnection(async (conn, remainingTime) => {
+    const queryAsync = (sql, values = []) => {
+      return new Promise((resolve, reject) => {
+        conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
+          if (err) return reject(err)
+          resolve(rows)
+        })
+      })
+    }
+
+    await queryAsync('START TRANSACTION')
+    try {
+      const result = await callback(queryAsync, conn)
+      await queryAsync('COMMIT')
+      return result
+    } catch (err) {
+      try {
+        await queryAsync('ROLLBACK')
+      } catch {}
+      throw err
+    }
+  }, timeoutMs)
+}
+
+/**
  * Đóng kết nối Sequelize an toàn khi tiến trình dừng (Graceful Shutdown)
  */
 export async function closeDatabase() {

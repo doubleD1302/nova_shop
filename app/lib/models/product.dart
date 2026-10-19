@@ -49,16 +49,38 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final rawPrice = json['price'];
+    final rawOrig = json['originalPrice'];
+    final priceVal = (rawPrice is num) ? rawPrice.toDouble() : double.tryParse(rawPrice?.toString() ?? '0') ?? 0.0;
+    final origVal = (rawOrig is num) ? rawOrig.toDouble() : double.tryParse(rawOrig?.toString() ?? '0') ?? priceVal;
+
+    final rawSold = json['soldCount'];
+    String soldStr = '0';
+    if (rawSold is num) {
+      if (rawSold >= 1000) {
+        soldStr = 'Đã bán ${(rawSold / 1000).toStringAsFixed(1)}k';
+      } else {
+        soldStr = 'Đã bán $rawSold';
+      }
+    } else if (rawSold != null) {
+      soldStr = rawSold.toString();
+    } else {
+      soldStr = 'Đã bán 1.2k';
+    }
+
     final rawBadges = json['badges'];
     List<String> badges = [];
     if (rawBadges is List) {
-      badges = rawBadges.map((e) => e.toString()).toList();
+      badges = rawBadges.where((e) => e != null).map((e) => e.toString()).toList();
+    } else {
+      if (json['isMall'] == true) badges.add('Mall');
+      if (json['freeShipping'] == true) badges.add('Freeship');
     }
 
     final rawImages = json['images'];
     List<String> images = [];
     if (rawImages is List) {
-      images = rawImages.map((e) => e.toString()).toList();
+      images = rawImages.where((e) => e != null).map((e) => e.toString()).toList();
     }
 
     final rawSpecs = json['specs'];
@@ -67,21 +89,21 @@ class Product {
       specs = Map<String, dynamic>.from(rawSpecs);
     }
 
-    final price = (json['price'] as num?)?.toDouble() ?? 0.0;
-    final origPrice = (json['originalPrice'] as num?)?.toDouble() ?? price;
     final discount = (json['discount'] as num?)?.toInt() ?? 0;
     final rating = (json['rating'] as num?)?.toDouble() ?? 4.9;
+    final img = json['imageUrl']?.toString() ?? (images.isNotEmpty ? images.first : '');
 
     return Product(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      imageUrl: json['imageUrl']?.toString() ?? (images.isNotEmpty ? images.first : ''),
-      price: price,
-      originalPrice: origPrice,
+      imageUrl: img,
+      price: priceVal,
+      originalPrice: origVal > 0 ? origVal : priceVal,
       discount: discount,
       rating: rating,
-      soldCount: json['soldCount']?.toString() ?? 'Đã bán 1.2k',
+      soldCount: soldStr,
       badges: badges,
+      isFavorite: json['isFavorite'] == true,
       isFlashSale: json['isFlashSale'] == true || badges.contains('flash') || badges.contains('Flash Sale'),
       isFeatured: json['isFeatured'] == true,
       shopName: json['shopName']?.toString() ?? '',

@@ -1,14 +1,35 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/order.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 
+/// Kết quả phân trang danh sách đơn hàng
+class OrderListResult {
+  final List<Order> orders;
+  final int total;
+  final int page;
+  final int limit;
+  final int totalPages;
+
+  OrderListResult({
+    required this.orders,
+    required this.total,
+    required this.page,
+    required this.limit,
+    required this.totalPages,
+  });
+}
+
+/// Service xử lý đặt hàng và quản lý đơn hàng với Backend API
 class OrderService {
   static final OrderService _instance = OrderService._internal();
   factory OrderService() => _instance;
   OrderService._internal();
 
+  final ApiClient _client = ApiClient();
   final List<Map<String, dynamic>> _localOrders = [];
   String? _lastError;
   String? get lastError => _lastError;
@@ -44,6 +65,13 @@ class OrderService {
       }
     }
 
+    // Sắp xếp đơn mới nhất lên đầu
+    combined.sort((a, b) {
+      final aDate = a['createdAt']?.toString() ?? '';
+      final bDate = b['createdAt']?.toString() ?? '';
+      return bDate.compareTo(aDate);
+    });
+
     return combined;
   }
 
@@ -53,11 +81,12 @@ class OrderService {
     required String recipientName,
     required String recipientPhone,
     required String province,
-    required String district,
-    required String ward,
+    String? district,
+    String? ward,
     required String addressDetail,
     String? note,
     String paymentMethod = 'cod',
+    String? idempotencyKey,
     required List<Map<String, dynamic>> items,
   }) async {
     _lastError = null;
@@ -72,11 +101,12 @@ class OrderService {
           'recipientName': recipientName.trim(),
           'recipientPhone': recipientPhone.trim(),
           'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
-          'district': district.trim().isNotEmpty ? district.trim() : 'Quận 1',
-          'ward': ward.trim().isNotEmpty ? ward.trim() : 'Phường Bến Nghé',
+          'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
+          'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
           'addressDetail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
           'note': note?.trim().isNotEmpty == true ? note!.trim() : null,
           'paymentMethod': paymentMethod,
+          if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
           'items': items,
         };
 
@@ -135,8 +165,8 @@ class OrderService {
       'recipientName': recipientName.trim(),
       'recipientPhone': recipientPhone.trim(),
       'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
-      'district': district.trim().isNotEmpty ? district.trim() : 'Quận 1',
-      'ward': ward.trim().isNotEmpty ? ward.trim() : 'Phường Bến Nghé',
+      'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
+      'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
       'addressDetail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
       'note': note,
       'paymentMethod': paymentMethod,
@@ -153,5 +183,68 @@ class OrderService {
 
     _localOrders.insert(0, fallbackOrder);
     return fallbackOrder;
+  }
+
+  /// Lấy danh sách lịch sử đơn hàng của người dùng dưới dạng model Order
+  /// GET /api/v1/orders
+  Future<OrderListResult> getOrders({
+    String? status,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (status != null && status.isNotEmpty) {
+      queryParams['status'] = status;
+    }
+
+    final response = await _client.get('/api/v1/orders', queryParams: queryParams);
+
+    if (response.success && response.data is List) {
+      final list = (response.data as List)
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Order.fromJson(item))
+          .toList();
+
+      final meta = response.meta ?? {};
+      final total = (meta['total'] is num) ? (meta['total'] as num).toInt() : list.length;
+      final totalPages = (meta['totalPages'] is num) ? (meta['totalPages'] as num).toInt() : 1;
+
+      return OrderListResult(
+        orders: list,
+        total: total,
+        page: page,
+        limit: limit,
+        totalPages: totalPages,
+      );
+    }
+
+    return OrderListResult(orders: [], total: 0, page: page, limit: limit, totalPages: 1);
+  }
+
+  /// Xem chi tiết một đơn hàng
+  /// GET /api/v1/orders/:orderId
+  Future<Order?> getOrderDetail(String orderId) async {
+    final response = await _client.get('/api/v1/orders/$orderId');
+
+    if (response.success && response.data is Map<String, dynamic>) {
+      return Order.fromJson(response.data as Map<String, dynamic>);
+    }
+
+    return null;
+  }
+
+  /// Hủy đơn hàng khi còn ở trạng thái pending
+  /// PATCH /api/v1/orders/:orderId/cancel
+  Future<bool> cancelOrder(String orderId, {String reason = 'Khách hàng yêu cầu hủy đơn'}) async {
+    final response = await _client.patch(
+      '/api/v1/orders/$orderId/cancel',
+      body: {'reason': reason},
+    );
+
+    return response.success;
   }
 }

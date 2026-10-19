@@ -5,12 +5,39 @@ import '../models/product.dart';
 import '../models/banner_item.dart';
 import '../models/flash_sale_item.dart';
 import '../data/website_data.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
-class CatalogService {
-  final http.Client _client;
+/// Kết quả phân trang danh sách sản phẩm
+class ProductListResult {
+  final List<Product> products;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
 
-  CatalogService({http.Client? client}) : _client = client ?? http.Client();
+  const ProductListResult({
+    required this.products,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+  });
+}
+
+class CatalogService {
+  static final CatalogService _instance = CatalogService._internal();
+  factory CatalogService({http.Client? client}) {
+    if (client != null) {
+      return CatalogService._internal(client: client);
+    }
+    return _instance;
+  }
+
+  final http.Client _client;
+  final ApiClient _apiClient = ApiClient();
+
+  CatalogService._internal({http.Client? client}) : _client = client ?? http.Client();
 
   /// Lấy danh sách danh mục sản phẩm từ Backend API (kết hợp dữ liệu chuẩn của website)
   Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = true}) async {
@@ -40,6 +67,16 @@ class CatalogService {
       }
     } catch (_) {}
     return mergeWebsiteData ? WebsiteData.categories : [];
+  }
+
+  /// Lấy danh sách ngành hàng/danh mục dạng thô từ Backend
+  /// GET /api/v1/categories
+  Future<List<Map<String, dynamic>>> getRawCategories() async {
+    final response = await _apiClient.get('/api/v1/categories');
+    if (response.success && response.data is List) {
+      return (response.data as List).whereType<Map<String, dynamic>>().toList();
+    }
+    return [];
   }
 
   /// Lấy danh sách sản phẩm từ Backend API (kết hợp trọn vẹn 60 sản phẩm của website)
@@ -104,11 +141,13 @@ class CatalogService {
       result = result.where((p) => p.isFlashSale).toList();
     }
 
-    // Lọc theo Tab Gợi Ý Website
-    if (filterTab != null) {
-      if (filterTab == 'freeship') {
-        result = result.where((p) => p.badges.any((b) => b.toLowerCase().contains('freeship'))).toList();
-      } else if (filterTab == 'sale50') {
+    // Lọc theo tab
+    if (filterTab != null && filterTab.isNotEmpty) {
+      if (filterTab == 'popular') {
+        result = List<Product>.from(result)..sort((a, b) => b.rating.compareTo(a.rating));
+      } else if (filterTab == 'newest') {
+        result = result.reversed.toList();
+      } else if (filterTab == 'hot_deal') {
         result = result.where((p) => p.discount >= 40).toList();
       } else if (filterTab == 'outlet') {
         result = List<Product>.from(result)..sort((a, b) => a.price.compareTo(b.price));
@@ -116,6 +155,56 @@ class CatalogService {
     }
 
     return result;
+  }
+
+  /// Lấy danh sách sản phẩm công khai kèm phân trang và bộ lọc
+  /// GET /api/v1/products?page=1&limit=24&categoryId=...&q=...&sort=...
+  Future<ProductListResult> getProductsPaginated({
+    int page = 1,
+    int limit = 24,
+    String? categoryId,
+    String? shopId,
+    String? q,
+    String? sort,
+    double? minPrice,
+    double? maxPrice,
+    String? province,
+    bool? mall,
+    bool? freeship,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+
+    if (categoryId != null && categoryId.isNotEmpty) queryParams['categoryId'] = categoryId;
+    if (shopId != null && shopId.isNotEmpty) queryParams['shopId'] = shopId;
+    if (q != null && q.trim().isNotEmpty) queryParams['q'] = q.trim();
+    if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
+    if (minPrice != null && minPrice >= 0) queryParams['minPrice'] = minPrice.toInt().toString();
+    if (maxPrice != null && maxPrice > 0) queryParams['maxPrice'] = maxPrice.toInt().toString();
+    if (province != null && province.isNotEmpty) queryParams['province'] = province;
+    if (mall == true) queryParams['mall'] = 'true';
+    if (freeship == true) queryParams['freeship'] = 'true';
+
+    final response = await _apiClient.get('/api/v1/products', queryParams: queryParams);
+
+    if (response.success && response.data is List) {
+      final list = (response.data as List)
+          .whereType<Map<String, dynamic>>()
+          .map((item) => Product.fromJson(item))
+          .toList();
+
+      return ProductListResult(
+        products: list,
+        page: (response.meta?['page'] as num?)?.toInt() ?? page,
+        limit: (response.meta?['limit'] as num?)?.toInt() ?? limit,
+        total: (response.meta?['total'] as num?)?.toInt() ?? list.length,
+        totalPages: (response.meta?['totalPages'] as num?)?.toInt() ?? 1,
+      );
+    }
+
+    return ProductListResult(products: [], page: page, limit: limit, total: 0, totalPages: 0);
   }
 
   /// Lấy danh sách banner khuyến mãi (kết hợp banner website)
@@ -213,6 +302,16 @@ class CatalogService {
       'tagline': s.tagline,
       'emoji': s.emoji,
     }).toList();
+  }
+
+  /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ
+  /// GET /api/v1/products/featured
+  Future<Map<String, dynamic>> getFeaturedHomeData() async {
+    final response = await _apiClient.get('/api/v1/products/featured');
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return {'flashSale': [], 'featuredProducts': []};
   }
 
   /// Lấy 8 tiện ích nhanh (QuickLinks) như trên Website

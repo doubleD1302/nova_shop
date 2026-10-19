@@ -5,7 +5,7 @@
 > *Trạng thái tài liệu: Bản nháp kỹ thuật (Draft) — Đã đồng bộ với schema thực tế `database/schema.sql`*
 > *Kiến trúc áp dụng: Frontend (Web/App) → Backend HTTP API (/api/v1/*) → Data API Nội bộ (/internal/v1/*) → Sequelize 6 + mysql2 → MySQL 8.4*
 > *Tham chiếu kiến trúc: Xem tại [ARCHITECTURE.md](./ARCHITECTURE.md) và mô hình dữ liệu tại [DATA_MODEL.md](./DATA_MODEL.md)*
-> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); tất cả endpoint nghiệp vụ (catalog, auth, cart, orders) đang ở trạng thái `planned`.*
+> *Trạng thái triển khai: Backend API `health` và `ready`, HTTP client nội bộ (`backend/src/clients/data.client.js`), và Data API nội bộ (`health`, `ready`) đã implemented (hoàn tất DB-002-R4 và DB-003); xác thực auth đã implemented (BE-003A); 3 API đọc catalog công khai và Data API tương ứng đã implemented (BE-004A); Giỏ hàng Cart API đã implemented (BE-006); các endpoint còn lại (orders, seller) đang ở trạng thái `planned`.*
 
 ---
 
@@ -20,32 +20,45 @@
 | **Auth Data API** | `data-api/src/controllers/auth.controller.js` | `POST /internal/v1/auth/verify-credentials` | `x-service-key` | Xác minh thông tin đăng nhập với MySQL, bcrypt compare | **implemented** (BE-003A) |
 | **Auth Data API** | `data-api/src/controllers/auth.controller.js` | `GET /internal/v1/users/:userId/auth-profile` | `x-service-key` | Lấy hồ sơ xác thực và trạng thái role/status thời gian thực | **implemented** (BE-003A) |
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/LoginPage.jsx` | `POST /api/v1/auth/login` | `public` | Request: `{ username, password }`<br>Response: `{ token, tokenType, expiresIn, user }` (JWT 15 phút, Rate Limit 429) | **implemented** (BE-003A) |
-| **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/RegisterPage.jsx` | `POST /api/v1/auth/register` | `public` | Request: `{ username, password, fullName, email, phone, role, shopName? }`<br>Response: `{ token, user }` | `planned` |
+| **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/RegisterPage.jsx` | `POST /api/v1/auth/register` | `public` | Request: `{ username, password, fullName, email, phone, role, shopName? }`<br>Response: `{ token, user }` | **implemented** (BE-003A) |
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/AccountPage.jsx` | `GET /api/v1/auth/me` | `buyer` / `seller` | Response: Thông tin tài khoản đăng nhập và hồ sơ (Bearer JWT) | **implemented** (BE-003A) |
-| **Auth & Hồ sơ** | `src/pages/AccountPage.jsx`<br>`app/lib/screens/account/` | `PUT /api/v1/auth/profile` | `buyer` / `seller` | Request: `{ fullName, phone, email, address }`<br>Response: Profile cập nhật | `planned` |
-| **Danh mục (Catalog)** | `src/context/CatalogContext.jsx`<br>`src/data/categories.js` | `GET /api/v1/categories` | `public` | Danh sách cây ngành hàng, slug, icon (Xem Mục 3.1) | `planned` |
-| **Gian hàng (Shop)** | `src/pages/ShopsPage.jsx`<br>`src/data/shops.js` | `GET /api/v1/shops` | `public` | Danh sách các gian hàng trên sàn kèm rating tính toán, Mall, tỉnh/thành (Xem Mục 3.2) | `planned` |
-| **Gian hàng (Shop)** | `src/pages/ShopPage.jsx`<br>`src/components/shop/` | `GET /api/v1/shops/:shopId` | `public` | Chi tiết gian hàng: logo, banner, rating tính toán, số followers (Xem Mục 3.3) | `planned` |
-| **Gian hàng (Shop)** | `src/pages/ShopPage.jsx` | `GET /api/v1/shops/:shopId/products` | `public` | Danh sách sản phẩm thuộc một shop cụ thể, có lọc ngành hàng (Xem Mục 3.4) | `planned` |
-| **Sản phẩm (Catalog)** | `src/pages/SearchPage.jsx`<br>`src/components/search/` | `GET /api/v1/products` | `public` | Tìm kiếm, lọc theo giá, ngành hàng, sắp xếp, phân trang (Xem Mục 3.5) | `planned` |
-| **Sản phẩm (Catalog)** | `src/pages/ProductDetailPage.jsx`<br>`app/lib/screens/product_detail/` | `GET /api/v1/products/:idOrSlug` | `public` | Chi tiết sản phẩm, gallery ảnh, SKU biến thể, thông số kỹ thuật (Xem Mục 3.6) | `planned` |
-| **Sản phẩm & Khuyến mãi** | `src/pages/HomePage.jsx`<br>`src/data/homeContent.js` | `GET /api/v1/products/featured` | `public` | Banners, Flash Sale, sản phẩm gợi ý trang chủ | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | `planned` |
-| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `hidden` hoặc `archived` | `planned` |
-| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | `planned` |
-| **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, sản phẩm bán chạy | `planned` |
-| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` | Thêm SKU vào giỏ: `{ variantId, qty }` | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` | Xóa sản phẩm khỏi giỏ hàng | `planned` |
-| **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn hàng mới (Master Order + Shop Orders). Tính lại giá và trừ kho | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn hàng đã mua của khách, lọc theo status | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Xem chi tiết tiến trình đơn tổng và các đơn con của shop | `planned` |
-| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `POST /api/v1/orders/:orderId/cancel` | `buyer` | Hủy đơn hàng khi shop chưa xác nhận giao | `planned` |
-| **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx` | `GET /api/v1/seller/orders` | `seller` | Danh sách đơn con (`shop_orders`) chứa sản phẩm thuộc shop mình | `planned` |
-| **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx` | `PATCH /api/v1/seller/orders/:shopOrderId/status` | `seller` | Đổi trạng thái xử lý đơn (Chờ xác nhận -> Đang giao...) cho riêng shop | `planned` |
+| **Auth & Hồ sơ** | `src/pages/AccountPage.jsx`<br>`app/lib/screens/account/` | `PUT /api/v1/auth/profile` | `buyer` / `seller` | Request: `{ fullName, phone, email, avatarUrl }`<br>Response: Profile cập nhật | **implemented** (BE-003B) |
+| **Sổ địa chỉ** | `app/lib/services/address_service.dart`<br>`src/pages/AccountPage.jsx` | `GET /api/v1/addresses` | `buyer` / `seller` | Lấy danh sách sổ địa chỉ nhận hàng của người dùng | **implemented** (BE-003B) |
+| **Sổ địa chỉ** | `app/lib/services/address_service.dart`<br>`src/pages/AccountPage.jsx` | `POST /api/v1/addresses` | `buyer` / `seller` | Thêm địa chỉ nhận hàng mới kèm tùy chọn mặc định | **implemented** (BE-003B) |
+| **Sổ địa chỉ** | `app/lib/services/address_service.dart` | `PATCH /api/v1/addresses/:id/default` | `buyer` / `seller` | Đặt địa chỉ làm mặc định | **implemented** (BE-003B) |
+| **Sổ địa chỉ** | `app/lib/services/address_service.dart` | `DELETE /api/v1/addresses/:id` | `buyer` / `seller` | Xóa mềm địa chỉ nhận hàng | **implemented** (BE-003B) |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/categories` | `x-service-key` | Đọc danh sách tất cả các danh mục đang hoạt động | **implemented** (BE-004A) |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/products` | `x-service-key` | Đọc danh sách sản phẩm công khai kèm phân trang và lọc | **implemented** (BE-004A) |
+| **Catalog Data API** | `data-api/src/controllers/catalog.controller.js` | `GET /internal/v1/products/:idOrSlug` | `x-service-key` | Chi tiết sản phẩm kèm SKU biến thể, thông số kỹ thuật | **implemented** (BE-004A) |
+| **Danh mục (Catalog)** | `src/context/CatalogContext.jsx`<br>`src/data/categories.js` | `GET /api/v1/categories` | `public` | Danh sách cây ngành hàng, slug, icon (Xem Mục 3.1) | **implemented** (BE-004A) |
+| **Gian hàng (Shop)** | `src/pages/ShopsPage.jsx`<br>`src/data/shops.js` | `GET /api/v1/shops` | `public` | Danh sách các gian hàng trên sàn kèm rating tính toán, Mall, tỉnh/thành (Xem Mục 3.2) | **implemented** (BE-004B) |
+| **Gian hàng (Shop)** | `src/pages/ShopPage.jsx`<br>`src/components/shop/` | `GET /api/v1/shops/:shopId` | `public` | Chi tiết gian hàng: logo, banner, rating tính toán, số followers (Xem Mục 3.3) | **implemented** (BE-004B) |
+| **Gian hàng (Shop)** | `src/pages/ShopPage.jsx` | `GET /api/v1/shops/:shopId/products` | `public` | Danh sách sản phẩm thuộc một shop cụ thể, có lọc ngành hàng (Xem Mục 3.4) | **implemented** (BE-004B) |
+| **Sản phẩm (Catalog)** | `src/pages/SearchPage.jsx`<br>`src/components/search/` | `GET /api/v1/products` | `public` | Tìm kiếm, lọc theo giá, ngành hàng, sắp xếp, phân trang (Xem Mục 3.5) | **implemented** (BE-004A) |
+| **Sản phẩm & Khuyến mãi** | `src/pages/HomePage.jsx`<br>`src/data/homeContent.js` | `GET /api/v1/products/featured` | `public` | Banners, Flash Sale, sản phẩm gợi ý trang chủ | **implemented** (BE-004C) |
+| **Đánh giá (Review)** | `app/lib/services/review_service.dart` | `GET /api/v1/products/:productId/reviews` | `public` | Xem danh sách đánh giá sản phẩm, rating trung bình và ảnh | **implemented** (BE-008) |
+| **Đánh giá (Review)** | `app/lib/services/review_service.dart` | `POST /api/v1/reviews` | `buyer` | Người mua gửi đánh giá sản phẩm sau khi đã nhận hàng | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `GET /api/v1/favorites` | `buyer` / `seller` | Lấy danh sách sản phẩm yêu thích của tài khoản | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `POST /api/v1/favorites/:productId` | `buyer` / `seller` | Thêm sản phẩm vào danh sách yêu thích | **implemented** (BE-008) |
+| **Yêu thích (Favorites)** | `app/lib/services/favorite_service.dart` | `DELETE /api/v1/favorites/:productId` | `buyer` / `seller` | Xóa sản phẩm khỏi danh sách yêu thích | **implemented** (BE-008) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `GET /api/v1/seller/products` | `seller` | Danh sách sản phẩm do chính shop của seller sở hữu | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `POST /api/v1/seller/products` | `seller` | Thêm mới sản phẩm kèm biến thể SKU và gallery ảnh | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductFormPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `PUT /api/v1/seller/products/:id` | `seller` | Cập nhật thông tin, biến thể, giá, tồn kho sản phẩm | **implemented** (BE-005) |
+| **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `archived` | **implemented** (BE-005) |
+| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `GET /api/v1/seller/shop` | `seller` | Lấy thông tin cấu hình gian hàng của seller đang đăng nhập | **implemented** (BE-005B) |
+| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | **implemented** (BE-005B) |
+| **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, số lượng sản phẩm | **implemented** (BE-005B) |
+| **Theo dõi Shop** | `src/components/shop/ShopHeader.jsx` | `GET/POST/DELETE /api/v1/shops/:shopId/follow` | `buyer` / `seller` | Kiểm tra, theo dõi hoặc hủy theo dõi gian hàng trên sàn | **implemented** (BE-004B2) |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` / `seller` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` / `seller` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` / `seller` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** (BE-006) |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` / `seller` | Xóa sản phẩm khỏi giỏ hàng | **implemented** (BE-006) |
+| **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn hàng mới (Master Order + Shop Orders). Tính lại giá và trừ kho | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn hàng đã mua của khách, lọc theo status | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Xem chi tiết tiến trình đơn tổng và các đơn con của shop | **implemented** (BE-007) |
+| **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `PATCH /api/v1/orders/:orderId/cancel` | `buyer` | Hủy đơn hàng khi shop chưa xác nhận giao | **implemented** (BE-007) |
+| **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx`<br>`app/lib/services/seller_order_service.dart` | `GET /api/v1/seller/orders` | `seller` | Danh sách đơn con (`shop_orders`) chứa sản phẩm thuộc shop mình | **implemented** (BE-007B) |
+| **Đơn hàng (Seller)** | `src/pages/seller/SellerOrdersPage.jsx`<br>`app/lib/services/seller_order_service.dart` | `PATCH /api/v1/seller/orders/:shopOrderId/status` | `seller` | Đổi trạng thái xử lý đơn (Chờ xác nhận -> Đang giao...) cho riêng shop | **implemented** (BE-007B) |
 
 ---
 
@@ -78,7 +91,7 @@
 ---
 
 ### 3.1. API `GET /api/v1/categories` (Đọc danh sách ngành hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/categories` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/categories` (implemented - BE-004A)
 - **Quyền:** `public`
 - **Query Parameters:** `parentId` (chuỗi ID cha), `includeChildren` (boolean, mặc định `true`).
 - **Response Data:** Mảng các danh mục có `id` (chuỗi), `name`, `slug`, `imageUrl`, `sortOrder`, `children`.
@@ -86,36 +99,36 @@
 ---
 
 ### 3.2. API `GET /api/v1/shops` (Đọc danh sách gian hàng trên sàn)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops` (implemented - BE-004B)
 - **Quyền:** `public`
 - **Query Parameters:** `mall` (boolean), `keyword` (string), `province` (string), `sort` (`popular` | `rating` | `newest`), `page`, `limit`.
-- **Response Data:** Mảng shop gồm `id` (chuỗi), `name`, `slug`, `logoUrl`, `bannerUrl`, `tagline`, `province`, `isMall`, `rating`, `ratingCount`, `followersCount`.
+- **Response Data:** Mảng shop gồm `id` (chuỗi), `name`, `slug`, `logoUrl`, `bannerUrl`, `tagline`, `province`, `isMall`, `rating`, `ratingCount`, `followersCount`, `productsCount`.
 
 ---
 
 ### 3.3. API `GET /api/v1/shops/:shopId` (Chi tiết gian hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:shopId` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:idOrSlug` (implemented - BE-004B)
 - **Path Parameter:** `shopId` (chuỗi ID hoặc slug).
 - **Response Data:** Thông tin chi tiết shop kèm số liệu thống kê được tính toán từ `reviews` và `shop_follows`.
 
 ---
 
 ### 3.4. API `GET /api/v1/shops/:shopId/products` (Sản phẩm trong gian hàng)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:shopId/products` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/shops/:idOrSlug/products` (implemented - BE-004B)
 - **Path Parameter:** `shopId` (chuỗi ID hoặc slug).
 - **Query Parameters:** `categoryId`, `sort`, `page`, `limit`.
 
 ---
 
 ### 3.5. API `GET /api/v1/products` (Tìm kiếm và lọc danh sách sản phẩm)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/products` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/products` (implemented - BE-004A)
 - **Query Parameters:** `q`, `categoryId`, `shopId`, `minPrice`, `maxPrice`, `province`, `mall`, `freeship`, `sort`, `page`, `limit`.
 - **Sắp xếp ổn định (Stable Sort):** Luôn kết hợp secondary sort là `id DESC`.
 
 ---
 
 ### 3.6. API `GET /api/v1/products/:idOrSlug` (Chi tiết sản phẩm)
-- **Endpoint Data API tương ứng:** `GET /internal/v1/products/:idOrSlug` (planned)
+- **Endpoint Data API tương ứng:** `GET /internal/v1/products/:idOrSlug` (implemented - BE-004A)
 - **Path Parameter:** `idOrSlug` (chuỗi ID số hoặc slug).
 
 ---

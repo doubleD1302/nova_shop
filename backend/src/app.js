@@ -4,6 +4,16 @@ import helmet from 'helmet'
 import { env } from './config/env.js'
 import healthRouter from './routes/health.routes.js'
 import authRouter from './routes/auth.routes.js'
+import catalogRouter from './routes/catalog.routes.js'
+import { shopRouter } from './routes/shop.routes.js'
+import cartRouter from './routes/cart.routes.js'
+import { orderRouter } from './routes/order.routes.js'
+import { addressRouter } from './routes/address.routes.js'
+import { reviewRouter } from './routes/review.routes.js'
+import { favoriteRouter } from './routes/favorite.routes.js'
+import { sellerOrderRouter } from './routes/seller-order.routes.js'
+import { sellerProductRouter } from './routes/seller-product.routes.js'
+import { sellerHubRouter } from './routes/seller-hub.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -39,6 +49,16 @@ app.use(express.json({ limit: '1mb' }))
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1', catalogRouter)
+app.use('/api/v1/shops', shopRouter)
+app.use('/api/v1/cart', cartRouter)
+app.use('/api/v1/orders', orderRouter)
+app.use('/api/v1/addresses', addressRouter)
+app.use('/api/v1', reviewRouter)
+app.use('/api/v1', favoriteRouter)
+app.use('/api/v1/seller', sellerOrderRouter)
+app.use('/api/v1/seller', sellerProductRouter)
+app.use('/api/v1/seller', sellerHubRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

@@ -2,14 +2,17 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/cart_item.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 
+/// Service xử lý toàn bộ thao tác giỏ hàng trên App Mobile
 class CartService extends ChangeNotifier {
   static final CartService _instance = CartService._internal();
   factory CartService() => _instance;
   CartService._internal();
 
+  final ApiClient _client = ApiClient();
   final List<CartItemModel> _items = [];
   bool _isLoading = false;
 
@@ -61,12 +64,12 @@ class CartService extends ChangeNotifier {
 
   /// Thêm hoặc tăng số lượng sản phẩm vào giỏ hàng
   Future<void> addToCart({
-    required String productId,
-    required String productName,
-    required String productSlug,
+    String? productId,
+    String? productName,
+    String? productSlug,
     String variantId = '1',
     String variantName = 'Mặc định',
-    required double price,
+    double price = 0.0,
     double? originalPrice,
     int qty = 1,
     String shopId = '1',
@@ -81,9 +84,9 @@ class CartService extends ChangeNotifier {
       _items.add(CartItemModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         variantId: variantId,
-        productId: productId,
-        productName: productName,
-        productSlug: productSlug,
+        productId: productId ?? '',
+        productName: productName ?? '',
+        productSlug: productSlug ?? '',
         variantName: variantName,
         price: price,
         originalPrice: originalPrice,
@@ -196,5 +199,56 @@ class CartService extends ChangeNotifier {
   void clearSelected() {
     _items.removeWhere((i) => i.selected);
     notifyListeners();
+  }
+
+  // --- API Client Direct Methods ---
+
+  /// Lấy toàn bộ thông tin giỏ hàng của người dùng đang đăng nhập
+  /// GET /api/v1/cart
+  Future<ApiResponse> getCart() async {
+    return await _client.get('/api/v1/cart');
+  }
+
+  /// Thêm một SKU biến thể vào giỏ hàng qua API Client
+  /// POST /api/v1/cart/items
+  Future<ApiResponse> addToCartApi({
+    required String variantId,
+    int qty = 1,
+    bool selected = true,
+  }) async {
+    return await _client.post(
+      '/api/v1/cart/items',
+      body: {
+        'variantId': variantId,
+        'qty': qty,
+        'selected': selected,
+      },
+    );
+  }
+
+  /// Cập nhật số lượng hoặc trạng thái chọn của sản phẩm trong giỏ
+  /// PATCH /api/v1/cart/items/:itemId
+  Future<ApiResponse> updateItem(
+    String itemId, {
+    int? qty,
+    bool? selected,
+  }) async {
+    final body = <String, dynamic>{};
+    if (qty != null) body['qty'] = qty;
+    if (selected != null) body['selected'] = selected;
+
+    return await _client.patch('/api/v1/cart/items/$itemId', body: body);
+  }
+
+  /// Xóa một sản phẩm khỏi giỏ hàng
+  /// DELETE /api/v1/cart/items/:itemId
+  Future<ApiResponse> removeItem(String itemId) async {
+    return await _client.delete('/api/v1/cart/items/$itemId');
+  }
+
+  /// Làm sạch toàn bộ giỏ hàng
+  /// DELETE /api/v1/cart/items
+  Future<ApiResponse> clearCart() async {
+    return await _client.delete('/api/v1/cart/items');
   }
 }
