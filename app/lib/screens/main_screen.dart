@@ -3,8 +3,8 @@ import 'package:shopnova/screens/home/home_screen.dart';
 import 'package:shopnova/screens/shop/shop_screen.dart';
 import 'package:shopnova/screens/cart/cart_screen.dart';
 import 'package:shopnova/widgets/common/shopnova_app_bar.dart';
-
 import 'package:shopnova/screens/account/account_screen.dart';
+import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -28,7 +28,7 @@ class _MainScreenState extends State<MainScreen> {
               children: const [
                 HomeScreen(),
                 ShopScreen(),
-                Center(child: Text('Nova AI Assistant')),
+                NovaAIScreen(isStandalone: false),
                 CartScreen(),
                 AccountScreen(),
               ],
