@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shopnova/screens/orders/orders_screen.dart';
 import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
+import 'package:shopnova/screens/account/addresses_screen.dart';
+import 'package:shopnova/screens/account/favorites_screen.dart';
+import 'package:shopnova/screens/seller/seller_hub_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/api_config.dart';
 
@@ -694,9 +697,12 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           _buildStatItem(
             icon: Icons.favorite_border,
-            count: '5',
-            label: 'Shop theo dõi',
+            count: '${_backendStats?['favoriteCount'] ?? 'Xem'}',
+            label: 'Yêu thích',
             color: Colors.pink,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesScreen()));
+            },
           ),
         ],
       ),
@@ -946,9 +952,38 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           _buildSettingsTile(
             icon: Icons.location_on_outlined,
-            title: 'Địa chỉ nhận hàng',
-            subtitle: _receiverAddress,
-            onTap: _showAddressDialog,
+            title: 'Sổ địa chỉ nhận hàng',
+            subtitle: 'Quản lý danh sách địa chỉ giao hàng',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddressesScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 52),
+          _buildSettingsTile(
+            icon: Icons.favorite_border,
+            title: 'Sản phẩm yêu thích',
+            subtitle: 'Xem và quản lý các sản phẩm đã lưu',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 52),
+          _buildSettingsTile(
+            icon: Icons.storefront_outlined,
+            title: 'Kênh Người Bán',
+            subtitle: 'Quản lý cửa hàng, doanh thu và đơn hàng',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SellerHubScreen()),
+              );
+            },
           ),
           const Divider(height: 1, indent: 52),
           _buildSettingsTile(

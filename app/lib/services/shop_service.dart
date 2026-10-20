@@ -124,4 +124,40 @@ class ShopService {
 
     return ProductListResult(products: [], total: 0, page: page, limit: limit, totalPages: 1);
   }
+
+  /// Kiểm tra trạng thái theo dõi gian hàng
+  /// GET /api/v1/shops/:shopId/follow
+  Future<bool> getFollowStatus(String shopId) async {
+    final response = await _client.get('/api/v1/shops/$shopId/follow');
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data['isFollowing'] == true;
+    }
+    return false;
+  }
+
+  /// Theo dõi gian hàng
+  /// POST /api/v1/shops/:shopId/follow
+  Future<bool> followShop(String shopId) async {
+    final response = await _client.post('/api/v1/shops/$shopId/follow');
+    return response.success;
+  }
+
+  /// Hủy theo dõi gian hàng
+  /// DELETE /api/v1/shops/:shopId/follow
+  Future<bool> unfollowShop(String shopId) async {
+    final response = await _client.delete('/api/v1/shops/$shopId/follow');
+    return response.success;
+  }
+
+  /// Bật / tắt theo dõi gian hàng
+  Future<bool> toggleFollow(String shopId, bool isCurrentlyFollowing) async {
+    if (isCurrentlyFollowing) {
+      final ok = await unfollowShop(shopId);
+      return ok ? false : true;
+    } else {
+      final ok = await followShop(shopId);
+      return ok ? true : false;
+    }
+  }
 }
+

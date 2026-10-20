@@ -92,6 +92,25 @@ class Product {
     final discount = (json['discount'] as num?)?.toInt() ?? 0;
     final rating = (json['rating'] as num?)?.toDouble() ?? 4.9;
     final img = json['imageUrl']?.toString() ?? (images.isNotEmpty ? images.first : '');
+    final shopObj = json['shop'];
+    final sName = (shopObj is Map && shopObj['name'] != null)
+        ? shopObj['name'].toString()
+        : (json['shopName']?.toString() ?? '');
+    final sId = (shopObj is Map && shopObj['id'] != null)
+        ? shopObj['id'].toString()
+        : (json['shopId']?.toString() ?? '');
+
+    final catObj = json['category'];
+    final cName = (catObj is Map && catObj['name'] != null)
+        ? catObj['name'].toString()
+        : (json['categoryName']?.toString() ?? '');
+    final cId = (catObj is Map && catObj['id'] != null)
+        ? catObj['id'].toString()
+        : (json['categoryId']?.toString() ?? '');
+
+    final loc = (shopObj is Map && shopObj['province'] != null)
+        ? shopObj['province'].toString()
+        : (json['province']?.toString() ?? json['location']?.toString() ?? 'TP. Hồ Chí Minh');
 
     return Product(
       id: json['id']?.toString() ?? '',
@@ -106,16 +125,16 @@ class Product {
       isFavorite: json['isFavorite'] == true,
       isFlashSale: json['isFlashSale'] == true || badges.contains('flash') || badges.contains('Flash Sale'),
       isFeatured: json['isFeatured'] == true,
-      shopName: json['shopName']?.toString() ?? '',
-      categoryName: json['categoryName']?.toString() ?? '',
+      shopName: sName,
+      categoryName: cName,
       description: json['description']?.toString() ?? '',
       images: images,
       specs: specs,
       emoji: json['emoji']?.toString() ?? '🛍️',
-      location: json['location']?.toString() ?? 'TP. Hồ Chí Minh',
+      location: loc,
       soldPercent: (json['soldPercent'] as num?)?.toInt() ?? 50,
-      categoryId: json['categoryId']?.toString() ?? '',
-      shopId: json['shopId']?.toString() ?? '',
+      categoryId: cId,
+      shopId: sId,
     );
   }
 }

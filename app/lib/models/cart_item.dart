@@ -34,19 +34,19 @@ class CartItemModel {
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
     return CartItemModel(
       id: json['id']?.toString() ?? '',
-      variantId: json['variantId']?.toString() ?? '1',
-      productId: json['productId']?.toString() ?? '',
-      productName: json['productName'] ?? 'Sản phẩm',
-      productSlug: json['productSlug'] ?? '',
-      variantName: json['variantName'] ?? '',
-      price: (json['price'] != null) ? double.parse(json['price'].toString()) : 0.0,
-      originalPrice: json['originalPrice'] != null ? double.parse(json['originalPrice'].toString()) : null,
-      qty: (json['qty'] != null) ? int.parse(json['qty'].toString()) : 1,
+      variantId: json['variantId']?.toString() ?? json['id']?.toString() ?? '1',
+      productId: json['productId']?.toString() ?? json['product_id']?.toString() ?? '',
+      productName: json['productName'] ?? json['name'] ?? 'Sản phẩm',
+      productSlug: json['productSlug'] ?? json['slug'] ?? '',
+      variantName: json['variantName'] ?? json['sku_name'] ?? json['variant'] ?? 'Mặc định',
+      price: (json['price'] != null) ? (double.tryParse(json['price'].toString()) ?? 0.0) : 0.0,
+      originalPrice: json['originalPrice'] != null ? double.tryParse(json['originalPrice'].toString()) : null,
+      qty: (json['qty'] != null) ? (int.tryParse(json['qty'].toString()) ?? 1) : 1,
       selected: json['selected'] ?? true,
-      shopId: json['shopId']?.toString() ?? '1',
-      shopName: json['shopName'] ?? 'ShopNova',
-      shopMall: json['shopMall'] ?? false,
-      imageUrl: json['imageUrl'] ?? '',
+      shopId: json['shopId']?.toString() ?? json['shop_id']?.toString() ?? '1',
+      shopName: json['shopName'] ?? json['shop_name'] ?? 'ShopNova',
+      shopMall: json['shopMall'] ?? json['shop_mall'] ?? false,
+      imageUrl: json['imageUrl'] ?? json['image_url'] ?? json['image'] ?? '',
     );
   }
 

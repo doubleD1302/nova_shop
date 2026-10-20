@@ -46,8 +46,16 @@ class CartService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        if (body['success'] == true && body['data'] is List) {
-          final list = (body['data'] as List)
+        List? rawList;
+        if (body['success'] == true && body['data'] != null) {
+          if (body['data'] is List) {
+            rawList = body['data'] as List;
+          } else if (body['data'] is Map && body['data']['items'] is List) {
+            rawList = body['data']['items'] as List;
+          }
+        }
+        if (rawList != null) {
+          final list = rawList
               .map((e) => CartItemModel.fromJson(e as Map<String, dynamic>))
               .toList();
           _items.clear();
@@ -67,7 +75,7 @@ class CartService extends ChangeNotifier {
     String? productId,
     String? productName,
     String? productSlug,
-    String variantId = '1',
+    String? variantId,
     String variantName = 'Mặc định',
     double price = 0.0,
     double? originalPrice,
@@ -77,17 +85,43 @@ class CartService extends ChangeNotifier {
     bool shopMall = false,
     String imageUrl = '',
   }) async {
-    final index = _items.indexWhere((i) => i.variantId == variantId);
+    final cleanProductId = (productId != null && productId.trim().isNotEmpty)
+        ? productId.trim()
+        : (productSlug != null && productSlug.trim().isNotEmpty ? productSlug.trim() : '1');
+    final cleanVariantName = variantName.trim().isNotEmpty ? variantName.trim() : 'Mặc định';
+
+    // Tạo ID biến thể đặc trưng kết hợp mã sản phẩm & phân loại nếu variantId bị trống hoặc bằng '1'
+    final effectiveVariantId = (variantId != null && variantId.trim().isNotEmpty && variantId.trim() != '1')
+        ? variantId.trim()
+        : '${cleanProductId}_${cleanVariantName.replaceAll(RegExp(r'\s+'), '_')}';
+
+    // Sản phẩm CHỈ được gộp số lượng khi:
+    // CÙNG mã sản phẩm VÀ CÙNG phân loại (biến thể)
+    final index = _items.indexWhere((i) {
+      // 1. Trùng chính xác variantId hiệu dụng
+      if (i.variantId == effectiveVariantId) {
+        return true;
+      }
+      // 2. Cùng sản phẩm VÀ cùng tên phân loại
+      final isSameProduct = (i.productId.isNotEmpty && i.productId == cleanProductId) ||
+          (i.productSlug.isNotEmpty && i.productSlug == (productSlug ?? cleanProductId));
+      final isSameVariant = cleanVariantName.isNotEmpty &&
+          cleanVariantName != 'Mặc định' &&
+          i.variantName.trim().toLowerCase() == cleanVariantName.toLowerCase();
+
+      return isSameProduct && isSameVariant;
+    });
+
     if (index >= 0) {
       _items[index].qty += qty;
     } else {
       _items.add(CartItemModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        variantId: variantId,
-        productId: productId ?? '',
-        productName: productName ?? '',
-        productSlug: productSlug ?? '',
-        variantName: variantName,
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        variantId: effectiveVariantId,
+        productId: cleanProductId,
+        productName: productName ?? 'Sản phẩm',
+        productSlug: productSlug ?? cleanProductId,
+        variantName: cleanVariantName,
         price: price,
         originalPrice: originalPrice,
         qty: qty,
@@ -104,19 +138,22 @@ class CartService extends ChangeNotifier {
     final token = AuthService().token;
     if (token != null) {
       try {
-        final currentQty = _items.firstWhere((i) => i.variantId == variantId).qty;
-        await http.post(
-          Uri.parse(ApiConfig.cartUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode({
-            'variantId': int.tryParse(variantId) ?? 1,
-            'qty': currentQty,
-            'selected': true,
-          }),
-        ).timeout(const Duration(seconds: 5));
+        final currentQty = _items.firstWhere((i) => i.variantId == effectiveVariantId).qty;
+        final numVariantId = int.tryParse(effectiveVariantId) ?? int.tryParse(cleanProductId);
+        if (numVariantId != null) {
+          await http.post(
+            Uri.parse(ApiConfig.cartItemsUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'variantId': numVariantId.toString(),
+              'qty': currentQty,
+              'selected': true,
+            }),
+          ).timeout(const Duration(seconds: 5));
+        }
       } catch (e) {
         debugPrint('[CartService] sync addToCart error: $e');
       }
@@ -125,7 +162,7 @@ class CartService extends ChangeNotifier {
 
   /// Cập nhật số lượng
   Future<void> updateQty(String variantId, int newQty) async {
-    final index = _items.indexWhere((i) => i.variantId == variantId);
+    final index = _items.indexWhere((i) => i.variantId == variantId || i.id == variantId);
     if (index < 0) return;
 
     if (newQty <= 0) {
@@ -134,21 +171,22 @@ class CartService extends ChangeNotifier {
     }
 
     _items[index].qty = newQty.clamp(1, 99);
+    final item = _items[index];
     notifyListeners();
 
     final token = AuthService().token;
     if (token != null) {
       try {
-        await http.post(
-          Uri.parse(ApiConfig.cartUrl),
+        final targetId = item.id.isNotEmpty ? item.id : item.variantId;
+        await http.patch(
+          Uri.parse(ApiConfig.cartItemUrl(targetId)),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
           body: jsonEncode({
-            'variantId': int.tryParse(variantId) ?? 1,
-            'qty': _items[index].qty,
-            'selected': _items[index].selected,
+            'qty': item.qty,
+            'selected': item.selected,
           }),
         ).timeout(const Duration(seconds: 5));
       } catch (e) {
@@ -159,16 +197,20 @@ class CartService extends ChangeNotifier {
 
   /// Xóa sản phẩm khỏi giỏ hàng
   Future<void> removeFromCart(String variantId) async {
-    _items.removeWhere((i) => i.variantId == variantId);
+    final itemToRemove = _items.cast<CartItemModel?>().firstWhere(
+      (i) => i?.variantId == variantId || i?.id == variantId,
+      orElse: () => null,
+    );
+    _items.removeWhere((i) => i.variantId == variantId || i.id == variantId);
     notifyListeners();
 
     final token = AuthService().token;
-    if (token != null) {
+    if (token != null && itemToRemove != null) {
       try {
+        final targetId = itemToRemove.id.isNotEmpty ? itemToRemove.id : itemToRemove.variantId;
         await http.delete(
-          Uri.parse(ApiConfig.cartItemUrl(variantId)),
+          Uri.parse(ApiConfig.cartItemUrl(targetId)),
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
         ).timeout(const Duration(seconds: 5));
@@ -180,7 +222,7 @@ class CartService extends ChangeNotifier {
 
   /// Chọn / Bỏ chọn một dòng
   void toggleSelect(String variantId) {
-    final index = _items.indexWhere((i) => i.variantId == variantId);
+    final index = _items.indexWhere((i) => i.variantId == variantId || i.id == variantId);
     if (index >= 0) {
       _items[index].selected = !_items[index].selected;
       notifyListeners();

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../models/cart_item.dart';
+import '../../models/address.dart';
+import '../../services/address_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/order_service.dart';
+import '../account/addresses_screen.dart';
 import '../auth/login_screen.dart' as shopnova_auth;
 import '../orders/orders_screen.dart';
 
@@ -39,6 +42,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _districtController = TextEditingController();
     _wardController = TextEditingController();
     _noteController = TextEditingController();
+    _loadDefaultAddress();
+  }
+
+  Future<void> _loadDefaultAddress() async {
+    if (!AuthService().isAuthenticated) return;
+    try {
+      final list = await AddressService().getAddresses();
+      if (list.isNotEmpty && mounted) {
+        final def = list.firstWhere((a) => a.isDefault, orElse: () => list.first);
+        _applyAddress(def);
+      }
+    } catch (_) {}
+  }
+
+  void _applyAddress(Address addr) {
+    setState(() {
+      _nameController.text = addr.recipientName;
+      _phoneController.text = addr.phone;
+      _addressController.text = addr.detail;
+      if (addr.ward != null && addr.ward!.isNotEmpty) {
+        _wardController.text = addr.ward!;
+      }
+      if (addr.district != null && addr.district!.isNotEmpty) {
+        _districtController.text = addr.district!;
+      }
+      _provinceController.text = addr.province;
+    });
   }
 
   @override
@@ -309,13 +339,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(3),
+              TextButton.icon(
+                onPressed: () async {
+                  final selected = await Navigator.push<Address>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddressesScreen(selectMode: true)),
+                  );
+                  if (selected != null && mounted) {
+                    _applyAddress(selected);
+                  }
+                },
+                icon: const Icon(Icons.bookmark_outline, size: 14),
+                label: const Text('Chọn sổ địa chỉ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: Text('Mặc định', style: TextStyle(color: primaryColor, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

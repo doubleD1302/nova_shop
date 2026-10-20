@@ -97,6 +97,81 @@ void main() {
       await cart.removeFromCart('v20');
       expect(cart.items.isEmpty, true);
     });
+
+    test('Adding 2 different products does NOT merge into the first product', () async {
+      final cart = CartService();
+      cart.clearSelected();
+      for (final it in List.from(cart.items)) {
+        await cart.removeFromCart(it.variantId);
+      }
+      expect(cart.items.isEmpty, true);
+
+      // Thêm sản phẩm 1 (ví dụ: Áo sơ mi)
+      await cart.addToCart(
+        productId: '101',
+        productName: 'Áo sơ mi Oxford',
+        productSlug: 'ao-so-mi-oxford',
+        variantName: 'Trắng - L',
+        price: 250000,
+        qty: 1,
+      );
+
+      expect(cart.items.length, 1);
+      expect(cart.items[0].productId, '101');
+      expect(cart.items[0].qty, 1);
+
+      // Thêm sản phẩm 2 hoàn toàn khác (ví dụ: Quần Jean)
+      await cart.addToCart(
+        productId: '202',
+        productName: 'Quần Jeans Slimfit',
+        productSlug: 'quan-jeans-slimfit',
+        variantName: 'Xanh - 32',
+        price: 350000,
+        qty: 1,
+      );
+
+      // Phải có đúng 2 sản phẩm riêng biệt trong giỏ hàng!
+      expect(cart.items.length, 2);
+      expect(cart.items[0].productId, '101');
+      expect(cart.items[0].qty, 1);
+      expect(cart.items[1].productId, '202');
+      expect(cart.items[1].qty, 1);
+
+      // Thêm cùng sản phẩm 1 với đúng phân loại đó -> số lượng tăng lên 2
+      await cart.addToCart(
+        productId: '101',
+        productName: 'Áo sơ mi Oxford',
+        productSlug: 'ao-so-mi-oxford',
+        variantName: 'Trắng - L',
+        price: 250000,
+        qty: 1,
+      );
+
+      expect(cart.items.length, 2);
+      expect(cart.items[0].qty, 2);
+      expect(cart.items[1].qty, 1);
+
+      // Thêm sản phẩm 1 nhưng với biến thể khác (Đen - M) -> tạo dòng sản phẩm mới riêng biệt
+      await cart.addToCart(
+        productId: '101',
+        productName: 'Áo sơ mi Oxford',
+        productSlug: 'ao-so-mi-oxford',
+        variantName: 'Đen - M',
+        price: 250000,
+        qty: 1,
+      );
+
+      expect(cart.items.length, 3);
+      expect(cart.items[2].productId, '101');
+      expect(cart.items[2].variantName, 'Đen - M');
+      expect(cart.items[2].qty, 1);
+
+      // Cleanup
+      for (final it in List.from(cart.items)) {
+        await cart.removeFromCart(it.variantId);
+      }
+      expect(cart.items.isEmpty, true);
+    });
   });
 
   group('OrderService Tests', () {

@@ -84,7 +84,8 @@ class ApiConfig {
   static String productDetailUrl(String id) => '$baseUrl/api/v1/products/$id';
   static String shopDetailUrl(String id) => '$baseUrl/api/v1/shops/$id';
   static String get cartUrl => '$baseUrl/api/v1/cart';
-  static String cartItemUrl(String variantId) => '$baseUrl/api/v1/cart/$variantId';
+  static String get cartItemsUrl => '$baseUrl/api/v1/cart/items';
+  static String cartItemUrl(String itemId) => '$baseUrl/api/v1/cart/items/$itemId';
   static String get ordersUrl => '$baseUrl/api/v1/orders';
   static String orderDetailUrl(String id) => '$baseUrl/api/v1/orders/$id';
   static String get updateProfileUrl => '$baseUrl/api/v1/auth/profile';

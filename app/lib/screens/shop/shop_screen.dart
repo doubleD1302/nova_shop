@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../models/product.dart';
+import '../../services/auth_service.dart';
 import '../../services/catalog_service.dart';
+import '../../services/shop_service.dart';
 import '../cart/cart_screen.dart';
 import '../product_detail/product_detail_screen.dart';
+import 'shop_detail_screen.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -13,16 +18,18 @@ class ShopScreen extends StatefulWidget {
 class _ShopScreenState extends State<ShopScreen> {
   final Color primaryColor = const Color(0xFFEE4D2D);
   final CatalogService _catalogService = CatalogService();
+  final ShopService _shopService = ShopService();
 
   int _selectedTabIndex = 0; // 0: Tất cả, 1: Nova Mall, 2: Yêu Thích, 3: Giao Hỏa Tốc
   String _activeFilterChip = ''; // 'Nova Mall', 'Yêu Thích+', 'Giao 2H', 'Đánh giá 4*+'
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  final Set<String> _followingShopIds = {'1'}; // Mặc định follow shop đầu tiên
+  final Set<String> _followingShopIds = {};
   final Set<String> _savedVouchers = {};
 
   List<Map<String, dynamic>> _shops = [];
+  Map<String, List<Product>> _shopProductsMap = {};
   bool _isLoading = true;
 
   @override
@@ -40,10 +47,68 @@ class _ShopScreenState extends State<ShopScreen> {
   Future<void> _loadShops() async {
     setState(() => _isLoading = true);
     try {
-      final shops = await _catalogService.getShops();
+      // 1. Gọi trực tiếp API Backend /api/v1/shops để lấy danh sách gian hàng thực tế
+      final shopListRes = await _shopService.getShops();
+      List<Map<String, dynamic>> shops = [];
+      if (shopListRes.shops.isNotEmpty) {
+        shops = shopListRes.shops.map((s) => {
+          'id': s.id,
+          'name': s.name,
+          'slug': s.slug,
+          'logoUrl': s.logoUrl,
+          'bannerUrl': s.bannerUrl,
+          'tagline': s.tagline,
+          'description': s.description,
+          'province': s.province,
+          'location': s.province,
+          'isMall': s.isMall,
+          'rating': s.rating,
+          'ratingCount': s.ratingCount,
+          'followersCount': s.followersCount,
+          'productsCount': s.productsCount,
+        }).toList();
+      } else {
+        shops = await _catalogService.getShops();
+      }
+
+      // 2. Nạp sản phẩm thực tế từ Backend API cho từng gian hàng
+      final Map<String, List<Product>> pMap = {};
+      final allProducts = await _catalogService.getProducts();
+      for (final p in allProducts) {
+        final sid = p.shopId.isNotEmpty ? p.shopId : '1';
+        pMap.putIfAbsent(sid, () => []).add(p);
+      }
+
+      // Nạp riêng theo endpoint /api/v1/shops/:id/products cho các shop trong danh sách
+      for (final s in shops.take(5)) {
+        final sId = s['id']?.toString() ?? '';
+        if (sId.isNotEmpty && (!pMap.containsKey(sId) || pMap[sId]!.isEmpty)) {
+          try {
+            final res = await _shopService.getShopProducts(sId, limit: 4);
+            if (res.products.isNotEmpty) {
+              pMap[sId] = res.products;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 3. Kiểm tra trạng thái theo dõi thật từ Backend nếu đã đăng nhập
+      if (AuthService().isAuthenticated) {
+        for (final s in shops) {
+          final sId = s['id']?.toString();
+          if (sId != null) {
+            try {
+              final isFol = await _shopService.getFollowStatus(sId);
+              if (isFol) _followingShopIds.add(sId);
+            } catch (_) {}
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _shops = shops;
+          _shopProductsMap = pMap;
           _isLoading = false;
         });
       }
@@ -51,6 +116,42 @@ class _ShopScreenState extends State<ShopScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _toggleFollowShop(String shopId, String shopName, bool isCurrentlyFollowing) async {
+    if (!AuthService().isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để theo dõi gian hàng.')),
+      );
+      return;
+    }
+
+    final nextStatus = !isCurrentlyFollowing;
+    setState(() {
+      if (nextStatus) {
+        _followingShopIds.add(shopId);
+      } else {
+        _followingShopIds.remove(shopId);
+      }
+    });
+
+    final ok = await _shopService.toggleFollow(shopId, !nextStatus);
+    if (mounted) {
+      setState(() {
+        if (ok) {
+          _followingShopIds.add(shopId);
+        } else {
+          _followingShopIds.remove(shopId);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Đã theo dõi $shopName!' : 'Đã hủy theo dõi $shopName'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -402,6 +503,7 @@ class _ShopScreenState extends State<ShopScreen> {
       final location = shop['location'] ?? 'TP. Hồ Chí Minh';
       final isFollowing = _followingShopIds.contains(id);
       final isVoucherSaved = _savedVouchers.contains(id);
+      final shopProducts = _shopProductsMap[id] ?? [];
 
       return Container(
         margin: const EdgeInsets.only(top: 8),
@@ -459,24 +561,9 @@ class _ShopScreenState extends State<ShopScreen> {
                     ],
                   ),
                 ),
-                // Nút Follow
+                // Nút Follow thật kết nối Backend API
                 OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      if (isFollowing) {
-                        _followingShopIds.remove(id);
-                      } else {
-                        _followingShopIds.add(id);
-                      }
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isFollowing ? 'Đã hủy theo dõi $name' : 'Đã theo dõi $name!'),
-                        duration: const Duration(seconds: 1),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onPressed: () => _toggleFollowShop(id, name, isFollowing),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     minimumSize: const Size(0, 32),
@@ -494,14 +581,13 @@ class _ShopScreenState extends State<ShopScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                // Nút Vào Shop
+                // Nút Vào Shop mở ShopDetailScreen
                 ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Chào mừng bạn đến với gian hàng $name!'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: primaryColor,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ShopDetailScreen(shopId: id, initialShopName: name),
                       ),
                     );
                   },
@@ -562,23 +648,42 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            // Sản phẩm nổi bật của Shop
-            Row(
-              children: [
-                _buildShopProductPreview('Áo Thun Cotton', '99.000₫', '1'),
-                const SizedBox(width: 8),
-                _buildShopProductPreview('Quần Short Kaki', '165.000₫', '2'),
-                const SizedBox(width: 8),
-                _buildShopProductPreview('Củ Sạc Nhanh GaN', '145.000₫', '3'),
-              ],
-            ),
+            // Sản phẩm thực tế của Shop (Đã loại bỏ dữ liệu tĩnh)
+            if (shopProducts.isNotEmpty)
+              Row(
+                children: shopProducts.take(3).map((p) {
+                  final priceFormatted = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(p.price);
+                  return _buildShopProductPreview(p.name, priceFormatted, p.id, p.imageUrl, p.emoji);
+                }).toList(),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, size: 15, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Gian hàng chính hãng • Chạm "Vào Shop" để xem danh mục sản phẩm',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       );
     }).toList();
   }
 
-  Widget _buildShopProductPreview(String name, String price, String productId) {
+  Widget _buildShopProductPreview(String name, String price, String productId, String imageUrl, String emoji) {
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -590,6 +695,7 @@ class _ShopScreenState extends State<ShopScreen> {
           );
         },
         child: Container(
+          margin: const EdgeInsets.only(right: 6),
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
@@ -606,7 +712,20 @@ class _ShopScreenState extends State<ShopScreen> {
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Center(child: Icon(Icons.image, color: Colors.grey, size: 28)),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: imageUrl.startsWith('http')
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(emoji.isNotEmpty ? emoji : '🛍️', style: const TextStyle(fontSize: 24)),
+                            ),
+                          )
+                        : Center(
+                            child: Text(emoji.isNotEmpty ? emoji : '🛍️', style: const TextStyle(fontSize: 24)),
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
