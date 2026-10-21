@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/cart_item.dart';
+import 'package:shopnova/models/order.dart';
 import 'package:shopnova/services/cart_service.dart';
 import 'package:shopnova/services/order_service.dart';
 
@@ -222,6 +223,69 @@ void main() {
     test('OrderService initial state and error handling', () {
       final orderService = OrderService();
       expect(orderService.lastError, null);
+    });
+
+    test('OrderItem.fromJson correctly parses price and unit_price fallbacks', () {
+      // Test when backend or checkout only provides 'price'
+      final jsonWithPrice = {
+        'id': '1',
+        'productName': 'Bàn Phím Cơ',
+        'price': 649000,
+        'qty': 1,
+      };
+      final item1 = OrderItem.fromJson(jsonWithPrice);
+      expect(item1.unitPrice, 649000);
+      expect(item1.lineTotal, 649000);
+
+      // Test when payload has 'unit_price'
+      final jsonWithSnakeCase = {
+        'id': '2',
+        'product_name': 'Sạc Dự Phòng 20000mAh',
+        'unit_price': 350000,
+        'quantity': 2,
+      };
+      final item2 = OrderItem.fromJson(jsonWithSnakeCase);
+      expect(item2.unitPrice, 350000);
+      expect(item2.qty, 2);
+      expect(item2.lineTotal, 700000);
+      expect(item2.productName, 'Sạc Dự Phòng 20000mAh');
+    });
+
+    test('createOrder fallback preserves item unitPrice, productName, and total amount', () async {
+      final orderService = OrderService();
+      final order = await orderService.createOrder(
+        recipientName: 'Nguyen Van A',
+        recipientPhone: '0901234567',
+        province: 'TP. Hồ Chí Minh',
+        addressDetail: '123 Đường Lê Lợi',
+        items: [
+          {
+            'variantId': 1,
+            'qty': 1,
+            'price': 499000,
+            'unitPrice': 499000,
+            'productName': 'Sạc dự phòng 20000mAh',
+            'variantName': 'Đen',
+          },
+          {
+            'variantId': 2,
+            'qty': 1,
+            'price': 500000,
+            'unitPrice': 500000,
+            'productName': 'Bàn Phím Cơ',
+            'variantName': 'Trắng',
+          },
+        ],
+      );
+
+      expect(order, isNotNull);
+      expect(order!['totalAmount'], 999000);
+      final items = order['items'] as List;
+      expect(items.length, 2);
+      expect(items[0]['unitPrice'], 499000);
+      expect(items[1]['unitPrice'], 500000);
+      expect(items[0]['variantName'], 'Đen');
+      expect(items[1]['variantName'], 'Trắng');
     });
   });
 }

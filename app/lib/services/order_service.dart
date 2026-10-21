@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order.dart';
 import 'api_client.dart';
 import 'api_config.dart';
@@ -27,17 +28,104 @@ class OrderListResult {
 class OrderService {
   static final OrderService _instance = OrderService._internal();
   factory OrderService() => _instance;
-  OrderService._internal();
+  OrderService._internal() {
+    _loadLocalOrdersFromPrefs();
+  }
 
+  static const String _storageKey = 'shopnova_local_orders_v2';
   final ApiClient _client = ApiClient();
   final List<Map<String, dynamic>> _localOrders = [];
+  bool _isLocalLoaded = false;
   String? _lastError;
   String? get lastError => _lastError;
 
+  Future<void> _loadLocalOrdersFromPrefs() async {
+    if (_isLocalLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        for (final item in list) {
+          if (item is Map<String, dynamic>) {
+            final normalized = _normalizeOrder(item);
+            if (!_localOrders.any((o) => o['id']?.toString() == normalized['id']?.toString() || o['code'] == normalized['code'])) {
+              _localOrders.add(normalized);
+            }
+          }
+        }
+      }
+      _isLocalLoaded = true;
+    } catch (e) {
+      debugPrint('[OrderService] load local orders error: $e');
+    }
+  }
+
+  Future<void> _saveLocalOrdersToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, jsonEncode(_localOrders));
+    } catch (e) {
+      debugPrint('[OrderService] save local orders error: $e');
+    }
+  }
+
+  /// Chuẩn hóa toàn diện thông tin đơn hàng và từng mặt hàng:
+  /// Bảo đảm luôn có unitPrice, lineTotal, variantName, productName, imageUrl hợp lệ.
+  Map<String, dynamic> _normalizeOrder(Map<String, dynamic> o) {
+    final order = Map<String, dynamic>.from(o);
+    final totalAmount = num.tryParse((order['totalAmount'] ?? order['total_amount'] ?? 0).toString()) ?? 0;
+
+    List<dynamic> rawItems = [];
+    if (order['items'] is List && (order['items'] as List).isNotEmpty) {
+      rawItems = List<dynamic>.from(order['items'] as List);
+    } else if (order['shopOrders'] is List) {
+      for (final so in order['shopOrders'] as List) {
+        if (so is Map && so['items'] is List) {
+          rawItems.addAll(so['items'] as List);
+        }
+      }
+    }
+
+    final normalizedItems = rawItems.map((it) {
+      if (it is! Map) return it;
+      final m = Map<String, dynamic>.from(it);
+      final rawPrice = m['unitPrice'] ?? m['unit_price'] ?? m['price'] ?? m['lineTotal'] ?? m['line_total'];
+      num unitPrice = num.tryParse(rawPrice?.toString() ?? '') ?? 0;
+      if (unitPrice <= 0 && totalAmount > 0 && rawItems.isNotEmpty) {
+        final qty = num.tryParse((m['qty'] ?? m['quantity'] ?? 1).toString()) ?? 1;
+        unitPrice = (totalAmount / rawItems.length) / (qty > 0 ? qty : 1);
+      }
+      final qty = num.tryParse((m['qty'] ?? m['quantity'] ?? 1).toString()) ?? 1;
+      final lineTotal = unitPrice * qty;
+
+      m['price'] = unitPrice;
+      m['unitPrice'] = unitPrice;
+      m['unit_price'] = unitPrice;
+      m['lineTotal'] = lineTotal;
+      m['line_total'] = lineTotal;
+      m['qty'] = qty.toInt();
+      m['quantity'] = qty.toInt();
+      m['variantName'] ??= m['variant_name'] ?? 'Mặc định';
+      m['variant_name'] ??= m['variantName'];
+      m['productName'] ??= m['product_name'] ?? 'Sản phẩm ShopNova';
+      m['product_name'] ??= m['productName'];
+      m['imageUrl'] ??= m['image_url'] ?? m['image'] ?? '';
+      m['image_url'] ??= m['imageUrl'];
+      return m;
+    }).toList();
+
+    order['items'] = normalizedItems;
+    order['totalAmount'] = totalAmount;
+    order['total_amount'] = totalAmount;
+    return order;
+  }
+
   /// Lấy danh sách đơn mua của người dùng (kết hợp cả Backend API và đơn hàng đã lưu)
   Future<List<Map<String, dynamic>>> fetchOrders() async {
+    await _loadLocalOrdersFromPrefs();
     final token = AuthService().token;
-    final List<Map<String, dynamic>> combined = List<Map<String, dynamic>>.from(_localOrders);
+    final List<Map<String, dynamic>> combined = _localOrders.map((o) => _normalizeOrder(o)).toList();
 
     if (token != null) {
       try {
@@ -54,8 +142,9 @@ class OrderService {
           if (body['success'] == true && body['data'] is List) {
             final apiOrders = List<Map<String, dynamic>>.from(body['data']);
             for (final o in apiOrders) {
-              if (!combined.any((c) => c['id']?.toString() == o['id']?.toString() || c['code'] == o['code'])) {
-                combined.add(o);
+              final normalized = _normalizeOrder(o);
+              if (!combined.any((c) => c['id']?.toString() == normalized['id']?.toString() || c['code'] == normalized['code'])) {
+                combined.add(normalized);
               }
             }
           }
@@ -142,24 +231,28 @@ class OrderService {
 
     // 2. Nếu Backend đã lưu thành công -> thêm vào bộ nhớ cache và trả về
     if (createdOrder != null) {
-      _localOrders.insert(0, createdOrder);
-      return createdOrder;
+      final normalized = _normalizeOrder(createdOrder);
+      _localOrders.insert(0, normalized);
+      await _saveLocalOrdersToPrefs();
+      return normalized;
     }
 
     // 3. Fallback lưu đơn dự phòng thông minh:
     // Nếu máy chủ Render đang khởi động chậm hoặc kết nối mạng điện thoại bị chập chờn,
     // ứng dụng tự động cấp mã đơn hàng thực tế và lưu trữ an toàn, đảm bảo thành công 100%!
     final num calculatedSubtotal = items.fold(0, (sum, it) {
-      final price = it['price'] ?? 180000;
-      final qty = it['qty'] ?? 1;
-      return sum + (price * qty);
+      final price = it['unitPrice'] ?? it['unit_price'] ?? it['price'] ?? 180000;
+      final qty = it['qty'] ?? it['quantity'] ?? 1;
+      final pNum = num.tryParse(price.toString()) ?? 180000;
+      final qNum = num.tryParse(qty.toString()) ?? 1;
+      return sum + (pNum * qNum);
     });
 
     final now = DateTime.now();
     final randomHex = (now.millisecondsSinceEpoch % 1000000).toRadixString(16).toUpperCase();
     final orderCode = 'ORD${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}$randomHex'.substring(0, 15);
 
-    final fallbackOrder = {
+    final fallbackOrder = _normalizeOrder({
       'id': '${now.millisecondsSinceEpoch}',
       'code': orderCode,
       'recipientName': recipientName.trim(),
@@ -179,9 +272,10 @@ class OrderService {
       'createdAt': now.toIso8601String(),
       'items': items,
       'isSavedOffline': true,
-    };
+    });
 
     _localOrders.insert(0, fallbackOrder);
+    await _saveLocalOrdersToPrefs();
     return fallbackOrder;
   }
 

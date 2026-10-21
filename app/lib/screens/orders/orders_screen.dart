@@ -201,7 +201,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     final totalAmount = order['totalAmount'] ?? order['total_amount'] ?? 0;
     final status = (order['status'] ?? 'pending').toString().toLowerCase();
     final createdAt = (order['createdAt'] ?? '').toString();
-    final items = (order['items'] as List?) ?? [];
+    List<dynamic> items = [];
+    if (order['items'] is List && (order['items'] as List).isNotEmpty) {
+      items = order['items'] as List;
+    } else if (order['shopOrders'] is List) {
+      for (final so in order['shopOrders'] as List) {
+        if (so is Map && so['items'] is List) {
+          items.addAll(so['items'] as List);
+        }
+      }
+    }
 
     Color statusColor;
     String statusText;
@@ -222,6 +231,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         statusText = 'Giao thành công';
         break;
       case 'cancelled':
+      case 'returned':
         statusColor = Colors.red;
         statusText = 'Đã hủy';
         break;
@@ -294,9 +304,20 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             ...items.map((it) {
               final name = it['productName'] ?? it['product_name'] ?? 'Sản phẩm ShopNova';
               final variant = it['variantName'] ?? it['variant_name'] ?? 'Mặc định';
-              final price = _formatVND(num.tryParse((it['unitPrice'] ?? it['unit_price'] ?? 0).toString()) ?? 0);
+              final rawPrice = it['unitPrice'] ??
+                  it['unit_price'] ??
+                  it['price'] ??
+                  it['lineTotal'] ??
+                  it['line_total'];
+              num parsedPrice = num.tryParse(rawPrice?.toString() ?? '') ?? 0;
+              if (parsedPrice <= 0 && items.isNotEmpty && totalAmount > 0) {
+                final num total = num.tryParse(totalAmount.toString()) ?? 0;
+                final qtyNum = num.tryParse((it['qty'] ?? it['quantity'] ?? 1).toString()) ?? 1;
+                parsedPrice = (total / items.length) / (qtyNum > 0 ? qtyNum : 1);
+              }
+              final price = _formatVND(parsedPrice);
               final qty = 'x${it['qty'] ?? it['quantity'] ?? 1}';
-              final img = it['imageUrl'] ?? it['image_url'] ?? '';
+              final img = (it['imageUrl'] ?? it['image_url'] ?? it['image'] ?? '').toString();
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -310,8 +331,12 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: img.isNotEmpty
-                          ? Image.network(img, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey))
+                      child: img.isNotEmpty && (img.startsWith('http://') || img.startsWith('https://'))
+                          ? Image.network(
+                              img,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                            )
                           : const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
                     ),
                     const SizedBox(width: 10),
