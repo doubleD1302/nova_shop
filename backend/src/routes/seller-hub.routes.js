@@ -1,11 +1,17 @@
 import { Router } from 'express'
-import { getShop, updateShop, getDashboard } from '../controllers/seller-hub.controller.js'
+import { getShop, updateShop, getDashboard, registerShop } from '../controllers/seller-hub.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const sellerHubRouter = Router()
 
-// Tất cả route hub seller đều yêu cầu đăng nhập và có role seller
-sellerHubRouter.use(authenticate, requireRole('seller'))
+// Yêu cầu đăng nhập trước khi thực hiện bất kỳ thao tác nào
+sellerHubRouter.use(authenticate)
+
+// POST /api/v1/seller/register-shop - Đăng ký mở gian hàng (dành cho cả buyer muốn nâng cấp thành seller)
+sellerHubRouter.post('/register-shop', registerShop)
+
+// Các route bên dưới yêu cầu role seller
+sellerHubRouter.use(requireRole('seller'))
 
 // GET /api/v1/seller/shop - Xem thông tin gian hàng của mình
 sellerHubRouter.get('/shop', getShop)
@@ -17,3 +23,4 @@ sellerHubRouter.put('/shop', updateShop)
 sellerHubRouter.get('/dashboard', getDashboard)
 
 export { sellerHubRouter }
+

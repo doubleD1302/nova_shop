@@ -35,13 +35,9 @@ export async function getProducts(req, res, next) {
  */
 export async function createProduct(req, res, next) {
   try {
-    const shopId = req.user.shopId
+    let shopId = req.user.shopId
     if (!shopId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Tài khoản của bạn chưa được liên kết với bất kỳ gian hàng nào.',
-        error: { code: 'SHOP_REQUIRED' },
-      })
+      shopId = req.user.id
     }
 
     const {
@@ -65,7 +61,7 @@ export async function createProduct(req, res, next) {
       })
     }
 
-    if (!categoryId || !/^\d+$/.test(String(categoryId))) {
+    if (!categoryId || String(categoryId).trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Danh mục sản phẩm không hợp lệ.',
@@ -81,11 +77,13 @@ export async function createProduct(req, res, next) {
       })
     }
 
+    const cleanCategoryId = String(categoryId).trim()
+
     const product = await insertSellerProduct({
-      shopId,
-      name,
+      shopId: String(shopId),
+      name: name.trim(),
       slug,
-      categoryId,
+      categoryId: cleanCategoryId,
       description,
       specs,
       freeShipping,

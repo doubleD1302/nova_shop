@@ -1807,6 +1807,70 @@ export async function updateUserProfile(userId, profileData) {
 }
 
 /**
+ * Đổi mật khẩu tài khoản người dùng:
+ * PUT /internal/v1/users/:userId/change-password
+ */
+export async function changeUserPassword(userId, currentPassword, newPassword) {
+  const { status, data: json } = await requestDataApi(
+    `/internal/v1/users/${encodeURIComponent(userId)}/change-password`,
+    {
+      method: 'PUT',
+      body: { currentPassword, newPassword },
+    },
+  )
+
+  if (status === 200) {
+    return true
+  }
+
+  if (status === 400) {
+    throw new DataApiClientError(
+      400,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Thông tin mật khẩu không hợp lệ.',
+    )
+  }
+
+  if (status === 403) {
+    throw new DataApiClientError(
+      403,
+      json?.error?.code || 'ACCOUNT_BLOCKED',
+      json?.message || 'Tài khoản đã bị tạm khóa hoặc ngừng kích hoạt.',
+    )
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(
+      404,
+      json?.error?.code || 'USER_NOT_FOUND',
+      json?.message || 'Không tìm thấy thông tin người dùng.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(
+      502,
+      'DATA_API_AUTH_FAILED',
+      'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+    )
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(
+      503,
+      'DATA_API_UNAVAILABLE',
+      'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.',
+    )
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Dịch vụ dữ liệu nội bộ phản hồi lỗi khi đổi mật khẩu.',
+  )
+}
+
+/**
  * Lấy danh sách địa chỉ nhận hàng của người dùng:
  * GET /internal/v1/users/:userId/addresses
  */
@@ -2737,3 +2801,37 @@ export async function unfollowShop(shopId, userId) {
 
   throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
 }
+
+/**
+ * Đăng ký gian hàng mới cho người dùng:
+ * POST /internal/v1/seller/register-shop
+ */
+export async function registerSellerShop(userId, shopData) {
+  const { status, data: json } = await requestDataApi('/internal/v1/seller/register-shop', {
+    method: 'POST',
+    body: { userId, ...shopData },
+  })
+
+  if (status === 201) {
+    return json?.data
+  }
+
+  if (status === 400 || status === 409) {
+    throw new DataApiClientError(
+      status,
+      json?.error?.code || 'VALIDATION_ERROR',
+      json?.message || 'Không thể đăng ký gian hàng.',
+    )
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
+}
+

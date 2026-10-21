@@ -1,4 +1,4 @@
-import { verifyCredentials, registerUser, updateUserProfile, DataApiClientError } from '../clients/data.client.js'
+import { verifyCredentials, registerUser, updateUserProfile, changeUserPassword, DataApiClientError } from '../clients/data.client.js'
 import { signAccessToken, ACCESS_TOKEN_EXPIRES_IN } from '../middlewares/auth.middleware.js'
 
 /**
@@ -291,6 +291,71 @@ export async function updateProfile(req, res, next) {
       data: {
         user: sanitizePublicUser(updatedUser),
       },
+    })
+  } catch (err) {
+    if (err instanceof DataApiClientError) {
+      return res.status(err.status).json({
+        success: false,
+        message: err.message,
+        error: { code: err.code },
+      })
+    }
+    next(err)
+  }
+}
+
+/**
+ * PUT /api/v1/auth/change-password
+ * POST /api/v1/auth/change-password
+ * Đổi mật khẩu tài khoản của người dùng hiện tại (Bearer JWT).
+ */
+export async function changePassword(req, res, next) {
+  try {
+    const userId = req.user?.id
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Yêu cầu bắt buộc phải có token xác thực.',
+        error: { code: 'AUTH_REQUIRED' },
+      })
+    }
+
+    const { currentPassword, newPassword } = req.body || {}
+
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string' ||
+      currentPassword.length === 0 ||
+      newPassword.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp mật khẩu hiện tại và mật khẩu mới.',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+        error: { code: 'PASSWORD_TOO_SHORT' },
+      })
+    }
+
+    if (Buffer.byteLength(newPassword, 'utf8') > 72) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới vượt quá giới hạn 72 bytes.',
+        error: { code: 'PASSWORD_TOO_LONG' },
+      })
+    }
+
+    await changeUserPassword(userId, currentPassword, newPassword)
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đổi mật khẩu tài khoản thành công.',
     })
   } catch (err) {
     if (err instanceof DataApiClientError) {

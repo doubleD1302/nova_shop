@@ -340,3 +340,76 @@ export async function unfollowShop(req, res, next) {
     next(err)
   }
 }
+
+/**
+ * POST /internal/v1/seller/register-shop
+ * Đăng ký mở gian hàng mới cho người dùng
+ */
+export async function registerSellerShop(req, res, next) {
+  try {
+    const { userId, shopName, tagline, province = 'Toàn quốc' } = req.body || {}
+
+    if (!userId || !/^\d+$/.test(String(userId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mã người dùng không hợp lệ.',
+        error: { code: 'INVALID_USER_ID' },
+      })
+    }
+
+    if (!shopName || typeof shopName !== 'string' || shopName.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên gian hàng không được để trống.',
+        error: { code: 'INVALID_SHOP_NAME' },
+      })
+    }
+
+    const numericUserId = BigInt(userId)
+    const trimmedName = shopName.trim().slice(0, 160)
+    const baseSlug = String(trimmedName)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `shop-${numericUserId}`
+    const uniqueSlug = `${baseSlug}-${numericUserId}-${Date.now().toString().slice(-4)}`.slice(0, 160)
+
+    // Kiểm tra xem user đã có shop chưa
+    const existingShop = await executeQuery('SELECT id FROM shops WHERE owner_id = ? LIMIT 1', [numericUserId])
+    let shopId
+    if (existingShop && existingShop.length > 0) {
+      shopId = existingShop[0].id
+      await executeQuery('UPDATE shops SET name = ?, tagline = ?, status = "active" WHERE id = ?', [
+        trimmedName,
+        tagline ? tagline.trim().slice(0, 255) : null,
+        shopId,
+      ])
+    } else {
+      const insertResult = await executeQuery(
+        'INSERT INTO shops (owner_id, slug, name, tagline, province, status) VALUES (?, ?, ?, ?, ?, "active")',
+        [numericUserId, uniqueSlug, trimmedName, tagline ? tagline.trim().slice(0, 255) : null, province || 'Toàn quốc'],
+      )
+      shopId = insertResult.insertId
+    }
+
+    // Cập nhật vai trò người dùng thành 'seller'
+    await executeQuery('UPDATE users SET role = "seller" WHERE id = ?', [numericUserId])
+
+    return res.status(201).json({
+      success: true,
+      message: 'Mở gian hàng thành công.',
+      data: {
+        shopId: String(shopId),
+        userId: String(numericUserId),
+        name: trimmedName,
+        slug: uniqueSlug,
+        role: 'seller',
+      },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+

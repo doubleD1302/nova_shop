@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
@@ -9,20 +9,64 @@ import EmptyState from '../../components/ui/EmptyState'
 import Paginator from '../../components/ui/Paginator'
 import { IconEdit, IconEye, IconPlus, IconSearch, IconTrash } from '../../components/ui/Icons'
 import SmartImage from '../../components/ui/SmartImage'
+import { apiGetSellerProducts, apiDeleteSellerProduct } from '../../utils/api'
 
 const PAGE_SIZE = 10
 
-/** QUẢN LÝ SẢN PHẨM (người bán) — tìm kiếm, sửa, xoá, cập nhật kho nhanh */
+/** QUẢN LÝ SẢN PHẨM (người bán) — Kết nối dữ liệu thật từ Backend API */
 export default function SellerProductsPage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { getProductsByShop, deleteProduct, upsertProduct, categories } = useCatalog()
   const { pushToast } = useToast()
   const [keyword, setKeyword] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [sort, setSort] = useState('newest')
   const [page, setPage] = useState(1)
+  const [backendProducts, setBackendProducts] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const all = getProductsByShop(user.shopId)
+  useEffect(() => {
+    let active = true
+    if (!token) return
+
+    setIsLoading(true)
+    apiGetSellerProducts(token)
+      .then(async (res) => {
+        if (!active) return
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.success && Array.isArray(data?.data)) {
+          const mapped = data.data.map((p) => ({
+            id: String(p.id),
+            name: p.name,
+            slug: p.slug || String(p.id),
+            categoryId: p.categorySlug || String(p.categoryId),
+            price: Number(p.minPrice || p.price || 0),
+            originalPrice: Number(p.maxPrice || p.originalPrice || p.price || 0),
+            stock: Number(p.totalStock ?? p.stock ?? 0),
+            sold: Number(p.soldCount ?? p.sold ?? 0),
+            location: p.province || p.location || 'TP. Hồ Chí Minh',
+            image: (p.images && p.images[0]?.imageUrl) || p.image || null,
+            emoji: p.emoji || '🛍️',
+            mall: p.isMall || false,
+            createdAt: p.createdAt || new Date().toISOString(),
+          }))
+          setBackendProducts(mapped)
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi lấy danh sách sản phẩm từ backend:', err)
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [token])
+
+  const localProducts = getProductsByShop(user?.shopId)
+  const all = backendProducts !== null ? backendProducts : localProducts
 
   const list = useMemo(() => {
     const k = keyword.trim().toLowerCase()
@@ -159,9 +203,17 @@ export default function SellerProductsPage() {
               </Link>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (window.confirm(`Xoá sản phẩm "${p.name}"?`)) {
+                    if (token && /^\d+$/.test(String(p.id))) {
+                      try {
+                        await apiDeleteSellerProduct(token, p.id)
+                      } catch (err) {
+                        console.warn('Lỗi khi xoá sản phẩm trên backend:', err)
+                      }
+                    }
                     deleteProduct(p.id)
+                    setBackendProducts((prev) => (prev ? prev.filter((item) => String(item.id) !== String(p.id)) : prev))
                     pushToast('Đã xoá sản phẩm khỏi gian hàng', 'success')
                   }
                 }}

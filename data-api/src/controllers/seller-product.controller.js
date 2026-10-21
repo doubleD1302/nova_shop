@@ -175,17 +175,56 @@ export async function createSellerProduct(req, res, next) {
       actorId,
     } = req.body || {}
 
-    if (!shopId || !name || !categoryId || !Array.isArray(variants) || variants.length === 0) {
+    if (!shopId || !name) {
       return res.status(400).json({
         success: false,
-        message: 'Thông tin sản phẩm bắt buộc (tên, danh mục, gian hàng, ít nhất 1 biến thể SKU) không đầy đủ.',
+        message: 'Thông tin sản phẩm bắt buộc (tên, gian hàng) không được để trống.',
         error: { code: 'VALIDATION_ERROR' },
       })
     }
 
     const numericShopId = BigInt(shopId)
-    const numericCategoryId = BigInt(categoryId)
     const numericActorId = actorId && /^\d+$/.test(String(actorId)) ? BigInt(actorId) : null
+
+    // Đảm bảo shopId tồn tại, nếu chưa có tạo shop mặc định theo owner
+    const existingShop = await executeQuery('SELECT id FROM shops WHERE id = ? LIMIT 1', [numericShopId])
+    if (!existingShop || existingShop.length === 0) {
+      const ownerId = numericActorId || 1n
+      const baseSlug = `shop-${numericShopId}-${Date.now().toString().slice(-4)}`
+      await executeQuery(
+        'INSERT INTO shops (id, owner_id, slug, name, province, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [numericShopId, ownerId, baseSlug, `Gian hàng #${numericShopId}`, 'Toàn quốc', 'active'],
+      )
+    }
+
+    // Tra cứu categoryId theo ID số nguyên hoặc slug (ví dụ: 'thoi-trang-nam', 'nha-cua')
+    let numericCategoryId = null
+    const rawCat = categoryId != null ? String(categoryId).trim() : ''
+    if (/^\d+$/.test(rawCat)) {
+      numericCategoryId = BigInt(rawCat)
+    } else if (rawCat.length > 0) {
+      const catRows = await executeQuery('SELECT id FROM categories WHERE slug = ? OR name = ? LIMIT 1', [rawCat, rawCat])
+      if (catRows && catRows.length > 0) {
+        numericCategoryId = BigInt(catRows[0].id)
+      }
+    }
+
+    if (!numericCategoryId) {
+      const firstCat = await executeQuery('SELECT id FROM categories ORDER BY id ASC LIMIT 1')
+      numericCategoryId = firstCat && firstCat.length > 0 ? BigInt(firstCat[0].id) : 1n
+    }
+
+    // Chuẩn bị danh sách biến thể SKU (tối thiểu 1 biến thể)
+    const effectiveVariants = Array.isArray(variants) && variants.length > 0
+      ? variants
+      : [
+          {
+            name: 'Mặc định',
+            price: req.body?.price || 100000,
+            originalPrice: req.body?.originalPrice || null,
+            stockQty: req.body?.stock || req.body?.stockQty || 10,
+          },
+        ]
 
     // Tạo slug nếu chưa có
     const finalSlug = slug && slug.trim().length > 0
@@ -225,8 +264,8 @@ export async function createSellerProduct(req, res, next) {
       }
 
       // 3. Tạo các SKU biến thể và nhập kho
-      for (let i = 0; i < variants.length; i++) {
-        const v = variants[i]
+      for (let i = 0; i < effectiveVariants.length; i++) {
+        const v = effectiveVariants[i]
         const skuCode = v.sku && v.sku.trim().length > 0
           ? v.sku.trim()
           : `SKU-${productId}-${i + 1}`

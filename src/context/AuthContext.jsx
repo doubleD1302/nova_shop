@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { users as seedUsers } from '../data/users'
 import { shopAvatar } from '../utils/image'
-import { apiGetMe, apiLogin, apiRegister } from '../utils/api'
+import { apiGetMe, apiLogin, apiRegister, apiUpdateProfile } from '../utils/api'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'novashop_token'
@@ -55,6 +55,7 @@ function normalizeUser(apiUser) {
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY))
   const [isInitializing, setIsInitializing] = useState(true)
 
   // Version của hành động auth để ngăn chặn race condition từ các request bất đồng bộ cũ
@@ -66,9 +67,12 @@ export function AuthProvider({ children }) {
     let isMounted = true
 
     const restoreSession = async () => {
-      const token = sessionStorage.getItem(TOKEN_KEY)
-      if (!token) {
-        if (isMounted) setIsInitializing(false)
+      const storedToken = sessionStorage.getItem(TOKEN_KEY)
+      if (!storedToken) {
+        if (isMounted) {
+          setToken(null)
+          setIsInitializing(false)
+        }
         return
       }
 
@@ -79,21 +83,22 @@ export function AuthProvider({ children }) {
       restoreAbortRef.current = controller
 
       try {
-        const res = await apiGetMe(token, { signal: controller.signal })
+        const res = await apiGetMe(storedToken, { signal: controller.signal })
 
         // Nếu đã có hành động auth mới hơn (login mới hoặc logout) hoặc token trong sessionStorage đã đổi: hủy bỏ xử lý
-        if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
+        if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== storedToken) {
           return
         }
 
         if (res.ok) {
           const data = await res.json().catch(() => null)
           // Kiểm tra lại version sau khi await json
-          if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
+          if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== storedToken) {
             return
           }
           if (data?.success && data?.data?.user) {
             if (isMounted) {
+              setToken(storedToken)
               setUser(normalizeUser(data.data.user))
             }
             return
@@ -102,9 +107,10 @@ export function AuthProvider({ children }) {
 
         // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi):
         // Chỉ xóa token và đặt user null nếu version vẫn khớp và token chưa bị thay thế
-        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === token) {
+        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === storedToken) {
           sessionStorage.removeItem(TOKEN_KEY)
           if (isMounted) {
+            setToken(null)
             setUser(null)
           }
         }
@@ -148,8 +154,9 @@ export function AuthProvider({ children }) {
         restoreAbortRef.current?.abort()
         authVersionRef.current += 1
 
-        const { token, user: apiUser } = data.data
-        sessionStorage.setItem(TOKEN_KEY, token)
+        const { token: receivedToken, user: apiUser } = data.data
+        sessionStorage.setItem(TOKEN_KEY, receivedToken)
+        setToken(receivedToken)
         const normalized = normalizeUser(apiUser)
         setUser(normalized)
         return { ok: true, user: normalized }
@@ -210,8 +217,9 @@ export function AuthProvider({ children }) {
         restoreAbortRef.current?.abort()
         authVersionRef.current += 1
 
-        const { token, user: apiUser } = data.data
-        sessionStorage.setItem(TOKEN_KEY, token)
+        const { token: receivedToken, user: apiUser } = data.data
+        sessionStorage.setItem(TOKEN_KEY, receivedToken)
+        setToken(receivedToken)
         const normalized = normalizeUser(apiUser)
         setUser(normalized)
         return { ok: true, user: normalized }
@@ -244,13 +252,63 @@ export function AuthProvider({ children }) {
   }, [])
 
   /**
-   * Cập nhật hồ sơ chưa có API Backend: không báo lưu thành công local.
+   * Cập nhật hồ sơ kết nối trực tiếp với Backend API.
    */
-  const updateProfile = useCallback(() => {
-    return {
-      ok: false,
-      error: 'Tính năng cập nhật thông tin hồ sơ chưa được hỗ trợ trên Backend API.',
+  const updateProfile = useCallback(async (profileData) => {
+    const curToken = sessionStorage.getItem(TOKEN_KEY)
+    if (!curToken) {
+      return { ok: false, error: 'Chưa đăng nhập hoặc phiên đã hết hạn.' }
     }
+    try {
+      const res = await apiUpdateProfile(curToken, profileData)
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success) {
+        if (data.data?.user) {
+          setUser(normalizeUser(data.data.user))
+        } else {
+          setUser((prev) => ({ ...prev, ...profileData }))
+        }
+        return { ok: true }
+      }
+      return { ok: false, error: data?.message || 'Cập nhật hồ sơ thất bại.' }
+    } catch (err) {
+      return { ok: false, error: 'Không thể kết nối đến máy chủ Backend.' }
+    }
+  }, [])
+
+  /**
+   * Cập nhật phiên sau khi đăng ký gian hàng người bán thành công.
+   */
+  const applyShopRegistration = useCallback(({ token: newToken, user: updatedUser }) => {
+    if (newToken) {
+      sessionStorage.setItem(TOKEN_KEY, newToken)
+      setToken(newToken)
+    }
+    if (updatedUser) {
+      setUser(normalizeUser(updatedUser))
+    }
+  }, [])
+
+  /**
+   * Tải lại thông tin người dùng từ Backend API.
+   */
+  const refreshUser = useCallback(async () => {
+    const curToken = sessionStorage.getItem(TOKEN_KEY)
+    if (!curToken) return null
+    try {
+      const res = await apiGetMe(curToken)
+      if (res.ok) {
+        const data = await res.json().catch(() => null)
+        if (data?.success && data?.data?.user) {
+          const norm = normalizeUser(data.data.user)
+          setUser(norm)
+          return norm
+        }
+      }
+    } catch (e) {
+      console.warn('refreshUser failed:', e)
+    }
+    return null
   }, [])
 
   /**
@@ -260,12 +318,14 @@ export function AuthProvider({ children }) {
     restoreAbortRef.current?.abort()
     authVersionRef.current += 1
     sessionStorage.removeItem(TOKEN_KEY)
+    setToken(null)
     setUser(null)
   }, [])
 
   const value = useMemo(
     () => ({
       user,
+      token,
       allUsers: seedUsers,
       isInitializing,
       isAuthenticated: Boolean(user),
@@ -278,8 +338,10 @@ export function AuthProvider({ children }) {
       register,
       logout,
       updateProfile,
+      applyShopRegistration,
+      refreshUser,
     }),
-    [user, isInitializing, login, loginAs, register, logout, updateProfile],
+    [user, token, isInitializing, login, loginAs, register, logout, updateProfile, applyShopRegistration, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -11,6 +11,8 @@ import AvatarPicker from '../components/ui/AvatarPicker'
 import { IconHeart, IconPackage, IconStore, IconUser } from '../components/ui/Icons'
 import SmartImage from '../components/ui/SmartImage'
 
+import { apiCreateAddress, apiGetAddresses } from '../utils/api'
+
 const TABS = [
   { id: 'profile', label: 'Hồ sơ', icon: <IconUser className="h-4 w-4" /> },
   { id: 'address', label: 'Địa chỉ nhận hàng', icon: <IconPackage className="h-4 w-4" /> },
@@ -44,7 +46,24 @@ export default function AccountPage() {
   const shopProducts = user.shopId ? getProductsByShop(user.shopId) : []
   const orders = getOrdersByBuyer(user.id)
   const spent = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0)
-  const setAddressField = (key) => (e) => updateProfile({ address: { ...address, [key]: e.target.value } })
+  
+  const [profileForm, setProfileForm] = useState({
+    fullName: user.fullName || '',
+    phone: user.phone || '',
+    email: user.email || '',
+  })
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+
+  const [addressForm, setAddressForm] = useState({
+    recipientName: address.fullName || user.fullName || '',
+    phone: address.phone || user.phone || '',
+    province: address.province || '',
+    district: address.district || '',
+    ward: address.ward || '',
+    detail: address.detail || '',
+  })
+  const [isSavingAddress, setIsSavingAddress] = useState(false)
+
   const inputClass = 'w-full rounded-sm border border-line px-3 py-2 text-[13px] outline-none focus:border-brand'
 
   return (
@@ -131,42 +150,44 @@ export default function AccountPage() {
               <label className="text-[12px] text-muted">
                 Họ và tên
                 <input
-                  value={user.fullName}
-                  onChange={(e) => updateProfile({ fullName: e.target.value })}
+                  value={profileForm.fullName}
+                  onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
                 Số điện thoại
                 <input
-                  value={user.phone || ''}
-                  onChange={(e) => updateProfile({ phone: e.target.value })}
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted md:col-span-2">
                 Email
                 <input
-                  value={user.email || ''}
-                  onChange={(e) => updateProfile({ email: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
-                />
-              </label>
-              <label className="text-[12px] text-muted md:col-span-2">
-                Danh xưng hiển thị
-                <input
-                  value={user.rank || ''}
-                  onChange={(e) => updateProfile({ rank: e.target.value })}
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => pushToast('Tính năng cập nhật hồ sơ chưa được hỗ trợ trên Backend API.', 'info')}
-                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+                  disabled={isSavingProfile}
+                  onClick={async () => {
+                    setIsSavingProfile(true)
+                    const res = await updateProfile(profileForm)
+                    setIsSavingProfile(false)
+                    if (res.ok) {
+                      pushToast('Cập nhật hồ sơ tài khoản thành công!', 'success')
+                    } else {
+                      pushToast(res.error || 'Cập nhật thất bại.', 'error')
+                    }
+                  }}
+                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
                 >
-                  Lưu thay đổi
+                  {isSavingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
               </div>
@@ -178,20 +199,24 @@ export default function AccountPage() {
               <label className="text-[12px] text-muted">
                 Người nhận
                 <input
-                  value={address.fullName || ''}
-                  onChange={setAddressField('fullName')}
+                  value={addressForm.recipientName}
+                  onChange={(e) => setAddressForm({ ...addressForm, recipientName: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
                 Số điện thoại
-                <input value={address.phone || ''} onChange={setAddressField('phone')} className={`mt-1 ${inputClass}`} />
+                <input
+                  value={addressForm.phone}
+                  onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                  className={`mt-1 ${inputClass}`}
+                />
               </label>
               <label className="text-[12px] text-muted">
                 Tỉnh / Thành phố
                 <select
-                  value={address.province || ''}
-                  onChange={setAddressField('province')}
+                  value={addressForm.province}
+                  onChange={(e) => setAddressForm({ ...addressForm, province: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 >
                   <option value="">Chọn Tỉnh / Thành phố</option>
@@ -205,30 +230,59 @@ export default function AccountPage() {
               <label className="text-[12px] text-muted">
                 Quận / Huyện
                 <input
-                  value={address.district || ''}
-                  onChange={setAddressField('district')}
+                  value={addressForm.district}
+                  onChange={(e) => setAddressForm({ ...addressForm, district: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
                 Phường / Xã
-                <input value={address.ward || ''} onChange={setAddressField('ward')} className={`mt-1 ${inputClass}`} />
+                <input
+                  value={addressForm.ward}
+                  onChange={(e) => setAddressForm({ ...addressForm, ward: e.target.value })}
+                  className={`mt-1 ${inputClass}`}
+                />
               </label>
               <label className="text-[12px] text-muted">
                 Địa chỉ chi tiết
                 <input
-                  value={address.detail || ''}
-                  onChange={setAddressField('detail')}
+                  value={addressForm.detail}
+                  onChange={(e) => setAddressForm({ ...addressForm, detail: e.target.value })}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => pushToast('Đã lưu địa chỉ nhận hàng', 'success')}
-                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+                  disabled={isSavingAddress}
+                  onClick={async () => {
+                    const token = sessionStorage.getItem('novashop_token')
+                    if (!token) {
+                      pushToast('Vui lòng đăng nhập lại.', 'error')
+                      return
+                    }
+                    if (!addressForm.recipientName || !addressForm.phone || !addressForm.province || !addressForm.detail) {
+                      pushToast('Vui lòng điền đủ người nhận, số điện thoại, tỉnh thành và địa chỉ chi tiết.', 'error')
+                      return
+                    }
+                    setIsSavingAddress(true)
+                    try {
+                      const res = await apiCreateAddress(token, addressForm)
+                      const data = await res.json().catch(() => null)
+                      setIsSavingAddress(false)
+                      if (res.ok && data?.success) {
+                        pushToast('Đã lưu địa chỉ nhận hàng lên máy chủ thành công!', 'success')
+                      } else {
+                        pushToast(data?.message || 'Lưu địa chỉ thất bại.', 'error')
+                      }
+                    } catch (err) {
+                      setIsSavingAddress(false)
+                      pushToast('Không thể kết nối đến máy chủ Backend.', 'error')
+                    }
+                  }}
+                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
                 >
-                  Lưu địa chỉ
+                  {isSavingAddress ? 'Đang lưu...' : 'Lưu địa chỉ'}
                 </button>
               </div>
             </div>
@@ -288,10 +342,6 @@ export default function AccountPage() {
           ) : null}
         </section>
       </div>
-
-      <p className="mt-3 text-center text-[11px] text-muted">
-        Tổng {allUsers.length} tài khoản trong hệ thống demo (người mua + người bán).
-      </p>
     </div>
   )
 }

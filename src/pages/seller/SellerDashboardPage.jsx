@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
@@ -9,28 +10,53 @@ import OrderStatusBadge from '../../components/order/OrderStatusBadge'
 import { IconBolt, IconChart, IconPackage, IconStore, IconTruck } from '../../components/ui/Icons'
 import Price from '../../components/ui/Price'
 import SmartImage from '../../components/ui/SmartImage'
+import { apiGetSellerDashboard } from '../../utils/api'
 
-/** TỔNG QUAN KÊNH NGƯỜI BÁN — số liệu sản phẩm, đơn hàng, doanh thu */
+/** TỔNG QUAN KÊNH NGƯỜI BÁN — Kết nối dữ liệu thật từ Backend API */
 export default function SellerDashboardPage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { getShop, getProductsByShop } = useCatalog()
   const { getOrdersByShop } = useOrders()
+  const [backendStats, setBackendStats] = useState(null)
 
-  const shop = getShop(user.shopId)
-  const products = getProductsByShop(user.shopId)
-  const orders = getOrdersByShop(user.shopId)
+  useEffect(() => {
+    let active = true
+    if (!token) return
 
-  const revenue = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.totalForShop, 0)
-  const pending = orders.filter((o) => o.status === 'pending')
-  const shipping = orders.filter((o) => o.status === 'shipping')
+    apiGetSellerDashboard(token)
+      .then(async (res) => {
+        if (!active) return
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.success && data?.data) {
+          setBackendStats(data.data)
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải dữ liệu dashboard từ backend:', err)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [token])
+
+  const shop = getShop(user?.shopId)
+  const products = getProductsByShop(user?.shopId)
+  const orders = getOrdersByShop(user?.shopId)
+
+  const revenue = backendStats?.revenue?.totalDelivered ?? orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.totalForShop, 0)
+  const pendingCount = backendStats?.orders?.pending ?? orders.filter((o) => o.status === 'pending').length
+  const shippingCount = backendStats?.orders?.shipping ?? orders.filter((o) => o.status === 'shipping').length
+  const totalProductsCount = backendStats?.products?.total ?? products.length
+
   const lowStock = [...products].sort((a, b) => a.stock - b.stock).slice(0, 5)
   const bestSellers = [...products].sort((a, b) => b.sold - a.sold).slice(0, 5)
 
   const stats = [
-    { label: 'Doanh thu (đơn không huỷ)', value: formatVnd(revenue), emoji: '💰', bg: 'bg-[#fff1ec]' },
-    { label: 'Sản phẩm đang bán', value: formatNumber(products.length), emoji: '📦', bg: 'bg-[#eef2ff]' },
-    { label: 'Đơn chờ xác nhận', value: formatNumber(pending.length), emoji: '⏳', bg: 'bg-[#fff8e6]' },
-    { label: 'Đơn đang giao', value: formatNumber(shipping.length), emoji: '🚚', bg: 'bg-[#e9fbf3]' },
+    { label: 'Doanh thu (đơn thành công)', value: formatVnd(revenue), emoji: '💰', bg: 'bg-[#fff1ec]' },
+    { label: 'Sản phẩm của shop', value: formatNumber(totalProductsCount), emoji: '📦', bg: 'bg-[#eef2ff]' },
+    { label: 'Đơn chờ xác nhận', value: formatNumber(pendingCount), emoji: '⏳', bg: 'bg-[#fff8e6]' },
+    { label: 'Đơn đang giao', value: formatNumber(shippingCount), emoji: '🚚', bg: 'bg-[#e9fbf3]' },
   ]
 
   return (

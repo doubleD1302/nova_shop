@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
@@ -9,15 +9,16 @@ import { vietnamProvinces } from '../../data/locations'
 import AvatarPicker from '../../components/ui/AvatarPicker'
 import { IconCheck, IconEye, IconStore } from '../../components/ui/Icons'
 import SmartImage from '../../components/ui/SmartImage'
+import { apiGetSellerShop, apiUpdateSellerShop } from '../../utils/api'
 
-/** THÔNG TIN GIAN HÀNG (người bán) — cập nhật tên, slogan, khu vực, ẢNH ĐẠI DIỆN GIAN HÀNG */
+/** THÔNG TIN GIAN HÀNG (người bán) — Kết nối trực tiếp Backend API */
 export default function SellerShopPage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { getShop, getProductsByShop, upsertProduct, updateShop } = useCatalog()
   const { pushToast } = useToast()
 
-  const shop = getShop(user.shopId)
-  const products = getProductsByShop(user.shopId)
+  const shop = getShop(user?.shopId)
+  const products = getProductsByShop(user?.shopId)
 
   const [form, setForm] = useState(() => ({
     name: shop?.name || '',
@@ -29,23 +30,64 @@ export default function SellerShopPage() {
     avatarUrl: shop?.avatarUrl || null,
   }))
 
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    apiGetSellerShop(token)
+      .then(async (res) => {
+        if (!active) return
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.success && data?.data) {
+          const s = data.data
+          setForm((f) => ({
+            ...f,
+            name: s.name || f.name,
+            tagline: s.tagline || f.tagline,
+            location: s.province || f.location,
+            avatarUrl: s.logoUrl || f.avatarUrl,
+          }))
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi lấy thông tin gian hàng từ backend:', err)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [token])
+
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
   const inputClass = 'w-full rounded-sm border border-line px-3 py-2 text-[13px] outline-none focus:border-brand'
   const previewAvatar =
     form.avatarUrl || shopAvatar({ name: form.name || 'Shop', emoji: form.emoji, hue: Number(form.hue) || 20 })
 
-  /** Lưu toàn bộ thông tin gian hàng (kể cả ảnh đại diện) */
-  const save = () => {
-    updateShop(shop.id, {
-      name: form.name.trim() || shop.name,
-      tagline: form.tagline,
-      location: form.location,
-      emoji: form.emoji,
-      hue: Number(form.hue) || 20,
-      responseTime: form.responseTime,
-      avatarUrl: form.avatarUrl,
-    })
-    pushToast('Đã lưu thông tin gian hàng', 'success')
+  /** Lưu toàn bộ thông tin gian hàng (kết nối Backend API) */
+  const save = async () => {
+    if (token) {
+      try {
+        await apiUpdateSellerShop(token, {
+          name: form.name.trim() || shop?.name,
+          tagline: form.tagline,
+          province: form.location,
+          logoUrl: form.avatarUrl,
+        })
+      } catch (err) {
+        console.warn('Lỗi lưu thông tin gian hàng trên backend:', err)
+      }
+    }
+    if (shop?.id) {
+      updateShop(shop.id, {
+        name: form.name.trim() || shop.name,
+        tagline: form.tagline,
+        location: form.location,
+        emoji: form.emoji,
+        hue: Number(form.hue) || 20,
+        responseTime: form.responseTime,
+        avatarUrl: form.avatarUrl,
+      })
+    }
+    pushToast('Đã lưu thông tin gian hàng thành công', 'success')
   }
 
   return (

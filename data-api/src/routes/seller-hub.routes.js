@@ -6,6 +6,7 @@ import {
   getShopFollowStatus,
   followShop,
   unfollowShop,
+  registerSellerShop,
 } from '../controllers/seller-hub.controller.js'
 
 const sellerHubRouter = Router()
@@ -16,9 +17,11 @@ const sellerHubRouter = Router()
 sellerHubRouter.get('/seller/shop', getSellerShop)
 sellerHubRouter.put('/seller/shop', updateSellerShop)
 sellerHubRouter.get('/seller/dashboard', getSellerDashboard)
+sellerHubRouter.post('/seller/register-shop', registerSellerShop)
 
 sellerHubRouter.get('/shops/:shopId/follow', getShopFollowStatus)
 sellerHubRouter.post('/shops/:shopId/follow', followShop)
 sellerHubRouter.delete('/shops/:shopId/follow', unfollowShop)
 
 export { sellerHubRouter }
+

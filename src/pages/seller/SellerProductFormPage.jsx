@@ -8,6 +8,11 @@ import { vietnamProvinces } from '../../data/locations'
 import { IconArrowLeft } from '../../components/ui/Icons'
 import { MallBadge, ShipBadge } from '../../components/ui/Badge'
 import SmartImage from '../../components/ui/SmartImage'
+import {
+  apiCreateSellerProduct,
+  apiUpdateSellerProduct,
+  apiRegisterSellerShop,
+} from '../../utils/api'
 
 const EMPTY = {
   name: '',
@@ -30,14 +35,14 @@ const TAG_OPTIONS = [
 ]
 
 /**
- * TRANG ĐĂNG / SỬA SẢN PHẨM của người bán.
+ * TRANG ĐĂNG / SỬA SẢN PHẨM của người bán — Kết nối trực tiếp Backend API.
  * - /nguoi-ban/san-pham/them-moi   => thêm mới
  * - /nguoi-ban/san-pham/:productId => chỉnh sửa
  */
 export default function SellerProductFormPage() {
   const { productId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, token, applyShopRegistration } = useAuth()
   const { getProductById, upsertProduct, categories } = useCatalog()
   const { pushToast } = useToast()
 
@@ -61,6 +66,7 @@ export default function SellerProductFormPage() {
       : { ...EMPTY, location: 'TP. Hồ Chí Minh' },
   )
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
   const toggleTag = (id) =>
@@ -76,35 +82,112 @@ export default function SellerProductFormPage() {
     extraShip: form.tags.includes('extra'),
   }
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (!form.name.trim()) return setError('Vui lòng nhập tên sản phẩm.')
     if (!Number(form.price)) return setError('Giá bán phải lớn hơn 0.')
 
-    const variants = form.variants
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean)
+    setError('')
+    setIsSubmitting(true)
 
-    upsertProduct({
-      id: editing?.id,
-      name: form.name.trim(),
-      categoryId: form.categoryId,
-      price: Number(form.price),
-      originalPrice: Number(form.originalPrice) || Number(form.price),
-      stock: Number(form.stock) || 0,
-      sold: Number(form.sold) || 0,
-      location: form.location,
-      emoji: form.emoji || '🛍️',
-      description: form.description,
-      tags: form.tags,
-      shopId: user.shopId,
-      variantGroups: variants.length ? [{ name: 'Phân loại', options: variants }] : [],
-      specs: editing?.specs,
-    })
+    try {
+      const variantsList = form.variants
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
 
-    pushToast(editing ? 'Đã cập nhật sản phẩm' : 'Đã đăng sản phẩm mới lên gian hàng', 'success')
-    navigate('/nguoi-ban/san-pham')
+      const variantsPayload =
+        variantsList.length > 0
+          ? variantsList.map((name, idx) => ({
+              name,
+              price: Number(form.price),
+              originalPrice: Number(form.originalPrice) || Number(form.price),
+              stock: Number(form.stock) || 0,
+              sku: `SKU-${Date.now()}-${idx + 1}`,
+            }))
+          : [
+              {
+                name: 'Mặc định',
+                price: Number(form.price),
+                originalPrice: Number(form.originalPrice) || Number(form.price),
+                stock: Number(form.stock) || 0,
+                sku: `SKU-${Date.now()}-1`,
+              },
+            ]
+
+      const payload = {
+        name: form.name.trim(),
+        categoryId: form.categoryId || 'nha-cua',
+        description: form.description || '',
+        freeShipping: form.tags.includes('freeship') || form.tags.includes('extra'),
+        isFeatured: form.tags.includes('favorites'),
+        isMall: form.tags.includes('mall'),
+        variants: variantsPayload,
+      }
+
+      let activeToken = token
+      // Tự động nâng cấp quyền seller và tạo shop nếu user là buyer mở kênh người bán
+      if (activeToken && (!user?.shopId || user?.role !== 'seller')) {
+        try {
+          const regRes = await apiRegisterSellerShop(activeToken, {
+            shopName: user?.shopName || user?.fullName || `Gian hàng của ${user?.username || 'tôi'}`,
+            province: form.location || 'TP. Hồ Chí Minh',
+          })
+          const regData = await regRes.json().catch(() => null)
+          if (regRes.ok && regData?.success && regData?.data?.token) {
+            activeToken = regData.data.token
+            applyShopRegistration?.({ token: activeToken, user: regData.data.user })
+          }
+        } catch (regErr) {
+          console.warn('Tự động mở gian hàng thất bại:', regErr)
+        }
+      }
+
+      let createdProduct = null
+
+      if (activeToken) {
+        if (editing?.id && /^\d+$/.test(String(editing.id))) {
+          const res = await apiUpdateSellerProduct(activeToken, editing.id, payload)
+          const data = await res.json().catch(() => null)
+          if (!res.ok || !data?.success) {
+            throw new Error(data?.message || 'Không thể cập nhật sản phẩm lên máy chủ.')
+          }
+        } else {
+          const res = await apiCreateSellerProduct(activeToken, payload)
+          const data = await res.json().catch(() => null)
+          if (res.ok && data?.success) {
+            createdProduct = data.data
+          } else {
+            throw new Error(data?.message || 'Không thể đăng sản phẩm lên máy chủ.')
+          }
+        }
+      }
+
+      // Luôn đồng bộ dữ liệu vào catalog context
+      upsertProduct({
+        id: createdProduct?.id ? String(createdProduct.id) : editing?.id,
+        name: form.name.trim(),
+        categoryId: form.categoryId,
+        price: Number(form.price),
+        originalPrice: Number(form.originalPrice) || Number(form.price),
+        stock: Number(form.stock) || 0,
+        sold: Number(form.sold) || 0,
+        location: form.location,
+        emoji: form.emoji || '🛍️',
+        description: form.description,
+        tags: form.tags,
+        shopId: user?.shopId || (createdProduct?.shopId ? String(createdProduct.shopId) : '1'),
+        variantGroups: variantsList.length ? [{ name: 'Phân loại', options: variantsList }] : [],
+        specs: editing?.specs,
+      })
+
+      pushToast(editing ? 'Đã cập nhật sản phẩm thành công' : 'Đã đăng sản phẩm mới lên gian hàng thành công', 'success')
+      navigate('/nguoi-ban/san-pham')
+    } catch (err) {
+      setError(err.message || 'Đã xảy ra lỗi khi lưu sản phẩm.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const inputClass = 'w-full rounded-sm border border-line px-3 py-2 text-[13px] outline-none focus:border-brand'
@@ -119,9 +202,10 @@ export default function SellerProductFormPage() {
         <h1 className="text-[16px] font-bold text-ink">{editing ? 'Chỉnh Sửa Sản Phẩm' : 'Đăng Sản Phẩm Mới'}</h1>
         <button
           type="submit"
-          className="ml-auto rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+          disabled={isSubmitting}
+          className="ml-auto rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
         >
-          {editing ? 'Lưu thay đổi' : 'Đăng sản phẩm'}
+          {isSubmitting ? 'Đang xử lý...' : editing ? 'Lưu thay đổi' : 'Đăng sản phẩm'}
         </button>
       </div>
 

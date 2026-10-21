@@ -415,3 +415,105 @@ export async function registerUser(req, res, next) {
     next(err)
   }
 }
+
+/**
+ * PUT /internal/v1/users/:userId/change-password
+ * Đổi mật khẩu tài khoản người dùng:
+ * - Nhận { currentPassword, newPassword }.
+ * - Kiểm tra mật khẩu hiện tại bằng bcrypt.compare.
+ * - Mã hóa mật khẩu mới bằng bcrypt cost 12.
+ * - Cập nhật password_hash trong bảng users.
+ */
+export async function changePassword(req, res, next) {
+  try {
+    const { userId } = req.params
+    const { currentPassword, newPassword } = req.body || {}
+
+    if (!userId || !/^\d+$/.test(String(userId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mã tài khoản không hợp lệ.',
+        error: { code: 'INVALID_USER_ID' },
+      })
+    }
+
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string' ||
+      currentPassword.length === 0 ||
+      newPassword.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp đầy đủ mật khẩu hiện tại và mật khẩu mới.',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+        error: { code: 'PASSWORD_TOO_SHORT' },
+      })
+    }
+
+    if (Buffer.byteLength(newPassword, 'utf8') > 72) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu mới vượt quá giới hạn 72 bytes.',
+        error: { code: 'PASSWORD_TOO_LONG' },
+      })
+    }
+
+    const numericUserId = BigInt(userId)
+
+    const rows = await executeQuery(
+      'SELECT id, password_hash, status FROM users WHERE id = ? LIMIT 1',
+      [numericUserId]
+    )
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy người dùng.',
+        error: { code: 'USER_NOT_FOUND' },
+      })
+    }
+
+    const user = rows[0]
+
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản đã bị tạm khóa hoặc ngừng kích hoạt.',
+        error: { code: 'ACCOUNT_BLOCKED' },
+      })
+    }
+
+    // So sánh mật khẩu hiện tại
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash)
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mật khẩu hiện tại không chính xác.',
+        error: { code: 'INVALID_CURRENT_PASSWORD' },
+      })
+    }
+
+    // Băm mật khẩu mới bằng bcrypt cost 12
+    const newHash = await bcrypt.hash(newPassword, 12)
+
+    await executeQuery(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newHash, numericUserId]
+    )
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đổi mật khẩu tài khoản thành công.',
+    })
+  } catch (err) {
+    next(err)
+  }
+}

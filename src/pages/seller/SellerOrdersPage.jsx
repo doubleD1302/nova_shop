@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
@@ -11,6 +11,7 @@ import OrderStatusBadge from '../../components/order/OrderStatusBadge'
 import { IconCheck, IconSearch, IconTruck } from '../../components/ui/Icons'
 import Price from '../../components/ui/Price'
 import SmartImage from '../../components/ui/SmartImage'
+import { apiGetSellerOrders, apiUpdateSellerOrderStatus } from '../../utils/api'
 
 const TABS = [
   { id: 'all', label: 'Tất cả' },
@@ -21,17 +22,65 @@ const TABS = [
   { id: 'cancelled', label: 'Đã huỷ' },
 ]
 
-/** QUẢN LÝ ĐƠN HÀNG (người bán) — chỉ hiển thị phần sản phẩm thuộc shop của mình */
+/** QUẢN LÝ ĐƠN HÀNG (người bán) — Kết nối dữ liệu thật từ Backend API */
 export default function SellerOrdersPage() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { getShop } = useCatalog()
   const { getOrdersByShop, updateOrderStatus, cancelOrder } = useOrders()
   const { pushToast } = useToast()
   const [tab, setTab] = useState('all')
   const [keyword, setKeyword] = useState('')
+  const [backendOrders, setBackendOrders] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const shop = getShop(user.shopId)
-  const orders = getOrdersByShop(user.shopId)
+  useEffect(() => {
+    let active = true
+    if (!token) return
+
+    setIsLoading(true)
+    apiGetSellerOrders(token)
+      .then(async (res) => {
+        if (!active) return
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.success && Array.isArray(data?.data)) {
+          const mapped = data.data.map((so) => ({
+            id: String(so.id),
+            orderId: String(so.orderId || so.order_id || so.id),
+            code: so.orderCode || so.order_code || `ORD-${so.id}`,
+            createdAt: so.createdAt || so.created_at || new Date().toISOString(),
+            buyerName: so.recipientName || so.recipient_name || 'Khách hàng',
+            status: so.status || 'pending',
+            items: (so.items || []).map((it) => ({
+              productId: String(it.productId || it.product_id),
+              name: it.productName || it.product_name,
+              variant: it.variantName || it.variant_name || 'Mặc định',
+              image: it.imageUrl || it.image_url || null,
+              price: Number(it.unitPrice || it.unit_price || 0),
+              qty: Number(it.quantity || 1),
+            })),
+            payment: 'cod',
+            shippingUnit: so.shippingName || so.shipping_name || 'Giao Hàng Tiết Kiệm',
+            shippingFee: Number(so.shippingFee || so.shipping_fee || 0),
+            totalForShop: Number(so.totalAmount || so.total_amount || 0),
+          }))
+          setBackendOrders(mapped)
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải danh sách đơn hàng từ backend:', err)
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [token])
+
+  const shop = getShop(user?.shopId)
+  const localOrders = getOrdersByShop(user?.shopId)
+  const orders = backendOrders !== null ? backendOrders : localOrders
 
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase()
@@ -49,9 +98,34 @@ export default function SellerOrdersPage() {
   const countByStatus = (id) => (id === 'all' ? orders.length : orders.filter((o) => o.status === id).length)
   const revenue = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.totalForShop, 0)
 
-  const act = (orderId, status, message) => {
+  const act = async (orderId, status, message) => {
+    if (token && /^\d+$/.test(String(orderId))) {
+      try {
+        await apiUpdateSellerOrderStatus(token, orderId, { status })
+      } catch (err) {
+        console.warn('Lỗi cập nhật trạng thái đơn hàng trên backend:', err)
+      }
+    }
+    setBackendOrders((prev) =>
+      prev ? prev.map((o) => (String(o.id) === String(orderId) ? { ...o, status } : o)) : prev,
+    )
     updateOrderStatus(orderId, status)
     pushToast(message, 'success')
+  }
+
+  const cancel = async (orderId, reason = 'Người bán huỷ đơn') => {
+    if (token && /^\d+$/.test(String(orderId))) {
+      try {
+        await apiUpdateSellerOrderStatus(token, orderId, { status: 'cancelled', cancelReason: reason })
+      } catch (err) {
+        console.warn('Lỗi huỷ đơn trên backend:', err)
+      }
+    }
+    setBackendOrders((prev) =>
+      prev ? prev.map((o) => (String(o.id) === String(orderId) ? { ...o, status: 'cancelled' } : o)) : prev,
+    )
+    cancelOrder(orderId, reason)
+    pushToast('Đã huỷ đơn hàng', 'info')
   }
 
   return (
@@ -152,10 +226,7 @@ export default function SellerOrdersPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        cancelOrder(order.id, 'Người bán huỷ đơn')
-                        pushToast('Đã huỷ đơn hàng', 'info')
-                      }}
+                      onClick={() => cancel(order.id, 'Người bán huỷ đơn')}
                       className="rounded-sm border border-line px-3 py-1.5 text-[12px] text-ink-soft transition hover:border-brand hover:text-brand"
                     >
                       Huỷ đơn

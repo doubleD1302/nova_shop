@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { login, register, getMe, updateProfile } from '../controllers/auth.controller.js'
+import { login, register, getMe, updateProfile, changePassword } from '../controllers/auth.controller.js'
 import { authenticate } from '../middlewares/auth.middleware.js'
 import { loginRateLimiter } from '../middlewares/rate-limit.middleware.js'
 
@@ -16,5 +16,9 @@ router.get('/me', authenticate, getMe)
 
 // PUT /api/v1/auth/profile - Cập nhật thông tin tài khoản (bắt buộc Bearer JWT)
 router.put('/profile', authenticate, updateProfile)
+
+// PUT & POST /api/v1/auth/change-password - Đổi mật khẩu tài khoản (bắt buộc Bearer JWT)
+router.put('/change-password', authenticate, changePassword)
+router.post('/change-password', authenticate, changePassword)
 
 export default router
