@@ -145,13 +145,18 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
+            style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
+              isDense: true,
               hintText: 'Tìm kiếm trong gian hàng...',
-              hintStyle: const TextStyle(fontSize: 12),
+              hintStyle: const TextStyle(fontSize: 12, color: Colors.grey, overflow: TextOverflow.ellipsis),
               prefixIcon: const Icon(Icons.search, size: 18, color: Colors.grey),
+              prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -159,7 +164,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             ),
           ),
         ),

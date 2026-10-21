@@ -93,8 +93,48 @@ class _DepositScreenState extends State<DepositScreen> {
         ),
         title: const Text('Nạp Tiền Ví NovaPay', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
-          IconButton(icon: const Icon(Icons.history, color: Colors.black54), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.support_agent, color: Colors.black54), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.black54),
+            tooltip: 'Lịch sử giao dịch',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                builder: (ctx) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Lịch Sử Nạp / Rút Ví', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        leading: const Icon(Icons.arrow_downward, color: Colors.green),
+                        title: const Text('+500.000 ₫ (Nạp qua Vietcombank)'),
+                        subtitle: const Text('Hôm nay • Thành công'),
+                        trailing: const Text('Ví NovaPay', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.shopping_bag_outlined, color: Colors.red),
+                        title: const Text('-180.000 ₫ (Thanh toán đơn hàng)'),
+                        subtitle: const Text('Hôm qua • Đã quyết toán'),
+                        trailing: const Text('Đơn #ORD1203', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.support_agent, color: Colors.black54),
+            tooltip: 'Hỗ trợ khách hàng',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Tổng đài hỗ trợ Ví NovaPay: 1900 1228 (Miễn phí 24/7)')),
+              );
+            },
+          ),
           Container(
             margin: const EdgeInsets.only(right: 16),
             width: 32, height: 32,
@@ -500,7 +540,7 @@ class _DepositScreenState extends State<DepositScreen> {
           ),
           const SizedBox(height: 12),
           InkWell(
-            onTap: () {},
+            onTap: _showLinkBankAccountDialog,
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
@@ -652,7 +692,7 @@ class _DepositScreenState extends State<DepositScreen> {
                   ],
                 ),
                 ElevatedButton.icon(
-                  onPressed: _selectedAmount > 0 ? () {} : null,
+                  onPressed: _selectedAmount > 0 ? _handleDeposit : null,
                   icon: const Icon(Icons.lock, size: 20),
                   label: Text('Nạp ${_amountController.text.isEmpty ? '0' : _amountController.text}đ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
@@ -670,6 +710,132 @@ class _DepositScreenState extends State<DepositScreen> {
             )
           ],
         ),
+      ),
+    );
+  }
+
+  void _handleDeposit() {
+    final amountStr = _amountController.text.trim();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
+              child: const Icon(Icons.check_circle, color: Colors.green, size: 44),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Nạp Tiền Thành Công!',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '+$amountStr đ',
+              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Đã nạp thành công vào Ví ShopNova từ nguồn ${_selectedSource.toUpperCase()}.\nMã GD: #TXN${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Hoàn tất'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLinkBankAccountDialog() {
+    final bankCtrl = TextEditingController();
+    final accCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Liên kết Ngân hàng Mới', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: bankCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Tên Ngân Hàng',
+                  hintText: 'Ví dụ: MB Bank, Techcombank...',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: accCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Số tài khoản ngân hàng',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Tên chủ tài khoản',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã liên kết tài khoản ngân hàng thành công!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Liên kết ngay'),
+          ),
+        ],
       ),
     );
   }

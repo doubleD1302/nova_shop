@@ -12,6 +12,7 @@ import 'package:shopnova/models/category_item.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/models/product.dart';
 import 'package:shopnova/services/catalog_service.dart';
+import 'package:shopnova/screens/wallet/deposit_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -131,7 +132,38 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 8),
 
               // 2. Quick Links (8 tiện ích nguyên bản website)
-              const QuickLinksSection(),
+              QuickLinksSection(
+                onLinkTap: (link) {
+                  if (link.contains('flash')) {
+                    setState(() => _suggestionTabIndex = 2);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('⚡ Đang xem các ưu đãi Flash Sale chớp nhoáng!'), duration: Duration(seconds: 1)),
+                    );
+                  } else if (link.contains('freeship')) {
+                    setState(() => _suggestionTabIndex = 1);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('🚚 Đang xem các sản phẩm Freeship Extra!'), duration: Duration(seconds: 1)),
+                    );
+                  } else if (link.contains('mall')) {
+                    setState(() => _suggestionTabIndex = 3);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('💎 Đang xem gian hàng Nova Mall chính hãng!'), duration: Duration(seconds: 1)),
+                    );
+                  } else if (link.contains('category=dien-thoai') || link.contains('topup')) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositScreen()));
+                  } else if (link.contains('discount')) {
+                    setState(() => _suggestionTabIndex = 2);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('🎟️ Đang lọc sản phẩm có mã giảm giá sốc!'), duration: Duration(seconds: 1)),
+                    );
+                  } else {
+                    setState(() => _suggestionTabIndex = 0);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đang cập nhật danh mục ưu đãi thịnh hành!'), duration: Duration(seconds: 1)),
+                    );
+                  }
+                },
+              ),
 
               const SizedBox(height: 8),
 

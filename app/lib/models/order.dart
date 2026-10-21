@@ -27,18 +27,31 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    final priceVal = json['unitPrice'] ?? json['price'] ?? json['unit_price'];
+    final unitPrice = (priceVal is num)
+        ? priceVal.toInt()
+        : (int.tryParse(priceVal?.toString() ?? '') ?? 0);
+    final qtyVal = json['qty'] ?? json['quantity'];
+    final qty = (qtyVal is num)
+        ? qtyVal.toInt()
+        : (int.tryParse(qtyVal?.toString() ?? '') ?? 1);
+    final lineTotalVal = json['lineTotal'] ?? json['line_total'];
+    final lineTotal = (lineTotalVal is num)
+        ? lineTotalVal.toInt()
+        : (int.tryParse(lineTotalVal?.toString() ?? '') ?? (unitPrice * qty));
+
     return OrderItem(
       id: json['id']?.toString() ?? '',
-      productId: json['productId']?.toString() ?? '',
-      variantId: json['variantId']?.toString() ?? '',
-      productName: json['productName'] as String? ?? '',
-      productSlug: json['productSlug'] as String? ?? '',
-      variantName: json['variantName'] as String? ?? '',
+      productId: json['productId']?.toString() ?? json['product_id']?.toString() ?? '',
+      variantId: json['variantId']?.toString() ?? json['variant_id']?.toString() ?? '',
+      productName: json['productName'] as String? ?? json['product_name'] as String? ?? 'Sản phẩm',
+      productSlug: json['productSlug'] as String? ?? json['product_slug'] as String? ?? '',
+      variantName: json['variantName'] as String? ?? json['variant_name'] as String? ?? 'Mặc định',
       sku: json['sku'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String?,
-      unitPrice: (json['unitPrice'] is num) ? (json['unitPrice'] as num).toInt() : 0,
-      qty: (json['qty'] is num) ? (json['qty'] as num).toInt() : 1,
-      lineTotal: (json['lineTotal'] is num) ? (json['lineTotal'] as num).toInt() : 0,
+      imageUrl: json['imageUrl'] as String? ?? json['image_url'] as String?,
+      unitPrice: unitPrice,
+      qty: qty,
+      lineTotal: lineTotal,
     );
   }
 }

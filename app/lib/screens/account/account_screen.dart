@@ -5,7 +5,9 @@ import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
 import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/account/favorites_screen.dart';
 import 'package:shopnova/screens/seller/seller_hub_screen.dart';
+import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
+import 'package:shopnova/services/cart_service.dart';
 import 'package:shopnova/services/api_config.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -29,7 +31,22 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void initState() {
     super.initState();
+    AuthService().addListener(_onAuthChanged);
     _loadUserStats();
+  }
+
+  @override
+  void dispose() {
+    AuthService().removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (mounted) {
+      _loadUserStats();
+      CartService().fetchCart();
+      setState(() {});
+    }
   }
 
   Future<void> _loadUserStats() async {
@@ -39,6 +56,12 @@ class _AccountScreenState extends State<AccountScreen> {
       if (mounted && stats != null) {
         setState(() {
           _backendStats = stats;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _backendStats = null;
         });
       }
     }
@@ -637,8 +660,12 @@ class _AccountScreenState extends State<AccountScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const shopnova_auth.LoginScreen()));
+                    onPressed: () async {
+                      await Navigator.push(context, MaterialPageRoute(builder: (_) => const shopnova_auth.LoginScreen()));
+                      if (mounted) {
+                        _loadUserStats();
+                        setState(() {});
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
@@ -657,11 +684,75 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
+  void _showVouchersModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.confirmation_number_outlined, color: Color(0xFFEE4D2D)),
+                SizedBox(width: 8),
+                Text('Ví Voucher Của Tôi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...[
+              {'code': 'FREESHIPMAX', 'title': 'Giảm 30K phí vận chuyển', 'desc': 'Đơn từ 99.000 ₫'},
+              {'code': 'CHAOBANMOI', 'title': 'Giảm 15% tối đa 50K', 'desc': 'Cho mọi đơn hàng đầu tiên'},
+              {'code': 'NOVAMEGA50', 'title': 'Giảm ngay 50.000 ₫', 'desc': 'Đơn từ 350.000 ₫'},
+            ].map((v) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(v['code']!, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D))),
+                      Text(v['title']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      Text(v['desc']!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _copyToClipboard(v['code']!);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: const Size(0, 32),
+                    ),
+                    child: const Text('Lưu mã', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
   // THANH 4 THẺ THỐNG KÊ TÀI KHOẢN
   Widget _buildStatsBar(BuildContext context) {
     final orderCount = _backendStats?['orderCount'] ?? 0;
     final totalSpent = _backendStats?['totalSpent'] ?? 0;
-    final voucherCount = _backendStats?['voucherCount'] ?? 4;
+    final voucherCount = _backendStats?['voucherCount'] ?? 3;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -688,12 +779,16 @@ class _AccountScreenState extends State<AccountScreen> {
             label: 'Đã chi tiêu',
             color: primaryColor,
             isAmount: true,
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositScreen()));
+            },
           ),
           _buildStatItem(
             icon: Icons.confirmation_number_outlined,
             count: '$voucherCount',
             label: 'Ví voucher',
             color: Colors.amber.shade800,
+            onTap: _showVouchersModal,
           ),
           _buildStatItem(
             icon: Icons.favorite_border,

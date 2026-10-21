@@ -5,6 +5,7 @@ import 'package:shopnova/screens/cart/cart_screen.dart';
 import 'package:shopnova/widgets/common/shopnova_app_bar.dart';
 import 'package:shopnova/screens/account/account_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
+import 'package:shopnova/services/cart_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -67,23 +68,60 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Nova AI',
           ),
           BottomNavigationBarItem(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.shopping_cart_outlined),
-                Positioned(
-                  right: -5,
-                  top: -5,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                    child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center),
-                  ),
-                )
-              ],
+            icon: AnimatedBuilder(
+              animation: CartService(),
+              builder: (context, _) {
+                final count = CartService().itemCount;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.shopping_cart_outlined),
+                    if (count > 0)
+                      Positioned(
+                        right: -5,
+                        top: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
-            activeIcon: const Icon(Icons.shopping_cart),
+            activeIcon: AnimatedBuilder(
+              animation: CartService(),
+              builder: (context, _) {
+                final count = CartService().itemCount;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.shopping_cart),
+                    if (count > 0)
+                      Positioned(
+                        right: -5,
+                        top: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
             label: 'Giỏ hàng',
           ),
           const BottomNavigationBarItem(

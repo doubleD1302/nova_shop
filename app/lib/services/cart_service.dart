@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cart_item.dart';
 import 'api_client.dart';
 import 'api_config.dart';
@@ -10,7 +11,11 @@ import 'auth_service.dart';
 class CartService extends ChangeNotifier {
   static final CartService _instance = CartService._internal();
   factory CartService() => _instance;
-  CartService._internal();
+  CartService._internal() {
+    loadFromPrefs();
+  }
+
+  static const String _storageKey = 'shopnova_cart_items_v1';
 
   final ApiClient _client = ApiClient();
   final List<CartItemModel> _items = [];
@@ -27,10 +32,53 @@ class CartService extends ChangeNotifier {
   double get shippingFee => subtotal >= 1000000 || subtotal == 0 ? 0 : 16500;
   double get totalAmount => subtotal + shippingFee;
 
+  /// Đọc giỏ hàng đã lưu trong SharedPreferences khi khởi động ứng dụng
+  Future<void> loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        final loaded = list
+            .map((e) => CartItemModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        if (loaded.isNotEmpty) {
+          if (_items.isEmpty) {
+            _items.addAll(loaded);
+            notifyListeners();
+          } else {
+            for (final it in loaded) {
+              if (!_items.any((i) => i.variantId == it.variantId || (i.id.isNotEmpty && i.id == it.id))) {
+                _items.add(it);
+              }
+            }
+            notifyListeners();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[CartService] loadFromPrefs error: $e');
+    }
+  }
+
+  /// Lưu danh sách sản phẩm hiện tại vào SharedPreferences
+  Future<void> _saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = jsonEncode(_items.map((i) => i.toJson()).toList());
+      await prefs.setString(_storageKey, data);
+    } catch (e) {
+      debugPrint('[CartService] _saveToPrefs error: $e');
+    }
+  }
+
   /// Nạp giỏ hàng từ Backend API (nếu đã đăng nhập)
   Future<void> fetchCart() async {
     final token = AuthService().token;
-    if (token == null) return;
+    if (token == null) {
+      await loadFromPrefs();
+      return;
+    }
 
     _isLoading = true;
     notifyListeners();
@@ -55,11 +103,31 @@ class CartService extends ChangeNotifier {
           }
         }
         if (rawList != null) {
-          final list = rawList
+          final serverList = rawList
               .map((e) => CartItemModel.fromJson(e as Map<String, dynamic>))
               .toList();
-          _items.clear();
-          _items.addAll(list);
+
+          // SMART MERGE: Tránh việc server trả về rỗng (hoặc chưa kịp sync xong)
+          // xóa mất sản phẩm mà người dùng vừa chọn ở trang chi tiết sản phẩm!
+          if (serverList.isNotEmpty) {
+            // Giữ lại các item local mà server chưa kịp có
+            for (final localItem in _items) {
+              final existsInServer = serverList.any((s) =>
+                  s.variantId == localItem.variantId ||
+                  (s.id.isNotEmpty && s.id == localItem.id) ||
+                  (s.productId.isNotEmpty && s.productId == localItem.productId && s.variantName == localItem.variantName));
+              if (!existsInServer) {
+                serverList.add(localItem);
+              }
+            }
+            _items.clear();
+            _items.addAll(serverList);
+          } else {
+            // Server trả về rỗng nhưng local đang có sản phẩm:
+            // TUYỆT ĐỐI KHÔNG XÓA _items, giữ nguyên toàn bộ sản phẩm local để không bao giờ bị biến mất sau 1 giây!
+            debugPrint('[CartService] Server cart is empty, keeping ${_items.length} local items.');
+          }
+          await _saveToPrefs();
         }
       }
     } catch (e) {
@@ -133,14 +201,26 @@ class CartService extends ChangeNotifier {
       ));
     }
     notifyListeners();
+    await _saveToPrefs();
 
     // Đồng bộ lên Backend API nếu có token
     final token = AuthService().token;
     if (token != null) {
       try {
         final currentQty = _items.firstWhere((i) => i.variantId == effectiveVariantId).qty;
-        final numVariantId = int.tryParse(effectiveVariantId) ?? int.tryParse(cleanProductId);
-        if (numVariantId != null) {
+        // Trích xuất số nguyên dương hợp lệ cho variantId theo chuẩn backend DB
+        int? numVariantId = int.tryParse(effectiveVariantId);
+        if (numVariantId == null || numVariantId <= 0) {
+          numVariantId = int.tryParse(cleanProductId);
+        }
+        if (numVariantId == null || numVariantId <= 0) {
+          final match = RegExp(r'\d+').firstMatch(cleanProductId) ?? RegExp(r'\d+').firstMatch(effectiveVariantId);
+          if (match != null) {
+            numVariantId = int.tryParse(match.group(0)!);
+          }
+        }
+
+        if (numVariantId != null && numVariantId > 0) {
           await http.post(
             Uri.parse(ApiConfig.cartItemsUrl),
             headers: {
@@ -173,6 +253,7 @@ class CartService extends ChangeNotifier {
     _items[index].qty = newQty.clamp(1, 99);
     final item = _items[index];
     notifyListeners();
+    await _saveToPrefs();
 
     final token = AuthService().token;
     if (token != null) {
@@ -203,6 +284,7 @@ class CartService extends ChangeNotifier {
     );
     _items.removeWhere((i) => i.variantId == variantId || i.id == variantId);
     notifyListeners();
+    await _saveToPrefs();
 
     final token = AuthService().token;
     if (token != null && itemToRemove != null) {
@@ -226,6 +308,7 @@ class CartService extends ChangeNotifier {
     if (index >= 0) {
       _items[index].selected = !_items[index].selected;
       notifyListeners();
+      _saveToPrefs();
     }
   }
 
@@ -235,12 +318,14 @@ class CartService extends ChangeNotifier {
       item.selected = selected;
     }
     notifyListeners();
+    _saveToPrefs();
   }
 
   /// Xóa các item đã thanh toán khỏi giỏ hàng
   void clearSelected() {
     _items.removeWhere((i) => i.selected);
     notifyListeners();
+    _saveToPrefs();
   }
 
   // --- API Client Direct Methods ---

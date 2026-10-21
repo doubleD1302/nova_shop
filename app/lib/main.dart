@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:shopnova/screens/main_screen.dart';
 import 'package:shopnova/theme/app_theme.dart';
 
-void main() {
+import 'package:shopnova/services/cart_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -11,6 +13,7 @@ void main() {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+  await CartService().loadFromPrefs();
   runApp(const ShopNovaApp());
 }
 

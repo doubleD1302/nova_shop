@@ -563,7 +563,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã kích hoạt đăng nhập nhanh bằng Sinh trắc học (Face ID / Vân tay)!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red[50],
                         foregroundColor: AppColors.primary,

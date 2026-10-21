@@ -3,19 +3,53 @@ import 'package:intl/intl.dart';
 import 'package:shopnova/models/product.dart';
 
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
+import 'package:shopnova/services/auth_service.dart';
+import 'package:shopnova/services/favorite_service.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product product;
 
   const ProductCard({super.key, required this.product});
+
+  @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  bool _isFavorite = false;
 
   String _formatPrice(double price) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0);
     return format.format(price);
   }
 
+  void _toggleFavorite() async {
+    if (!AuthService().isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đăng nhập để lưu sản phẩm yêu thích.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    final nextStatus = !_isFavorite;
+    setState(() => _isFavorite = nextStatus);
+    await FavoriteService().toggleFavorite(widget.product.id, !nextStatus);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(nextStatus ? 'Đã thêm vào danh sách yêu thích' : 'Đã bỏ khỏi danh sách yêu thích'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final product = widget.product;
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -99,7 +133,7 @@ class ProductCard extends StatelessWidget {
                   top: 8,
                   right: 8,
                   child: InkWell(
-                    onTap: () {},
+                    onTap: _toggleFavorite,
                     child: Container(
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
@@ -110,9 +144,9 @@ class ProductCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.favorite_border,
-                        color: Colors.white,
+                      child: Icon(
+                        _isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: _isFavorite ? Colors.red : Colors.white,
                         size: 20,
                       ),
                     ),

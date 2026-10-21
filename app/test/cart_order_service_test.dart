@@ -1,9 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/cart_item.dart';
 import 'package:shopnova/services/cart_service.dart';
 import 'package:shopnova/services/order_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('CartItemModel Tests', () {
     test('CartItemModel parses JSON correctly', () {
       final json = {
@@ -165,6 +172,43 @@ void main() {
       expect(cart.items[2].productId, '101');
       expect(cart.items[2].variantName, 'Đen - M');
       expect(cart.items[2].qty, 1);
+
+      // Cleanup
+      for (final it in List.from(cart.items)) {
+        await cart.removeFromCart(it.variantId);
+      }
+      expect(cart.items.isEmpty, true);
+    });
+
+    test('Cart items persist and are NOT wiped out when fetchCart runs', () async {
+      final cart = CartService();
+      // Ensure clean start
+      for (final it in List.from(cart.items)) {
+        await cart.removeFromCart(it.variantId);
+      }
+      expect(cart.items.isEmpty, true);
+
+      // Add item as user does when clicking "MUA VỚI VOUCHER"
+      await cart.addToCart(
+        productId: '1',
+        productName: 'Áo thun ShopNova',
+        variantId: '1_Trắng_M',
+        variantName: 'Trắng - M',
+        price: 180000,
+        qty: 1,
+      );
+
+      expect(cart.items.length, 1);
+      expect(cart.items.first.productName, 'Áo thun ShopNova');
+
+      // Now simulate fetchCart (when user navigates to CartScreen)
+      // fetchCart should preserve local items and never wipe them out
+      await cart.fetchCart();
+
+      // Product must STILL be in cart!
+      expect(cart.items.length, 1);
+      expect(cart.items.first.productName, 'Áo thun ShopNova');
+      expect(cart.subtotal, 180000.0);
 
       // Cleanup
       for (final it in List.from(cart.items)) {

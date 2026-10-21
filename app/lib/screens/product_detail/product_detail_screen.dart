@@ -10,6 +10,7 @@ import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/screens/cart/cart_screen.dart';
 import 'package:shopnova/screens/shop/shop_screen.dart';
 import 'package:shopnova/screens/shop/shop_detail_screen.dart';
+import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String? productId;
@@ -1064,8 +1065,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             flex: 2,
             child: InkWell(
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng Chat đang được nâng cấp!'), duration: Duration(seconds: 1)),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NovaAIScreen(isStandalone: true),
+                  ),
                 );
               },
               child: const Column(
@@ -1081,7 +1085,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 2,
             child: InkWell(
-              onTap: () {
+              onTap: () async {
                 final p = _product;
                 final pId = widget.productId ?? p?.id ?? '1';
                 final vName = '$selectedColor - $selectedSize';
@@ -1091,7 +1095,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
                 final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
 
-                CartService().addToCart(
+                await CartService().addToCart(
                   productId: pId,
                   productName: p?.name ?? 'Sản phẩm ShopNova',
                   productSlug: p?.id ?? pId,
@@ -1105,6 +1109,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   shopMall: sMall,
                   imageUrl: img,
                 );
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Đã thêm sản phẩm vào giỏ hàng thành công!'),
@@ -1125,7 +1130,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Expanded(
             flex: 5,
             child: InkWell(
-              onTap: () {
+              onTap: () async {
                 final p = _product;
                 final pId = widget.productId ?? p?.id ?? '1';
                 final vName = '$selectedColor - $selectedSize';
@@ -1135,7 +1140,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
                 final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
 
-                CartService().addToCart(
+                await CartService().addToCart(
                   productId: pId,
                   productName: p?.name ?? 'Sản phẩm ShopNova',
                   productSlug: p?.id ?? pId,
@@ -1149,6 +1154,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   shopMall: sMall,
                   imageUrl: img,
                 );
+                if (!mounted) return;
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const CartScreen()),

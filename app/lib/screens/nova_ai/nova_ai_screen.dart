@@ -659,35 +659,29 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
                   // Logo & Brand
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.network(
-                        'https://lh3.googleusercontent.com/aida/AEtjO1UKr4dSlarEUefs-mYZOyTBrAr3bLUYl7sMcgbQc6s5tCR6AYe8cLFBl0luTP-A_wdC-pwBUcHvKB_nbOj99J6cddEeTlN1Faz7DEQ2geuRxVApWVcjdcO5boHltBm2N_fUV-Xnap-Zmi-GjddrJ0j7i0TrDMGhVm-ojpK5uHxFc2HP7sNUWxctAed-JHvk80O4tKMZhRKAUlk2Mmhv0LxGLapYZB1V0Ro7W4dDQE4cJw7fjzxMI2ojxAU',
-                        height: 32,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: colorPrimary,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.shopping_bag, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'ShopNova',
-                              style: TextStyle(
-                                color: colorPrimary,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 17,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: colorPrimary,
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child: const Icon(Icons.shopping_bag, color: Colors.white, size: 18),
                       ),
+                      if (!widget.isStandalone) ...[
+                        const SizedBox(width: 6),
+                        const Text(
+                          'ShopNova',
+                          style: TextStyle(
+                            color: colorPrimary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(width: 10),

@@ -140,11 +140,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       }
 
-      final orderItems = items.map((it) => {
-        'variantId': int.tryParse(it.variantId) ?? 1,
-        'qty': it.qty,
-        'price': it.price,
-        'productName': it.productName,
+      final orderItems = items.map((it) {
+        int vId = int.tryParse(it.variantId) ?? int.tryParse(it.productId) ?? 1;
+        if (vId <= 0) {
+          final m = RegExp(r'\d+').firstMatch(it.variantId) ?? RegExp(r'\d+').firstMatch(it.productId);
+          if (m != null) vId = int.tryParse(m.group(0)!) ?? 1;
+        }
+        final unitPrice = it.price;
+        return {
+          'variantId': vId,
+          'productId': it.productId,
+          'qty': it.qty,
+          'quantity': it.qty,
+          'price': unitPrice,
+          'unitPrice': unitPrice,
+          'unit_price': unitPrice,
+          'lineTotal': unitPrice * it.qty,
+          'line_total': unitPrice * it.qty,
+          'productName': it.productName,
+          'product_name': it.productName,
+          'variantName': it.variantName.isNotEmpty ? it.variantName : 'Mặc định',
+          'variant_name': it.variantName.isNotEmpty ? it.variantName : 'Mặc định',
+          'imageUrl': it.imageUrl,
+          'image_url': it.imageUrl,
+        };
       }).toList();
 
       final order = await OrderService().createOrder(

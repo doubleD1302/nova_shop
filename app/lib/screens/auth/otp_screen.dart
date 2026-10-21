@@ -14,18 +14,31 @@ class _OtpScreenState extends State<OtpScreen> {
   int _remainingSeconds = 54;
   bool _isProcessing = false;
 
+  void _handleSubmitOtp() async {
+    if (_otp.length < _maxLength || _isProcessing) return;
+    setState(() => _isProcessing = true);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Xác thực OTP thành công! Đang chuyển hướng...'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 1),
+      ),
+    );
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      Navigator.pop(context, true);
+    }
+  }
+
   void _onKeypadPressed(String val) {
     if (_otp.length < _maxLength) {
       setState(() {
         _otp.add(val);
         if (_otp.length == _maxLength) {
-          _isProcessing = true;
-          // Simulate auto-submit
-          Future.delayed(const Duration(seconds: 1), () {
-            if (mounted) {
-              setState(() { _isProcessing = false; });
-            }
-          });
+          _handleSubmitOtp();
         }
       });
     }
@@ -44,10 +57,7 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() {
       _otp.clear();
       _otp.addAll(['9', '8', '2', '4', '1', '7']);
-      _isProcessing = true;
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) setState(() { _isProcessing = false; });
-      });
+      _handleSubmitOtp();
     });
   }
 
@@ -116,7 +126,26 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
             Row(
               children: [
-                const Icon(Icons.help_outline, color: Colors.grey, size: 24),
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Hỗ trợ xác thực OTP'),
+                        content: const Text(
+                          'Mã xác thực OTP gồm 6 chữ số được gửi tới số điện thoại của bạn.\n\nNếu chưa nhận được mã sau 60 giây, vui lòng bấm "Gửi qua Zalo ZNS" hoặc "Cuộc gọi thoại", hoặc liên hệ tổng đài 1900 1234.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Đã hiểu'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.help_outline, color: Colors.grey, size: 24),
+                ),
                 const SizedBox(width: 12),
                 Container(
                   width: 32, height: 32,
@@ -194,7 +223,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const Text('+84 098 765 4321', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5)),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () {},
+                onTap: () => Navigator.pop(context),
                 child: Row(
                   children: [
                     Text('Đổi số', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12)),
@@ -284,12 +313,21 @@ class _OtpScreenState extends State<OtpScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                setState(() => _remainingSeconds = 60);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mã OTP mới đã được gửi qua Zalo ZNS thành công!'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               child: const Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 16),
+                  Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 16),
                   SizedBox(width: 4),
-                  Text('Gửi qua Zalo ZNS', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                  Text('Gửi qua Zalo ZNS', style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -297,12 +335,20 @@ class _OtpScreenState extends State<OtpScreen> {
             Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
             const SizedBox(width: 16),
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                setState(() => _remainingSeconds = 60);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Hệ thống đang kết nối cuộc gọi thoại đọc mã OTP...'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               child: const Row(
                 children: [
-                  Icon(Icons.phone_forwarded, color: Colors.grey, size: 16),
+                  Icon(Icons.phone_forwarded, color: AppColors.primary, size: 16),
                   SizedBox(width: 4),
-                  Text('Cuộc gọi thoại', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                  Text('Cuộc gọi thoại', style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -315,7 +361,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Widget _buildSubmitButton() {
     return ElevatedButton(
-      onPressed: _otp.length == _maxLength ? () {} : null,
+      onPressed: (_otp.length == _maxLength && !_isProcessing) ? _handleSubmitOtp : null,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -325,12 +371,22 @@ class _OtpScreenState extends State<OtpScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('Xác Nhận & Hoàn Tất Đăng Ký', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          SizedBox(width: 8),
-          Icon(Icons.arrow_forward, size: 20),
+          Text(
+            _isProcessing ? 'Đang xác thực...' : 'Xác Nhận & Hoàn Tất Đăng Ký',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          if (_isProcessing)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
+          else
+            const Icon(Icons.arrow_forward, size: 20),
         ],
       ),
     );

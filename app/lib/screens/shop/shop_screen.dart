@@ -4,6 +4,7 @@ import '../../models/product.dart';
 import '../../services/auth_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/shop_service.dart';
+import '../../services/cart_service.dart';
 import '../cart/cart_screen.dart';
 import '../product_detail/product_detail_screen.dart';
 import 'shop_detail_screen.dart';
@@ -194,33 +195,41 @@ class _ShopScreenState extends State<ShopScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        leadingWidth: 120,
+        titleSpacing: 0,
+        leadingWidth: 110,
         leading: const Padding(
           padding: EdgeInsets.only(left: 12),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.shopping_bag, color: Color(0xFFEE4D2D), size: 22),
+              Icon(Icons.shopping_bag, color: Color(0xFFEE4D2D), size: 20),
               SizedBox(width: 4),
               Text(
                 'ShopNova',
-                style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ],
           ),
         ),
         title: Container(
           height: 36,
+          margin: const EdgeInsets.only(right: 4),
           decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(6)),
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
+            style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
+              isDense: true,
               hintText: 'Tìm kiếm gian hàng, thương hiệu...',
-              hintStyle: const TextStyle(fontSize: 12),
+              hintStyle: const TextStyle(fontSize: 12, color: Colors.grey, overflow: TextOverflow.ellipsis),
               prefixIcon: const Icon(Icons.storefront, size: 18, color: Colors.grey),
+              prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -228,15 +237,49 @@ class _ShopScreenState extends State<ShopScreen> {
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
             ),
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (ctx) => const CartScreen()));
+          AnimatedBuilder(
+            animation: CartService(),
+            builder: (context, _) {
+              final count = CartService().itemCount;
+              return Container(
+                width: 40,
+                height: 40,
+                margin: const EdgeInsets.only(right: 6),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87, size: 22),
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (ctx) => const CartScreen()));
+                      },
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                          decoration: const BoxDecoration(color: Color(0xFFEE4D2D), shape: BoxShape.circle),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Center(
+                            child: Text(
+                              count > 99 ? '99+' : '$count',
+                              style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
             },
           ),
         ],
