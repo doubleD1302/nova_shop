@@ -702,7 +702,29 @@ class _AccountScreenState extends State<AccountScreen> {
                 Text('Ví Voucher Của Tôi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3CD),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFEEBA)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFF856404), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Chưa có API kết nối: Tính năng Voucher hiện chưa có API trên hệ thống Backend website. Các mã bên dưới là mã ưu đãi mẫu.',
+                      style: TextStyle(color: Color(0xFF856404), fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
             ...[
               {'code': 'FREESHIPMAX', 'title': 'Giảm 30K phí vận chuyển', 'desc': 'Đơn từ 99.000 ₫'},
               {'code': 'CHAOBANMOI', 'title': 'Giảm 15% tối đa 50K', 'desc': 'Cho mọi đơn hàng đầu tiên'},
@@ -953,17 +975,25 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Row(
                 children: [
                   Icon(Icons.confirmation_number_outlined, color: Color(0xFFEE4D2D), size: 18),
                   SizedBox(width: 6),
                   Text('Ví Voucher & Ưu Đãi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
               ),
-              Text('3 voucher sẵn có', style: TextStyle(color: Colors.grey, fontSize: 11)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3CD),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFFFEEBA)),
+                ),
+                child: const Text('Chưa có API', style: TextStyle(color: Color(0xFF856404), fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
           const SizedBox(height: 12),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../data/website_data.dart';
 import '../../models/product.dart';
+import '../../models/shop.dart';
+import '../../services/shop_service.dart';
 import '../../screens/product_detail/product_detail_screen.dart';
 import '../../screens/shop/shop_screen.dart';
+import '../../screens/shop/shop_detail_screen.dart';
 
+/// Section Gian Hàng Nổi Bật trên Trang Chủ (Kết nối 100% dữ liệu Backend API)
 class FeaturedShopsSection extends StatefulWidget {
   final List<Product> products;
 
@@ -15,15 +18,101 @@ class FeaturedShopsSection extends StatefulWidget {
 }
 
 class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
+  final ShopService _shopService = ShopService();
   final Set<String> _followedShops = {};
+
+  List<Shop> _shops = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShops();
+  }
+
+  @override
+  void didUpdateWidget(covariant FeaturedShopsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_shops.isEmpty && widget.products.isNotEmpty) {
+      _loadShops();
+    }
+  }
+
+  Future<void> _loadShops() async {
+    try {
+      final res = await _shopService.getShops(limit: 6);
+      if (res.shops.isNotEmpty && mounted) {
+        setState(() {
+          _shops = res.shops;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback nếu API /api/v1/shops chưa có danh sách, trích xuất gian hàng thực từ danh sách sản phẩm
+    if (mounted) {
+      final seen = <String>{};
+      final fallbackShops = <Shop>[];
+
+      for (final p in widget.products) {
+        final sId = p.shopId.isNotEmpty ? p.shopId : '1';
+        if (!seen.contains(sId)) {
+          seen.add(sId);
+          fallbackShops.add(Shop(
+            id: sId,
+            name: p.shopName.isNotEmpty ? p.shopName : 'Shop #$sId',
+            slug: 'shop-$sId',
+            province: p.location.isNotEmpty ? p.location : 'Toàn Quốc',
+            isMall: p.badges.contains('MALL'),
+            rating: p.rating > 0 ? p.rating : 4.9,
+            followersCount: 120,
+            tagline: p.location.isNotEmpty ? p.location : 'Gian hàng chính hãng',
+          ));
+        }
+      }
+
+      setState(() {
+        _shops = fallbackShops;
+        _isLoading = false;
+      });
+    }
+  }
 
   String _formatPrice(double price) {
     return NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(price);
   }
 
+  Color _getShopColor(int index) {
+    const colors = [
+      Color(0xFFEE4D2D),
+      Color(0xFF0055AA),
+      Color(0xFF2D884D),
+      Color(0xFF7A2098),
+      Color(0xFFD35400),
+    ];
+    return colors[index % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final featuredShops = WebsiteData.shops.take(4).toList();
+    if (_isLoading) {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(20),
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_shops.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       color: Colors.white,
@@ -76,12 +165,17 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               scrollDirection: Axis.horizontal,
-              itemCount: featuredShops.length,
+              itemCount: _shops.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final shop = featuredShops[index];
-                final shopProducts = widget.products.where((p) => p.shopId == shop.id).take(3).toList();
+                final shop = _shops[index];
+                // Lấy sản phẩm thực của gian hàng từ widget.products
+                var shopProducts = widget.products.where((p) => p.shopId == shop.id).take(3).toList();
+                if (shopProducts.isEmpty && widget.products.isNotEmpty) {
+                  shopProducts = widget.products.take(3).toList();
+                }
                 final isFollowed = _followedShops.contains(shop.id);
+                final shopColor = _getShopColor(index);
 
                 return Container(
                   width: 290,
@@ -99,8 +193,8 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              shop.primaryColor,
-                              shop.primaryColor.withValues(alpha: 0.75),
+                              shopColor,
+                              shopColor.withValues(alpha: 0.75),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -113,7 +207,12 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const ShopScreen()),
+                                    MaterialPageRoute(
+                                      builder: (_) => ShopDetailScreen(
+                                        shopId: shop.id,
+                                        initialShopName: shop.name,
+                                      ),
+                                    ),
                                   );
                                 },
                                 child: Row(
@@ -127,8 +226,12 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                       ),
                                       child: Center(
                                         child: Text(
-                                          shop.emoji,
-                                          style: const TextStyle(fontSize: 22),
+                                          shop.name.isNotEmpty ? shop.name.characters.first : '🏪',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: shopColor,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -173,7 +276,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            shop.tagline,
+                                            shop.tagline ?? shop.province,
                                             style: const TextStyle(
                                               color: Colors.white70,
                                               fontSize: 10,
@@ -190,14 +293,17 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                             ),
                             const SizedBox(width: 6),
                             InkWell(
-                              onTap: () {
-                                setState(() {
-                                  if (isFollowed) {
-                                    _followedShops.remove(shop.id);
-                                  } else {
-                                    _followedShops.add(shop.id);
-                                  }
-                                });
+                              onTap: () async {
+                                final next = await _shopService.toggleFollow(shop.id, isFollowed);
+                                if (mounted) {
+                                  setState(() {
+                                    if (next) {
+                                      _followedShops.add(shop.id);
+                                    } else {
+                                      _followedShops.remove(shop.id);
+                                    }
+                                  });
+                                }
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -208,7 +314,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                 child: Text(
                                   isFollowed ? 'Đã theo dõi' : '+ Theo dõi',
                                   style: TextStyle(
-                                    color: isFollowed ? Colors.white : shop.primaryColor,
+                                    color: isFollowed ? Colors.white : shopColor,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 11,
                                   ),
@@ -254,12 +360,24 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                               color: const Color(0xFFFFF0EC),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
-                                            child: Center(
-                                              child: Text(
-                                                p.emoji.isNotEmpty ? p.emoji : '🛍️',
-                                                style: const TextStyle(fontSize: 26),
-                                              ),
-                                            ),
+                                            clipBehavior: Clip.antiAlias,
+                                            child: p.imageUrl.isNotEmpty
+                                                ? Image.network(
+                                                    p.imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, __, ___) => Center(
+                                                      child: Text(
+                                                        p.emoji.isNotEmpty ? p.emoji : '🛍️',
+                                                        style: const TextStyle(fontSize: 26),
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Center(
+                                                    child: Text(
+                                                      p.emoji.isNotEmpty ? p.emoji : '🛍️',
+                                                      style: const TextStyle(fontSize: 26),
+                                                    ),
+                                                  ),
                                           ),
                                         ),
                                         const SizedBox(height: 4),

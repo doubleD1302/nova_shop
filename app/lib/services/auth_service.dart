@@ -360,11 +360,10 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
         return true;
       } else if (response.statusCode == 404) {
-        // Nếu máy chủ remote cloud chưa triển khai kịp route mới, xác nhận thành công cho người dùng
-        debugPrint('[AuthService] Remote server endpoint returned 404, fallback applied');
+        _lastError = 'Chưa có API đổi mật khẩu trên máy chủ Backend hoặc máy chủ đang cập nhật.';
         _isLoading = false;
         notifyListeners();
-        return true;
+        return false;
       } else {
         _lastError = body['message'] as String? ?? 'Đổi mật khẩu thất bại.';
         _isLoading = false;

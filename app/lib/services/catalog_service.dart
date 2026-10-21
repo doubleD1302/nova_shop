@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/category_item.dart';
 import '../models/product.dart';
@@ -39,8 +40,8 @@ class CatalogService {
 
   CatalogService._internal({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Lấy danh sách danh mục sản phẩm từ Backend API (kết hợp dữ liệu chuẩn của website)
-  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = true}) async {
+  /// Lấy danh sách danh mục sản phẩm từ Backend API (Ưu tiên 100% dữ liệu thực tế)
+  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = false}) async {
     try {
       final res = await _client.get(
         Uri.parse(ApiConfig.categoriesUrl),
@@ -52,16 +53,8 @@ class CatalogService {
         if (body['success'] == true && body['data'] is List) {
           final list = body['data'] as List;
           final apiCategories = list.map((e) => CategoryItem.fromJson(e as Map<String, dynamic>)).toList();
-          if (!mergeWebsiteData) return apiCategories;
           if (apiCategories.isNotEmpty) {
-            // Hợp nhất dữ liệu danh mục: ưu tiên API nhưng giữ đủ 12 danh mục website
-            final merged = List<CategoryItem>.from(apiCategories);
-            for (final cat in WebsiteData.categories) {
-              if (!merged.any((c) => c.slug == cat.slug || c.id == cat.id)) {
-                merged.add(cat);
-              }
-            }
-            return merged;
+            return apiCategories;
           }
         }
       }
@@ -79,21 +72,22 @@ class CatalogService {
     return [];
   }
 
-  /// Lấy danh sách sản phẩm từ Backend API (kết hợp trọn vẹn 60 sản phẩm của website)
+  /// Lấy danh sách sản phẩm từ Backend API (Ưu tiên 100% dữ liệu thực từ MySQL)
   Future<List<Product>> getProducts({
     String? categoryId,
     bool? isFlashSale,
     bool? isFeatured,
     String? filterTab,
-    bool mergeWebsiteData = true,
+    bool mergeWebsiteData = false,
   }) async {
     List<Product> allProducts = [];
 
     try {
       final uri = Uri.parse(ApiConfig.productsUrl).replace(queryParameters: {
-        if (categoryId != null) 'category_id': categoryId,
+        if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
         if (isFlashSale != null) 'is_flash_sale': isFlashSale ? '1' : '0',
         if (isFeatured != null) 'is_featured': isFeatured ? '1' : '0',
+        'limit': '100',
       });
 
       final res = await _client.get(
@@ -110,7 +104,7 @@ class CatalogService {
       }
     } catch (_) {}
 
-    if (!mergeWebsiteData) {
+    if (allProducts.isNotEmpty) {
       var result = allProducts;
       if (categoryId != null && categoryId.isNotEmpty) {
         result = result.where((p) => p.categoryId == categoryId || p.categoryName.toLowerCase().contains(categoryId.toLowerCase())).toList();
@@ -121,12 +115,10 @@ class CatalogService {
       return result;
     }
 
-    // Hợp nhất với danh mục 60 sản phẩm gốc của Website
+    if (!mergeWebsiteData) return [];
+
     final productMap = <String, Product>{};
     for (final p in WebsiteData.products) {
-      productMap[p.id] = p;
-    }
-    for (final p in allProducts) {
       productMap[p.id] = p;
     }
     var result = productMap.values.toList();
@@ -229,9 +221,35 @@ class CatalogService {
     return WebsiteData.banners;
   }
 
-  /// Lấy danh sách sản phẩm Flash Sale từ Backend API hoặc Website Data
+  /// Lấy danh sách sản phẩm Flash Sale từ Backend API
   Future<List<FlashSaleItem>> getFlashSaleItems() async {
     try {
+      // 1. Ưu tiên lấy từ API Backend /api/v1/products/featured
+      final featured = await getFeaturedHomeData();
+      final flashList = featured['flashSale'];
+      if (flashList is List && flashList.isNotEmpty) {
+        return flashList.map((item) {
+          final m = item as Map<String, dynamic>;
+          final num price = num.tryParse(m['price']?.toString() ?? '') ?? 0;
+          final num origPrice = num.tryParse(m['originalPrice']?.toString() ?? '') ?? price;
+          final num discount = num.tryParse(m['discount']?.toString() ?? '') ??
+              (origPrice > price && origPrice > 0 ? (((origPrice - price) / origPrice) * 100).round() : 0);
+          final stock = num.tryParse(m['stock']?.toString() ?? '') ?? 50;
+
+          return FlashSaleItem(
+            id: m['id']?.toString() ?? '',
+            name: m['name']?.toString() ?? 'Sản phẩm Flash Sale',
+            imageUrl: m['imageUrl']?.toString() ?? '',
+            price: price.toDouble(),
+            discount: discount.toInt(),
+            soldPercentage: 0.65,
+            soldLabel: stock <= 10 ? 'SẮP CHÁY HÀNG' : 'ĐÃ BÁN 65%',
+            emoji: '⚡',
+          );
+        }).toList();
+      }
+
+      // 2. Dự phòng lấy từ getProducts(isFlashSale: true)
       final products = await getProducts(isFlashSale: true);
       if (products.isNotEmpty) {
         return products.take(6).map((p) {
@@ -247,8 +265,10 @@ class CatalogService {
           );
         }).toList();
       }
-    } catch (_) {}
-    return WebsiteData.flashSales;
+    } catch (e) {
+      debugPrint('[CatalogService] getFlashSaleItems error: $e');
+    }
+    return [];
   }
 
   /// Lấy chi tiết sản phẩm
@@ -267,16 +287,11 @@ class CatalogService {
       }
     } catch (_) {}
 
-    // Tìm trong dữ liệu Website
-    final match = WebsiteData.products.where((p) => p.id == id).toList();
-    if (match.isNotEmpty) {
-      return match.first;
-    }
     return null;
   }
 
-  /// Lấy danh sách gian hàng từ Backend API hoặc Website Data
-  Future<List<Map<String, dynamic>>> getShops() async {
+  /// Lấy danh sách gian hàng từ Backend API
+  Future<List<Map<String, dynamic>>> getShops({bool mergeWebsiteData = false}) async {
     try {
       final res = await _client.get(
         Uri.parse(ApiConfig.shopsUrl),
@@ -292,7 +307,7 @@ class CatalogService {
       }
     } catch (_) {}
 
-    return WebsiteData.shops.map((s) => {
+    return mergeWebsiteData ? WebsiteData.shops.map((s) => {
       'id': s.id,
       'name': s.name,
       'isMall': s.isMall,
@@ -301,7 +316,7 @@ class CatalogService {
       'location': s.location,
       'tagline': s.tagline,
       'emoji': s.emoji,
-    }).toList();
+    }).toList() : [];
   }
 
   /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ

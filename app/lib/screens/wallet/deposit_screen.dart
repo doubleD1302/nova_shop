@@ -149,6 +149,7 @@ class _DepositScreenState extends State<DepositScreen> {
             padding: const EdgeInsets.only(bottom: 120),
             child: Column(
               children: [
+                _buildNoApiBanner(),
                 _buildWalletCard(),
                 _buildAmountInputSection(),
                 _buildVoucherBanner(),
@@ -159,6 +160,45 @@ class _DepositScreenState extends State<DepositScreen> {
             ),
           ),
           _buildBottomActionBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoApiBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFEEBA)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Color(0xFF856404), size: 22),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CHƯA CÓ API KẾT NỐI BACKEND',
+                  style: TextStyle(
+                    color: Color(0xFF856404),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Tính năng Ví NovaPay và nạp tiền hiện chưa được phát triển API trên hệ thống Backend của website thương mại. Đây là giao diện xem trước (UI Prototype).',
+                  style: TextStyle(color: Color(0xFF856404), fontSize: 11, height: 1.3),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -715,56 +755,43 @@ class _DepositScreenState extends State<DepositScreen> {
   }
 
   void _handleDeposit() {
-    final amountStr = _amountController.text.trim();
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        title: const Row(
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
-              child: const Icon(Icons.check_circle, color: Colors.green, size: 44),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Nạp Tiền Thành Công!',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
+            Icon(Icons.info_outline, color: Color(0xFFEE4D2D)),
+            SizedBox(width: 8),
+            Text('Chưa Có API Kết Nối', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              '+$amountStr đ',
-              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 22),
+              'Tính năng nạp tiền Ví NovaPay hiện chưa được xây dựng API trên máy chủ Backend của website thương mại.',
+              style: TextStyle(fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
-              'Đã nạp thành công vào Ví ShopNova từ nguồn ${_selectedSource.toUpperCase()}.\nMã GD: #TXN${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('Hoàn tất'),
-              ),
+              'Giao diện này hiện đóng vai trò mô phỏng (UI Prototype) để bạn tham khảo quy trình nạp tiền.',
+              style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
             ),
           ],
         ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
       ),
     );
   }
