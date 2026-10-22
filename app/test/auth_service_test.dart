@@ -58,5 +58,20 @@ void main() {
       expect(auth.token, isNull);
       expect(auth.currentUser, isNull);
     });
+
+    test('AuthService checkReadiness and checkFullConnectionStatus method structure', () async {
+      final auth = AuthService();
+      // Test when baseUrl is invalid or timeout
+      ApiConfig.setBaseUrl('http://127.0.0.1:59999');
+      final result = await auth.checkFullConnectionStatus();
+      expect(result, isA<Map<String, dynamic>>());
+      expect(result.containsKey('isOnline'), isTrue);
+      expect(result.containsKey('isReady'), isTrue);
+      expect(result.containsKey('backend'), isTrue);
+      expect(result.containsKey('dataApi'), isTrue);
+      expect(result.containsKey('database'), isTrue);
+      expect(result.containsKey('latencyMs'), isTrue);
+      ApiConfig.resetBaseUrl();
+    });
   });
 }

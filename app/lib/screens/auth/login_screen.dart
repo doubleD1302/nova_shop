@@ -37,14 +37,20 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _isCheckingBackend = true;
     });
-    final isOnline = await AuthService().checkHealth();
+    final status = await AuthService().checkFullConnectionStatus();
     if (!mounted) return;
+    final isOnline = status['isOnline'] == true;
+    final isReady = status['isReady'] == true;
     setState(() {
       _isCheckingBackend = false;
       _backendOnline = isOnline;
-      _backendStatusText = isOnline
-          ? 'Backend Online: ${ApiConfig.baseUrl}'
-          : 'Chưa kết nối Backend: ${ApiConfig.baseUrl}';
+      if (isReady) {
+        _backendStatusText = 'Máy chủ & CSDL sẵn sàng (${status['latencyMs']}ms)';
+      } else if (isOnline) {
+        _backendStatusText = 'Backend online, CSDL ngắt kết nối';
+      } else {
+        _backendStatusText = 'Không thể kết nối máy chủ API';
+      }
     });
   }
 

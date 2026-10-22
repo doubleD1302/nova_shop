@@ -62,23 +62,112 @@ class AuthService extends ChangeNotifier {
 
   /// Kiểm tra Readiness (Backend + Data API + MySQL)
   Future<Map<String, dynamic>> checkReadiness() async {
+    final sw = Stopwatch()..start();
     try {
       final response = await http
           .get(Uri.parse(ApiConfig.readyUrl))
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 6));
+      sw.stop();
       final data = jsonDecode(response.body);
       return {
         'statusCode': response.statusCode,
         'success': data['success'] == true,
         'data': data['data'],
         'message': data['message'] ?? '',
+        'latencyMs': sw.elapsedMilliseconds,
       };
     } catch (e) {
+      sw.stop();
       debugPrint('[AuthService] checkReadiness error: $e');
       return {
         'statusCode': 0,
         'success': false,
         'error': e.toString(),
+        'latencyMs': sw.elapsedMilliseconds,
+      };
+    }
+  }
+
+  /// Kiểm tra toàn diện kết nối (Backend, Data API, Cơ sở dữ liệu MySQL và độ trễ Ping)
+  Future<Map<String, dynamic>> checkFullConnectionStatus() async {
+    final sw = Stopwatch()..start();
+    try {
+      final response = await http
+          .get(Uri.parse(ApiConfig.readyUrl))
+          .timeout(const Duration(seconds: 6));
+      sw.stop();
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'] as Map<String, dynamic>? ?? {};
+        return {
+          'isOnline': true,
+          'isReady': true,
+          'backend': 'OK',
+          'dataApi': data['dataApi'] == 'connected' ? 'Đã kết nối' : 'Không phản hồi',
+          'database': data['database'] == 'connected' ? 'Đã kết nối' : 'Mất kết nối',
+          'latencyMs': sw.elapsedMilliseconds,
+          'url': ApiConfig.baseUrl,
+          'message': body['message'] ?? 'Máy chủ và cơ sở dữ liệu đã sẵn sàng.',
+        };
+      } else {
+        // Backend vẫn phản hồi nhưng Data API hoặc Database gặp sự cố
+        try {
+          final body = jsonDecode(response.body);
+          final isDbIssue = body['error']?['code'] == 'DATABASE_UNAVAILABLE';
+          return {
+            'isOnline': true,
+            'isReady': false,
+            'backend': 'OK',
+            'dataApi': isDbIssue ? 'Đã kết nối' : 'Lỗi kết nối',
+            'database': isDbIssue ? 'Mất kết nối CSDL' : 'Lỗi kết nối',
+            'latencyMs': sw.elapsedMilliseconds,
+            'url': ApiConfig.baseUrl,
+            'message': body['message'] ?? 'Dịch vụ chưa sẵn sàng (Mã: ${response.statusCode})',
+          };
+        } catch (_) {
+          return {
+            'isOnline': false,
+            'isReady': false,
+            'backend': 'Lỗi HTTP ${response.statusCode}',
+            'dataApi': 'Chưa kết nối',
+            'database': 'Chưa kết nối',
+            'latencyMs': sw.elapsedMilliseconds,
+            'url': ApiConfig.baseUrl,
+            'message': 'Máy chủ trả về mã lỗi ${response.statusCode}',
+          };
+        }
+      }
+    } catch (e) {
+      sw.stop();
+      // Nếu readyUrl timeout hoặc lỗi, thử kiểm tra health xem backend liveness có phản hồi không
+      try {
+        final healthRes = await http
+            .get(Uri.parse(ApiConfig.healthUrl))
+            .timeout(const Duration(seconds: 3));
+        if (healthRes.statusCode == 200) {
+          return {
+            'isOnline': true,
+            'isReady': false,
+            'backend': 'OK',
+            'dataApi': 'Mất kết nối',
+            'database': 'Mất kết nối',
+            'latencyMs': sw.elapsedMilliseconds,
+            'url': ApiConfig.baseUrl,
+            'message': 'Backend đang hoạt động nhưng mất kết nối đến Data API/CSDL.',
+          };
+        }
+      } catch (_) {}
+
+      return {
+        'isOnline': false,
+        'isReady': false,
+        'backend': 'Mất kết nối',
+        'dataApi': 'Mất kết nối',
+        'database': 'Mất kết nối',
+        'latencyMs': sw.elapsedMilliseconds,
+        'url': ApiConfig.baseUrl,
+        'message': 'Không thể kết nối đến máy chủ: $e',
       };
     }
   }

@@ -26,12 +26,15 @@ class _AccountScreenState extends State<AccountScreen> {
   String _receiverName = '';
   String _receiverPhone = '';
   String _receiverAddress = 'Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh';
+  bool _isCheckingServer = false;
+  Map<String, dynamic>? _serverStatus;
 
   @override
   void initState() {
     super.initState();
     AuthService().addListener(_onAuthChanged);
     _loadUserStats();
+    _checkServerStatus();
   }
 
   @override
@@ -1158,7 +1161,206 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
+  Future<void> _checkServerStatus({bool showToast = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _isCheckingServer = true;
+    });
+
+    final status = await AuthService().checkFullConnectionStatus();
+    if (!mounted) return;
+
+    setState(() {
+      _isCheckingServer = false;
+      _serverStatus = status;
+    });
+
+    if (showToast) {
+      final isSuccess = status['isReady'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                isSuccess ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isSuccess
+                      ? 'Kết nối máy chủ thành công! (${status['latencyMs']} ms)'
+                      : 'Cảnh báo kết nối: ${status['message']}',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: isSuccess ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    }
+  }
+
+  void _showChangeServerDialog() {
+    final controller = TextEditingController(text: ApiConfig.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.dns_rounded, color: Color(0xFF2563EB), size: 22),
+              SizedBox(width: 8),
+              Text('Cấu hình Backend API', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Chọn cấu hình máy chủ hoặc nhập URL tùy chỉnh:',
+                style: TextStyle(fontSize: 12, color: Color(0xFF555770)),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.cloud_rounded, size: 16, color: Color(0xFF00BFA5)),
+                    label: const Text('Render Cloud', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      setDialogState(() {
+                        controller.text = ApiConfig.productionUrl;
+                      });
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.wifi_rounded, size: 16, color: Colors.blue),
+                    label: const Text('Wi-Fi LAN', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      setDialogState(() {
+                        controller.text = ApiConfig.lanHostUrl;
+                      });
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.usb_rounded, size: 16, color: Colors.orange),
+                    label: const Text('USB Debug', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      setDialogState(() {
+                        controller.text = ApiConfig.usbLoopbackUrl;
+                      });
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.computer_rounded, size: 16, color: Colors.grey),
+                    label: const Text('Máy ảo 10.0.2.2', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      setDialogState(() {
+                        controller.text = ApiConfig.emulatorUrl;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  isDense: true,
+                  hintText: 'https://novashop-api-952u.onrender.com',
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '💡 Render Cloud là máy chủ trực tuyến, cho phép truy cập độc lập không cần máy tính.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6), height: 1.3),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                ApiConfig.resetBaseUrl();
+                Navigator.pop(ctx);
+                _checkServerStatus(showToast: true);
+              },
+              child: const Text('Mặc định', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  ApiConfig.setBaseUrl(controller.text.trim());
+                }
+                Navigator.pop(ctx);
+                _checkServerStatus(showToast: true);
+              },
+              child: const Text('Lưu & Kiểm tra', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildServerConfigSection(BuildContext context) {
+    final status = _serverStatus;
+    final isOnline = status?['isOnline'] == true;
+    final isReady = status?['isReady'] == true;
+    final latency = status?['latencyMs'];
+
+    Color badgeBg;
+    Color badgeBorder;
+    Color badgeText;
+    IconData badgeIcon;
+    String badgeLabel;
+
+    if (_isCheckingServer) {
+      badgeBg = const Color(0xFFEFF6FF);
+      badgeBorder = const Color(0xFFBFDBFE);
+      badgeText = const Color(0xFF1D4ED8);
+      badgeIcon = Icons.hourglass_top_rounded;
+      badgeLabel = 'Đang kiểm tra...';
+    } else if (status == null) {
+      badgeBg = const Color(0xFFF3F4F6);
+      badgeBorder = const Color(0xFFE5E7EB);
+      badgeText = const Color(0xFF4B5563);
+      badgeIcon = Icons.help_outline_rounded;
+      badgeLabel = 'Chưa kiểm tra';
+    } else if (isReady) {
+      badgeBg = const Color(0xFFF0FDF4);
+      badgeBorder = const Color(0xFFBBF7D0);
+      badgeText = const Color(0xFF15803D);
+      badgeIcon = Icons.check_circle_rounded;
+      badgeLabel = latency != null ? 'Đã kết nối ($latency ms)' : 'Đã kết nối';
+    } else if (isOnline) {
+      badgeBg = const Color(0xFFFFFBEB);
+      badgeBorder = const Color(0xFFFDE68A);
+      badgeText = const Color(0xFFB45309);
+      badgeIcon = Icons.warning_amber_rounded;
+      badgeLabel = 'CSDL ngắt kết nối';
+    } else {
+      badgeBg = const Color(0xFFFEF2F2);
+      badgeBorder = const Color(0xFFFECACA);
+      badgeText = const Color(0xFFB91C1C);
+      badgeIcon = Icons.cancel_rounded;
+      badgeLabel = 'Mất kết nối';
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1177,33 +1379,159 @@ class _AccountScreenState extends State<AccountScreen> {
             children: [
               Row(
                 children: const [
-                  Icon(Icons.dns_outlined, color: Color(0xFF2563EB), size: 18),
+                  Icon(Icons.dns_rounded, color: Color(0xFF2563EB), size: 18),
                   SizedBox(width: 8),
-                  Text('Máy Chủ Backend API', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
+                  Text('Máy Chủ & Cơ Sở Dữ Liệu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: badgeBorder),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 12),
-                    SizedBox(width: 4),
-                    Text('Đang kết nối', style: TextStyle(color: Color(0xFF15803D), fontSize: 10, fontWeight: FontWeight.bold)),
+                  children: [
+                    if (_isCheckingServer)
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1D4ED8)),
+                      )
+                    else
+                      Icon(badgeIcon, color: badgeText, size: 12),
+                    const SizedBox(width: 4),
+                    Text(badgeLabel, style: TextStyle(color: badgeText, fontSize: 10, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          SelectableText(
-            ApiConfig.baseUrl,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF28293D), fontFamily: 'monospace'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 14, color: Color(0xFF64748B)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SelectableText(
+                    ApiConfig.baseUrl,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF334155), fontFamily: 'monospace'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 3 trạng thái chi tiết của Backend, Data API, CSDL MySQL
+          Row(
+            children: [
+              Expanded(
+                child: _buildServiceStatusChip(
+                  label: 'Backend API',
+                  status: status?['backend'] ?? (_isCheckingServer ? 'Kiểm tra...' : '---'),
+                  isOk: isOnline,
+                  icon: Icons.code_rounded,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildServiceStatusChip(
+                  label: 'Data API',
+                  status: status?['dataApi'] ?? (_isCheckingServer ? 'Kiểm tra...' : '---'),
+                  isOk: isReady,
+                  icon: Icons.hub_rounded,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildServiceStatusChip(
+                  label: 'CSDL MySQL',
+                  status: status?['database'] ?? (_isCheckingServer ? 'Kiểm tra...' : '---'),
+                  isOk: isReady,
+                  icon: Icons.storage_rounded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Nút bấm thao tác: Kiểm tra kết nối lại & Đổi máy chủ
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: _isCheckingServer
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF2563EB)),
+                  label: const Text('Kiểm tra lại', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                  onPressed: _isCheckingServer ? null : () => _checkServerStatus(showToast: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 16, color: Color(0xFF475569)),
+                  label: const Text('Đổi máy chủ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                  onPressed: _showChangeServerDialog,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceStatusChip({
+    required String label,
+    required String status,
+    required bool isOk,
+    required IconData icon,
+  }) {
+    final color = isOk ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    final bgColor = isOk ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2);
+    final borderColor = isOk ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(height: 3),
+          Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+          const SizedBox(height: 2),
+          Text(
+            status,
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
