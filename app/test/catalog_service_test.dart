@@ -112,5 +112,22 @@ void main() {
       expect(banners.length, 1);
       expect(banners[0].title, 'Freeship Toàn Quốc');
     });
+
+    test('searchProducts finds matching products for query', () async {
+      final service = CatalogService();
+      final result = await service.searchProducts('tai nghe');
+
+      expect(result.products.isNotEmpty, true);
+      expect(result.isExactMatch, true);
+      expect(result.products.any((p) => p.name.toLowerCase().contains('tai nghe')), true);
+    });
+
+    test('searchProducts returns fallback related products for obscure query', () async {
+      final service = CatalogService();
+      final result = await service.searchProducts('xyz12345nonexistent');
+
+      expect(result.products.isNotEmpty, true);
+      expect(result.isExactMatch, false);
+    });
   });
 }

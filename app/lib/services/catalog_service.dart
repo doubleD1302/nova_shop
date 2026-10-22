@@ -338,4 +338,120 @@ class CatalogService {
   List<CommitmentItem> getCommitments() {
     return WebsiteData.commitments;
   }
+
+  /// Tìm kiếm sản phẩm thông minh và lấy danh sách sản phẩm liên quan
+  Future<SearchResult> searchProducts(
+    String query, {
+    String? sort,
+    bool? mall,
+    bool? freeship,
+    String? categoryId,
+  }) async {
+    final q = query.trim().toLowerCase();
+    List<Product> results = [];
+    bool isExact = true;
+
+    // 1. Thử gọi API Backend phân trang kèm query 'q'
+    if (q.isNotEmpty) {
+      try {
+        final apiResult = await getProductsPaginated(
+          q: query.trim(),
+          sort: sort,
+          mall: mall,
+          freeship: freeship,
+          categoryId: categoryId,
+          limit: 60,
+        );
+        if (apiResult.products.isNotEmpty) {
+          results = apiResult.products;
+          isExact = true;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Dự phòng: Tìm kiếm trong WebsiteData.products
+    if (results.isEmpty) {
+      final all = WebsiteData.products;
+      if (q.isEmpty) {
+        results = List<Product>.from(all);
+        isExact = true;
+      } else {
+        // Tìm khớp chính xác theo tên, danh mục, mô tả, shop
+        final exact = all.where((p) {
+          final name = p.name.toLowerCase();
+          final cat = p.categoryName.toLowerCase();
+          final desc = p.description.toLowerCase();
+          final shop = p.shopName.toLowerCase();
+          return name.contains(q) || cat.contains(q) || desc.contains(q) || shop.contains(q);
+        }).toList();
+
+        if (exact.isNotEmpty) {
+          results = exact;
+          isExact = true;
+        } else {
+          // Tách từ khóa và tìm kiếm mờ (fuzzy search)
+          final words = q.split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
+          final fuzzy = all.where((p) {
+            final name = p.name.toLowerCase();
+            final cat = p.categoryName.toLowerCase();
+            final desc = p.description.toLowerCase();
+            return words.any((w) => name.contains(w) || cat.contains(w) || desc.contains(w));
+          }).toList();
+
+          if (fuzzy.isNotEmpty) {
+            results = fuzzy;
+            isExact = true;
+          } else {
+            // Không tìm thấy sản phẩm nào khớp: Gợi ý các sản phẩm phổ biến / hot nhất
+            results = List<Product>.from(all)..sort((a, b) => b.rating.compareTo(a.rating));
+            results = results.take(16).toList();
+            isExact = false;
+          }
+        }
+      }
+    }
+
+    // 3. Áp dụng bộ lọc Mall / Freeship / Category
+    if (mall == true) {
+      results = results.where((p) => p.badges.any((b) => b.toUpperCase().contains('MALL'))).toList();
+    }
+    if (freeship == true) {
+      results = results.where((p) => p.badges.any((b) => b.toUpperCase().contains('FREESHIP'))).toList();
+    }
+    if (categoryId != null && categoryId.isNotEmpty) {
+      results = results.where((p) => p.categoryId == categoryId || p.categoryName.toLowerCase().contains(categoryId.toLowerCase())).toList();
+    }
+
+    // 4. Sắp xếp kết quả
+    if (sort == 'price_asc') {
+      results.sort((a, b) => a.price.compareTo(b.price));
+    } else if (sort == 'price_desc') {
+      results.sort((a, b) => b.price.compareTo(a.price));
+    } else if (sort == 'rating') {
+      results.sort((a, b) => b.rating.compareTo(a.rating));
+    } else if (sort == 'popular') {
+      results.sort((a, b) => b.soldPercent.compareTo(a.soldPercent));
+    } else if (sort == 'newest') {
+      results = results.reversed.toList();
+    }
+
+    return SearchResult(
+      products: results,
+      isExactMatch: isExact,
+      query: query,
+    );
+  }
+}
+
+/// Kết quả tìm kiếm sản phẩm kèm metadata phân loại
+class SearchResult {
+  final List<Product> products;
+  final bool isExactMatch;
+  final String query;
+
+  const SearchResult({
+    required this.products,
+    required this.isExactMatch,
+    required this.query,
+  });
 }

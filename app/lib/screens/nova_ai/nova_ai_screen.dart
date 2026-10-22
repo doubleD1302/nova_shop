@@ -4,6 +4,7 @@ import '../../services/cart_service.dart';
 import '../../services/order_service.dart';
 import '../cart/cart_screen.dart';
 import '../orders/orders_screen.dart';
+import '../search/search_screen.dart';
 
 /// Screen Nova AI Copilot - Trợ lý mua sắm và theo dõi đơn hàng thông minh
 class NovaAIScreen extends StatefulWidget {
@@ -682,25 +683,34 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
                   // Search Capsule: "Nova Ai"
                   Expanded(
-                    child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: colorSurfaceContainerLow,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.search, color: colorSecondary, size: 18),
-                          SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'Nova Ai',
-                              style: TextStyle(color: colorSecondary, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SearchScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: colorSurfaceContainerLow,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.search, color: colorSecondary, size: 18),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Nova Ai',
+                                style: TextStyle(color: colorSecondary, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

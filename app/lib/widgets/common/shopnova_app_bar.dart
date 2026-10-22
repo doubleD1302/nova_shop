@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../screens/cart/cart_screen.dart';
 import '../../screens/nova_ai/nova_ai_screen.dart';
+import '../../screens/search/search_screen.dart';
 import '../../services/cart_service.dart';
 
 class ShopNovaAppBar extends StatelessWidget {
@@ -50,6 +51,7 @@ class ShopNovaAppBar extends StatelessWidget {
                       child: TextField(
                         controller: searchCtrl,
                         autofocus: true,
+                        textInputAction: TextInputAction.search,
                         decoration: InputDecoration(
                           hintText: 'Tìm kiếm sản phẩm, thương hiệu...',
                           hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13.5),
@@ -64,11 +66,10 @@ class ShopNovaAppBar extends StatelessWidget {
                         onSubmitted: (query) {
                           if (query.trim().isNotEmpty) {
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Đang tìm kiếm: "$query"'),
-                                duration: const Duration(seconds: 1),
-                                behavior: SnackBarBehavior.floating,
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SearchScreen(initialQuery: query.trim()),
                               ),
                             );
                           }
@@ -114,11 +115,11 @@ class ShopNovaAppBar extends StatelessWidget {
                 ].map((tag) => InkWell(
                   onTap: () {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Tìm kiếm: "$tag"'),
-                        duration: const Duration(seconds: 1),
-                        behavior: SnackBarBehavior.floating,
+                    final cleanTag = tag.replaceAll(RegExp(r'^[^\w\s]+'), '').trim();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SearchScreen(initialQuery: cleanTag),
                       ),
                     );
                   },
@@ -203,7 +204,12 @@ class ShopNovaAppBar extends StatelessWidget {
               // Capsule Search Field
               Expanded(
                 child: InkWell(
-                  onTap: () => _showSearchModal(context),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SearchScreen()),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     height: 38,
