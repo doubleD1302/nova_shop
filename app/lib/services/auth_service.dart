@@ -10,11 +10,23 @@ import 'api_config.dart';
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal() {
+    restoreSession();
+  }
 
   final ApiClient _client = ApiClient();
   static const String _userKey = 'novashop_current_user';
   static const String _savedCredsKey = 'novashop_saved_credentials';
+  static const String _userKeyId = 'novashop_user_id';
+  static const String _userKeyUsername = 'novashop_user_username';
+  static const String _userKeyFullName = 'novashop_user_fullname';
+  static const String _userKeyEmail = 'novashop_user_email';
+  static const String _userKeyPhone = 'novashop_user_phone';
+  static const String _userKeyRole = 'novashop_user_role';
+  static const String _userKeyShopId = 'novashop_user_shopid';
+  static const String _userKeyAvatar = 'novashop_user_avatar';
+  static const String _userKeyStatus = 'novashop_user_status';
+  static const String _userKeyIsLoggedIn = 'novashop_is_logged_in';
 
   String? _token;
   User? _currentUser;
@@ -320,6 +332,16 @@ class AuthService extends ChangeNotifier {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
         }
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+            _savedCredsKey,
+            jsonEncode({
+              'username': username.trim().toLowerCase(),
+              'password': password,
+            }),
+          );
+        } catch (_) {}
         _isLoading = false;
         notifyListeners();
         return true;
@@ -374,60 +396,90 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  /// Khôi phục thông tin user đã lưu trong máy khi mở app (duy trì phiên bền vững)
+  /// Khôi phục thông tin user tức thì từ bộ nhớ máy (Offline-first, 0ms, không bao giờ tự đăng xuất)
   Future<User?> restoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      try {
+        await prefs.reload();
+      } catch (_) {}
 
-      // 1. Nạp ngay lập tức thông tin user từ cache máy để hiển thị UI không giật lag
-      final userJsonStr = prefs.getString(_userKey);
-      if (userJsonStr != null) {
-        try {
-          _currentUser = User.fromJson(jsonDecode(userJsonStr));
-        } catch (_) {}
-      }
-
-      // 2. Lấy token JWT đã lưu
+      // 1. Nạp token JWT đã lưu
       final t = await _client.getToken();
       if (t != null && t.isNotEmpty) {
         _token = t;
       }
 
-      // Báo UI ngay lập tức nếu đã có dữ liệu user trong máy
+      // 2. Nạp User từ JSON cache
+      final userJsonStr = prefs.getString(_userKey);
+      if (userJsonStr != null && userJsonStr.isNotEmpty) {
+        try {
+          _currentUser = User.fromJson(jsonDecode(userJsonStr));
+        } catch (_) {}
+      }
+
+      // 3. Dự phòng đa tầng: Khôi phục từ các trường riêng biệt nếu JSON bị mất
+      if (_currentUser == null) {
+        final isLoggedIn = prefs.getBool(_userKeyIsLoggedIn) ?? false;
+        final savedUsername = prefs.getString(_userKeyUsername);
+        if (isLoggedIn && savedUsername != null && savedUsername.isNotEmpty) {
+          _currentUser = User(
+            id: prefs.getString(_userKeyId) ?? '',
+            username: savedUsername,
+            fullName: prefs.getString(_userKeyFullName) ?? savedUsername,
+            email: prefs.getString(_userKeyEmail),
+            phone: prefs.getString(_userKeyPhone),
+            role: prefs.getString(_userKeyRole) ?? 'buyer',
+            avatarUrl: prefs.getString(_userKeyAvatar),
+            status: prefs.getString(_userKeyStatus) ?? 'active',
+            shopId: prefs.getString(_userKeyShopId),
+          );
+        }
+      }
+
+      // 4. Báo UI ngay lập tức không để màn hình bị chớp hay lag
       if (_currentUser != null) {
         notifyListeners();
       }
 
-      // 3. Thử đồng bộ dữ liệu mới nhất từ server
-      if (_token != null && _token!.isNotEmpty) {
-        final freshUser = await fetchCurrentUser();
-        if (freshUser != null) {
-          _currentUser = freshUser;
-          notifyListeners();
-          return _currentUser;
-        }
-      }
-
-      // 4. Nếu token hết hạn hoặc chưa có token nhưng máy còn lưu thông tin đăng nhập tự động
-      final credsStr = prefs.getString(_savedCredsKey);
-      if (credsStr != null) {
-        try {
-          final creds = jsonDecode(credsStr) as Map<String, dynamic>;
-          final savedUsername = creds['username'] as String?;
-          final savedPassword = creds['password'] as String?;
-          if (savedUsername != null && savedPassword != null) {
-            debugPrint('[AuthService] Tự động duy trì phiên đăng nhập ngầm...');
-            final ok = await silentLogin(savedUsername, savedPassword);
-            if (ok) return _currentUser;
-          }
-        } catch (_) {}
-      }
+      // 5. Đồng bộ dữ liệu nền ngầm (Non-blocking): không await để app mở tức thì
+      _syncSessionInBackground(prefs);
     } catch (e) {
       debugPrint('[AuthService] restoreSession error: $e');
     }
 
-    // Không tự động đăng xuất người dùng, chỉ đăng xuất khi người dùng chủ động nhấn Đăng xuất
     return _currentUser;
+  }
+
+  /// Đồng bộ phiên đăng nhập ngầm trong nền (tự làm mới token nếu cần, không bao giờ null hóa tài khoản)
+  void _syncSessionInBackground(SharedPreferences prefs) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        final freshUser = await fetchCurrentUser();
+        if (freshUser != null) {
+          _currentUser = freshUser;
+          await _saveUserToLocal(freshUser);
+          notifyListeners();
+          return;
+        }
+      }
+
+      // Nếu token hết hạn (15 phút) hoặc chưa lấy được profile mới:
+      // Tự động đăng nhập ngầm bằng credentials đã lưu để gia hạn token mới
+      final credsStr = prefs.getString(_savedCredsKey);
+      if (credsStr != null) {
+        final creds = jsonDecode(credsStr) as Map<String, dynamic>;
+        final savedUsername = creds['username'] as String?;
+        final savedPassword = creds['password'] as String?;
+        if (savedUsername != null && savedPassword != null) {
+          debugPrint('[AuthService] Đang gia hạn token ngầm...');
+          await silentLogin(savedUsername, savedPassword);
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthService] _syncSessionInBackground error: $e');
+    }
+    // Dù mạng lỗi, server offline hay token cũ: TUYỆT ĐỐI GIỮ NGUYÊN _currentUser, không tự đăng xuất!
   }
 
   /// Cập nhật thông tin hồ sơ tài khoản
@@ -591,6 +643,16 @@ class AuthService extends ChangeNotifier {
     try {
       SharedPreferences.getInstance().then((prefs) {
         prefs.remove(_userKey);
+        prefs.remove(_userKeyId);
+        prefs.remove(_userKeyUsername);
+        prefs.remove(_userKeyFullName);
+        prefs.remove(_userKeyEmail);
+        prefs.remove(_userKeyPhone);
+        prefs.remove(_userKeyRole);
+        prefs.remove(_userKeyShopId);
+        prefs.remove(_userKeyAvatar);
+        prefs.remove(_userKeyStatus);
+        prefs.remove(_userKeyIsLoggedIn);
         prefs.remove(_savedCredsKey);
       }).catchError((_) {});
     } catch (_) {}
@@ -601,6 +663,18 @@ class AuthService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userKey, jsonEncode(user.toJson()));
-    } catch (_) {}
+      await prefs.setString(_userKeyId, user.id);
+      await prefs.setString(_userKeyUsername, user.username);
+      await prefs.setString(_userKeyFullName, user.fullName);
+      if (user.email != null) await prefs.setString(_userKeyEmail, user.email!);
+      if (user.phone != null) await prefs.setString(_userKeyPhone, user.phone!);
+      await prefs.setString(_userKeyRole, user.role);
+      if (user.shopId != null) await prefs.setString(_userKeyShopId, user.shopId!);
+      if (user.avatarUrl != null) await prefs.setString(_userKeyAvatar, user.avatarUrl!);
+      await prefs.setString(_userKeyStatus, user.status);
+      await prefs.setBool(_userKeyIsLoggedIn, true);
+    } catch (e) {
+      debugPrint('[AuthService] _saveUserToLocal error: $e');
+    }
   }
 }

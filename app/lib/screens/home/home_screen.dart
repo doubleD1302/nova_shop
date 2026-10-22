@@ -13,6 +13,7 @@ import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/models/product.dart';
 import 'package:shopnova/services/catalog_service.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
+import '../search/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -135,31 +136,79 @@ class _HomeScreenState extends State<HomeScreen> {
               QuickLinksSection(
                 onLinkTap: (link) {
                   if (link.contains('flash')) {
-                    setState(() => _suggestionTabIndex = 2);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('⚡ Đang xem các ưu đãi Flash Sale chớp nhoáng!'), duration: Duration(seconds: 1)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '⚡ Khung Giờ Flash Sale Chớp Nhoáng',
+                          filterFlashSale: true,
+                        ),
+                      ),
                     );
                   } else if (link.contains('freeship')) {
-                    setState(() => _suggestionTabIndex = 1);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('🚚 Đang xem các sản phẩm Freeship Extra!'), duration: Duration(seconds: 1)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '🚚 Miễn Phí Vận Chuyển Freeship Xtra',
+                          filterFreeship: true,
+                        ),
+                      ),
                     );
                   } else if (link.contains('mall')) {
-                    setState(() => _suggestionTabIndex = 3);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('💎 Đang xem gian hàng Nova Mall chính hãng!'), duration: Duration(seconds: 1)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '💎 Nova Mall - 100% Chính Hãng',
+                          filterMall: true,
+                        ),
+                      ),
                     );
                   } else if (link.contains('category=dien-thoai') || link.contains('topup')) {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DepositScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DepositScreen()),
+                    );
                   } else if (link.contains('discount')) {
-                    setState(() => _suggestionTabIndex = 2);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('🎟️ Đang lọc sản phẩm có mã giảm giá sốc!'), duration: Duration(seconds: 1)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '🎟️ Siêu Mã Giảm Giá & Voucher Khủng',
+                          initialSort: 'discount',
+                        ),
+                      ),
+                    );
+                  } else if (link.contains('price-asc')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '🛒 Hàng Tiêu Dùng Giá Rẻ Vô Địch',
+                          initialSort: 'price_asc',
+                        ),
+                      ),
+                    );
+                  } else if (link.contains('popular')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '🔮 Xu Hướng Mua Sắm Thịnh Hành Hôm Nay',
+                          initialSort: 'popular',
+                        ),
+                      ),
                     );
                   } else {
-                    setState(() => _suggestionTabIndex = 0);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đang cập nhật danh mục ưu đãi thịnh hành!'), duration: Duration(seconds: 1)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(
+                          title: '🌍 Hàng Quốc Tế Deal Xịn & Mới Về',
+                          initialSort: 'newest',
+                        ),
+                      ),
                     );
                   }
                 },

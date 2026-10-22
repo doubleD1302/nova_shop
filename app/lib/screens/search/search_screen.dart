@@ -7,8 +7,25 @@ import '../cart/cart_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;
+  final String? initialCategory;
+  final String? categoryId;
+  final String? title;
+  final bool filterMall;
+  final bool filterFreeship;
+  final bool filterFlashSale;
+  final String initialSort;
 
-  const SearchScreen({super.key, this.initialQuery});
+  const SearchScreen({
+    super.key,
+    this.initialQuery,
+    this.initialCategory,
+    this.categoryId,
+    this.title,
+    this.filterMall = false,
+    this.filterFreeship = false,
+    this.filterFlashSale = false,
+    this.initialSort = 'relevance',
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -24,9 +41,13 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isExactMatch = true;
   List<Product> _products = [];
 
-  String _selectedSort = 'relevance';
-  bool _filterMall = false;
-  bool _filterFreeship = false;
+  late String _selectedSort;
+  late bool _filterMall;
+  late bool _filterFreeship;
+  late bool _filterFlashSale;
+  String? _categoryId;
+  String? _categoryName;
+  String? _pageTitle;
 
   final List<String> _recentSearches = [
     'Tai nghe bluetooth',
@@ -48,13 +69,32 @@ class _SearchScreenState extends State<SearchScreen> {
     '💄 Son dưỡng Cocoon',
   ];
 
+  bool get _isBrowsingMode =>
+      _pageTitle != null ||
+      _categoryName != null ||
+      _categoryId != null ||
+      _filterFlashSale ||
+      _filterMall ||
+      _filterFreeship ||
+      _selectedSort != 'relevance';
+
   @override
   void initState() {
     super.initState();
+    _selectedSort = widget.initialSort;
+    _filterMall = widget.filterMall;
+    _filterFreeship = widget.filterFreeship;
+    _filterFlashSale = widget.filterFlashSale;
+    _categoryId = widget.categoryId;
+    _categoryName = widget.initialCategory;
+    _pageTitle = widget.title;
+
     if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
       _currentQuery = widget.initialQuery!.trim();
       _searchController.text = _currentQuery;
       _performSearch(_currentQuery);
+    } else if (_isBrowsingMode) {
+      _loadBrowsingProducts();
     } else {
       _focusNode.requestFocus();
     }
@@ -67,17 +107,91 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  Future<void> _loadBrowsingProducts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      List<Product> list = [];
+
+      if (_filterFlashSale) {
+        // Nạp các sản phẩm Flash Sale
+        final flashItems = await _catalogService.getFlashSaleItems();
+        if (flashItems.isNotEmpty) {
+          list = flashItems.map<Product>((f) {
+            final origPrice = f.discount > 0 ? (f.price / (1 - f.discount / 100)) : (f.price * 1.35);
+            return Product(
+              id: f.id,
+              name: f.name,
+              price: f.price,
+              originalPrice: origPrice,
+              discount: f.discount,
+              imageUrl: f.imageUrl,
+              categoryName: 'Flash Sale',
+              shopName: 'ShopNova Mall',
+              rating: 4.9,
+              soldCount: '990',
+              badges: const ['FLASH SALE', 'MALL'],
+              description: 'Sản phẩm Flash Sale với mức giảm giá chớp nhoáng siêu hấp dẫn.',
+            );
+          }).toList();
+        }
+      }
+
+      if (list.isEmpty) {
+        final result = await _catalogService.searchProducts(
+          _currentQuery,
+          categoryId: _categoryId ?? _categoryName,
+          mall: _filterMall ? true : null,
+          freeship: _filterFreeship ? true : null,
+          sort: _selectedSort,
+        );
+        list = result.products;
+      }
+
+      // Áp dụng bộ lọc sắp xếp
+      if (_selectedSort == 'discount') {
+        list.sort((a, b) {
+          final discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : 0;
+          final discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : 0;
+          return discB.compareTo(discA);
+        });
+      } else if (_selectedSort == 'price_asc') {
+        list.sort((a, b) => a.price.compareTo(b.price));
+      } else if (_selectedSort == 'price_desc') {
+        list.sort((a, b) => b.price.compareTo(a.price));
+      } else if (_selectedSort == 'popular') {
+        list.sort((a, b) => b.soldCount.compareTo(a.soldCount));
+      } else if (_selectedSort == 'newest') {
+        list = list.reversed.toList();
+      }
+
+      if (mounted) {
+        setState(() {
+          _products = list;
+          _isExactMatch = true;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _performSearch(String query) async {
     final cleanQuery = query.trim();
-    if (cleanQuery.isEmpty) return;
-
     _focusNode.unfocus();
     setState(() {
       _currentQuery = cleanQuery;
       _isLoading = true;
     });
 
-    if (!_recentSearches.contains(cleanQuery)) {
+    if (cleanQuery.isNotEmpty && !_recentSearches.contains(cleanQuery)) {
       _recentSearches.insert(0, cleanQuery);
       if (_recentSearches.length > 8) {
         _recentSearches.removeLast();
@@ -90,6 +204,7 @@ class _SearchScreenState extends State<SearchScreen> {
         sort: _selectedSort,
         mall: _filterMall ? true : null,
         freeship: _filterFreeship ? true : null,
+        categoryId: _categoryId ?? _categoryName,
       );
 
       if (mounted) {
@@ -113,6 +228,8 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _selectedSort = sort);
     if (_currentQuery.isNotEmpty) {
       _performSearch(_currentQuery);
+    } else if (_isBrowsingMode) {
+      _loadBrowsingProducts();
     }
   }
 
@@ -120,6 +237,8 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _filterMall = !_filterMall);
     if (_currentQuery.isNotEmpty) {
       _performSearch(_currentQuery);
+    } else if (_isBrowsingMode) {
+      _loadBrowsingProducts();
     }
   }
 
@@ -127,6 +246,8 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _filterFreeship = !_filterFreeship);
     if (_currentQuery.isNotEmpty) {
       _performSearch(_currentQuery);
+    } else if (_isBrowsingMode) {
+      _loadBrowsingProducts();
     }
   }
 
@@ -260,13 +381,63 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       body: Column(
         children: [
-          if (_currentQuery.isNotEmpty) _buildFilterBar(),
+          if (_pageTitle != null) _buildBrowsingTitleHeader(),
+          if (_currentQuery.isNotEmpty || _isBrowsingMode) _buildFilterBar(),
           Expanded(
-            child: _currentQuery.isEmpty
+            child: (_currentQuery.isEmpty && !_isBrowsingMode)
                 ? _buildRecentAndSuggestions()
                 : _isLoading
                     ? _buildLoadingState()
                     : _buildSearchResults(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrowsingTitleHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF7F5),
+        border: Border(bottom: BorderSide(color: Color(0xFFFFDDD4))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.category_rounded, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _pageTitle ?? (_categoryName != null ? 'Ngành hàng: $_categoryName' : 'Danh mục sản phẩm'),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E2022),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  _products.isNotEmpty
+                      ? 'Hiển thị ${_products.length} sản phẩm theo danh mục & tiện ích'
+                      : (_isLoading ? 'Đang nạp các sản phẩm...' : 'Chưa có sản phẩm phù hợp'),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -285,6 +456,8 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         children: [
           _buildSortChip('Liên quan', 'relevance'),
+          const SizedBox(width: 6),
+          _buildSortChip('Giảm sốc', 'discount'),
           const SizedBox(width: 6),
           _buildSortChip('Mới nhất', 'newest'),
           const SizedBox(width: 6),
@@ -493,10 +666,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   text: '${_products.length}',
                   style: const TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' sản phẩm cho '),
                 TextSpan(
-                  text: '"$_currentQuery"',
-                  style: const TextStyle(color: Color(0xFF1E2022), fontWeight: FontWeight.bold),
+                  text: _currentQuery.isNotEmpty
+                      ? ' sản phẩm cho "$_currentQuery"'
+                      : ' sản phẩm phù hợp',
+                  style: const TextStyle(color: Color(0xFF1E2022), fontWeight: FontWeight.w600),
                 ),
               ],
             ),

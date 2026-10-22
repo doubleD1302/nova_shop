@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shopnova/models/category_item.dart';
 import 'package:shopnova/theme/app_colors.dart';
+import '../../screens/search/search_screen.dart';
 
 class CategoryGrid extends StatelessWidget {
   final List<CategoryItem> categories;
@@ -56,11 +57,14 @@ class CategoryGrid extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Đang lọc danh mục: ${cat.name}'),
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SearchScreen(
+                            initialCategory: cat.name,
+                            categoryId: cat.id,
+                            title: 'Ngành hàng: ${cat.name}',
+                          ),
                         ),
                       );
                     },
@@ -163,11 +167,14 @@ class CategoryGrid extends StatelessWidget {
               return InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Đang lọc danh mục: ${category.name}'),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SearchScreen(
+                        initialCategory: category.name,
+                        categoryId: category.id,
+                        title: 'Ngành hàng: ${category.name}',
+                      ),
                     ),
                   );
                 },
