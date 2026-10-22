@@ -21,27 +21,27 @@ class NovaAIScreen extends StatefulWidget {
 }
 
 class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMixin {
-  // Theme Color Tokens (Chuẩn theo thiết kế Tailwind)
-  static const Color colorPrimary = Color(0xFFB22204);
-  static const Color colorPrimaryContainer = Color(0xFFD63C1E);
-  static const Color colorPrimaryFixed = Color(0xFFFFDAD3);
+  // Theme Color Tokens (Chuẩn theo thiết kế ShopNova Brand)
+  static const Color colorPrimary = Color(0xFFEE4D2D);
+  static const Color colorPrimaryContainer = Color(0xFFD73211);
+  static const Color colorPrimaryFixed = Color(0xFFFFE8E2);
   static const Color colorOnPrimaryFixed = Color(0xFF3E0500);
 
   static const Color colorSecondary = Color(0xFF515F7A);
-  static const Color colorSecondaryContainer = Color(0xFFCFDDFD);
+  static const Color colorSecondaryContainer = Color(0xFFE8EEF8);
   static const Color colorSecondaryFixed = Color(0xFFD7E3FF);
 
-  static const Color colorTertiary = Color(0xFF006A42);
+  static const Color colorTertiary = Color(0xFF00BFA5);
   static const Color colorTertiaryContainer = Color(0xFF008654);
 
-  static const Color colorSurface = Color(0xFFF9F9FF);
+  static const Color colorSurface = Color(0xFFF6F6F9);
   static const Color colorSurfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color colorSurfaceContainerLow = Color(0xFFEFF3FF);
-  static const Color colorSurfaceContainer = Color(0xFFE6EEFF);
-  static const Color colorSurfaceContainerHigh = Color(0xFFE0E8FB);
-  static const Color colorSurfaceContainerHighest = Color(0xFFDAE3F5);
+  static const Color colorSurfaceContainerLow = Color(0xFFF1F3F5);
+  static const Color colorSurfaceContainer = Color(0xFFE9ECEF);
+  static const Color colorSurfaceContainerHigh = Color(0xFFDEE2E6);
+  static const Color colorSurfaceContainerHighest = Color(0xFFCED4DA);
 
-  static const Color colorOnSurface = Color(0xFF131C29);
+  static const Color colorOnSurface = Color(0xFF1E2022);
   static const Color colorOnSurfaceVariant = Color(0xFF5B403B);
 
   // Controllers
@@ -627,19 +627,13 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
     return Scaffold(
       backgroundColor: colorSurface,
-      // 1. Header (Cố định chuẩn như bản mẫu HTML)
+      // 1. Header (Cố định chuẩn như bản mẫu)
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: Container(
-          decoration: BoxDecoration(
-            color: colorSurface.withOpacity(0.95),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Color(0xFFEEEEF0))),
           ),
           child: SafeArea(
             child: Padding(
@@ -649,7 +643,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   // Back button nếu mở từ màn hình khác (như Quản lý đơn hàng)
                   if (widget.isStandalone) ...[
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: colorOnSurface),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: colorOnSurface, size: 18),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -832,8 +826,8 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: const BoxDecoration(
-        color: Color(0xFFFFF3CD),
-        border: Border(bottom: BorderSide(color: Color(0xFFFFEEBA))),
+        color: Color(0xFFFFF8E1),
+        border: Border(bottom: BorderSide(color: Color(0xFFFFECB3))),
       ),
       child: const Row(
         children: [
@@ -883,7 +877,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: Color(0x33B22204), blurRadius: 8, offset: Offset(0, 2)),
+                          BoxShadow(color: Color(0x33EE4D2D), blurRadius: 8, offset: Offset(0, 2)),
                         ],
                       ),
                       child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
@@ -1077,7 +1071,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   topRight: Radius.circular(4),
                 ),
                 boxShadow: [
-                  BoxShadow(color: Color(0x22B22204), blurRadius: 6, offset: Offset(0, 2)),
+                  BoxShadow(color: Color(0x22EE4D2D), blurRadius: 6, offset: Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -1944,7 +1938,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                       color: colorPrimary,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: Color(0x33B22204), blurRadius: 4, offset: Offset(0, 2)),
+                        BoxShadow(color: Color(0x33EE4D2D), blurRadius: 4, offset: Offset(0, 2)),
                       ],
                     ),
                     child: const Icon(Icons.arrow_upward, color: Colors.white, size: 19),

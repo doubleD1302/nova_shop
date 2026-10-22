@@ -20,7 +20,6 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
   final SellerProductService _productService = SellerProductService();
   final ApiClient _client = ApiClient();
 
-  // Dashboard Data
   Map<String, dynamic> _dashboard = {
     'revenue': 0,
     'pendingOrders': 0,
@@ -29,12 +28,10 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
   };
   bool _isLoadingDashboard = true;
 
-  // Orders Data
   List<ShopOrder> _orders = [];
   bool _isLoadingOrders = true;
   String _selectedOrderStatus = '';
 
-  // Products Data
   List<SellerProductItem> _products = [];
   bool _isLoadingProducts = true;
 
@@ -139,15 +136,15 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Đăng Sản Phẩm Mới Lên Sàn', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
                         labelText: 'Tên sản phẩm *',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -159,7 +156,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
                               labelText: 'Giá bán (VND) *',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -170,7 +167,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
                               labelText: 'Số lượng tồn *',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -181,7 +178,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       controller: imageCtrl,
                       decoration: InputDecoration(
                         labelText: 'Link ảnh sản phẩm (URL)',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -190,17 +187,25 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       maxLines: 3,
                       decoration: InputDecoration(
                         labelText: 'Mô tả chi tiết sản phẩm',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
+                    const SizedBox(height: 18),
+                    Container(
                       width: double.infinity,
-                      height: 48,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: isSubmitting
                             ? null
@@ -233,7 +238,6 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                                   ],
                                 );
 
-                                // Nếu chưa có gian hàng hoặc 403, tự động kích hoạt gian hàng và thử lại
                                 if (!response.success && (response.statusCode == 403 || response.message.contains('gian hàng'))) {
                                   final regRes = await _client.post('/api/v1/seller/register-shop', body: {
                                     'shopName': 'Gian hàng $name',
@@ -264,7 +268,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                                 if (response.success && mounted) {
                                   Navigator.pop(ctx);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Đăng sản phẩm thành công!'), backgroundColor: Colors.green),
+                                    const SnackBar(content: Text('Đăng sản phẩm thành công!'), backgroundColor: Color(0xFF00BFA5)),
                                   );
                                   _loadProducts();
                                   _loadDashboard();
@@ -273,7 +277,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                                       ? response.message
                                       : 'Đăng sản phẩm thất bại. Vui lòng kiểm tra lại.';
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+                                    SnackBar(content: Text(errMsg), backgroundColor: const Color(0xFFD0011B)),
                                   );
                                 }
                               },
@@ -301,32 +305,51 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.storefront, color: Color(0xFFEE4D2D), size: 22),
-            SizedBox(width: 8),
-            Text('Kênh Người Bán ShopNova', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 17)),
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0EC),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.storefront_rounded, color: Color(0xFFEE4D2D), size: 18),
+            ),
+            const SizedBox(width: 8),
+            const Text('Kênh Người Bán ShopNova', style: TextStyle(color: Color(0xFF1E2022), fontWeight: FontWeight.w700, fontSize: 16)),
           ],
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: primaryColor,
-          unselectedLabelColor: Colors.grey.shade600,
-          indicatorColor: primaryColor,
-          indicatorWeight: 3,
-          tabs: const [
-            Tab(text: 'Tổng Quan'),
-            Tab(text: 'Đơn Hàng'),
-            Tab(text: 'Sản Phẩm'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(49),
+          child: Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                labelColor: primaryColor,
+                unselectedLabelColor: const Color(0xFF555770),
+                indicatorColor: primaryColor,
+                indicatorWeight: 2.5,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                tabs: const [
+                  Tab(text: 'Tổng Quan'),
+                  Tab(text: 'Đơn Hàng'),
+                  Tab(text: 'Sản Phẩm'),
+                ],
+              ),
+              Container(color: const Color(0xFFEEEEF0), height: 1),
+            ],
+          ),
         ),
       ),
       body: TabBarView(
@@ -340,7 +363,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
       floatingActionButton: _tabController.index == 2
           ? FloatingActionButton.extended(
               backgroundColor: primaryColor,
-              icon: const Icon(Icons.add, color: Colors.white),
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
               label: const Text('Đăng Sản Phẩm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onPressed: _showAddProductDialog,
             )
@@ -348,10 +371,9 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
     );
   }
 
-  // TAB 1: TỔNG QUAN
   Widget _buildDashboardTab() {
     if (_isLoadingDashboard) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
     }
 
     final revenue = (_dashboard['revenue'] as num?) ?? 0;
@@ -363,80 +385,103 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
       onRefresh: _loadDashboard,
       color: primaryColor,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         children: [
-          // Banner Chào Mừng Người Bán
+          // Banner Chào Mừng
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF7337)],
+                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: primaryColor.withOpacity(0.28), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Trung Tâm Quản Lý Gian Hàng', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('Trung Tâm Quản Lý Gian Hàng', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
                 SizedBox(height: 6),
-                Text('Theo dõi số liệu bán hàng, xử lý đơn và quản lý kho theo thời gian thực.', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                Text('Theo dõi số liệu bán hàng, xử lý đơn và quản lý kho theo thời gian thực.', style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.3)),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           // Chỉ Số Kinh Doanh
           Row(
             children: [
               Expanded(
-                child: _buildMetricCard('Doanh Thu', _formatVND(revenue), Icons.monetization_on, Colors.green),
+                child: _buildMetricCard('Doanh Thu', _formatVND(revenue), Icons.monetization_on_rounded, const Color(0xFF16A34A)),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _buildMetricCard('Đơn Chờ Xử Lý', '$pendingOrders đơn', Icons.pending_actions, Colors.orange),
+                child: _buildMetricCard('Đơn Chờ Xử Lý', '$pendingOrders đơn', Icons.pending_actions_rounded, const Color(0xFFD97706)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: _buildMetricCard('Sản Phẩm Đang Bán', '$totalProducts sản phẩm', Icons.inventory_2_outlined, Colors.blue),
+                child: _buildMetricCard('Sản Phẩm Đang Bán', '$totalProducts sản phẩm', Icons.inventory_2_outlined, const Color(0xFF2563EB)),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: _buildMetricCard('Cảnh Báo Hết Hàng', '$lowStock SKU', Icons.warning_amber_rounded, Colors.redAccent),
+                child: _buildMetricCard('Cảnh Báo Hết Hàng', '$lowStock SKU', Icons.warning_amber_rounded, const Color(0xFFDC2626)),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           // Tiện Ích Nhanh Cho Seller
-          const Text('Thao Tác Nhanh', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-          const SizedBox(height: 12),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const CircleAvatar(backgroundColor: Color(0xFFFBE9E7), child: Icon(Icons.add_box_outlined, color: Color(0xFFEE4D2D))),
-                  title: const Text('Đăng bán sản phẩm mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('Tải ảnh và cấu hình biến thể sản phẩm'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    _tabController.animateTo(2);
-                    _showAddProductDialog();
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const CircleAvatar(backgroundColor: Color(0xFFFFF3E0), child: Icon(Icons.local_shipping_outlined, color: Colors.orange)),
-                  title: const Text('Xử lý đơn hàng đang chờ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('Xác nhận và chuẩn bị hàng giao vận'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _tabController.animateTo(1),
-                ),
+          const Text('Thao Tác Nhanh', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E2022))),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFEEEEF0)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
               ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Color(0xFFFFF0EC), shape: BoxShape.circle),
+                      child: const Icon(Icons.add_box_outlined, color: Color(0xFFEE4D2D), size: 20),
+                    ),
+                    title: const Text('Đăng bán sản phẩm mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
+                    subtitle: const Text('Tải ảnh và cấu hình biến thể sản phẩm', style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
+                    trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF8F90A6)),
+                    onTap: () {
+                      _tabController.animateTo(2);
+                      _showAddProductDialog();
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56, color: Color(0xFFEEEEF0)),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Color(0xFFFFFBEB), shape: BoxShape.circle),
+                      child: const Icon(Icons.local_shipping_outlined, color: Color(0xFFD97706), size: 20),
+                    ),
+                    title: const Text('Xử lý đơn hàng đang chờ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
+                    subtitle: const Text('Xác nhận và chuẩn bị hàng giao vận', style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
+                    trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF8F90A6)),
+                    onTap: () => _tabController.animateTo(1),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -446,11 +491,14 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
 
   Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,22 +506,24 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              Icon(icon, color: color, size: 20),
+              Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 16),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
         ],
       ),
     );
   }
 
-  // TAB 2: QUẢN LÝ ĐƠN HÀNG
   Widget _buildOrdersTab() {
     return Column(
       children: [
-        // Status filter bar
         Container(
           color: Colors.white,
           height: 48,
@@ -492,15 +542,15 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
         ),
         Expanded(
           child: _isLoadingOrders
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)))
               : _orders.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade400),
-                          const SizedBox(height: 12),
-                          const Text('Không có đơn hàng nào', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                        children: const [
+                          Icon(Icons.inbox_outlined, size: 54, color: Color(0xFF8F90A6)),
+                          SizedBox(height: 12),
+                          Text('Không có đơn hàng nào', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 15)),
                         ],
                       ),
                     )
@@ -510,7 +560,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       child: ListView.separated(
                         padding: const EdgeInsets.all(12),
                         itemCount: _orders.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (ctx, index) {
                           final o = _orders[index];
                           return _buildOrderCard(o);
@@ -529,10 +579,12 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
-        selectedColor: primaryColor.withValues(alpha: 0.15),
+        selectedColor: const Color(0xFFFFF0EC),
+        backgroundColor: const Color(0xFFF7F7F8),
+        side: BorderSide(color: isSelected ? primaryColor : const Color(0xFFE2E2E6)),
         labelStyle: TextStyle(
-          color: isSelected ? primaryColor : Colors.black87,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? primaryColor : const Color(0xFF555770),
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           fontSize: 12,
         ),
         onSelected: (val) {
@@ -548,8 +600,11 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,11 +612,11 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Đơn hàng #${o.id}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('Đơn hàng #${o.id}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
               _buildStatusBadge(o.status),
             ],
           ),
-          const Divider(height: 16),
+          const Divider(height: 16, color: Color(0xFFEEEEF0)),
           ...o.items.map((it) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
@@ -570,45 +625,56 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(it.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          Text('${it.variantName} x${it.qty}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                          Text(it.productName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E2022))),
+                          Text('${it.variantName} x${it.qty}', style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 12)),
                         ],
                       ),
                     ),
-                    Text(_formatVND(it.lineTotal), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(_formatVND(it.lineTotal), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
                   ],
                 ),
               )),
-          const Divider(height: 16),
+          const Divider(height: 16, color: Color(0xFFEEEEF0)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Tổng thu:', style: TextStyle(fontSize: 13, color: Colors.grey)),
-              Text(_formatVND(o.totalAmount), style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 15)),
+              const Text('Tổng thu:', style: TextStyle(fontSize: 13, color: Color(0xFF555770))),
+              Text(_formatVND(o.totalAmount), style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 10),
-          // Thao tác đổi trạng thái
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (o.status == 'pending')
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: () => _updateOrderStatus(o.id, 'processing', 'Đang chuẩn bị hàng'),
-                  child: const Text('Xác Nhận Đơn'),
+                  child: const Text('Xác Nhận Đơn', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               if (o.status == 'processing')
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: () => _updateOrderStatus(o.id, 'shipping', 'Đang giao hàng'),
-                  child: const Text('Giao Đơn Cho Vận Chuyển'),
+                  child: const Text('Giao Cho Vận Chuyển', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               if (o.status == 'shipping')
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: () => _updateOrderStatus(o.id, 'delivered', 'Giao thành công'),
-                  child: const Text('Hoàn Tất Đơn'),
+                  child: const Text('Hoàn Tất Đơn', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
@@ -624,59 +690,62 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
 
     switch (status) {
       case 'pending':
-        bg = Colors.orange.shade50;
-        fg = Colors.orange.shade800;
+        bg = const Color(0xFFFFFBEB);
+        fg = const Color(0xFFD97706);
         text = 'Chờ xác nhận';
         break;
       case 'processing':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
+        bg = const Color(0xFFEFF6FF);
+        fg = const Color(0xFF2563EB);
         text = 'Đang đóng gói';
         break;
       case 'shipping':
-        bg = Colors.purple.shade50;
-        fg = Colors.purple.shade800;
+        bg = const Color(0xFFF3E8FF);
+        fg = const Color(0xFF7E22CE);
         text = 'Đang giao';
         break;
       case 'delivered':
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade800;
+        bg = const Color(0xFFF0FDF4);
+        fg = const Color(0xFF16A34A);
         text = 'Đã giao';
         break;
       case 'cancelled':
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade800;
+        bg = const Color(0xFFFEF2F2);
+        fg = const Color(0xFFDC2626);
         text = 'Đã hủy';
         break;
       default:
-        bg = Colors.grey.shade100;
-        fg = Colors.black87;
+        bg = const Color(0xFFF7F7F8);
+        fg = const Color(0xFF1E2022);
         text = status;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
       child: Text(text, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
 
-  // TAB 3: QUẢN LÝ SẢN PHẨM
   Widget _buildProductsTab() {
     return _isLoadingProducts
-        ? const Center(child: CircularProgressIndicator())
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)))
         : _products.isEmpty
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+                    const Icon(Icons.inventory_2_outlined, size: 54, color: Color(0xFF8F90A6)),
                     const SizedBox(height: 12),
-                    const Text('Gian hàng chưa có sản phẩm nào', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                    const Text('Gian hàng chưa có sản phẩm nào', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 15)),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
-                      icon: const Icon(Icons.add),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.add_rounded),
                       label: const Text('Đăng sản phẩm đầu tiên'),
                       onPressed: _showAddProductDialog,
                     ),
@@ -696,8 +765,11 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFEEEEF0)),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
+                        ],
                       ),
                       child: Row(
                         children: [
@@ -705,26 +777,30 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                             width: 64,
                             height: 64,
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
+                              color: const Color(0xFFF7F7F8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFEEEEF0)),
                             ),
-                            child: p.imageUrl != null && p.imageUrl!.isNotEmpty
-                                ? Image.network(p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey))
-                                : const Icon(Icons.image, color: Colors.grey),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: p.imageUrl != null && p.imageUrl!.isNotEmpty
+                                  ? Image.network(p.imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey))
+                                  : const Icon(Icons.image, color: Colors.grey),
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(p.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
                                 const SizedBox(height: 4),
                                 Text(
                                   p.minPrice == p.maxPrice ? _formatVND(p.minPrice) : '${_formatVND(p.minPrice)} - ${_formatVND(p.maxPrice)}',
                                   style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                                 const SizedBox(height: 2),
-                                Text('Kho: ${p.totalStock} sản phẩm', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                Text('Kho: ${p.totalStock} sản phẩm', style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 12)),
                               ],
                             ),
                           ),

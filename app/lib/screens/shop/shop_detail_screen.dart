@@ -51,13 +51,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Lấy chi tiết gian hàng từ Backend
       final shopData = await _shopService.getShopDetail(widget.shopId);
-
-      // 2. Lấy danh sách sản phẩm thực tế của gian hàng từ Backend
       final prodResult = await _shopService.getShopProducts(widget.shopId);
 
-      // 3. Kiểm tra trạng thái theo dõi nếu đã đăng nhập
       bool isFol = false;
       if (AuthService().isAuthenticated) {
         try {
@@ -126,35 +122,41 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     final filtered = _getFilteredProducts();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+        ),
         titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Container(
-          height: 36,
+          height: 38,
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(6),
+            color: const Color(0xFFF5F5F7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E2E6)),
           ),
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF1E2022)),
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Tìm kiếm trong gian hàng...',
-              hintStyle: const TextStyle(fontSize: 12, color: Colors.grey, overflow: TextOverflow.ellipsis),
-              prefixIcon: const Icon(Icons.search, size: 18, color: Colors.grey),
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6), overflow: TextOverflow.ellipsis),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF8F90A6)),
               prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                      icon: const Icon(Icons.clear_rounded, size: 16, color: Color(0xFF8F90A6)),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: () {
@@ -173,34 +175,37 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             animation: CartService(),
             builder: (context, _) {
               final count = CartService().itemCount;
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
-                    },
-                  ),
-                  if (count > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                        child: Text(
-                          '$count',
-                          style: const TextStyle(color: Colors.white, fontSize: 10),
-                          textAlign: TextAlign.center,
+              return Container(
+                margin: const EdgeInsets.only(right: 6),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_cart_outlined, color: Color(0xFF1E2022), size: 22),
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+                      },
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEE4D2D),
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            '$count',
+                            style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               );
             },
           ),
@@ -237,13 +242,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     final province = _shop?.province.isNotEmpty == true ? _shop!.province : 'Toàn quốc';
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -251,12 +256,12 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         children: [
           // Banner background gradient
           Container(
-            height: 90,
+            height: 96,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isMall
-                    ? [const Color(0xFF003366), const Color(0xFF001A33)]
-                    : [const Color(0xFFEE4D2D), const Color(0xFFFF7337)],
+                    ? [const Color(0xFFD0011B), const Color(0xFF8B0000)]
+                    : [const Color(0xFFEE4D2D), const Color(0xFFFF5224)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -273,14 +278,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     Transform.translate(
                       offset: const Offset(0, -28),
                       child: Container(
-                        width: 72,
-                        height: 72,
+                        width: 74,
+                        height: 74,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x18000000), blurRadius: 8, offset: Offset(0, 3)),
                           ],
                         ),
                         child: ClipOval(
@@ -288,9 +293,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                               ? Image.network(
                                   _shop!.logoUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Icon(Icons.store, color: primaryColor, size: 36),
+                                  errorBuilder: (_, __, ___) => Icon(Icons.storefront_rounded, color: primaryColor, size: 36),
                                 )
-                              : Icon(Icons.storefront, color: primaryColor, size: 36),
+                              : Icon(Icons.storefront_rounded, color: primaryColor, size: 36),
                         ),
                       ),
                     ),
@@ -305,8 +310,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF003366),
-                                    borderRadius: BorderRadius.circular(3),
+                                    color: const Color(0xFFD0011B),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                                 ),
@@ -315,17 +320,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                               Expanded(
                                 child: Text(
                                   displayName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1E2022)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Text(
                             _shop?.tagline?.isNotEmpty == true ? _shop!.tagline! : 'Chính hãng • Giao hàng toàn quốc',
-                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -337,20 +342,20 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     OutlinedButton(
                       onPressed: _toggleFollow,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         minimumSize: const Size(0, 32),
-                        side: BorderSide(color: _isFollowing ? Colors.green : primaryColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        side: BorderSide(color: _isFollowing ? const Color(0xFF00BFA5) : primaryColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(_isFollowing ? Icons.check : Icons.add, size: 14, color: _isFollowing ? Colors.green : primaryColor),
+                          Icon(_isFollowing ? Icons.check_rounded : Icons.add_rounded, size: 14, color: _isFollowing ? const Color(0xFF00BFA5) : primaryColor),
                           const SizedBox(width: 4),
                           Text(
                             _isFollowing ? 'Đã theo dõi' : 'Theo dõi',
                             style: TextStyle(
-                              color: _isFollowing ? Colors.green : primaryColor,
+                              color: _isFollowing ? const Color(0xFF00BFA5) : primaryColor,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -360,7 +365,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     ),
                   ],
                 ),
-                const Divider(height: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(height: 1, color: Color(0xFFEEEEF0)),
+                ),
                 // Shop Stats Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -382,9 +390,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1E2022))),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
       ],
     );
   }
@@ -392,18 +400,21 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   Widget _buildSortBar() {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border.symmetric(horizontal: BorderSide(color: Color(0xFFEEEEF0))),
+      ),
       child: Row(
         children: [
-          const Text('Sắp xếp:', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 12),
+          const Text('Sắp xếp:', style: TextStyle(fontSize: 12, color: Color(0xFF555770), fontWeight: FontWeight.bold)),
+          const SizedBox(width: 10),
           _buildSortChip('Phổ biến', 'popular'),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _buildSortChip('Mới nhất', 'newest'),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _buildSortChip('Giá ↑', 'price_asc'),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _buildSortChip('Giá ↓', 'price_desc'),
         ],
       ),
@@ -415,17 +426,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedSort = value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.grey.shade100,
+          color: isSelected ? primaryColor : const Color(0xFFF5F5F7),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
+            color: isSelected ? Colors.white : const Color(0xFF555770),
             fontSize: 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
       ),
@@ -438,16 +449,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
       ),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.inventory_2_outlined, size: 56, color: Colors.grey.shade400),
+            const Icon(Icons.inventory_2_outlined, size: 54, color: Color(0xFF8F90A6)),
             const SizedBox(height: 12),
             const Text(
               'Gian hàng chưa có sản phẩm nào',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E2022)),
             ),
             const SizedBox(height: 4),
             Text(
@@ -455,7 +467,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   ? 'Không có sản phẩm nào khớp với từ khóa "$_searchQuery".'
                   : 'Người bán đang cập nhật danh mục sản phẩm.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
+              style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 12),
             ),
           ],
         ),
@@ -472,7 +484,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         itemCount: products.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.70,
+          childAspectRatio: 0.65,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -486,6 +498,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
   Widget _buildProductCard(Product p) {
     return InkWell(
+      borderRadius: BorderRadius.circular(12),
       onTap: () {
         Navigator.push(
           context,
@@ -497,9 +510,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEEEEF0)),
+          boxShadow: const [
+            BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -509,20 +523,20 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             Expanded(
               flex: 5,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
                 child: Container(
                   width: double.infinity,
-                  color: Colors.grey.shade100,
+                  color: const Color(0xFFF7F7F8),
                   child: p.imageUrl.startsWith('http')
                       ? Image.network(
                           p.imageUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Center(
-                            child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 40)),
+                            child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 36)),
                           ),
                         )
                       : Center(
-                          child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 40)),
+                          child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 36)),
                         ),
                 ),
               ),
@@ -538,7 +552,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   children: [
                     Text(
                       p.name,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, height: 1.2),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.25, color: Color(0xFF1E2022)),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -549,13 +563,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                           children: [
                             Text(
                               NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(p.price),
-                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 13),
                             ),
                             if (p.discount > 0) ...[
                               const SizedBox(width: 4),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(2)),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(3)),
                                 child: Text('-${p.discount}%', style: TextStyle(color: primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
                               ),
                             ],
@@ -565,8 +579,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('⭐ ${p.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                            Text('Đã bán ${p.soldCount}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            Text('⭐ ${p.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6))),
+                            Text('Đã bán ${p.soldCount}', style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6))),
                           ],
                         ),
                       ],

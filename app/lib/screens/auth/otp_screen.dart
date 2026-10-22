@@ -23,7 +23,7 @@ class _OtpScreenState extends State<OtpScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Xác thực OTP thành công! Đang chuyển hướng...'),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF00BFA5),
         duration: Duration(seconds: 1),
       ),
     );
@@ -61,99 +61,88 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Column(
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: const Color(0xFFEEEEF0), height: 1),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF1E2022)),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildAppBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                children: [
-                  _buildTrustIndicator(),
-                  _buildHeroContent(),
-                  _buildOtpInputGrid(),
-                  _buildStatusHelper(),
-                  _buildResendActions(),
-                  _buildSubmitButton(),
-                  _buildKeypad(),
-                  _buildSecurityDisclaimer(),
-                  const SizedBox(height: 32),
-                ],
-              ),
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF0EC),
+              borderRadius: BorderRadius.circular(8),
             ),
-          )
+            child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'ShopNova',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
         ],
       ),
+      centerTitle: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF555770), size: 22),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Text('Hỗ trợ xác thực OTP', style: TextStyle(fontWeight: FontWeight.bold)),
+                content: const Text(
+                  'Mã xác thực OTP gồm 6 chữ số được gửi tới số điện thoại của bạn.\n\nNếu chưa nhận được mã sau 60 giây, vui lòng bấm "Gửi qua Zalo ZNS" hoặc "Cuộc gọi thoại", hoặc liên hệ tổng đài 1900 1234.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Đã hiểu', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(width: 4),
+      ],
     );
   }
 
-  Widget _buildAppBar() {
-    return Container(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 1),
-          )
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F7F9),
+      appBar: _buildAppBar(),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
           children: [
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back_ios_new, size: 24, color: Colors.black87),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.shopping_bag, color: AppColors.primary, size: 28),
-                const SizedBox(width: 4),
-                const Text(
-                  'ShopNova',
-                  style: TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Hỗ trợ xác thực OTP'),
-                        content: const Text(
-                          'Mã xác thực OTP gồm 6 chữ số được gửi tới số điện thoại của bạn.\n\nNếu chưa nhận được mã sau 60 giây, vui lòng bấm "Gửi qua Zalo ZNS" hoặc "Cuộc gọi thoại", hoặc liên hệ tổng đài 1900 1234.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Đã hiểu'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.help_outline, color: Colors.grey, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 32, height: 32,
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                  child: const Icon(Icons.person, color: Colors.white, size: 18),
-                )
-              ],
-            )
+            _buildTrustIndicator(),
+            _buildHeroContent(),
+            _buildOtpInputGrid(),
+            _buildStatusHelper(),
+            _buildResendActions(),
+            _buildSubmitButton(),
+            _buildKeypad(),
+            _buildSecurityDisclaimer(),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -162,21 +151,21 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Widget _buildTrustIndicator() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            children: [
-              const Icon(Icons.verified_user, color: Colors.green, size: 18),
-              const SizedBox(width: 4),
-              Text('BẢO MẬT ĐA TẦNG 256-BIT', style: TextStyle(color: Colors.green[700], fontSize: 10, fontWeight: FontWeight.bold)),
+            children: const [
+              Icon(Icons.verified_user_rounded, color: Color(0xFF00BFA5), size: 18),
+              SizedBox(width: 6),
+              Text('BẢO MẬT ĐA TẦNG 256-BIT', style: TextStyle(color: Color(0xFF00897B), fontSize: 11, fontWeight: FontWeight.bold)),
             ],
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12)),
-            child: const Text('Bước 2/2', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: const Color(0xFFEEEEF0), borderRadius: BorderRadius.circular(10)),
+            child: const Text('Bước 2/2', style: TextStyle(color: Color(0xFF555770), fontSize: 11, fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -186,56 +175,72 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget _buildHeroContent() {
     return Column(
       children: [
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Stack(
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 56, height: 56,
-              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.phonelink_lock, color: AppColors.primary, size: 30),
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0EC),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: AppColors.primary.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: const Icon(Icons.phonelink_lock_rounded, color: AppColors.primary, size: 32),
             ),
             Positioned(
-              bottom: -4, right: -4,
+              bottom: -4,
+              right: -4,
               child: Container(
-                width: 24, height: 24,
-                decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                child: const Icon(Icons.shield, color: Colors.white, size: 14),
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(color: Color(0xFF00BFA5), shape: BoxShape.circle),
+                child: const Icon(Icons.shield_rounded, color: Colors.white, size: 14),
               ),
             )
           ],
         ),
         const SizedBox(height: 16),
-        const Text('Xác thực số điện thoại 🔐', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
-        const SizedBox(height: 8),
         const Text(
-          'Mã xác thực gồm 6 chữ số đã được gửi qua tin nhắn SMS / Zalo đến số:',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.4),
+          'Xác thực số điện thoại 🔐',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
+        const Text(
+          'Mã xác thực gồm 6 chữ số đã được gửi qua SMS / Zalo đến số:',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF8F90A6), fontSize: 13, height: 1.4),
+        ),
+        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(24)),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F4FF),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFD0E1FD)),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('+84 098 765 4321', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5)),
+              const Text('+84 098 765 4321', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Row(
-                  children: [
-                    Text('Đổi số', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12)),
-                    const SizedBox(width: 2),
-                    Icon(Icons.edit, color: AppColors.primary, size: 14),
+                  children: const [
+                    Text('Đổi số', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                    SizedBox(width: 2),
+                    Icon(Icons.edit_rounded, color: AppColors.primary, size: 14),
                   ],
                 ),
               )
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -249,23 +254,28 @@ class _OtpScreenState extends State<OtpScreen> {
         String text = hasValue ? _otp[index] : '';
 
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          margin: const EdgeInsets.symmetric(horizontal: 5),
           width: 48,
           height: 56,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: isActive ? [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))
-            ] : [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
-            ],
-            border: isActive ? Border.all(color: AppColors.primary, width: 2) : Border.all(color: Colors.transparent),
+            border: Border.all(
+              color: isActive ? AppColors.primary : (hasValue ? const Color(0xFF28293D) : const Color(0xFFE2E2E6)),
+              width: isActive ? 2 : 1,
+            ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 3)),
+                  ]
+                : const [
+                    BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 2)),
+                  ],
           ),
           child: Center(
             child: isActive
-              ? Container(width: 2, height: 24, color: AppColors.primary) // caret
-              : Text(text, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
+                ? Container(width: 2, height: 22, color: AppColors.primary)
+                : Text(text, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E2022))),
           ),
         );
       }),
@@ -279,17 +289,20 @@ class _OtpScreenState extends State<OtpScreen> {
           ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.verified, color: Colors.green, size: 16),
-                const SizedBox(width: 4),
-                Text(_isProcessing ? 'Đang xử lý...' : 'Đã nhập đủ 6 chữ số.', style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Icon(Icons.verified_rounded, color: Color(0xFF00BFA5), size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  _isProcessing ? 'Đang xác thực...' : 'Đã nhập đủ 6 chữ số.',
+                  style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 12, fontWeight: FontWeight.bold),
+                ),
               ],
             )
-          : const Row(
+          : Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 16),
-                SizedBox(width: 4),
-                Text('Tự động kiểm tra sau khi điền đủ 6 số', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              children: const [
+                Icon(Icons.check_circle_outline_rounded, color: Color(0xFF8F90A6), size: 16),
+                SizedBox(width: 6),
+                Text('Tự động kiểm tra sau khi điền đủ 6 số', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 12)),
               ],
             ),
     );
@@ -301,40 +314,39 @@ class _OtpScreenState extends State<OtpScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.schedule, color: Colors.grey, size: 16),
+            const Icon(Icons.schedule_rounded, color: Color(0xFF8F90A6), size: 16),
             const SizedBox(width: 4),
-            const Text('Gửi lại mã sau:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            const SizedBox(width: 4),
-            Text('00:$_remainingSeconds\s', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+            const Text('Gửi lại mã sau: ', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 12)),
+            Text('00:$_remainingSeconds s', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            GestureDetector(
+            InkWell(
               onTap: () {
                 setState(() => _remainingSeconds = 60);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Mã OTP mới đã được gửi qua Zalo ZNS thành công!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: Color(0xFF00BFA5),
                     duration: Duration(seconds: 2),
                   ),
                 );
               },
-              child: const Row(
-                children: [
-                  Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 16),
+              child: Row(
+                children: const [
+                  Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary, size: 16),
                   SizedBox(width: 4),
-                  Text('Gửi qua Zalo ZNS', style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500)),
+                  Text('Gửi qua Zalo ZNS', style: TextStyle(color: Color(0xFF1E2022), fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
-            Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
-            const SizedBox(width: 16),
-            GestureDetector(
+            const SizedBox(width: 14),
+            Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFF8F90A6), shape: BoxShape.circle)),
+            const SizedBox(width: 14),
+            InkWell(
               onTap: () {
                 setState(() => _remainingSeconds = 60);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -344,67 +356,87 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                 );
               },
-              child: const Row(
-                children: [
-                  Icon(Icons.phone_forwarded, color: AppColors.primary, size: 16),
+              child: Row(
+                children: const [
+                  Icon(Icons.phone_forwarded_rounded, color: AppColors.primary, size: 16),
                   SizedBox(width: 4),
-                  Text('Cuộc gọi thoại', style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500)),
+                  Text('Cuộc gọi thoại', style: TextStyle(color: Color(0xFF1E2022), fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
       ],
     );
   }
 
   Widget _buildSubmitButton() {
-    return ElevatedButton(
-      onPressed: (_otp.length == _maxLength && !_isProcessing) ? _handleSubmitOtp : null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
-        disabledForegroundColor: Colors.white70,
-        minimumSize: const Size(double.infinity, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 2,
+    final canSubmit = _otp.length == _maxLength && !_isProcessing;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: canSubmit
+            ? const LinearGradient(
+                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+              )
+            : null,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: canSubmit
+            ? [
+                BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3)),
+              ]
+            : null,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            _isProcessing ? 'Đang xác thực...' : 'Xác Nhận & Hoàn Tất Đăng Ký',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(width: 8),
-          if (_isProcessing)
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-            )
-          else
-            const Icon(Icons.arrow_forward, size: 20),
-        ],
+      child: ElevatedButton(
+        onPressed: canSubmit ? _handleSubmitOtp : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: canSubmit ? Colors.transparent : const Color(0xFFE2E2E6),
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          disabledForegroundColor: const Color(0xFF8F90A6),
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _isProcessing ? 'Đang xác thực...' : 'Xác Nhận & Hoàn Tất Đăng Ký',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 8),
+            if (_isProcessing)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.arrow_forward_rounded, size: 18),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildKeypad() {
     return Container(
-      margin: const EdgeInsets.only(top: 24),
+      margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue[50]?.withValues(alpha: 0.5),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3))
+        ],
       ),
       child: GridView.count(
         crossAxisCount: 3,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 2,
+        childAspectRatio: 2.1,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
@@ -419,29 +451,34 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Widget _buildKey(String text) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFFF7F7F8),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: () => _onKeypadPressed(text),
-        borderRadius: BorderRadius.circular(12),
-        child: Center(child: Text(text, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+        borderRadius: BorderRadius.circular(10),
+        child: Center(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildPasteKey() {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFFF7F7F8),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: _onPastePressed,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.content_paste, color: Colors.grey[700], size: 20),
-            const SizedBox(height: 2),
-            Text('DÁN MÃ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+          children: const [
+            Icon(Icons.content_paste_rounded, color: Color(0xFF555770), size: 18),
+            SizedBox(height: 2),
+            Text('DÁN MÃ', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF555770))),
           ],
         ),
       ),
@@ -450,35 +487,39 @@ class _OtpScreenState extends State<OtpScreen> {
 
   Widget _buildBackspaceKey() {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFFF7F7F8),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: _onBackspacePressed,
-        borderRadius: BorderRadius.circular(12),
-        child: const Center(child: Icon(Icons.backspace, color: Colors.black87)),
+        borderRadius: BorderRadius.circular(10),
+        child: const Center(child: Icon(Icons.backspace_outlined, color: Color(0xFF1E2022), size: 20)),
       ),
     );
   }
 
   Widget _buildSecurityDisclaimer() {
     return Container(
-      margin: const EdgeInsets.only(top: 24),
+      margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.security, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
+        children: const [
+          Icon(Icons.security_rounded, color: Color(0xFF16A34A), size: 20),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Cam kết an toàn ShopNova Security', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
-                const SizedBox(height: 4),
-                const Text(
+                Text('Cam kết an toàn ShopNova Security', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF15803D))),
+                SizedBox(height: 3),
+                Text(
                   'Mã OTP có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã cho bất kỳ ai kể cả nhân viên ShopNova.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12, height: 1.4),
+                  style: TextStyle(color: Color(0xFF166534), fontSize: 11, height: 1.4),
                 )
               ],
             ),

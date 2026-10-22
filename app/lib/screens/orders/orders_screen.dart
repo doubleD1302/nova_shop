@@ -50,41 +50,54 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(49),
+          child: Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: primaryColor,
+                unselectedLabelColor: const Color(0xFF555770),
+                indicatorColor: primaryColor,
+                indicatorWeight: 2.5,
+                indicatorSize: TabBarIndicatorSize.label,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                tabs: const [
+                  Tab(text: 'Chờ xác nhận'),
+                  Tab(text: 'Chờ lấy hàng'),
+                  Tab(text: 'Đang giao'),
+                  Tab(text: 'Đã giao'),
+                  Tab(text: 'Đã hủy / Trả hàng'),
+                ],
+              ),
+              Container(color: const Color(0xFFEEEEF0), height: 1),
+            ],
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Đơn mua của tôi',
-          style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
+          'Đơn Mua Của Tôi',
+          style: TextStyle(color: Color(0xFF1E2022), fontSize: 17, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF555770)),
             tooltip: 'Làm mới đơn hàng',
             onPressed: _loadOrders,
           ),
+          const SizedBox(width: 4),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: primaryColor,
-          unselectedLabelColor: Colors.grey[600],
-          indicatorColor: primaryColor,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-          tabs: const [
-            Tab(text: 'Chờ xác nhận'),
-            Tab(text: 'Chờ lấy hàng'),
-            Tab(text: 'Đang giao'),
-            Tab(text: 'Đã giao'),
-            Tab(text: 'Đã hủy / Trả hàng'),
-          ],
-        ),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -156,40 +169,58 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   Widget _buildEmptyOrdersState(String title, String subtitle) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2))
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 56, color: Colors.grey.shade400),
-          const SizedBox(height: 14),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F7F8),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.inventory_2_outlined, size: 40, color: Color(0xFF8F90A6)),
+          ),
+          const SizedBox(height: 18),
           Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1E2022)),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+            style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 13, height: 1.4),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _loadOrders,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          const SizedBox(height: 22),
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+              ),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text('Làm mới danh sách', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: ElevatedButton(
+              onPressed: _loadOrders,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Làm mới danh sách', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
           ),
         ],
       ),
@@ -212,31 +243,37 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       }
     }
 
-    Color statusColor;
+    Color statusBgColor;
+    Color statusTextColor;
     String statusText;
     switch (status) {
       case 'confirmed':
       case 'processing':
-        statusColor = Colors.blue;
+        statusBgColor = const Color(0xFFEFF6FF);
+        statusTextColor = const Color(0xFF2563EB);
         statusText = 'Đang chuẩn bị hàng';
         break;
       case 'shipping':
       case 'in_transit':
-        statusColor = Colors.orange;
+        statusBgColor = const Color(0xFFFFFBEB);
+        statusTextColor = const Color(0xFFD97706);
         statusText = 'Đang vận chuyển';
         break;
       case 'delivered':
       case 'completed':
-        statusColor = Colors.green;
+        statusBgColor = const Color(0xFFF0FDF4);
+        statusTextColor = const Color(0xFF16A34A);
         statusText = 'Giao thành công';
         break;
       case 'cancelled':
       case 'returned':
-        statusColor = Colors.red;
+        statusBgColor = const Color(0xFFFEF2F2);
+        statusTextColor = const Color(0xFFDC2626);
         statusText = 'Đã hủy';
         break;
       default:
-        statusColor = primaryColor;
+        statusBgColor = const Color(0xFFFFF0EC);
+        statusTextColor = primaryColor;
         statusText = 'Chờ shop xác nhận';
     }
 
@@ -244,9 +281,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2))
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -254,30 +292,34 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         children: [
           // Order Header
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              border: Border(bottom: BorderSide(color: Color(0xFFEEEEF0))),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.receipt_long, color: Colors.blueGrey, size: 18),
+                    const Icon(Icons.receipt_long_rounded, color: Color(0xFF555770), size: 18),
                     const SizedBox(width: 8),
-                    Text('Mã: #$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(
+                      'Đơn hàng: #$code',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1E2022)),
+                    ),
                   ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     statusText,
-                    style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: statusTextColor, fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -285,19 +327,19 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           ),
           // Order Meta Date
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
             child: Text(
               createdAt.length >= 10 ? 'Ngày đặt: ${createdAt.substring(0, 10)}' : 'Hôm nay',
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
+              style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 11),
             ),
           ),
-          // Order Items from DB
+          // Order Items
           if (items.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               child: Text(
                 'Kiện hàng #$code',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1E2022)),
               ),
             )
           else
@@ -320,26 +362,30 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
               final img = (it['imageUrl'] ?? it['image_url'] ?? it['image'] ?? '').toString();
 
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 58,
+                      height: 58,
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFFF7F7F8),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFEEEEF0)),
                       ),
-                      child: img.isNotEmpty && (img.startsWith('http://') || img.startsWith('https://'))
-                          ? Image.network(
-                              img,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
-                            )
-                          : const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: img.isNotEmpty && (img.startsWith('http://') || img.startsWith('https://'))
+                            ? Image.network(
+                                img,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                              )
+                            : const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,16 +394,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                             name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E2022)),
                           ),
-                          const SizedBox(height: 2),
-                          Text('Phân loại: $variant', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                          const SizedBox(height: 3),
+                          Text('Phân loại: $variant', style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 11)),
                           const SizedBox(height: 4),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(price, style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                              Text(qty, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                              Text(price, style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.w700)),
+                              Text(qty, style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 12, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ],
@@ -367,19 +413,24 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 ),
               );
             }),
-          const Divider(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+            child: Divider(height: 1, color: Color(0xFFEEEEF0)),
+          ),
           // Total Amount & Action
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            padding: const EdgeInsets.all(14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Text('Tổng thanh toán: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text('Tổng thanh toán: ', style: TextStyle(fontSize: 12, color: Color(0xFF555770))),
                     Text(
                       _formatVND(num.tryParse(totalAmount.toString()) ?? 0),
-                      style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 16),
                     ),
                   ],
                 ),
@@ -388,18 +439,19 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: Text('Chi tiết đơn #$code'),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        title: Text('Chi tiết đơn #$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         content: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Trạng thái: $statusText'),
-                            const SizedBox(height: 4),
+                            Text('Trạng thái: $statusText', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
                             Text('Số lượng sản phẩm: ${items.length} món'),
                             const SizedBox(height: 4),
-                            Text('Tổng tiền: ${_formatVND(num.tryParse(totalAmount.toString()) ?? 0)}'),
+                            Text('Tổng tiền: ${_formatVND(num.tryParse(totalAmount.toString()) ?? 0)}', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
                             if (order['recipientName'] != null) ...[
-                              const SizedBox(height: 8),
+                              const Divider(height: 16),
                               Text('Người nhận: ${order['recipientName']}'),
                               Text('SĐT: ${order['recipientPhone'] ?? ''}'),
                               Text('Địa chỉ: ${order['addressDetail'] ?? ''}, ${order['ward'] ?? ''}, ${order['district'] ?? ''}, ${order['province'] ?? ''}'),
@@ -407,19 +459,22 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                           ],
                         ),
                         actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Đóng', style: TextStyle(color: Color(0xFF555770))),
+                          ),
                         ],
                       ),
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    side: BorderSide(color: Colors.grey[300]!),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    minimumSize: const Size(0, 32),
+                    foregroundColor: const Color(0xFF1E2022),
+                    side: const BorderSide(color: Color(0xFFE2E2E6)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    minimumSize: const Size(0, 34),
                   ),
-                  child: const Text('Chi tiết', style: TextStyle(fontSize: 12)),
+                  child: const Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
