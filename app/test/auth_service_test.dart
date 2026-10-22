@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/user.dart';
 import 'package:shopnova/services/api_config.dart';
 import 'package:shopnova/services/auth_service.dart';
@@ -72,6 +74,32 @@ void main() {
       expect(result.containsKey('database'), isTrue);
       expect(result.containsKey('latencyMs'), isTrue);
       ApiConfig.resetBaseUrl();
+    });
+
+    test('AuthService restoreSession preserves user from local storage without auto logout', () async {
+      final dummyUser = {
+        'id': '99',
+        'username': 'buyer_persistent',
+        'fullName': 'Người Dùng Bền Vững',
+        'role': 'buyer',
+        'status': 'active',
+      };
+      SharedPreferences.setMockInitialValues({
+        'novashop_current_user': jsonEncode(dummyUser),
+        'novashop_jwt_token': 'dummy_mock_jwt_token_for_session',
+      });
+
+      final auth = AuthService();
+      final restored = await auth.restoreSession();
+      expect(restored, isNotNull);
+      expect(restored?.username, equals('buyer_persistent'));
+      expect(auth.isAuthenticated, isTrue);
+      expect(auth.currentUser?.fullName, equals('Người Dùng Bền Vững'));
+
+      // Chỉ đăng xuất khi người dùng chủ động nhấn logout()
+      auth.logout();
+      expect(auth.isAuthenticated, isFalse);
+      expect(auth.currentUser, isNull);
     });
   });
 }

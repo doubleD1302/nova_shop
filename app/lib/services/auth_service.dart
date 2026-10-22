@@ -14,6 +14,7 @@ class AuthService extends ChangeNotifier {
 
   final ApiClient _client = ApiClient();
   static const String _userKey = 'novashop_current_user';
+  static const String _savedCredsKey = 'novashop_saved_credentials';
 
   String? _token;
   User? _currentUser;
@@ -22,9 +23,10 @@ class AuthService extends ChangeNotifier {
 
   String? get token => _token;
   User? get currentUser => _currentUser;
+  User? get user => _currentUser;
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
-  bool get isAuthenticated => _token != null && _currentUser != null;
+  bool get isAuthenticated => _currentUser != null;
 
   /// Kiểm tra trạng thái đã đăng nhập
   Future<bool> isLoggedIn() async {
@@ -172,8 +174,8 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Đăng nhập tài khoản
-  Future<bool> login(String username, String password) async {
+  /// Đăng nhập tài khoản với tùy chọn ghi nhớ phiên đăng nhập bền vững
+  Future<bool> login(String username, String password, {bool rememberMe = true}) async {
     _isLoading = true;
     _lastError = null;
     notifyListeners();
@@ -202,6 +204,23 @@ class AuthService extends ChangeNotifier {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
         }
+
+        // Lưu thông tin đăng nhập tự động nếu người dùng ghi nhớ
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          if (rememberMe) {
+            await prefs.setString(
+              _savedCredsKey,
+              jsonEncode({
+                'username': username.trim(),
+                'password': password,
+              }),
+            );
+          } else {
+            await prefs.remove(_savedCredsKey);
+          }
+        } catch (_) {}
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -218,6 +237,40 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Đăng nhập ngầm trong nền để làm mới token tự động mà không làm gián đoạn người dùng
+  Future<bool> silentLogin(String username, String password) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConfig.loginUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'username': username.trim(),
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      final Map<String, dynamic> body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final data = body['data'] as Map<String, dynamic>;
+        _token = data['token'] as String?;
+        if (_token != null) {
+          await _client.saveToken(_token!);
+        }
+        if (data['user'] != null) {
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[AuthService] silentLogin error: $e');
+    }
+    return false;
   }
 
   /// Đăng ký tài khoản người dùng mới
@@ -321,35 +374,59 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  /// Khôi phục thông tin user đã lưu trong máy khi mở app
+  /// Khôi phục thông tin user đã lưu trong máy khi mở app (duy trì phiên bền vững)
   Future<User?> restoreSession() async {
-    final t = await _client.getToken();
-    if (t == null || t.isEmpty) {
-      _currentUser = null;
-      _token = null;
-      return null;
-    }
-    _token = t;
-
-    // Nạp tạm user từ SharedPreferences để hiển thị UI nhanh
-    final prefs = await SharedPreferences.getInstance();
-    final userJsonStr = prefs.getString(_userKey);
-    if (userJsonStr != null) {
-      try {
-        _currentUser = User.fromJson(jsonDecode(userJsonStr));
-        notifyListeners();
-      } catch (_) {}
-    }
-
-    // Đồng bộ thông tin mới nhất từ server
     try {
-      final freshUser = await fetchCurrentUser();
-      if (freshUser != null) {
-        _currentUser = freshUser;
+      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Nạp ngay lập tức thông tin user từ cache máy để hiển thị UI không giật lag
+      final userJsonStr = prefs.getString(_userKey);
+      if (userJsonStr != null) {
+        try {
+          _currentUser = User.fromJson(jsonDecode(userJsonStr));
+        } catch (_) {}
+      }
+
+      // 2. Lấy token JWT đã lưu
+      final t = await _client.getToken();
+      if (t != null && t.isNotEmpty) {
+        _token = t;
+      }
+
+      // Báo UI ngay lập tức nếu đã có dữ liệu user trong máy
+      if (_currentUser != null) {
         notifyListeners();
       }
-    } catch (_) {}
 
+      // 3. Thử đồng bộ dữ liệu mới nhất từ server
+      if (_token != null && _token!.isNotEmpty) {
+        final freshUser = await fetchCurrentUser();
+        if (freshUser != null) {
+          _currentUser = freshUser;
+          notifyListeners();
+          return _currentUser;
+        }
+      }
+
+      // 4. Nếu token hết hạn hoặc chưa có token nhưng máy còn lưu thông tin đăng nhập tự động
+      final credsStr = prefs.getString(_savedCredsKey);
+      if (credsStr != null) {
+        try {
+          final creds = jsonDecode(credsStr) as Map<String, dynamic>;
+          final savedUsername = creds['username'] as String?;
+          final savedPassword = creds['password'] as String?;
+          if (savedUsername != null && savedPassword != null) {
+            debugPrint('[AuthService] Tự động duy trì phiên đăng nhập ngầm...');
+            final ok = await silentLogin(savedUsername, savedPassword);
+            if (ok) return _currentUser;
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[AuthService] restoreSession error: $e');
+    }
+
+    // Không tự động đăng xuất người dùng, chỉ đăng xuất khi người dùng chủ động nhấn Đăng xuất
     return _currentUser;
   }
 
@@ -445,6 +522,17 @@ class AuthService extends ChangeNotifier {
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200 && body['success'] == true) {
+        // Cập nhật lại mật khẩu mới vào bộ nhớ đăng nhập tự động
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final credsStr = prefs.getString(_savedCredsKey);
+          if (credsStr != null) {
+            final creds = jsonDecode(credsStr) as Map<String, dynamic>;
+            creds['password'] = newPassword;
+            await prefs.setString(_savedCredsKey, jsonEncode(creds));
+          }
+        } catch (_) {}
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -492,7 +580,7 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  /// Đăng xuất tài khoản
+  /// Đăng xuất tài khoản (chỉ khi người dùng chủ động nhấn nút Đăng xuất)
   void logout() {
     _token = null;
     _currentUser = null;
@@ -503,6 +591,7 @@ class AuthService extends ChangeNotifier {
     try {
       SharedPreferences.getInstance().then((prefs) {
         prefs.remove(_userKey);
+        prefs.remove(_savedCredsKey);
       }).catchError((_) {});
     } catch (_) {}
     notifyListeners();

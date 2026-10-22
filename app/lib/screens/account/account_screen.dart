@@ -33,6 +33,12 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     AuthService().addListener(_onAuthChanged);
+    AuthService().restoreSession().then((_) {
+      if (mounted) {
+        _loadUserStats();
+        setState(() {});
+      }
+    });
     _loadUserStats();
     _checkServerStatus();
   }
