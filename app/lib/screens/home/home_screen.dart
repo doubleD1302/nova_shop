@@ -235,9 +235,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 )
               else
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -245,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
-                      childAspectRatio: 0.55,
+                      childAspectRatio: 0.60,
                     ),
                     itemCount: displayProducts.length,
                     itemBuilder: (ctx, i) => ProductCard(product: displayProducts[i]),

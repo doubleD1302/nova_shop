@@ -403,18 +403,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(30),
+          preferredSize: const Size.fromHeight(32),
           child: Container(
             width: double.infinity,
-            color: Colors.amber[100],
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFFFF0EC), Color(0xFFFFE8E0)],
+              ),
+              border: Border(
+                top: BorderSide(color: Color(0xFFFFDDD4), width: 0.8),
+                bottom: BorderSide(color: Color(0xFFFFDDD4), width: 0.8),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
             child: const Row(
               children: [
-                Icon(Icons.check_circle, size: 14, color: Colors.amber),
-                SizedBox(width: 4),
+                Icon(Icons.verified_outlined, size: 15, color: Color(0xFFEE4D2D)),
+                SizedBox(width: 6),
                 Text(
-                  '• HÀNG CHÍNH HÃNG 100%',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                  'HÀNG CHÍNH HÃNG 100% • ĐỔI TRẢ MIỄN PHÍ 15 NGÀY',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D), letterSpacing: 0.2),
                 ),
               ],
             ),
@@ -1054,125 +1062,146 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      height: 60,
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[300]!)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NovaAIScreen(isStandalone: true),
-                  ),
-                );
-              },
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline, size: 20),
-                  Text('Chat Shop', style: TextStyle(fontSize: 10)),
-                ],
-              ),
-            ),
-          ),
-          Container(width: 1, color: Colors.grey[300]),
-          Expanded(
-            flex: 2,
-            child: InkWell(
-              onTap: () async {
-                final p = _product;
-                final pId = widget.productId ?? p?.id ?? '1';
-                final vName = '$selectedColor - $selectedSize';
-                final vId = '${pId}_${selectedColor.replaceAll(RegExp(r'\s+'), '_')}_${selectedSize.replaceAll(RegExp(r'\s+'), '_')}';
-                final sId = (p?.shopId != null && p!.shopId.isNotEmpty) ? p.shopId : '1';
-                final sName = (p?.shopName != null && p!.shopName.isNotEmpty) ? p.shopName : 'ShopNova';
-                final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
-                final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
-
-                await CartService().addToCart(
-                  productId: pId,
-                  productName: p?.name ?? 'Sản phẩm ShopNova',
-                  productSlug: p?.id ?? pId,
-                  variantId: vId,
-                  variantName: vName,
-                  price: p?.price ?? 180000,
-                  originalPrice: p?.originalPrice,
-                  qty: quantity,
-                  shopId: sId,
-                  shopName: sName,
-                  shopMall: sMall,
-                  imageUrl: img,
-                );
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã thêm sản phẩm vào giỏ hàng thành công!'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_shopping_cart, size: 20),
-                  Text('Thêm giỏ', style: TextStyle(fontSize: 10)),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 5,
-            child: InkWell(
-              onTap: () async {
-                final p = _product;
-                final pId = widget.productId ?? p?.id ?? '1';
-                final vName = '$selectedColor - $selectedSize';
-                final vId = '${pId}_${selectedColor.replaceAll(RegExp(r'\s+'), '_')}_${selectedSize.replaceAll(RegExp(r'\s+'), '_')}';
-                final sId = (p?.shopId != null && p!.shopId.isNotEmpty) ? p.shopId : '1';
-                final sName = (p?.shopName != null && p!.shopName.isNotEmpty) ? p.shopName : 'ShopNova';
-                final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
-                final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
-
-                await CartService().addToCart(
-                  productId: pId,
-                  productName: p?.name ?? 'Sản phẩm ShopNova',
-                  productSlug: p?.id ?? pId,
-                  variantId: vId,
-                  variantName: vName,
-                  price: p?.price ?? 180000,
-                  originalPrice: p?.originalPrice,
-                  qty: quantity,
-                  shopId: sId,
-                  shopName: sName,
-                  shopMall: sMall,
-                  imageUrl: img,
-                );
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                );
-              },
-              child: Container(
-                color: primaryColor,
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('MUA VỚI VOUCHER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text('Cầm thêm 20k tại bước thanh toán', style: TextStyle(color: Colors.white70, fontSize: 10)),
-                  ],
-                ),
-              ),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
           ),
         ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NovaAIScreen(isStandalone: true),
+                      ),
+                    );
+                  },
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Color(0xFF555555)),
+                      SizedBox(height: 2),
+                      Text('Chat Shop', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF555555))),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 0.8, height: 36, color: Colors.grey.shade200),
+              Expanded(
+                flex: 2,
+                child: InkWell(
+                  onTap: () async {
+                    final p = _product;
+                    final pId = widget.productId ?? p?.id ?? '1';
+                    final vName = '$selectedColor - $selectedSize';
+                    final vId = '${pId}_${selectedColor.replaceAll(RegExp(r'\s+'), '_')}_${selectedSize.replaceAll(RegExp(r'\s+'), '_')}';
+                    final sId = (p?.shopId != null && p!.shopId.isNotEmpty) ? p.shopId : '1';
+                    final sName = (p?.shopName != null && p!.shopName.isNotEmpty) ? p.shopName : 'ShopNova';
+                    final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
+                    final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
+
+                    await CartService().addToCart(
+                      productId: pId,
+                      productName: p?.name ?? 'Sản phẩm ShopNova',
+                      productSlug: p?.id ?? pId,
+                      variantId: vId,
+                      variantName: vName,
+                      price: p?.price ?? 180000,
+                      originalPrice: p?.originalPrice,
+                      qty: quantity,
+                      shopId: sId,
+                      shopName: sName,
+                      shopMall: sMall,
+                      imageUrl: img,
+                    );
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã thêm sản phẩm vào giỏ hàng thành công!'),
+                        backgroundColor: Color(0xFF2E7D32),
+                        duration: Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_shopping_cart_rounded, size: 20, color: Color(0xFFEE4D2D)),
+                      SizedBox(height: 2),
+                      Text('Thêm giỏ', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFFEE4D2D))),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 5,
+                child: InkWell(
+                  onTap: () async {
+                    final p = _product;
+                    final pId = widget.productId ?? p?.id ?? '1';
+                    final vName = '$selectedColor - $selectedSize';
+                    final vId = '${pId}_${selectedColor.replaceAll(RegExp(r'\s+'), '_')}_${selectedSize.replaceAll(RegExp(r'\s+'), '_')}';
+                    final sId = (p?.shopId != null && p!.shopId.isNotEmpty) ? p.shopId : '1';
+                    final sName = (p?.shopName != null && p!.shopName.isNotEmpty) ? p.shopName : 'ShopNova';
+                    final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
+                    final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.imageUrl ?? '');
+
+                    await CartService().addToCart(
+                      productId: pId,
+                      productName: p?.name ?? 'Sản phẩm ShopNova',
+                      productSlug: p?.id ?? pId,
+                      variantId: vId,
+                      variantName: vName,
+                      price: p?.price ?? 180000,
+                      originalPrice: p?.originalPrice,
+                      qty: quantity,
+                      shopId: sId,
+                      shopName: sName,
+                      shopMall: sMall,
+                      imageUrl: img,
+                    );
+                    if (!mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CartScreen()),
+                    );
+                  },
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('MUA VỚI VOUCHER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 0.2)),
+                        SizedBox(height: 2),
+                        Text('Giảm thêm tại bước thanh toán', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

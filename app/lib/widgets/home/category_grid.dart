@@ -67,15 +67,24 @@ class CategoryGrid extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: const Color(0xFFE8F5E9),
-                          child: Icon(cat.icon, color: AppColors.primary, size: 28),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFF4F0), Color(0xFFFFEAE3)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFFFDDD4), width: 0.8),
+                          ),
+                          child: Icon(cat.icon, color: AppColors.primary, size: 26),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           cat.name,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -96,20 +105,34 @@ class CategoryGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'DANH MỤC',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF222222),
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'DANH MỤC NGÀNH HÀNG',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF222222),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
               ),
               InkWell(
                 onTap: () => _showAllCategoriesModal(context),
@@ -120,8 +143,8 @@ class CategoryGrid extends StatelessWidget {
                     'Xem tất cả >',
                     style: TextStyle(
                       color: AppColors.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -135,40 +158,60 @@ class CategoryGrid extends StatelessWidget {
             crossAxisCount: 4,
             mainAxisSpacing: 14,
             crossAxisSpacing: 8,
-            childAspectRatio: 0.9,
+            childAspectRatio: 0.88,
             children: categories.map((category) {
-          return InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Đang lọc danh mục: ${category.name}'),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
+              return InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Đang lọc danh mục: ${category.name}'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFF5F2), Color(0xFFFFEBE4)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFFDDD4), width: 0.8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEE4D2D).withValues(alpha: 0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(category.icon, color: AppColors.primary, size: 24),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      category.name,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF333333),
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               );
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFFE8F5E9),
-                  child: Icon(category.icon, color: AppColors.primary),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  category.name,
-                  style: const TextStyle(fontSize: 11),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
+            }).toList(),
+          ),
         ],
       ),
     );
