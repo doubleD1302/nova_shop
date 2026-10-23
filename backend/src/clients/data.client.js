@@ -2835,3 +2835,64 @@ export async function registerSellerShop(userId, shopData) {
   throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.')
 }
 
+
+/**
+ * Lấy danh sách các mã giảm giá đang hoạt động:
+ * GET /internal/v1/vouchers
+ */
+export async function fetchVouchers(query = {}) {
+  const { code } = query
+  const queryParams = new URLSearchParams()
+  if (code && typeof code === 'string') queryParams.append('code', code.trim())
+  const qs = queryParams.toString() ? `?${queryParams.toString()}` : ''
+
+  const { status, data: json } = await requestDataApi(`/internal/v1/vouchers${qs}`)
+
+  if (status === 200 && json && json.success === true && Array.isArray(json.data)) {
+    return json.data
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Phản hồi danh sách mã giảm giá từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+  )
+}
+
+/**
+ * Tra cứu chi tiết một mã giảm giá theo mã:
+ * GET /internal/v1/vouchers/:code
+ */
+export async function fetchVoucherByCode(code) {
+  const { status, data: json } = await requestDataApi(`/internal/v1/vouchers/${encodeURIComponent(code)}`)
+
+  if (status === 200 && json && json.success === true && json.data) {
+    return json.data
+  }
+
+  if (status === 404) {
+    throw new DataApiClientError(404, 'VOUCHER_NOT_FOUND', 'Không tìm thấy mã giảm giá.')
+  }
+
+  if (status === 401) {
+    throw new DataApiClientError(502, 'DATA_API_AUTH_FAILED', 'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.')
+  }
+
+  if (status === 503) {
+    throw new DataApiClientError(503, 'DATA_API_UNAVAILABLE', 'Dịch vụ dữ liệu nội bộ hoặc cơ sở dữ liệu hiện không sẵn sàng.')
+  }
+
+  throw new DataApiClientError(
+    502,
+    'DATA_API_BAD_RESPONSE',
+    'Phản hồi mã giảm giá từ dịch vụ dữ liệu nội bộ không đúng quy chuẩn.',
+  )
+}

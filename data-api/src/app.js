@@ -11,6 +11,7 @@ import { engagementRouter } from './routes/engagement.routes.js'
 import { sellerOrderRouter } from './routes/seller-order.routes.js'
 import { sellerProductRouter } from './routes/seller-product.routes.js'
 import { sellerHubRouter } from './routes/seller-hub.routes.js'
+import { voucherRouter } from './routes/voucher.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
@@ -40,6 +41,7 @@ app.use(
   sellerOrderRouter,
   sellerProductRouter,
   sellerHubRouter,
+  voucherRouter,
 )
 
 // 4. Middleware xử lý khi client gọi route không tồn tại (404)

@@ -23,6 +23,7 @@
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/RegisterPage.jsx` | `POST /api/v1/auth/register` | `public` | Request: `{ username, password, fullName, email, phone, role, shopName? }`<br>Response: `{ token, user }` | **implemented** (BE-003A) |
 | **Auth & Hồ sơ** | `src/context/AuthContext.jsx`<br>`src/pages/AccountPage.jsx` | `GET /api/v1/auth/me` | `buyer` / `seller` | Response: Thông tin tài khoản đăng nhập và hồ sơ (Bearer JWT) | **implemented** (BE-003A) |
 | **Auth & Hồ sơ** | `src/pages/AccountPage.jsx`<br>`app/lib/screens/account/` | `PUT /api/v1/auth/profile` | `buyer` / `seller` | Request: `{ fullName, phone, email, avatarUrl }`<br>Response: Profile cập nhật | **implemented** (BE-003B) |
+| **Auth & Hồ sơ** | `src/pages/AccountPage.jsx`<br>`app/lib/screens/account/` | `PUT /api/v1/auth/change-password` | `buyer` / `seller` | Đổi mật khẩu tài khoản (Bearer JWT) | **implemented** (BE-003C) |
 | **Sổ địa chỉ** | `app/lib/services/address_service.dart`<br>`src/pages/AccountPage.jsx` | `GET /api/v1/addresses` | `buyer` / `seller` | Lấy danh sách sổ địa chỉ nhận hàng của người dùng | **implemented** (BE-003B) |
 | **Sổ địa chỉ** | `app/lib/services/address_service.dart`<br>`src/pages/AccountPage.jsx` | `POST /api/v1/addresses` | `buyer` / `seller` | Thêm địa chỉ nhận hàng mới kèm tùy chọn mặc định | **implemented** (BE-003B) |
 | **Sổ địa chỉ** | `app/lib/services/address_service.dart` | `PATCH /api/v1/addresses/:id/default` | `buyer` / `seller` | Đặt địa chỉ làm mặc định | **implemented** (BE-003B) |
@@ -47,8 +48,13 @@
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx`<br>`app/lib/services/seller_product_service.dart` | `DELETE /api/v1/seller/products/:id` | `seller` | Chuyển trạng thái sản phẩm sang `archived` | **implemented** (BE-005) |
 | **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `GET /api/v1/seller/shop` | `seller` | Lấy thông tin cấu hình gian hàng của seller đang đăng nhập | **implemented** (BE-005B) |
 | **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật logo, banner, tagline, địa chỉ shop | **implemented** (BE-005B) |
+| **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `POST /api/v1/seller/register-shop` | `buyer` / `seller` | Đăng ký mở gian hàng mới | **implemented** (BE-005B) |
 | **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, số lượng sản phẩm | **implemented** (BE-005B) |
 | **Theo dõi Shop** | `src/components/shop/ShopHeader.jsx` | `GET/POST/DELETE /api/v1/shops/:shopId/follow` | `buyer` / `seller` | Kiểm tra, theo dõi hoặc hủy theo dõi gian hàng trên sàn | **implemented** (BE-004B2) |
+| **Mã giảm giá (Vouchers)** | `app/lib/screens/account/`<br>`src/pages/CheckoutPage.jsx` | `GET /api/v1/vouchers` | `public` | Danh sách mã voucher toàn sàn khả dụng | **implemented** (BE-009) |
+| **Mã giảm giá (Vouchers)** | `app/lib/screens/account/`<br>`src/pages/CheckoutPage.jsx` | `GET /api/v1/vouchers/:code` | `public` | Tra cứu chi tiết một mã voucher cụ thể | **implemented** (BE-009) |
+| **Voucher Data API** | `data-api/src/controllers/voucher.controller.js` | `GET /internal/v1/vouchers` | `x-service-key` | Truy vấn danh sách voucher từ MySQL | **implemented** (BE-009) |
+| **Voucher Data API** | `data-api/src/controllers/voucher.controller.js` | `GET /internal/v1/vouchers/:code` | `x-service-key` | Tra cứu chi tiết một mã voucher theo code | **implemented** (BE-009) |
 | **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` / `seller` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx`<br>`app/lib/screens/cart/` | `POST /api/v1/cart/items` | `buyer` / `seller` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** (BE-006) |
 | **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` / `seller` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** (BE-006) |

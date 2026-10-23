@@ -38,7 +38,10 @@ INSERT INTO stock_moves (variant_id, reason, delta_qty, actor_id, note) VALUES
 INSERT INTO cart_items (user_id, variant_id, qty, selected) VALUES
   (1, 1, 1, TRUE), (1, 3, 1, TRUE);
 
-INSERT INTO vouchers (id, code, name, discount_amount, min_subtotal, starts_at, ends_at, usage_limit, per_user_limit)
-VALUES (1, 'NOVA20K', 'Voucher dev giảm 20.000 VND', 20000, 500000, '2026-01-01 00:00:00', '2028-01-01 00:00:00', 1000, 1);
+INSERT INTO vouchers (id, code, name, discount_amount, min_subtotal, starts_at, ends_at, usage_limit, per_user_limit) VALUES
+  (1, 'NOVA20K', 'Voucher dev giảm 20.000 VND', 20000, 500000, '2026-01-01 00:00:00', '2028-01-01 00:00:00', 1000, 1),
+  (2, 'FREESHIPMAX', 'Giảm 30K phí vận chuyển', 30000, 99000, '2026-01-01 00:00:00', '2028-01-01 00:00:00', 1000, 1),
+  (3, 'CHAOBANMOI', 'Giảm 15% tối đa 50K cho đơn đầu tiên', 50000, 0, '2026-01-01 00:00:00', '2028-01-01 00:00:00', 1000, 1),
+  (4, 'NOVAMEGA50', 'Giảm ngay 50.000 VND', 50000, 350000, '2026-01-01 00:00:00', '2028-01-01 00:00:00', 1000, 1);
 
 COMMIT;
