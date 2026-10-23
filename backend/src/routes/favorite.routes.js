@@ -5,7 +5,7 @@ import { authenticate } from '../middlewares/auth.middleware.js'
 const favoriteRouter = Router()
 
 // Tất cả route yêu thích đều yêu cầu đăng nhập
-favoriteRouter.use(authenticate)
+favoriteRouter.use('/favorites', authenticate)
 
 // GET /api/v1/favorites - Xem danh sách sản phẩm yêu thích
 favoriteRouter.get('/favorites', getFavorites)
