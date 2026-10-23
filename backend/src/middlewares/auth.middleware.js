@@ -232,3 +232,48 @@ export function requireRole(...allowedRoles) {
     next()
   }
 }
+
+/**
+ * Middleware xác thực tùy chọn (Optional Authentication).
+ * - Nếu request có Bearer token hợp lệ: gắn thông tin userProfile vào req.user.
+ * - Nếu không có Authorization header hoặc token không hợp lệ: gán req.user = null và cho tiếp tục.
+ * - Phù hợp với các endpoint mở cho cả khách vãng lai và thành viên đăng nhập (như Chat AI).
+ */
+export async function optionalAuthenticate(req, res, next) {
+  req.user = null
+  const authHeader = req.headers['authorization']
+  if (!authHeader || typeof authHeader !== 'string') {
+    return next()
+  }
+
+  const trimmedHeader = authHeader.trim()
+  if (!trimmedHeader.startsWith('Bearer ')) {
+    return next()
+  }
+
+  const token = trimmedHeader.slice(7).trim()
+  if (!token || token.length > MAX_TOKEN_LENGTH) {
+    return next()
+  }
+
+  try {
+    const payload = verifyAccessToken(token)
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      typeof payload.sub !== 'string' ||
+      !isValidBigIntUnsignedString(payload.sub)
+    ) {
+      return next()
+    }
+
+    const userProfile = await getUserAuthProfile(payload.sub)
+    if (userProfile && userProfile.status === 'active') {
+      req.user = userProfile
+    }
+  } catch {
+    // Bỏ qua lỗi xác thực với optional auth, coi như khách vãng lai
+  }
+
+  return next()
+}
