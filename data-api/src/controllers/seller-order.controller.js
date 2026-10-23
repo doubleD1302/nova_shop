@@ -291,6 +291,32 @@ export async function updateSellerOrderStatus(req, res, next) {
             [item.qty, item.variant_id],
           )
         }
+
+        // Kiểm tra xem tất cả các shop_orders của đơn cha này đã bị hủy hết chưa
+        const remainingActiveShops = await query(
+          `SELECT COUNT(*) AS activeCount FROM shop_orders WHERE order_id = ? AND status != 'cancelled'`,
+          [currentOrder.order_id],
+        )
+        const activeCount = Number(remainingActiveShops[0]?.activeCount || 0)
+        if (activeCount === 0) {
+          // Toàn bộ các shop_orders trong đơn cha đã bị hủy: tự động hoàn trả voucher cho người mua
+          const appliedVoucherRows = await query(
+            `SELECT id, voucher_id FROM voucher_uses WHERE order_id = ? AND state = 'applied' FOR UPDATE`,
+            [currentOrder.order_id],
+          )
+          if (appliedVoucherRows && appliedVoucherRows.length > 0) {
+            for (const vu of appliedVoucherRows) {
+              await query(
+                `UPDATE voucher_uses SET state = 'released', released_at = NOW(3) WHERE id = ?`,
+                [vu.id],
+              )
+              await query(
+                `UPDATE vouchers SET used_count = GREATEST(0, used_count - 1) WHERE id = ?`,
+                [vu.voucher_id],
+              )
+            }
+          }
+        }
       }
 
       // 4. Ghi nhận sự kiện vào bảng order_events

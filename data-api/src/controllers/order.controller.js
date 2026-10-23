@@ -103,11 +103,22 @@ export async function createOrder(req, res, next) {
       })
     }
 
+    if (voucherCode !== undefined && voucherCode !== null) {
+      if (typeof voucherCode !== 'string' || voucherCode.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã giảm giá không hợp lệ.',
+          error: { code: 'INVALID_VOUCHER_CODE' },
+        })
+      }
+    }
+
     const numericUserId = BigInt(userId)
     const cleanIdempotencyKey = idempotencyKey.trim().substring(0, 64)
-    const cleanVoucherCode = voucherCode && typeof voucherCode === 'string' && voucherCode.trim().length > 0
-      ? voucherCode.trim().toUpperCase()
-      : null
+    const cleanVoucherCode =
+      typeof voucherCode === 'string' && voucherCode.trim().length > 0
+        ? voucherCode.trim().toUpperCase()
+        : null
 
     const requestHash = hashRequest({
       userId,
@@ -328,23 +339,54 @@ export async function createOrder(req, res, next) {
         grandDiscount = Math.min(grandSubtotal, Number(v.discount_amount))
       }
 
-      // Phân bổ discountAmount vào từng shop_orders theo tỷ lệ giá trị hàng
-      let remainingDiscount = grandDiscount
+      // Phân bổ discountAmount vào từng shop_orders theo tỷ lệ giá trị hàng (Largest Remainder Method có chặn trên subtotal)
       const shopGroupsList = Array.from(shopGroups.values())
-      for (let i = 0; i < shopGroupsList.length; i++) {
-        const group = shopGroupsList[i]
-        let shopDiscount = 0
-        if (grandDiscount > 0 && grandSubtotal > 0) {
-          if (i === shopGroupsList.length - 1) {
-            shopDiscount = remainingDiscount
-          } else {
-            shopDiscount = Math.round((group.subtotal / grandSubtotal) * grandDiscount)
-            shopDiscount = Math.min(shopDiscount, group.subtotal, remainingDiscount)
-            remainingDiscount -= shopDiscount
+      const targetDiscount = Math.min(grandDiscount, grandSubtotal)
+
+      if (targetDiscount > 0 && grandSubtotal > 0) {
+        // Bước 1: Tính phân bổ cơ sở (làm tròn xuống) đảm bảo không bao giờ vượt quá subtotal của từng shop
+        const allocations = shopGroupsList.map((g, idx) => {
+          const raw = (g.subtotal / grandSubtotal) * targetDiscount
+          const base = Math.min(g.subtotal, Math.floor(raw))
+          return {
+            index: idx,
+            subtotal: g.subtotal,
+            allocated: base,
+            fraction: raw - Math.floor(raw),
           }
+        })
+
+        let currentAllocated = allocations.reduce((sum, a) => sum + a.allocated, 0)
+        let remainder = targetDiscount - currentAllocated
+
+        // Bước 2: Phân bổ phần dư từng 1 VND cho shop có fraction cao hơn, chỉ cộng khi allocated < subtotal
+        allocations.sort((a, b) => b.fraction - a.fraction || b.subtotal - a.subtotal)
+        while (remainder > 0) {
+          let progressed = false
+          for (const a of allocations) {
+            if (remainder <= 0) break
+            if (a.allocated < a.subtotal) {
+              a.allocated += 1
+              remainder -= 1
+              progressed = true
+            }
+          }
+          if (!progressed) break // Toàn bộ các shop đã chạm trần subtotal
         }
-        group.discountAmount = shopDiscount
-        group.totalAmount = Math.max(0, group.subtotal + group.shippingFee - shopDiscount)
+
+        // Khôi phục lại thứ tự ban đầu và cập nhật discountAmount, totalAmount cho từng shop
+        allocations.sort((a, b) => a.index - b.index)
+        for (let i = 0; i < shopGroupsList.length; i++) {
+          const group = shopGroupsList[i]
+          const discount = allocations[i].allocated
+          group.discountAmount = discount
+          group.totalAmount = Math.max(0, group.subtotal + group.shippingFee - discount)
+        }
+      } else {
+        for (const group of shopGroupsList) {
+          group.discountAmount = 0
+          group.totalAmount = group.subtotal + group.shippingFee
+        }
       }
 
       const grandTotal = Math.max(0, grandSubtotal + grandShippingFee - grandDiscount)

@@ -280,9 +280,66 @@ async function run() {
 
     // 8. Tích hợp Voucher vào quy trình Đặt hàng & Hủy đơn hoàn Voucher
     console.log('\n--- 8. Tích hợp Voucher vào Đặt hàng & Hủy đơn hoàn trả ---')
-    let voucherOrderId = null
+    const tokenSellerShop1 = generateToken('2', 'seller') // Chủ shop 1
 
-    // 8.1 Voucher không tồn tại
+    // 8.1 Kiểm tra thẩm định voucherCode sai kiểu (Object, Number, khoảng trắng rỗng)
+    {
+      const resObjectVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Test',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 1 }],
+          voucherCode: { code: 'NOVA20K' },
+        },
+      })
+      assert(resObjectVoucher.status === 400, 'voucherCode dạng object trả HTTP 400')
+      assert(
+        resObjectVoucher.body?.error?.code === 'INVALID_VOUCHER_CODE',
+        'Mã lỗi voucherCode object là INVALID_VOUCHER_CODE',
+      )
+
+      const resNumberVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Test',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 1 }],
+          voucherCode: 12345,
+        },
+      })
+      assert(resNumberVoucher.status === 400, 'voucherCode dạng number trả HTTP 400')
+      assert(
+        resNumberVoucher.body?.error?.code === 'INVALID_VOUCHER_CODE',
+        'Mã lỗi voucherCode number là INVALID_VOUCHER_CODE',
+      )
+
+      const resEmptyVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Test',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 1 }],
+          voucherCode: '   ',
+        },
+      })
+      assert(resEmptyVoucher.status === 400, 'voucherCode toàn khoảng trắng trả HTTP 400')
+      assert(
+        resEmptyVoucher.body?.error?.code === 'INVALID_VOUCHER_CODE',
+        'Mã lỗi voucherCode rỗng là INVALID_VOUCHER_CODE',
+      )
+    }
+
+    // 8.2 Voucher không tồn tại
     {
       const resInvalidVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
         method: 'POST',
@@ -300,7 +357,7 @@ async function run() {
       assert(resInvalidVoucher.body?.error?.code === 'VOUCHER_NOT_FOUND', 'Mã lỗi là VOUCHER_NOT_FOUND')
     }
 
-    // 8.2 Đơn chưa đạt giá trị tối thiểu của Voucher (NOVA20K yêu cầu tối thiểu 500k, 1 áo 180k)
+    // 8.3 Đơn chưa đạt giá trị tối thiểu của Voucher (NOVA20K yêu cầu tối thiểu 500k, 1 áo 180k)
     {
       const resMinNotMet = await requestHttp(backendUrl, '/api/v1/orders', {
         method: 'POST',
@@ -318,7 +375,51 @@ async function run() {
       assert(resMinNotMet.body?.error?.code === 'VOUCHER_MIN_NOT_MET', 'Mã lỗi là VOUCHER_MIN_NOT_MET')
     }
 
-    // 8.3 Đặt hàng thành công với Voucher hợp lệ (3 áo x 180k = 540k >= 500k)
+    // 8.4 Đặt đơn nhiều shop với Voucher: kiểm tra phân bổ chiết khấu không shop nào vượt subtotal
+    {
+      const resMultiShop = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Nhiều Shop',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [
+            { variantId: '1', qty: 2 }, // Shop 1: 180k * 2 = 360k
+            { variantId: '10', qty: 1 }, // Shop 2: 145k * 1 = 145k (tổng 505k >= 500k)
+          ],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      if (resMultiShop.status !== 201) {
+        console.error('LỖI ĐẶT HÀNG NHIỀU SHOP:', resMultiShop.status, JSON.stringify(resMultiShop.body))
+      }
+      assert(resMultiShop.status === 201, 'Đặt hàng nhiều shop với voucher trả HTTP 201')
+      assert(resMultiShop.body?.data?.shopOrders.length === 2, 'Đơn gồm 2 shop')
+      const shop1 = resMultiShop.body?.data?.shopOrders[0]
+      const shop2 = resMultiShop.body?.data?.shopOrders[1]
+      assert(shop1.discountAmount <= shop1.subtotal, 'Shop 1 discountAmount không vượt quá subtotal')
+      assert(shop2.discountAmount <= shop2.subtotal, 'Shop 2 discountAmount không vượt quá subtotal')
+      assert(
+        shop1.discountAmount + shop2.discountAmount === 20000,
+        'Tổng chiết khấu các shop bằng chính xác 20.000 ₫',
+      )
+
+      // Hủy đơn nhiều shop để giải phóng voucher
+      const multiOrderId = resMultiShop.body?.data?.id
+      if (multiOrderId) {
+        await requestHttp(backendUrl, `/api/v1/orders/${multiOrderId}/cancel`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenUser1}` },
+          body: { reason: 'Hủy đơn nhiều shop test' },
+        })
+      }
+    }
+
+    // 8.5 Đặt hàng thành công 1 shop với Voucher hợp lệ (3 áo x 180k = 540k >= 500k)
+    let voucherOrderId = null
+    let shopOrderIdToCancel = null
     {
       const resVoucherOrder = await requestHttp(backendUrl, '/api/v1/orders', {
         method: 'POST',
@@ -347,19 +448,10 @@ async function run() {
       )
 
       voucherOrderId = resVoucherOrder.body?.data?.id
+      shopOrderIdToCancel = resVoucherOrder.body?.data?.shopOrders[0]?.id
     }
 
-    // 8.4 Chi tiết đơn hàng trả về voucherCode và discountAmount
-    {
-      const resVoucherDetail = await requestHttp(backendUrl, `/api/v1/orders/${voucherOrderId}`, {
-        headers: { Authorization: `Bearer ${tokenUser1}` },
-      })
-      assert(resVoucherDetail.status === 200, 'Xem chi tiết đơn voucher trả HTTP 200')
-      assert(resVoucherDetail.body?.data?.voucherCode === 'NOVA20K', 'Chi tiết đơn có voucherCode')
-      assert(resVoucherDetail.body?.data?.discountAmount === 20000, 'Chi tiết đơn có discountAmount')
-    }
-
-    // 8.5 Chặn vượt quá per_user_limit khi voucher đã được áp dụng
+    // 8.6 Chặn vượt quá per_user_limit khi voucher đã được áp dụng
     {
       const resExceedLimit = await requestHttp(backendUrl, '/api/v1/orders', {
         method: 'POST',
@@ -380,20 +472,33 @@ async function run() {
       )
     }
 
-    // 8.6 Hủy đơn hàng và tự động hoàn trả voucher
+    // 8.7 SELLER HỦY ĐƠN: kiểm tra voucher tự động được hoàn lại khi seller hủy đơn con duy nhất
     {
-      const resCancelVoucherOrder = await requestHttp(backendUrl, `/api/v1/orders/${voucherOrderId}/cancel`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${tokenUser1}` },
-        body: { reason: 'Tôi muốn áp dụng mã giảm giá khác' },
-      })
-      assert(resCancelVoucherOrder.status === 200, 'Hủy đơn voucher thành công trả HTTP 200')
-      assert(resCancelVoucherOrder.body?.data?.cancelled === true, 'Đã xác nhận hủy đơn')
+      const resSellerCancel = await requestHttp(
+        backendUrl,
+        `/api/v1/seller/orders/${shopOrderIdToCancel}/status`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenSellerShop1}` },
+          body: {
+            toStatus: 'cancelled',
+            cancelReason: 'Shop hết hàng mẫu kích cỡ yêu cầu',
+          },
+        },
+      )
+      if (resSellerCancel.status !== 200) {
+        console.error('LỖI SELLER CANCEL:', resSellerCancel.status, JSON.stringify(resSellerCancel.body))
+      }
+      assert(resSellerCancel.status === 200, 'Seller hủy đơn hàng thành công trả HTTP 200')
+      assert(
+        resSellerCancel.body?.data?.toStatus === 'cancelled',
+        'Trạng thái đơn con chuyển thành cancelled',
+      )
     }
 
-    // 8.7 Áp dụng lại voucher thành công sau khi đơn cũ đã hủy
+    // 8.8 BUYER TÁI SỬ DỤNG VOUCHER thành công ngay sau khi seller hủy đơn
     {
-      const resReuseVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+      const resReuseAfterSellerCancel = await requestHttp(backendUrl, '/api/v1/orders', {
         method: 'POST',
         headers: { Authorization: `Bearer ${tokenUser1}` },
         body: {
@@ -405,13 +510,19 @@ async function run() {
           voucherCode: 'NOVA20K',
         },
       })
-      assert(resReuseVoucher.status === 201, 'Tái sử dụng voucher đã hoàn trả thành công trả HTTP 201')
-      assert(resReuseVoucher.body?.data?.voucherCode === 'NOVA20K', 'Đơn mới nhận mã voucher')
+      assert(
+        resReuseAfterSellerCancel.status === 201,
+        'Buyer áp dụng lại voucher thành công sau khi seller hủy đơn trả HTTP 201',
+      )
+      assert(
+        resReuseAfterSellerCancel.body?.data?.voucherCode === 'NOVA20K',
+        'Đơn mới nhận lại mã voucher NOVA20K',
+      )
 
-      // Dọn dẹp: Hủy luôn đơn tái sử dụng này để trả lại tồn kho & voucher cho hệ thống
-      const reuseOrderId = resReuseVoucher.body?.data?.id
-      if (reuseOrderId) {
-        await requestHttp(backendUrl, `/api/v1/orders/${reuseOrderId}/cancel`, {
+      // Dọn dẹp: Hủy luôn đơn tái sử dụng này để giải phóng voucher và kho
+      const reuseId = resReuseAfterSellerCancel.body?.data?.id
+      if (reuseId) {
+        await requestHttp(backendUrl, `/api/v1/orders/${reuseId}/cancel`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${tokenUser1}` },
           body: { reason: 'Dọn dẹp sau khi kiểm thử tự động hoàn tất' },

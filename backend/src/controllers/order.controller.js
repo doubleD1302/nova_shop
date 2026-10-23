@@ -68,6 +68,17 @@ export async function createOrder(req, res, next) {
       })
     }
 
+    // Kiểm tra tính hợp lệ của voucherCode nếu được truyền lên
+    if (voucherCode !== undefined && voucherCode !== null) {
+      if (typeof voucherCode !== 'string' || voucherCode.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã giảm giá không hợp lệ.',
+          error: { code: 'INVALID_VOUCHER_CODE', field: 'voucherCode' },
+        })
+      }
+    }
+
     // Tự sinh idempotencyKey nếu client không truyền
     const cleanIdempotencyKey =
       idempotencyKey && typeof idempotencyKey === 'string' && idempotencyKey.trim().length > 0
@@ -86,7 +97,7 @@ export async function createOrder(req, res, next) {
       note: note ? String(note).trim() : null,
       paymentMethod,
       voucherCode:
-        voucherCode && typeof voucherCode === 'string' && voucherCode.trim().length > 0
+        typeof voucherCode === 'string' && voucherCode.trim().length > 0
           ? voucherCode.trim().toUpperCase()
           : undefined,
       items: Array.isArray(items) ? items : undefined,
