@@ -203,14 +203,37 @@ export async function updateSellerOrderStatus(req, res, next) {
     const numericActorId = actorId && /^\d+$/.test(String(actorId)) ? BigInt(actorId) : null
 
     const result = await executeTransaction(async (query) => {
-      // 1. Khóa và lấy thông tin shop_order
-      const checkSql = `
+      // 1. Tra cứu order_id cha để thực hiện khóa theo cấp bậc (Parent-Child Hierarchy Locking)
+      const lookupSql = `
+        SELECT id, order_id, shop_id, status
+        FROM shop_orders
+        WHERE id = ? AND shop_id = ?
+      `
+      const lookupRows = await query(lookupSql, [numericShopOrderId, numericShopId])
+      if (!lookupRows || lookupRows.length === 0) {
+        const err = new Error('Không tìm thấy đơn hàng của shop hoặc không có quyền thao tác.')
+        err.status = 404
+        err.code = 'ORDER_NOT_FOUND'
+        throw err
+      }
+
+      const parentOrderId = lookupRows[0].order_id
+
+      // 2. KHÓA ĐƠN CHA (orders) TRƯỚC TIÊN để tuần tự hóa mọi cập nhật trạng thái đơn con trên cùng đơn cha,
+      // ngăn ngừa race condition khi nhiều seller cùng hủy đơn đồng thời.
+      await query(
+        `SELECT id FROM orders WHERE id = ? FOR UPDATE`,
+        [parentOrderId],
+      )
+
+      // 3. Khóa và lấy trạng thái mới nhất của shop_order hiện tại
+      const lockSql = `
         SELECT id, order_id, shop_id, status
         FROM shop_orders
         WHERE id = ? AND shop_id = ?
         FOR UPDATE
       `
-      const rows = await query(checkSql, [numericShopOrderId, numericShopId])
+      const rows = await query(lockSql, [numericShopOrderId, numericShopId])
       if (!rows || rows.length === 0) {
         const err = new Error('Không tìm thấy đơn hàng của shop hoặc không có quyền thao tác.')
         err.status = 404
@@ -239,7 +262,7 @@ export async function updateSellerOrderStatus(req, res, next) {
         throw err
       }
 
-      // 2. Cập nhật trạng thái
+      // 4. Cập nhật trạng thái shop_order
       const updateFields = ['status = ?', 'updated_at = NOW(3)']
       const updateParams = [toStatus]
 
@@ -264,7 +287,7 @@ export async function updateSellerOrderStatus(req, res, next) {
         updateParams,
       )
 
-      // 3. Nếu hủy đơn: HOÀN TỒN KHO cho các SKU thuộc đơn con này
+      // 5. Nếu hủy đơn: HOÀN TỒN KHO và kiểm tra hoàn trả voucher an toàn
       if (toStatus === 'cancelled') {
         const items = await query(
           'SELECT id, variant_id, qty FROM order_items WHERE shop_order_id = ?',
@@ -292,17 +315,18 @@ export async function updateSellerOrderStatus(req, res, next) {
           )
         }
 
-        // Kiểm tra xem tất cả các shop_orders của đơn cha này đã bị hủy hết chưa
-        const remainingActiveShops = await query(
-          `SELECT COUNT(*) AS activeCount FROM shop_orders WHERE order_id = ? AND status != 'cancelled'`,
-          [currentOrder.order_id],
+        // Đọc trạng thái TẤT CẢ các shop_orders thuộc đơn cha bằng locking read (FOR UPDATE)
+        const allShopsOfParent = await query(
+          `SELECT id, status FROM shop_orders WHERE order_id = ? FOR UPDATE`,
+          [parentOrderId],
         )
-        const activeCount = Number(remainingActiveShops[0]?.activeCount || 0)
-        if (activeCount === 0) {
-          // Toàn bộ các shop_orders trong đơn cha đã bị hủy: tự động hoàn trả voucher cho người mua
+
+        const remainingActiveCount = allShopsOfParent.filter((s) => s.status !== 'cancelled').length
+        if (remainingActiveCount === 0) {
+          // Toàn bộ các shop_orders trong đơn cha đã bị hủy: tự động hoàn trả voucher cho người mua đúng 1 lần
           const appliedVoucherRows = await query(
             `SELECT id, voucher_id FROM voucher_uses WHERE order_id = ? AND state = 'applied' FOR UPDATE`,
-            [currentOrder.order_id],
+            [parentOrderId],
           )
           if (appliedVoucherRows && appliedVoucherRows.length > 0) {
             for (const vu of appliedVoucherRows) {

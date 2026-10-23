@@ -281,6 +281,7 @@ async function run() {
     // 8. Tích hợp Voucher vào quy trình Đặt hàng & Hủy đơn hoàn Voucher
     console.log('\n--- 8. Tích hợp Voucher vào Đặt hàng & Hủy đơn hoàn trả ---')
     const tokenSellerShop1 = generateToken('2', 'seller') // Chủ shop 1
+    const tokenSellerShop2 = generateToken('3', 'seller') // Chủ shop 2
 
     // 8.1 Kiểm tra thẩm định voucherCode sai kiểu (Object, Number, khoảng trắng rỗng)
     {
@@ -523,6 +524,90 @@ async function run() {
       const reuseId = resReuseAfterSellerCancel.body?.data?.id
       if (reuseId) {
         await requestHttp(backendUrl, `/api/v1/orders/${reuseId}/cancel`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenUser1}` },
+          body: { reason: 'Dọn dẹp sau khi kiểm thử tự động hoàn tất' },
+        })
+      }
+    }
+
+    // 8.9 HAI SELLER HỦY ĐỒNG THỜI (CONCURRENT SELLER CANCELLATION)
+    // Kiểm tra khóa đơn cha tuần tự hóa an toàn, không bị race condition, voucher hoàn đúng 1 lần
+    {
+      const resOrderMulti = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Đồng Thời',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [
+            { variantId: '1', qty: 2 }, // Shop 1: 360k
+            { variantId: '10', qty: 1 }, // Shop 2: 145k (tổng 505k >= 500k)
+          ],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      assert(resOrderMulti.status === 201, 'Đặt đơn 2 shop cho test hủy đồng thời trả HTTP 201')
+      const shopOrdersList = resOrderMulti.body?.data?.shopOrders || []
+      assert(shopOrdersList.length === 2, 'Đơn gồm đúng 2 shop con')
+
+      const shopOrder1 = shopOrdersList.find((s) => Number(s.shopId) === 1)
+      const shopOrder2 = shopOrdersList.find((s) => Number(s.shopId) === 2)
+      assert(shopOrder1 && shopOrder2, 'Tìm thấy đủ 2 đơn con của Shop 1 và Shop 2')
+
+      // Hai seller gửi request hủy đồng thời bằng Promise.all
+      const [resCancel1, resCancel2] = await Promise.all([
+        requestHttp(backendUrl, `/api/v1/seller/orders/${shopOrder1.id}/status`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenSellerShop1}` },
+          body: {
+            toStatus: 'cancelled',
+            cancelReason: 'Seller 1 hủy do hết mẫu (đồng thời)',
+          },
+        }),
+        requestHttp(backendUrl, `/api/v1/seller/orders/${shopOrder2.id}/status`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenSellerShop2}` },
+          body: {
+            toStatus: 'cancelled',
+            cancelReason: 'Seller 2 hủy do lỗi kho (đồng thời)',
+          },
+        }),
+      ])
+
+      assert(resCancel1.status === 200, 'Seller 1 hủy đồng thời thành công trả HTTP 200')
+      assert(resCancel2.status === 200, 'Seller 2 hủy đồng thời thành công trả HTTP 200')
+      assert(resCancel1.body?.data?.toStatus === 'cancelled', 'Shop 1 chuyển trạng thái cancelled')
+      assert(resCancel2.body?.data?.toStatus === 'cancelled', 'Shop 2 chuyển trạng thái cancelled')
+
+      // Kiểm tra voucher đã được hoàn trả thành công sau khi cả 2 shop hủy đồng thời
+      const resReuseAfterConcurrent = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 3 }],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      assert(
+        resReuseAfterConcurrent.status === 201,
+        'Buyer áp dụng lại voucher thành công sau khi 2 seller hủy đồng thời trả HTTP 201',
+      )
+      assert(
+        resReuseAfterConcurrent.body?.data?.voucherCode === 'NOVA20K',
+        'Đơn mới nhận lại mã voucher NOVA20K (không bị kẹt race condition)',
+      )
+
+      // Dọn dẹp: Hủy đơn này để hoàn trả tồn kho và voucher
+      const finalOrderId = resReuseAfterConcurrent.body?.data?.id
+      if (finalOrderId) {
+        await requestHttp(backendUrl, `/api/v1/orders/${finalOrderId}/cancel`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${tokenUser1}` },
           body: { reason: 'Dọn dẹp sau khi kiểm thử tự động hoàn tất' },
