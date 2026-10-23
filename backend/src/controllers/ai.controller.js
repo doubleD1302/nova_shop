@@ -1,6 +1,7 @@
 import {
   getProducts,
   fetchOrders,
+  fetchOrderDetail,
   fetchVouchers,
   DataApiClientError,
 } from '../clients/data.client.js'
@@ -31,12 +32,81 @@ function extractSearchKeyword(text) {
     }
   }
 
-  // Nếu không khớp từ khóa chuyên biệt, loại bỏ các từ dư thừa để lấy từ khóa tìm kiếm
+  // Nếu không khớp từ khóa chuyên biệt, loại bỏ các cụm giá và từ dư thừa để lấy từ khóa tìm kiếm
   const cleaned = lower
+    .replace(/(?:dưới|tầm|khoảng|tối đa|<|nhỏ hơn|gần|từ|giá|ngân sách)?\s*[0-9]+(?:[.,][0-9]+)?\s*(?:triệu|tr(?:\b|\s|$)|k(?:\b|\s|$)|nghìn|ngàn|đ|vnd|đồng)/gi, '')
     .replace(/(tìm|kiếm|gợi ý|tư vấn|mua|cho tôi|giúp tôi|hãy|cần|muốn|giá rẻ|chính hãng|dưới|tầm giá|khoảng)/gi, '')
     .trim()
 
   return cleaned.length >= 2 ? cleaned : ''
+}
+
+/**
+ * Trích xuất giới hạn ngân sách (nếu người dùng có nêu mức giá)
+ */
+function extractBudgetLimit(text) {
+  const lower = text.toLowerCase()
+
+  // Dạng triệu kép: 1tr5, 2tr8, 1 triệu 5
+  const compoundMillionMatch = lower.match(/(?:dưới|tầm|khoảng|tối đa|<|nhỏ hơn|gần|từ|giá|ngân sách)?\s*([0-9]+)\s*(?:tr|triệu)\s*([0-9]+)/i)
+  if (compoundMillionMatch) {
+    const main = parseInt(compoundMillionMatch[1], 10)
+    const fracStr = compoundMillionMatch[2]
+    const frac = parseInt(fracStr, 10) / Math.pow(10, fracStr.length)
+    return (main + frac) * 1000000
+  }
+
+  // 1. Dạng triệu: "dưới 1.5 triệu", "dưới 2tr", "dưới 1 triệu"
+  const millionMatch = lower.match(/(?:dưới|tầm|khoảng|tối đa|<|nhỏ hơn|gần|từ|giá|ngân sách)?\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:triệu|tr(?:\b|\s|$))/i)
+  if (millionMatch) {
+    const num = parseFloat(millionMatch[1].replace(',', '.'))
+    if (!isNaN(num) && num > 0) {
+      return num * 1000000
+    }
+  }
+
+  // 2. Dạng 'k' hoặc nghìn: "dưới 200k", "dưới 200 k", "dưới 500 nghìn"
+  const thousandMatch = lower.match(/(?:dưới|tầm|khoảng|tối đa|<|nhỏ hơn|gần|từ|giá|ngân sách)?\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:k(?:\b|\s|$)|nghìn|ngàn)/i)
+  if (thousandMatch) {
+    const num = parseFloat(thousandMatch[1].replace(',', '.'))
+    if (!isNaN(num) && num > 0) {
+      return num * 1000
+    }
+  }
+
+  // 3. Dạng số đầy đủ: "dưới 200000", "dưới 200.000đ", "dưới 200.000 ₫"
+  const fullNumMatch = lower.match(/(?:dưới|tầm|khoảng|tối đa|<|nhỏ hơn|gần|từ|giá|ngân sách)?\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{4,9})\s*(?:đ|vnd|đồng)?/i)
+  if (fullNumMatch) {
+    const cleanNumStr = fullNumMatch[1].replace(/[.,]/g, '')
+    const num = parseInt(cleanNumStr, 10)
+    if (!isNaN(num) && num > 0) {
+      return num
+    }
+  }
+
+  return null
+}
+
+/**
+ * Trích xuất mã đơn hàng được hỏi cụ thể (nếu có)
+ */
+function extractOrderCode(text) {
+  const ordMatch = text.match(/\b(ORD[-A-Z0-9]+)\b/i)
+  if (ordMatch) {
+    return ordMatch[1].toUpperCase()
+  }
+
+  const hashMatch = text.match(/#([A-Z0-9_-]+)\b/i)
+  if (hashMatch) {
+    return hashMatch[1].toUpperCase()
+  }
+
+  const numMatch = text.match(/đơn\s*(?:hàng)?\s*(?:mã|số|#)?\s*([0-9]+)\b/i)
+  if (numMatch) {
+    return numMatch[1]
+  }
+
+  return null
 }
 
 /**
@@ -91,30 +161,114 @@ export async function chatWithAi(req, res, next) {
     ) {
       if (currentUser && currentUser.id) {
         try {
-          const ordersResult = await fetchOrders({ userId: currentUser.id, limit: 5 })
-          const orders = ordersResult?.data || []
+          const queryOrderCode = extractOrderCode(trimmedMessage)
+          let selectedOrder = null
 
-          if (orders.length > 0) {
-            const latest = orders[0]
-            const orderCode = latest.code || `ORD-${latest.id}`
-            const total = Number(latest.totalAmount || 0)
-            const firstShopOrder = latest.shopOrders?.[0]
-            const rawStatus = firstShopOrder?.status || 'pending'
+          if (queryOrderCode) {
+            // Người dùng nêu đích danh mã đơn hàng: tra cứu đúng đơn thuộc sở hữu của user
+            try {
+              selectedOrder = await fetchOrderDetail(queryOrderCode, currentUser.id)
+            } catch (err) {
+              if (err instanceof DataApiClientError && (err.status === 404 || err.status === 403)) {
+                selectedOrder = null
+              } else {
+                try {
+                  const ordersResult = await fetchOrders({ userId: currentUser.id, limit: 50 })
+                  const orders = Array.isArray(ordersResult) ? ordersResult : (ordersResult?.data || [])
+                  selectedOrder = orders.find(
+                    (o) =>
+                      (o.code && (o.code.toUpperCase() === queryOrderCode || o.code.replace(/-/g, '').toUpperCase() === queryOrderCode.replace(/-/g, ''))) ||
+                      String(o.id) === queryOrderCode,
+                  )
+                } catch {}
+              }
+            }
+
+            if (!selectedOrder) {
+              return res.status(200).json({
+                success: true,
+                message: 'Trợ lý Nova AI phản hồi thành công.',
+                data: {
+                  reply: `Nova không tìm thấy đơn hàng nào có mã "${queryOrderCode}" trong tài khoản của bạn. Bạn vui lòng kiểm tra lại mã đơn hàng chính xác trong mục Đơn Mua nhé!`,
+                  intent: 'order_tracking',
+                  intentTitle: `Không Tìm Thấy Đơn Hàng #${queryOrderCode}`,
+                  intentMatch: 'Khớp 99%',
+                  suggestions: [
+                    'Xem tất cả đơn hàng đã mua',
+                    'Liên hệ hỗ trợ chăm sóc khách hàng',
+                    'Gợi ý sản phẩm nổi bật',
+                  ],
+                  orderData: null,
+                  products: null,
+                  outfitCombo: null,
+                  vouchers: null,
+                },
+              })
+            }
+          } else {
+            // Người dùng không nêu mã cụ thể: lấy đơn mới nhất
+            const ordersResult = await fetchOrders({ userId: currentUser.id, limit: 10 })
+            const orders = Array.isArray(ordersResult) ? ordersResult : (ordersResult?.data || [])
+            selectedOrder = orders.length > 0 ? orders[0] : null
+          }
+
+          if (selectedOrder) {
+            const orderCode = selectedOrder.code || `ORD-${selectedOrder.id}`
+            const total = Number(selectedOrder.totalAmount || 0)
+            const firstShopOrder = selectedOrder.shopOrders?.[0]
+            const rawStatus = firstShopOrder?.status || selectedOrder.status || 'pending'
 
             const statusMap = {
               pending: 'Chờ người bán xác nhận',
-              confirmed: 'Đang chuẩn bị hàng',
+              confirmed: 'Người bán đang chuẩn bị hàng',
               shipping: 'Đang vận chuyển giao hàng',
               delivered: 'Giao hàng thành công',
               cancelled: 'Đã hủy đơn hàng',
             }
             const statusLabel = statusMap[rawStatus] || 'Đang xử lý'
 
+            // Thông tin giao vận trung thực theo trạng thái thực tế
+            let location = 'Chưa xác định'
+            let eta = 'Chưa xác định'
+            let shipper = null
+            let replyText = ''
+
+            if (rawStatus === 'cancelled') {
+              location = 'Đơn hàng đã hủy'
+              eta = 'Không áp dụng'
+              shipper = null
+              const cancelReason = firstShopOrder?.cancelReason || selectedOrder.cancelReason || 'Khách hàng hoặc người bán yêu cầu hủy'
+              replyText = `Nova kiểm tra thấy đơn hàng #${orderCode} của bạn hiện ở trạng thái "${statusLabel}" (Lý do: ${cancelReason}). Đơn hàng này không còn trong tiến trình giao nhận.`
+            } else if (rawStatus === 'delivered') {
+              location = 'Đã giao đến địa chỉ người nhận'
+              eta = 'Đã hoàn tất giao hàng'
+              shipper = firstShopOrder?.shippingName || null
+              replyText = `Đơn hàng #${orderCode} của bạn đã được giao thành công với tổng thanh toán ${formatVnd(total)}. Cảm ơn bạn đã mua sắm tại ShopNova!`
+            } else if (rawStatus === 'shipping') {
+              location = firstShopOrder?.shippingName
+                ? `Đang vận chuyển qua ${firstShopOrder.shippingName}`
+                : 'Đang trên đường giao hàng'
+              eta = firstShopOrder?.estimatedDelivery || 'Chưa xác định'
+              shipper = firstShopOrder?.shippingName || null
+              replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "${statusLabel}". Kiện hàng đang trên đường vận chuyển an toàn!`
+            } else if (rawStatus === 'confirmed') {
+              location = 'Người bán đang chuẩn bị hàng tại kho'
+              eta = 'Chờ bàn giao cho đơn vị vận chuyển'
+              shipper = null
+              replyText = `Đơn hàng #${orderCode} của bạn đã được người bán xác nhận và đang đóng gói chuẩn bị hàng tại kho.`
+            } else {
+              // pending
+              location = 'Chờ người bán tiếp nhận đơn'
+              eta = 'Chờ xác nhận'
+              shipper = null
+              replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "${statusLabel}" với tổng thanh toán ${formatVnd(total)}.`
+            }
+
             return res.status(200).json({
               success: true,
               message: 'Trợ lý Nova AI tra cứu đơn hàng thành công.',
               data: {
-                reply: `Nova đã tra cứu thông tin đơn hàng mới nhất #${orderCode} của bạn: Hiện đơn đang ở trạng thái "${statusLabel}" với tổng thanh toán ${formatVnd(total)}. Kiện hàng đang được trung chuyển an toàn qua đơn vị vận chuyển đối tác!`,
+                reply: replyText,
                 intent: 'order_tracking',
                 intentTitle: `Nova Tra Cứu Đơn Hàng #${orderCode}`,
                 intentMatch: 'Khớp 99%',
@@ -128,14 +282,15 @@ export async function chatWithAi(req, res, next) {
                   status: rawStatus,
                   statusLabel,
                   total,
-                  recipientName: latest.recipientName || 'Khách hàng',
-                  address: [latest.addressDetail, latest.ward, latest.district, latest.province]
+                  recipientName: selectedOrder.recipientName || 'Khách hàng',
+                  address: [selectedOrder.addressDetail, selectedOrder.ward, selectedOrder.district, selectedOrder.province]
                     .filter(Boolean)
-                    .join(', '),
-                  shipper: 'Tài xế giao vận ShopNova Express',
-                  location: 'Đang trung chuyển qua bưu cục giao nhận khu vực người nhận',
-                  eta: 'Dự kiến giao trong 1-2 ngày làm việc',
-                  itemCount: latest.shopOrders?.reduce((acc, so) => acc + (so.items?.length || 0), 0) || 1,
+                    .join(', ') || 'Chưa xác định',
+                  shipper: rawStatus === 'cancelled' ? null : (shipper || 'Chưa xác định'),
+                  location,
+                  eta,
+                  trackingCode: firstShopOrder?.trackingCode || null,
+                  itemCount: selectedOrder.shopOrders?.reduce((acc, so) => acc + (so.items?.length || 0), 0) || 1,
                 },
                 products: null,
                 outfitCombo: null,
@@ -147,13 +302,13 @@ export async function chatWithAi(req, res, next) {
               success: true,
               message: 'Trợ lý Nova AI phản hồi thành công.',
               data: {
-                reply: 'Hiện tại bạn chưa có đơn hàng nào đang trong quá trình xử lý. Nova sẵn sàng gợi ý cho bạn các sản phẩm Flash Sale hot nhất và mã Voucher độc quyền hôm nay!',
+                reply: 'Hiện tại bạn chưa có đơn hàng nào trong tài khoản. Nova sẵn sàng gợi ý cho bạn các sản phẩm đang có ưu đãi lớn hôm nay!',
                 intent: 'order_tracking',
                 intentTitle: 'Tình Trạng Mua Sắm',
                 intentMatch: 'Khớp 98%',
                 suggestions: [
                   'Xem các sản phẩm bán chạy hôm nay',
-                  'Nhận mã giảm giá 20k',
+                  'Khám phá mã giảm giá voucher',
                   'Gợi ý set đồ thời trang hot',
                 ],
                 orderData: null,
@@ -164,7 +319,7 @@ export async function chatWithAi(req, res, next) {
             })
           }
         } catch (err) {
-          // Fallback an toàn nếu Data API có sự cố
+          // Bắt lỗi nếu có
         }
       }
 
@@ -173,7 +328,7 @@ export async function chatWithAi(req, res, next) {
         success: true,
         message: 'Trợ lý Nova AI phản hồi thành công.',
         data: {
-          reply: 'Để tra cứu thông tin đơn hàng cá nhân, tình trạng vận chuyển và hành trình giao hàng thời gian thực, bạn vui lòng đăng nhập vào tài khoản ShopNova nhé!',
+          reply: 'Để tra cứu thông tin đơn hàng cá nhân và hành trình vận chuyển thời gian thực, bạn vui lòng đăng nhập vào tài khoản ShopNova nhé!',
           intent: 'order_tracking',
           intentTitle: 'Tra Cứu Đơn Hàng Yêu Cầu Đăng Nhập',
           intentMatch: 'Khớp 95%',
@@ -200,54 +355,56 @@ export async function chatWithAi(req, res, next) {
       lower.includes('freeship') ||
       lower.includes('tiết kiệm')
     ) {
+      let activeVouchers = []
       try {
-        const vouchersResult = await fetchVouchers()
-        const vouchers = vouchersResult?.data || []
-
-        const activeVouchers = vouchers.filter((v) => v.isActive)
-        if (activeVouchers.length > 0) {
-          const voucherLines = activeVouchers.map(
-            (v) => `• Mã **${v.code}**: Giảm ${formatVnd(v.discountAmount)} cho đơn hàng từ ${formatVnd(v.minSubtotal)} (tên: ${v.name}).`,
-          )
-
-          return res.status(200).json({
-            success: true,
-            message: 'Trợ lý Nova AI cung cấp mã giảm giá thành công.',
-            data: {
-              reply: `Nova gửi bạn các mã Voucher toàn sàn hấp dẫn đang có hiệu lực trên ShopNova:\n\n${voucherLines.join('\n')}\n\nBạn hãy nhập mã tại bước Đặt hàng để nhận chiết khấu trực tiếp nhé!`,
-              intent: 'promotion_voucher',
-              intentTitle: 'Kho Voucher ShopNova Toàn Sàn',
-              intentMatch: 'Khớp 98%',
-              suggestions: [
-                'Cách áp dụng mã giảm giá khi đặt hàng',
-                'Xem các sản phẩm đủ điều kiện áp mã',
-                'Khám phá ưu đãi miễn phí vận chuyển',
-              ],
-              vouchers: activeVouchers,
-              orderData: null,
-              products: null,
-              outfitCombo: null,
-            },
-          })
-        }
+        const rawVouchers = await fetchVouchers()
+        const vouchersList = Array.isArray(rawVouchers) ? rawVouchers : (rawVouchers?.data || [])
+        activeVouchers = vouchersList.filter((v) => v.isActive)
       } catch (err) {
-        // Fallback
+        // Không hardcode mã giả khi upstream lỗi hoặc rỗng
       }
 
+      if (activeVouchers.length > 0) {
+        const voucherLines = activeVouchers.map(
+          (v) => `• Mã **${v.code}**: Giảm ${formatVnd(v.discountAmount)} cho đơn hàng từ ${formatVnd(v.minSubtotal)} (tên: ${v.name}).`,
+        )
+
+        return res.status(200).json({
+          success: true,
+          message: 'Trợ lý Nova AI cung cấp mã giảm giá thành công.',
+          data: {
+            reply: `Nova gửi bạn các mã Voucher đang có hiệu lực trên ShopNova:\n\n${voucherLines.join('\n')}\n\nBạn hãy nhập mã tại bước Đặt hàng để nhận chiết khấu trực tiếp nhé!`,
+            intent: 'promotion_voucher',
+            intentTitle: 'Kho Voucher ShopNova',
+            intentMatch: 'Khớp 98%',
+            suggestions: [
+              'Cách áp dụng mã giảm giá khi đặt hàng',
+              'Xem các sản phẩm đủ điều kiện áp mã',
+              'Khám phá ưu đãi miễn phí vận chuyển',
+            ],
+            vouchers: activeVouchers,
+            orderData: null,
+            products: null,
+            outfitCombo: null,
+          },
+        })
+      }
+
+      // Khi kho voucher rỗng hoặc chưa có voucher nào active
       return res.status(200).json({
         success: true,
         message: 'Trợ lý Nova AI phản hồi thành công.',
         data: {
-          reply: 'Hiện tại ShopNova đang có chương trình khuyến mãi đặc quyền với mã giảm giá **NOVA20K** (giảm 20.000 ₫ cho đơn hàng từ 500.000 ₫) áp dụng cho mọi khách hàng!',
+          reply: 'Hiện tại ShopNova chưa có mã giảm giá toàn sàn nào đang mở. Nova sẽ cập nhật ngay khi có đợt phát hành voucher mới, bạn nhớ theo dõi nhé!',
           intent: 'promotion_voucher',
-          intentTitle: 'Ưu Đãi Mua Sắm ShopNova',
-          intentMatch: 'Khớp 96%',
+          intentTitle: 'Thông Tin Voucher ShopNova',
+          intentMatch: 'Khớp 95%',
           suggestions: [
-            'Sử dụng mã NOVA20K ngay',
-            'Tìm sản phẩm trên 500k',
-            'Chính sách thanh toán khi nhận hàng',
+            'Xem các sản phẩm đang giảm giá',
+            'Đăng ký nhận thông báo ưu đãi',
+            'Tìm kiếm sản phẩm nổi bật',
           ],
-          vouchers: [{ code: 'NOVA20K', discountAmount: 20000, minSubtotal: 500000 }],
+          vouchers: [],
           orderData: null,
           products: null,
           outfitCombo: null,
@@ -269,54 +426,106 @@ export async function chatWithAi(req, res, next) {
       let outfitProducts = []
       try {
         const prodResult = await getProducts({ q: 'áo', limit: 4 })
-        outfitProducts = (prodResult?.data || []).slice(0, 3)
+        const rawList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
+        outfitProducts = rawList.slice(0, 3)
+
+        if (outfitProducts.length === 0) {
+          const fallbackResult = await getProducts({ limit: 3 })
+          const fallbackList = Array.isArray(fallbackResult) ? fallbackResult : (fallbackResult?.data || [])
+          outfitProducts = fallbackList.slice(0, 3)
+        }
       } catch {}
 
+      if (outfitProducts.length > 0) {
+        // Tính toán số liệu THỰC TẾ dựa trên các sản phẩm thật
+        const totalPrice = outfitProducts.reduce((sum, p) => sum + Number(p.price || 0), 0)
+        const totalOriginalPrice = outfitProducts.reduce(
+          (sum, p) => sum + Number(p.originalPrice || p.price || 0),
+          0,
+        )
+        const savedAmount = Math.max(0, totalOriginalPrice - totalPrice)
+
+        const productDetails = outfitProducts.map(
+          (p, idx) => `${idx + 1}. **${p.name}** - Giá: **${formatVnd(p.price)}**`,
+        )
+
+        return res.status(200).json({
+          success: true,
+          message: 'Trợ lý Nova AI tư vấn phối đồ thành công.',
+          data: {
+            reply: `Nova gợi ý bạn set đồ thời trang gồm các sản phẩm sau:\n\n${productDetails.join('\n')}\n\nTổng chi phí combo là **${formatVnd(totalPrice)}**${savedAmount > 0 ? ` (tiết kiệm ${formatVnd(savedAmount)} so với giá gốc)` : ''}!`,
+            intent: 'outfit_combo',
+            intentTitle: 'Nova Phối Đồ Thông Minh & Tiết Kiệm',
+            intentMatch: 'Khớp 97%',
+            suggestions: [
+              'Xem thêm phụ kiện đi kèm',
+              'Đổi sang phong cách khác',
+              'Xem chi tiết từng sản phẩm',
+            ],
+            outfitCombo: {
+              title: 'Set Đồ Thời Trang Phối Sẵn',
+              budgetMax: formatVnd(totalOriginalPrice > totalPrice ? totalOriginalPrice : totalPrice),
+              budgetSaved: savedAmount > 0 ? `Tiết kiệm ${formatVnd(savedAmount)}` : 'Giá ưu đãi tốt nhất',
+              comboPrice: formatVnd(totalPrice),
+              isOutfitCombo: true,
+            },
+            products: outfitProducts,
+            orderData: null,
+            vouchers: null,
+          },
+        })
+      }
+
+      // Nếu không tìm thấy sản phẩm thời trang nào trong kho
       return res.status(200).json({
         success: true,
-        message: 'Trợ lý Nova AI tư vấn phối đồ thành công.',
+        message: 'Trợ lý Nova AI phản hồi thành công.',
         data: {
-          reply: 'Nova đã phối sẵn set đồ thời trang phong cách trẻ trung, năng động phù hợp cho các buổi đi chơi, dạo phố hoặc dự tiệc nhẹ. Set trang phục kết hợp hài hòa giữa áo thun/croptop phom chuẩn và quần ống rộng thoáng mát, tổng chi phí trọn gói cực kỳ tiết kiệm!',
+          reply: 'Hiện tại trong kho chưa có đủ sản phẩm thời trang phù hợp để tạo combo phối đồ hoàn chỉnh. Bạn vui lòng quay lại sau hoặc xem các danh mục sản phẩm khác nhé!',
           intent: 'outfit_combo',
-          intentTitle: 'Nova Phối Đồ Thông Minh & Tiết Kiệm',
-          intentMatch: 'Khớp 97%',
+          intentTitle: 'Tư Vấn Phối Đồ',
+          intentMatch: 'Khớp 90%',
           suggestions: [
-            'Xem thêm phụ kiện túi xách & giày dép',
-            'Đổi sang phong cách công sở lịch lãm',
-            'Thêm vào giỏ hàng cả combo',
+            'Xem danh mục thời trang',
+            'Sản phẩm bán chạy hôm nay',
+            'Nhận mã giảm giá voucher',
           ],
-          outfitCombo: {
-            title: 'Set Đồ Thời Trang Thanh Lịch Dạo Phố',
-            budgetMax: '500.000 ₫',
-            budgetSaved: 'Tiết kiệm 85.000 ₫',
-            comboPrice: '469.000 ₫',
-            isOutfitCombo: true,
-          },
-          products: outfitProducts.length > 0 ? outfitProducts : null,
+          outfitCombo: null,
+          products: null,
           orderData: null,
           vouchers: null,
         },
       })
     }
 
-    // CASE D: Tư vấn & Gợi ý sản phẩm cụ thể (Product Search & Recommendation)
+    // CASE D: Tư vấn & Gợi ý sản phẩm cụ thể có Giới hạn Ngân sách (Product Search & Recommendation)
     const keyword = extractSearchKeyword(trimmedMessage)
-    if (keyword || lower.includes('giá') || lower.includes('dưới') || lower.includes('mua') || lower.includes('gợi ý') || lower.includes('tìm')) {
+    const budgetLimit = extractBudgetLimit(trimmedMessage)
+
+    if (keyword || budgetLimit !== null || lower.includes('giá') || lower.includes('mua') || lower.includes('gợi ý') || lower.includes('tìm')) {
       try {
         const searchQ = keyword || ''
-        const prodResult = await getProducts({ q: searchQ, limit: 6 })
-        const productsList = prodResult?.data || []
+        const prodResult = await getProducts({ q: searchQ, limit: 12 })
+        const rawProductsList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
+
+        // Áp dụng giới hạn ngân sách nếu người dùng có yêu cầu
+        let productsList = rawProductsList
+        if (budgetLimit !== null) {
+          productsList = rawProductsList.filter((p) => Number(p.price) <= budgetLimit)
+        }
 
         if (productsList.length > 0) {
-          const productBulletPoints = productsList.slice(0, 3).map(
+          const productBulletPoints = productsList.slice(0, 4).map(
             (p, idx) => `${idx + 1}. **${p.name}** - Giá: **${formatVnd(p.price)}** (Shop: ${p.shopName || 'Shop chính hãng'})`,
           )
+
+          const budgetNote = budgetLimit !== null ? ` trong tầm giá dưới ${formatVnd(budgetLimit)}` : ''
 
           return res.status(200).json({
             success: true,
             message: 'Trợ lý Nova AI gợi ý sản phẩm thành công.',
             data: {
-              reply: `Nova đã tìm thấy các sản phẩm phù hợp nhất với nhu cầu "${trimmedMessage}" của bạn trong kho hàng ShopNova:\n\n${productBulletPoints.join('\n')}\n\nTất cả sản phẩm đều được kiểm định chất lượng, bảo hành chính hãng và hỗ trợ đổi trả miễn phí trong 7 ngày!`,
+              reply: `Nova đã tìm thấy các sản phẩm phù hợp nhất với nhu cầu "${trimmedMessage}"${budgetNote} trong kho hàng ShopNova:\n\n${productBulletPoints.join('\n')}\n\nTất cả sản phẩm đều được kiểm định chất lượng, bảo hành chính hãng và hỗ trợ đổi trả miễn phí trong 7 ngày!`,
               intent: 'product_recommendation',
               intentTitle: `Nova Gợi Ý Sản Phẩm "${searchQ || 'Nổi Bật'}"`,
               intentMatch: 'Khớp 96%',
@@ -326,6 +535,28 @@ export async function chatWithAi(req, res, next) {
                 'So sánh các phân khúc giá khác',
               ],
               products: productsList,
+              orderData: null,
+              outfitCombo: null,
+              vouchers: null,
+            },
+          })
+        } else if (budgetLimit !== null && rawProductsList.length > 0) {
+          // Có sản phẩm nhưng toàn bộ vượt quá ngân sách yêu cầu
+          const minPrice = Math.min(...rawProductsList.map((p) => Number(p.price)))
+          return res.status(200).json({
+            success: true,
+            message: 'Trợ lý Nova AI phản hồi thành công.',
+            data: {
+              reply: `Hiện tại ShopNova chưa có sản phẩm "${searchQ || 'này'}" nào ở mức giá dưới ${formatVnd(budgetLimit)}. Mức giá thấp nhất hiện có trong kho là **${formatVnd(minPrice)}**. Bạn có muốn tham khảo thêm không?`,
+              intent: 'product_recommendation',
+              intentTitle: 'Không Tìm Thấy Sản Phẩm Phù Hợp Ngân Sách',
+              intentMatch: 'Khớp 95%',
+              suggestions: [
+                `Xem sản phẩm giá từ ${formatVnd(minPrice)}`,
+                'Tìm kiếm sản phẩm khác',
+                'Nhận mã giảm giá để tiết kiệm thêm',
+              ],
+              products: [],
               orderData: null,
               outfitCombo: null,
               vouchers: null,
@@ -341,7 +572,7 @@ export async function chatWithAi(req, res, next) {
     let fallbackProducts = []
     try {
       const featured = await getProducts({ limit: 4 })
-      fallbackProducts = featured?.data || []
+      fallbackProducts = Array.isArray(featured) ? featured : (featured?.data || [])
     } catch {}
 
     const isGreeting = /^(xin chào|chào|hello|hi|hey|alo|bạn là ai|nova là ai)/i.test(lower)

@@ -129,8 +129,13 @@ async function run() {
 
   let dataProc = null
   let backendProc = null
+  let mockServer = null
+  let mockBackendProc = null
 
   try {
+    // =========================================================================
+    // PHẦN 1: TÍCH HỢP HỆ THỐNG THẬT (REAL DATA API + REAL BACKEND)
+    // =========================================================================
     dataProc = await startProcess('Data API', dataApiRootDir, {
       PORT: String(dataApiPort),
       DATA_API_KEY: TEST_SERVICE_KEY,
@@ -233,6 +238,11 @@ async function run() {
       assert(typeof resOutfit.body?.data?.outfitCombo === 'object', 'outfitCombo là object')
       assert(resOutfit.body?.data?.outfitCombo?.isOutfitCombo === true, 'isOutfitCombo === true')
       assert(typeof resOutfit.body?.data?.outfitCombo?.comboPrice === 'string', 'Có giá combo')
+      if (resOutfit.body?.data?.products?.length > 0) {
+        const calculatedSum = resOutfit.body.data.products.reduce((acc, p) => acc + Number(p.price || 0), 0)
+        const expectedCombo = Number(calculatedSum).toLocaleString('vi-VN') + ' ₫'
+        assert(resOutfit.body.data.outfitCombo.comboPrice === expectedCombo, `Giá combo (${resOutfit.body.data.outfitCombo.comboPrice}) khớp chính xác tổng giá sản phẩm thật (${expectedCombo})`)
+      }
     }
 
     // 5. Khuyến mãi & Mã giảm giá Voucher
@@ -245,7 +255,9 @@ async function run() {
       assert(resVoucher.status === 200, 'Hỏi voucher trả HTTP 200 OK')
       assert(resVoucher.body?.data?.intent === 'promotion_voucher', 'Ý định là promotion_voucher')
       assert(Array.isArray(resVoucher.body?.data?.vouchers), 'vouchers trả về là một mảng')
-      assert(resVoucher.body?.data?.vouchers.some((v) => v.code === 'NOVA20K'), 'Tìm thấy voucher NOVA20K')
+      for (const v of resVoucher.body?.data?.vouchers || []) {
+        assert(v.isActive === true, `Voucher ${v.code} có isActive === true`)
+      }
     }
 
     // 6. Tra cứu đơn hàng khi CHƯA đăng nhập
@@ -277,10 +289,375 @@ async function run() {
       assert(typeof resOrderAuth.body?.data?.orderData?.total === 'number', 'orderData có total tiền')
     }
 
+    // =========================================================================
+    // PHẦN 2: KIỂM THỬ HỒI QUY CHUYÊN SÂU 5 LỖI REVIEW (MOCK DATA API)
+    // =========================================================================
+    console.log('\n==================================================================')
+    console.log('=== PHẦN 2: KIỂM THỬ HỒI QUY 5 LỖI REVIEW QUA MOCK DATA API ===')
+    console.log('==================================================================\n')
+
+    const mockPort = await getAvailablePort()
+    const mockBackendPort = await getAvailablePort()
+
+    // Trạng thái dữ liệu giả lập có thể điều khiển linh hoạt theo từng ca kiểm thử
+    const mockState = {
+      vouchers: [],
+      products: [],
+      orders: [],
+      orderDetailMap: new Map(),
+    }
+
+    mockServer = http.createServer((req, res) => {
+      const parsedUrl = new URL(req.url, `http://127.0.0.1:${mockPort}`)
+      const pathname = parsedUrl.pathname
+
+      // Health check
+      if (pathname === '/internal/v1/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ success: true, service: 'shopnova-data-api', status: 'ok' }))
+      }
+
+      // User auth profile endpoint: GET /internal/v1/users/:id/auth-profile
+      const userMatch = pathname.match(/^\/internal\/v1\/users\/([^/]+)\/auth-profile$/)
+      if (userMatch) {
+        const id = userMatch[1]
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({
+          success: true,
+          data: {
+            user: {
+              id: String(id),
+              username: `buyer_${id}`,
+              fullName: `Người Mua ${id}`,
+              email: `buyer${id}@example.com`,
+              phone: null,
+              avatarUrl: null,
+              role: 'buyer',
+              status: 'active',
+              shopId: null,
+            },
+          },
+        }))
+      }
+
+      // Vouchers endpoint: GET /internal/v1/vouchers
+      if (pathname === '/internal/v1/vouchers') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ success: true, data: mockState.vouchers }))
+      }
+
+      // Products endpoint: GET /internal/v1/products
+      if (pathname === '/internal/v1/products') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({
+          success: true,
+          data: mockState.products,
+          meta: {
+            total: mockState.products.length,
+            page: 1,
+            limit: 20,
+          },
+        }))
+      }
+
+      // Orders list endpoint: GET /internal/v1/orders
+      if (pathname === '/internal/v1/orders') {
+        const userId = parsedUrl.searchParams.get('userId')
+        const filtered = mockState.orders.filter((o) => !userId || String(o.buyerId || o.buyer_id) === String(userId))
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ success: true, data: filtered }))
+      }
+
+      // Order detail endpoint: GET /internal/v1/orders/:orderIdOrCode
+      const orderMatch = pathname.match(/^\/internal\/v1\/orders\/([^/]+)$/)
+      if (orderMatch) {
+        const codeOrId = decodeURIComponent(orderMatch[1]).toUpperCase()
+        const userId = parsedUrl.searchParams.get('userId')
+        const order = mockState.orderDetailMap.get(codeOrId)
+
+        if (order && (!userId || String(order.buyerId || order.buyer_id) === String(userId))) {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: true, data: order }))
+        }
+
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ success: false, message: 'Không tìm thấy thông tin đơn hàng.', error: { code: 'ORDER_NOT_FOUND' } }))
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: false, message: 'Not found' }))
+    })
+
+    await new Promise((resolve) => mockServer.listen(mockPort, '127.0.0.1', resolve))
+    console.log(`[Khởi động] Mock Data API cổng: ${mockPort}`)
+
+    mockBackendProc = await startProcess('Mock Backend', rootDir, {
+      PORT: String(mockBackendPort),
+      DATA_API_URL: `http://127.0.0.1:${mockPort}`,
+      DATA_API_KEY: TEST_SERVICE_KEY,
+      JWT_SECRET: TEST_JWT_SECRET,
+    })
+    console.log(`[Khởi động] Mock Backend cổng: ${mockBackendPort}`)
+
+    const mockBackendUrl = `http://127.0.0.1:${mockBackendPort}`
+
+    // -------------------------------------------------------------------------
+    // Lỗi 1 [P1]: Đọc đúng danh sách voucher từ mảng, không tự bịa NOVA20K khi kho chỉ có LIVE50 hoặc rỗng
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Lỗi 1 [P1]: Đọc danh sách voucher thực tế & Bỏ voucher giả ---')
+    {
+      // Trường hợp 1A: Upstream chỉ có LIVE50
+      mockState.vouchers = [
+        {
+          id: 50,
+          code: 'LIVE50',
+          name: 'Voucher Livestream 50k',
+          discountAmount: 50000,
+          minSubtotal: 250000,
+          isActive: true,
+        },
+      ]
+
+      const resLive50 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Shop có voucher gì hot không?' },
+      })
+      assert(resLive50.status === 200, 'Hỏi voucher trả HTTP 200')
+      assert(Array.isArray(resLive50.body?.data?.vouchers), 'vouchers trả về là một mảng')
+      assert(resLive50.body?.data?.vouchers.length === 1, 'Chỉ có đúng 1 voucher LIVE50')
+      assert(resLive50.body?.data?.vouchers[0].code === 'LIVE50', 'Mã voucher đúng là LIVE50')
+      assert(!resLive50.body?.data?.reply.includes('NOVA20K'), 'Reply tuyệt đối KHÔNG quảng cáo mã giả NOVA20K')
+      assert(resLive50.body?.data?.reply.includes('LIVE50'), 'Reply quảng cáo mã thật LIVE50')
+
+      // Trường hợp 1B: Kho rỗng (hoặc lỗi 503)
+      mockState.vouchers = []
+      const resEmptyVoucher = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Có mã giảm giá nào không?' },
+      })
+      assert(resEmptyVoucher.status === 200, 'Kho voucher rỗng trả HTTP 200')
+      assert(Array.isArray(resEmptyVoucher.body?.data?.vouchers) && resEmptyVoucher.body.data.vouchers.length === 0, 'vouchers là mảng rỗng [] khi kho rỗng')
+      assert(!resEmptyVoucher.body?.data?.reply.includes('NOVA20K'), 'Khi kho rỗng tuyệt đối KHÔNG trả mã fallback NOVA20K')
+      assert(resEmptyVoucher.body?.data?.reply.includes('chưa có mã giảm giá'), 'Thông báo lịch sự chưa có voucher mở')
+    }
+
+    // -------------------------------------------------------------------------
+    // Lỗi 2 [P1]: Giá combo dựa trên tổng sản phẩm thực tế (không hardcode 469.000 ₫ / 85.000 ₫)
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Lỗi 2 [P1]: Giá combo tính từ sản phẩm thật ---')
+    {
+      // Trường hợp 2A: 2 sản phẩm tổng 1.300.000 ₫
+      mockState.products = [
+        {
+          id: 301,
+          name: 'Áo Blazer Hàn Quốc Form Rộng',
+          price: 700000,
+          originalPrice: 800000,
+          shopName: 'Shop Thời Trang Hàn Quốc',
+        },
+        {
+          id: 302,
+          name: 'Quần Âu Suông Ống Rộng',
+          price: 600000,
+          originalPrice: 650000,
+          shopName: 'Shop Thời Trang Hàn Quốc',
+        },
+      ]
+
+      const resOutfit = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tư vấn cho mình set đồ đi tiệc sang trọng' },
+      })
+      assert(resOutfit.status === 200, 'Hỏi phối đồ trả HTTP 200')
+      assert(resOutfit.body?.data?.outfitCombo?.comboPrice === '1.300.000 ₫', 'Giá combo tính đúng 1.300.000 ₫ (KHÔNG phải 469.000 ₫)')
+      assert(resOutfit.body?.data?.outfitCombo?.budgetSaved === 'Tiết kiệm 150.000 ₫', 'Mức tiết kiệm tính đúng 150.000 ₫ (KHÔNG phải 85.000 ₫)')
+      assert(resOutfit.body?.data?.reply.includes('1.300.000 ₫'), 'Reply hiển thị đúng tổng chi phí 1.300.000 ₫')
+
+      // Trường hợp 2B: Không có sản phẩm nào trong kho
+      mockState.products = []
+      const resNoOutfit = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Gợi ý set đồ mặc đi chơi' },
+      })
+      assert(resNoOutfit.status === 200, 'Không có sản phẩm phối đồ trả HTTP 200')
+      assert(resNoOutfit.body?.data?.outfitCombo === null, 'outfitCombo là null khi không có sản phẩm (không tự bịa combo ảo)')
+      assert(resNoOutfit.body?.data?.products === null, 'products là null khi không có sản phẩm')
+      assert(resNoOutfit.body?.data?.reply.includes('chưa có đủ sản phẩm thời trang'), 'Thông báo rõ ràng chưa có sản phẩm phù hợp')
+    }
+
+    // -------------------------------------------------------------------------
+    // Lỗi 3 [P2]: Tra cứu đúng mã đơn được hỏi và kiểm tra quyền sở hữu
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Lỗi 3 [P2]: Tra đúng mã đơn được hỏi & Kiểm tra Owner ---')
+    {
+      const orderOld = {
+        id: 101,
+        code: 'ORDOLD123',
+        buyerId: 1,
+        totalAmount: 250000,
+        recipientName: 'Nguyễn Văn A',
+        addressDetail: 'Số 10 Lý Tự Trọng',
+        province: 'TP.HCM',
+        shopOrders: [
+          {
+            id: 201,
+            status: 'shipping',
+            shippingName: 'Giao Hàng Nhanh',
+            trackingCode: 'GHN-OLD-123',
+          },
+        ],
+      }
+
+      const orderNew = {
+        id: 102,
+        code: 'ORDNEW456',
+        buyerId: 1,
+        totalAmount: 500000,
+        recipientName: 'Nguyễn Văn A',
+        addressDetail: 'Số 10 Lý Tự Trọng',
+        province: 'TP.HCM',
+        shopOrders: [
+          {
+            id: 202,
+            status: 'confirmed',
+          },
+        ],
+      }
+
+      const orderOtherUser = {
+        id: 103,
+        code: 'ORDOTHER999',
+        buyerId: 2, // Thuộc user 2
+        totalAmount: 900000,
+        recipientName: 'Người Lạ',
+        shopOrders: [{ id: 203, status: 'delivered' }],
+      }
+
+      mockState.orders = [orderNew, orderOld] // Đơn mới nhất đứng đầu
+      mockState.orderDetailMap.set('ORDOLD123', orderOld)
+      mockState.orderDetailMap.set('ORDNEW456', orderNew)
+      mockState.orderDetailMap.set('ORDOTHER999', orderOtherUser)
+
+      // Hỏi đích danh mã ORDOLD123 -> Phải trả ORDOLD123, KHÔNG được lấy đơn mới nhất ORDNEW456
+      const resAskOld = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Kiểm tra giúp mình tình trạng đơn hàng ORDOLD123' },
+      })
+      assert(resAskOld.status === 200, 'Hỏi ORDOLD123 trả HTTP 200')
+      assert(resAskOld.body?.data?.orderData?.code === 'ORDOLD123', 'Trả về đúng đơn ORDOLD123 (KHÔNG bị nhầm sang đơn mới ORDNEW456)')
+      assert(resAskOld.body?.data?.orderData?.total === 250000, 'Tổng tiền đúng của ORDOLD123 là 250.000 ₫')
+
+      // Hỏi mã đơn của người khác (ORDOTHER999) -> Phải bị từ chối, trả null
+      const resAskOther = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Tra cứu đơn hàng #ORDOTHER999' },
+      })
+      assert(resAskOther.status === 200, 'Tra cứu đơn không sở hữu trả HTTP 200')
+      assert(resAskOther.body?.data?.orderData === null, 'orderData là null khi không thuộc tài khoản người dùng')
+      assert(resAskOther.body?.data?.reply.includes('ORDOTHER999'), 'Nêu rõ không tìm thấy đơn ORDOTHER999 trong tài khoản')
+    }
+
+    // -------------------------------------------------------------------------
+    // Lỗi 4 [P2]: Thông tin giao vận trung thực theo trạng thái đơn (đơn cancelled không bịa đang giao)
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Lỗi 4 [P2]: Thông tin giao vận đơn Cancelled & Chưa xác định ---')
+    {
+      const orderCancelled = {
+        id: 104,
+        code: 'ORDCANCEL789',
+        buyerId: 1,
+        totalAmount: 420000,
+        recipientName: 'Nguyễn Văn A',
+        shopOrders: [
+          {
+            id: 204,
+            status: 'cancelled',
+            cancelReason: 'Khách hàng thay đổi địa chỉ nhận hàng',
+          },
+        ],
+      }
+
+      mockState.orderDetailMap.set('ORDCANCEL789', orderCancelled)
+
+      const resCancelled = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDCANCEL789 của tôi bao giờ giao?' },
+      })
+      assert(resCancelled.status === 200, 'Hỏi đơn cancelled trả HTTP 200')
+      assert(resCancelled.body?.data?.orderData?.status === 'cancelled', 'Trạng thái là cancelled')
+      assert(resCancelled.body?.data?.orderData?.location === 'Đơn hàng đã hủy', 'location ghi rõ "Đơn hàng đã hủy"')
+      assert(resCancelled.body?.data?.orderData?.eta === 'Không áp dụng', 'eta ghi rõ "Không áp dụng"')
+      assert(resCancelled.body?.data?.orderData?.shipper === null, 'shipper là null cho đơn đã hủy')
+      assert(!resCancelled.body?.data?.reply.includes('trung chuyển'), 'Reply tuyệt đối KHÔNG nói "đang trung chuyển"')
+      assert(!resCancelled.body?.data?.reply.includes('1-2 ngày'), 'Reply tuyệt đối KHÔNG nói "giao trong 1-2 ngày"')
+      assert(resCancelled.body?.data?.reply.includes('Đã hủy đơn hàng'), 'Reply thông báo đúng trạng thái Đã hủy đơn hàng')
+      assert(resCancelled.body?.data?.reply.includes('Khách hàng thay đổi địa chỉ'), 'Reply nêu đúng lý do hủy thực tế')
+    }
+
+    // -------------------------------------------------------------------------
+    // Lỗi 5 [P2]: Áp dụng giới hạn ngân sách (không trả sản phẩm 2.000.000 ₫ cho câu hỏi dưới 200k)
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Lỗi 5 [P2]: Áp dụng giới hạn ngân sách ---')
+    {
+      // Kho chỉ có tai nghe đắt tiền 2.000.000 ₫
+      mockState.products = [
+        {
+          id: 401,
+          name: 'Tai nghe Bluetooth Apple AirPods Pro 2',
+          price: 2000000,
+          shopName: 'Apple Flagship Store',
+        },
+      ]
+
+      // Hỏi tai nghe dưới 200k -> Tuyệt đối không được trả tai nghe 2.000.000 ₫
+      const resOverBudget = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Gợi ý cho mình tai nghe dưới 200k với' },
+      })
+      assert(resOverBudget.status === 200, 'Hỏi tai nghe dưới 200k trả HTTP 200')
+      assert(Array.isArray(resOverBudget.body?.data?.products) && resOverBudget.body.data.products.length === 0, 'products là mảng rỗng [] khi toàn bộ sản phẩm vượt ngân sách')
+      assert(resOverBudget.body?.data?.intentTitle === 'Không Tìm Thấy Sản Phẩm Phù Hợp Ngân Sách', 'intentTitle nêu rõ không tìm thấy phù hợp ngân sách')
+      assert(resOverBudget.body?.data?.reply.includes('dưới 200.000 ₫'), 'Reply phản hồi rõ ràng về mức giá dưới 200.000 ₫')
+      assert(resOverBudget.body?.data?.reply.includes('2.000.000 ₫'), 'Reply thông báo mức giá tối thiểu hiện có là 2.000.000 ₫')
+
+      // Bây giờ bổ sung thêm tai nghe 150.000 ₫ vào kho
+      mockState.products = [
+        {
+          id: 401,
+          name: 'Tai nghe Bluetooth Apple AirPods Pro 2',
+          price: 2000000,
+          shopName: 'Apple Flagship Store',
+        },
+        {
+          id: 402,
+          name: 'Tai nghe có dây Jack 3.5mm Hoco',
+          price: 150000,
+          shopName: 'Phụ Kiện Số 24h',
+        },
+      ]
+
+      const resWithinBudget = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(resWithinBudget.status === 200, 'Hỏi tai nghe dưới 200k khi có hàng trả HTTP 200')
+      assert(resWithinBudget.body?.data?.products?.length === 1, 'Chỉ trả về đúng 1 sản phẩm thỏa mãn ngân sách')
+      assert(resWithinBudget.body?.data?.products?.[0]?.id === 402, 'Sản phẩm trả về là Tai nghe Hoco (150.000 ₫)')
+      assert(resWithinBudget.body?.data?.products?.[0]?.price <= 200000, 'Giá sản phẩm trả về <= 200.000 ₫')
+      assert(!resWithinBudget.body?.data?.products?.some((p) => p.price > 200000), 'Tuyệt đối không lọt tai nghe 2.000.000 ₫ vào kết quả')
+    }
+
   } finally {
     console.log('\n[Dọn dẹp] Đang tắt các server kiểm thử...')
     if (backendProc) backendProc.kill()
     if (dataProc) dataProc.kill()
+    if (mockBackendProc) mockBackendProc.kill()
+    if (mockServer) {
+      await new Promise((resolve) => mockServer.close(resolve))
+    }
   }
 
   console.log('\n=== TỔNG KẾT KIỂM THỬ TRỢ LÝ NOVA AI ===')
