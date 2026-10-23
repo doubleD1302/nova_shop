@@ -6,6 +6,7 @@ import '../models/product.dart';
 import '../models/banner_item.dart';
 import '../models/flash_sale_item.dart';
 import '../data/website_data.dart';
+import '../utils/product_image_resolver.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
@@ -40,8 +41,9 @@ class CatalogService {
 
   CatalogService._internal({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Lấy danh sách danh mục sản phẩm từ Backend API (Ưu tiên 100% dữ liệu thực tế)
-  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = false}) async {
+  /// Lấy danh sách danh mục sản phẩm từ Backend API (kết hợp đầy đủ 12 ngành hàng giao diện)
+  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = true}) async {
+    List<CategoryItem> apiCategories = [];
     try {
       final res = await _client.get(
         Uri.parse(ApiConfig.categoriesUrl),
@@ -52,14 +54,24 @@ class CatalogService {
         final Map<String, dynamic> body = jsonDecode(res.body);
         if (body['success'] == true && body['data'] is List) {
           final list = body['data'] as List;
-          final apiCategories = list.map((e) => CategoryItem.fromJson(e as Map<String, dynamic>)).toList();
-          if (apiCategories.isNotEmpty) {
-            return apiCategories;
-          }
+          apiCategories = list.map((e) => CategoryItem.fromJson(e as Map<String, dynamic>)).toList();
         }
       }
     } catch (_) {}
-    return mergeWebsiteData ? WebsiteData.categories : [];
+
+    if (mergeWebsiteData) {
+      // Hợp nhất để luôn hiển thị đầy đủ 12 ngành hàng, ưu tiên dữ liệu từ API
+      final categoryMap = <String, CategoryItem>{};
+      for (final c in WebsiteData.categories) {
+        categoryMap[c.slug ?? c.id] = c;
+      }
+      for (final c in apiCategories) {
+        categoryMap[c.slug ?? c.id] = c;
+      }
+      return categoryMap.values.toList();
+    }
+
+    return apiCategories.isNotEmpty ? apiCategories : WebsiteData.categories;
   }
 
   /// Lấy danh sách ngành hàng/danh mục dạng thô từ Backend
@@ -72,13 +84,13 @@ class CatalogService {
     return [];
   }
 
-  /// Lấy danh sách sản phẩm từ Backend API (Ưu tiên 100% dữ liệu thực từ MySQL)
+  /// Lấy danh sách sản phẩm từ Backend API (Ưu tiên kết hợp dữ liệu thực từ MySQL và danh mục website)
   Future<List<Product>> getProducts({
     String? categoryId,
     bool? isFlashSale,
     bool? isFeatured,
     String? filterTab,
-    bool mergeWebsiteData = false,
+    bool mergeWebsiteData = true,
   }) async {
     List<Product> allProducts = [];
 
@@ -104,28 +116,26 @@ class CatalogService {
       }
     } catch (_) {}
 
-    if (allProducts.isNotEmpty) {
-      var result = allProducts;
-      if (categoryId != null && categoryId.isNotEmpty) {
-        result = result.where((p) => p.categoryId == categoryId || p.categoryName.toLowerCase().contains(categoryId.toLowerCase())).toList();
-      }
-      if (isFlashSale == true) {
-        result = result.where((p) => p.isFlashSale).toList();
-      }
-      return result;
-    }
-
-    if (!mergeWebsiteData) return [];
-
     final productMap = <String, Product>{};
-    for (final p in WebsiteData.products) {
-      productMap[p.id] = p;
+    if (mergeWebsiteData) {
+      for (final p in WebsiteData.products) {
+        productMap[p.id] = p;
+      }
     }
+    for (final p in allProducts) {
+      // Giữ lại ảnh sắc nét nếu API trả về sản phẩm không có ảnh
+      if (productMap.containsKey(p.id) && (p.imageUrl.isEmpty || !p.imageUrl.startsWith('http'))) {
+        productMap[p.id] = p.copyWith(imageUrl: productMap[p.id]!.imageUrl);
+      } else {
+        productMap[p.id] = p;
+      }
+    }
+
     var result = productMap.values.toList();
 
-    // Lọc theo danh mục
+    // Lọc theo danh mục với bộ so khớp thông minh
     if (categoryId != null && categoryId.isNotEmpty) {
-      result = result.where((p) => p.categoryId == categoryId || p.categoryName.toLowerCase().contains(categoryId.toLowerCase())).toList();
+      result = result.where((p) => matchesCategory(p, categoryId)).toList();
     }
 
     // Lọc theo Flash Sale
@@ -236,10 +246,19 @@ class CatalogService {
               (origPrice > price && origPrice > 0 ? (((origPrice - price) / origPrice) * 100).round() : 0);
           final stock = num.tryParse(m['stock']?.toString() ?? '') ?? 50;
 
+          final itemId = m['id']?.toString() ?? '';
+          final itemName = m['name']?.toString() ?? 'Sản phẩm Flash Sale';
+          final rawImg = m['imageUrl']?.toString() ?? '';
+          final resolvedImg = ProductImageResolver.resolve(
+            id: itemId,
+            imageUrl: rawImg,
+            name: itemName,
+          );
+
           return FlashSaleItem(
-            id: m['id']?.toString() ?? '',
-            name: m['name']?.toString() ?? 'Sản phẩm Flash Sale',
-            imageUrl: m['imageUrl']?.toString() ?? '',
+            id: itemId,
+            name: itemName,
+            imageUrl: resolvedImg,
             price: price.toDouble(),
             discount: discount.toInt(),
             soldPercentage: 0.65,
@@ -256,7 +275,7 @@ class CatalogService {
           return FlashSaleItem(
             id: p.id,
             name: p.name,
-            imageUrl: p.imageUrl,
+            imageUrl: p.effectiveImageUrl,
             price: p.price,
             discount: p.discount > 0 ? p.discount : 35,
             soldPercentage: p.soldPercent / 100.0,
@@ -268,7 +287,7 @@ class CatalogService {
     } catch (e) {
       debugPrint('[CatalogService] getFlashSaleItems error: $e');
     }
-    return [];
+    return WebsiteData.flashSales;
   }
 
   /// Lấy chi tiết sản phẩm
@@ -339,6 +358,89 @@ class CatalogService {
     return WebsiteData.commitments;
   }
 
+  /// So khớp sản phẩm với ngành hàng / danh mục một cách thông minh và linh hoạt
+  static bool matchesCategory(Product p, String categoryTarget) {
+    final target = categoryTarget.trim().toLowerCase();
+    if (target.isEmpty) return true;
+
+    final pCatId = p.categoryId.trim().toLowerCase();
+    final pCatName = p.categoryName.trim().toLowerCase();
+
+    // 1. Khớp trực tiếp ID hoặc Tên
+    if (pCatId == target || pCatName == target) return true;
+
+    // 2. Bộ từ điển ánh xạ ngành hàng: slug <-> ID <-> tên đầy đủ <-> từ khóa nhận diện
+    final Map<String, List<String>> aliases = {
+      'thoi-trang-nam': [
+        'thoi-trang-nam', 'thoi trang nam', 'thoitrangnam', 'nam', 'ao nam', 'quan nam', '1'
+      ],
+      'thoi-trang-nu': [
+        'thoi-trang-nu', 'thoi trang nu', 'thoitrangnu', 'nu', 'áo nữ', 'váy', 'đầm', 'túi xách', '2'
+      ],
+      'dien-thoai': [
+        'dien-thoai', 'điện thoại & phụ kiện', 'điện thoại và phụ kiện', 'điện thoại', 'phụ kiện',
+        'dienthoai', 'tai nghe', 'sạc', 'cáp', 'pin dự phòng', '3'
+      ],
+      'may-tinh': [
+        'may-tinh', 'máy tính & laptop', 'máy tính và laptop', 'máy tính', 'laptop', 'maytinh',
+        'bàn phím', 'chuột', 'màn hình', 'pc', '4'
+      ],
+      'thiet-bi-gia-dung': [
+        'thiet-bi-gia-dung', 'thiết bị gia dụng', 'gia dụng', 'thietbigiadung', 'gia-dung',
+        'robot hút bụi', 'nồi chiên', 'ấm đun', 'máy lọc không khí', '5'
+      ],
+      'sac-dep': [
+        'sac-dep', 'sắc đẹp & chăm sóc da', 'sắc đẹp và chăm sóc da', 'sắc đẹp', 'chăm sóc da',
+        'mỹ phẩm', 'sacdep', 'son', 'serum', 'tẩy trang', 'sữa rửa mặt', '6'
+      ],
+      'nha-cua': [
+        'nha-cua', 'nhà cửa & đời sống', 'nhà cửa và đời sống', 'nhà cửa', 'đời sống',
+        'nhacua', 'chảo', 'nồi', 'gối', 'đèn', 'kệ', 'nến', 'thảm', 'dép', 'ghế', '7'
+      ],
+      'me-be': [
+        'me-be', 'mẹ & bé yêu', 'mẹ & bé', 'mẹ và bé yêu', 'mẹ và bé', 'mebe',
+        'xe đẩy', 'bỉm', 'tã', 'ghế ăn dặm', '8'
+      ],
+      'bach-hoa': [
+        'bach-hoa', 'bách hóa online', 'bách hóa', 'bachhoa', 'thực phẩm', 'cà phê', 'trà', 'tiêu dùng', '9'
+      ],
+      'the-thao': [
+        'the-thao', 'thể thao & du lịch', 'thể thao và du lịch', 'thể thao', 'thethao',
+        'xe đạp', 'bóng đá', 'du lịch', '10'
+      ],
+      'o-to-xe-may': [
+        'o-to-xe-may', 'ô tô & xe máy', 'ô tô và xe máy', 'ô tô', 'xe máy', 'otoxemay',
+        'mũ bảo hiểm', 'bơm lốp', 'phụ tùng', '11'
+      ],
+      'may-anh': [
+        'may-anh', 'máy ảnh & máy quay', 'máy ảnh và máy quay', 'máy ảnh', 'máy quay',
+        'mayanh', 'camera', 'ống kính', '12'
+      ],
+    };
+
+    // Tìm canonical key cho target
+    String? matchedCanonicalKey;
+    for (final entry in aliases.entries) {
+      if (entry.key == target || entry.value.any((alias) => alias == target || target.contains(alias) || alias.contains(target))) {
+        matchedCanonicalKey = entry.key;
+        break;
+      }
+    }
+
+    if (matchedCanonicalKey != null) {
+      if (pCatId == matchedCanonicalKey) return true;
+      final group = aliases[matchedCanonicalKey]!;
+      if (group.any((a) => pCatId == a || pCatName == a || pCatName.contains(a))) {
+        return true;
+      }
+    }
+
+    // 3. So khớp substring tên ngành hàng
+    if (pCatName.contains(target) || target.contains(pCatName)) return true;
+
+    return false;
+  }
+
   /// Tìm kiếm sản phẩm thông minh và lấy danh sách sản phẩm liên quan
   Future<SearchResult> searchProducts(
     String query, {
@@ -351,11 +453,11 @@ class CatalogService {
     List<Product> results = [];
     bool isExact = true;
 
-    // 1. Thử gọi API Backend phân trang kèm query 'q'
-    if (q.isNotEmpty) {
+    // 1. Thử gọi API Backend nếu có từ khóa q HOẶC có categoryId
+    if (q.isNotEmpty || (categoryId != null && categoryId.isNotEmpty)) {
       try {
         final apiResult = await getProductsPaginated(
-          q: query.trim(),
+          q: q.isNotEmpty ? query.trim() : null,
           sort: sort,
           mall: mall,
           freeship: freeship,
@@ -419,7 +521,10 @@ class CatalogService {
       results = results.where((p) => p.badges.any((b) => b.toUpperCase().contains('FREESHIP'))).toList();
     }
     if (categoryId != null && categoryId.isNotEmpty) {
-      results = results.where((p) => p.categoryId == categoryId || p.categoryName.toLowerCase().contains(categoryId.toLowerCase())).toList();
+      final categoryFiltered = results.where((p) => matchesCategory(p, categoryId)).toList();
+      if (categoryFiltered.isNotEmpty || q.isEmpty) {
+        results = categoryFiltered;
+      }
     }
 
     // 4. Sắp xếp kết quả

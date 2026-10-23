@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
+import '../../utils/product_image_resolver.dart';
 
 class FlashSaleItemCard extends StatelessWidget {
   final FlashSaleItem item;
@@ -64,17 +65,34 @@ class FlashSaleItemCard extends StatelessWidget {
                           ),
                         ),
                         child: Center(
-                          child: item.imageUrl.isNotEmpty && item.imageUrl.startsWith('http')
-                              ? Image.network(
-                                  item.imageUrl,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  errorBuilder: (_, __, ___) => Center(
-                                    child: Text(item.emoji, style: const TextStyle(fontSize: 44)),
+                          child: Image.network(
+                            item.effectiveImageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: const Color(0xFFFFF0EC),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEE4D2D)),
                                   ),
-                                )
-                              : Text(item.emoji, style: const TextStyle(fontSize: 44)),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Image.network(
+                              ProductImageResolver.resolve(id: item.id, name: item.name),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(item.emoji, style: const TextStyle(fontSize: 44)),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       if (item.discount > 0)

@@ -744,7 +744,7 @@ class _ShopScreenState extends State<ShopScreen> {
               Row(
                 children: shopProducts.take(3).map((p) {
                   final priceFormatted = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(p.price);
-                  return _buildShopProductPreview(p.name, priceFormatted, p.id, p.imageUrl, p.emoji);
+                  return _buildShopProductPreview(p.name, priceFormatted, p.id, p.effectiveImageUrl, p.emoji);
                 }).toList(),
               )
             else

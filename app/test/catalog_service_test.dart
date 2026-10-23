@@ -6,6 +6,7 @@ import 'package:shopnova/services/catalog_service.dart';
 import 'package:shopnova/models/category_item.dart';
 import 'package:shopnova/models/product.dart';
 import 'package:shopnova/models/banner_item.dart';
+import 'package:shopnova/data/website_data.dart';
 
 void main() {
   group('CatalogService Tests', () {
@@ -122,12 +123,55 @@ void main() {
       expect(result.products.any((p) => p.name.toLowerCase().contains('tai nghe')), true);
     });
 
-    test('searchProducts returns fallback related products for obscure query', () async {
+    test('searchProducts with categoryId returns matching products for all 12 categories', () async {
       final service = CatalogService();
-      final result = await service.searchProducts('xyz12345nonexistent');
+      final testCategories = [
+        'thoi-trang-nam',
+        'thoi-trang-nu',
+        'dien-thoai',
+        'may-tinh',
+        'thiet-bi-gia-dung',
+        'sac-dep',
+        'nha-cua',
+        'me-be',
+        'bach-hoa',
+        'the-thao',
+        'o-to-xe-may',
+        'may-anh',
+      ];
 
-      expect(result.products.isNotEmpty, true);
-      expect(result.isExactMatch, false);
+      for (final catId in testCategories) {
+        final result = await service.searchProducts('', categoryId: catId);
+        expect(
+          result.products.isNotEmpty,
+          true,
+          reason: 'Category $catId should have at least 1 product when clicked',
+        );
+      }
+    });
+
+    test('all products in WebsiteData have real https image URLs and not empty', () {
+      final products = WebsiteData.products;
+      expect(products.isNotEmpty, true);
+      for (final p in products) {
+        expect(
+          p.imageUrl.startsWith('https://'),
+          true,
+          reason: 'Product ${p.id} (${p.name}) must have a real https image URL',
+        );
+      }
+    });
+
+    test('all banners in WebsiteData have real https image URLs', () {
+      final banners = WebsiteData.banners;
+      expect(banners.isNotEmpty, true);
+      for (final b in banners) {
+        expect(
+          b.imageUrl.startsWith('https://'),
+          true,
+          reason: 'Banner ${b.id} must have a real https image URL',
+        );
+      }
     });
   });
 }

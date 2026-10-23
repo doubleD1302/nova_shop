@@ -1,3 +1,5 @@
+import '../utils/product_image_resolver.dart';
+
 class Product {
   final String id;
   final String name;
@@ -48,6 +50,64 @@ class Product {
     this.shopId = '',
   });
 
+  /// Luôn trả về hình ảnh thật chuẩn mực sắc nét của sản phẩm
+  String get effectiveImageUrl => ProductImageResolver.resolve(
+        id: id,
+        imageUrl: imageUrl,
+        categoryId: categoryId,
+        name: name,
+      );
+
+  Product copyWith({
+    String? id,
+    String? name,
+    String? imageUrl,
+    double? price,
+    double? originalPrice,
+    int? discount,
+    double? rating,
+    String? soldCount,
+    List<String>? badges,
+    bool? isFavorite,
+    bool? isFlashSale,
+    bool? isFeatured,
+    String? shopName,
+    String? categoryName,
+    String? description,
+    List<String>? images,
+    Map<String, dynamic>? specs,
+    String? emoji,
+    String? location,
+    int? soldPercent,
+    String? categoryId,
+    String? shopId,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      imageUrl: imageUrl ?? this.imageUrl,
+      price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
+      discount: discount ?? this.discount,
+      rating: rating ?? this.rating,
+      soldCount: soldCount ?? this.soldCount,
+      badges: badges ?? this.badges,
+      isFavorite: isFavorite ?? this.isFavorite,
+      isFlashSale: isFlashSale ?? this.isFlashSale,
+      isFeatured: isFeatured ?? this.isFeatured,
+      shopName: shopName ?? this.shopName,
+      categoryName: categoryName ?? this.categoryName,
+      description: description ?? this.description,
+      images: images ?? this.images,
+      specs: specs ?? this.specs,
+      emoji: emoji ?? this.emoji,
+      location: location ?? this.location,
+      soldPercent: soldPercent ?? this.soldPercent,
+      categoryId: categoryId ?? this.categoryId,
+      shopId: shopId ?? this.shopId,
+    );
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
     final rawPrice = json['price'];
     final rawOrig = json['originalPrice'];
@@ -91,7 +151,7 @@ class Product {
 
     final discount = (json['discount'] as num?)?.toInt() ?? 0;
     final rating = (json['rating'] as num?)?.toDouble() ?? 4.9;
-    final img = json['imageUrl']?.toString() ?? (images.isNotEmpty ? images.first : '');
+    
     final shopObj = json['shop'];
     final sName = (shopObj is Map && shopObj['name'] != null)
         ? shopObj['name'].toString()
@@ -112,9 +172,21 @@ class Product {
         ? shopObj['province'].toString()
         : (json['province']?.toString() ?? json['location']?.toString() ?? 'TP. Hồ Chí Minh');
 
+    final prodId = json['id']?.toString() ?? '';
+    final prodName = json['name']?.toString() ?? '';
+
+    // Phân giải hình ảnh thật: ưu tiên imageUrl từ API, rồi images list, rồi phân giải tự động
+    String img = json['imageUrl']?.toString() ?? (images.isNotEmpty ? images.first : '');
+    img = ProductImageResolver.resolve(
+      id: prodId,
+      imageUrl: img,
+      categoryId: cId,
+      name: prodName,
+    );
+
     return Product(
-      id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? '',
+      id: prodId,
+      name: prodName,
       imageUrl: img,
       price: priceVal,
       originalPrice: origVal > 0 ? origVal : priceVal,
@@ -128,7 +200,7 @@ class Product {
       shopName: sName,
       categoryName: cName,
       description: json['description']?.toString() ?? '',
-      images: images,
+      images: images.isNotEmpty ? images : [img],
       specs: specs,
       emoji: json['emoji']?.toString() ?? '🛍️',
       location: loc,
@@ -138,3 +210,4 @@ class Product {
     );
   }
 }
+

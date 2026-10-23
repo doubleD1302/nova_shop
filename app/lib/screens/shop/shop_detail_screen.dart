@@ -527,17 +527,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 child: Container(
                   width: double.infinity,
                   color: const Color(0xFFF7F7F8),
-                  child: p.imageUrl.startsWith('http')
-                      ? Image.network(
-                          p.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
-                            child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 36)),
-                          ),
-                        )
-                      : Center(
-                          child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 36)),
-                        ),
+                  child: Image.network(
+                    p.effectiveImageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(p.emoji.isNotEmpty ? p.emoji : '🛍️', style: const TextStyle(fontSize: 36)),
+                    ),
+                  ),
                 ),
               ),
             ),

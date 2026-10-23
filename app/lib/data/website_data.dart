@@ -73,28 +73,28 @@ class WebsiteData {
       title: 'MEGA SALE 9.9',
       subtitle: 'Và đặc quyền Freeship bù Ủ Ủ toàn quốc hôm nay.',
       backgroundColor: Color(0xFFF53D2D),
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80',
     ),
     const BannerItem(
       id: 'b2',
       title: 'FREESHIP EXTRA',
       subtitle: 'Giảm thêm 50% phí vận chuyển cho mọi đơn hàng.',
       backgroundColor: Color(0xFFFF6B81),
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80',
     ),
     const BannerItem(
       id: 'b3',
       title: 'HÀNG MỚI MỖI NGÀY',
       subtitle: 'Áp dụng cho mọi đơn hàng đầu tiên.',
       backgroundColor: Color(0xFF3A3F47),
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
     ),
     const BannerItem(
       id: 'b4',
       title: 'NOVA MALL',
       subtitle: 'Hàng hiệu 100% - Chính hãng trả góp 0%',
       backgroundColor: Color(0xFF153A9C),
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1468495244123-6c6c332eeede?auto=format&fit=crop&w=1200&q=80',
     ),
   ];
 
@@ -239,7 +239,7 @@ class WebsiteData {
     const FlashSaleItem(
       id: 'p01',
       name: 'Tai nghe Bluetooth Nova Sound Pro Chống Ồn ANC',
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
       price: 890000,
       discount: 52,
       soldPercentage: 0.82,
@@ -249,7 +249,7 @@ class WebsiteData {
     const FlashSaleItem(
       id: 'p02',
       name: 'Robot Hút Bụi Lau Nhà Tự Động Smart Cleaner Laser',
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=600&q=80',
       price: 3250000,
       discount: 45,
       soldPercentage: 0.61,
@@ -259,7 +259,7 @@ class WebsiteData {
     const FlashSaleItem(
       id: 'p03',
       name: 'Bàn Phím Cơ Không Dây 3 Chế Độ Kết Nối Hotswap',
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80',
       price: 649000,
       discount: 59,
       soldPercentage: 0.95,
@@ -269,7 +269,7 @@ class WebsiteData {
     const FlashSaleItem(
       id: 'p04',
       name: 'Tinh Chất Dưỡng Trắng & Phục Hồi Da Chuyên Sâu NIVITA',
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80',
       price: 415000,
       discount: 40,
       soldPercentage: 0.78,
@@ -279,7 +279,7 @@ class WebsiteData {
     const FlashSaleItem(
       id: 'p05',
       name: 'Giày Sneaker Thể Thao Nam Siêu Nhẹ Kháng Khuẩn',
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
       price: 520000,
       discount: 48,
       soldPercentage: 0.88,
@@ -444,7 +444,7 @@ class WebsiteData {
       badges: ['MALL', 'YÊU THÍCH+'],
       isFlashSale: true,
       soldPercent: 82,
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
       description: 'Tai nghe Bluetooth Nova Sound Pro ANC được phân phối chính thức bởi NovaAudio Official. Chống ồn chủ động đỉnh cao, âm thanh Hi-Res chân thực.',
       specs: {'Thương hiệu': 'NovaAudio', 'Bảo hành': '12 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
@@ -465,7 +465,7 @@ class WebsiteData {
       badges: ['YÊU THÍCH+'],
       isFlashSale: true,
       soldPercent: 61,
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=600&q=80',
       description: 'Robot Hút Bụi Lau Nhà Tự Động Smart Cleaner Laser quét laser định vị phòng, điều khiển qua ứng dụng tiếng Việt tiện lợi.',
       specs: {'Thương hiệu': 'SmartCleaner', 'Bảo hành': '12 tháng', 'Gửi từ': 'Đà Nẵng'},
     ),
@@ -486,7 +486,7 @@ class WebsiteData {
       badges: ['MALL'],
       isFlashSale: true,
       soldPercent: 95,
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80',
       description: 'Bàn phím cơ hotswap 3 chế độ Bluetooth 5.0, 2.4Ghz, Type-C. Switch gõ êm mượt, LED RGB sống động.',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '24 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
@@ -507,7 +507,7 @@ class WebsiteData {
       badges: ['MALL'],
       isFlashSale: true,
       soldPercent: 78,
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80',
       description: 'Tinh chất dưỡng trắng phục hồi da chuyên sâu NIVITA thuần chay 100%, bổ sung vitamin B5 và Niacinamide dưỡng ẩm mờ thâm.',
       specs: {'Thương hiệu': 'Cocoon', 'Bảo hành': 'Không bảo hành', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
@@ -528,7 +528,7 @@ class WebsiteData {
       badges: ['YÊU THÍCH+'],
       isFlashSale: true,
       soldPercent: 88,
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
       description: 'Giày Sneaker nam thiết kế trẻ trung năng động, đế lót cao su êm ái thoáng khí kháng khuẩn suốt cả ngày.',
       specs: {'Thương hiệu': 'FashionHouse', 'Bảo hành': 'Không bảo hành', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
@@ -549,7 +549,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🔌',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Bảo hành': '18 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -567,7 +567,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🧵',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Bảo hành': '18 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -585,7 +585,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🔋',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Bảo hành': '18 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -605,7 +605,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '☕',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Bảo hành': 'Không bảo hành', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -623,7 +623,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🥒',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1608248597359-53e77f0a8c2f?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Bảo hành': 'Không bảo hành', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -641,7 +641,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '💧',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Bảo hành': 'Không bảo hành', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -661,7 +661,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '👕',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -679,7 +679,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🍶',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'SmartCleaner', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -697,7 +697,7 @@ class WebsiteData {
       location: 'Đà Nẵng',
       emoji: '🖱️',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '24 tháng', 'Gửi từ': 'Đà Nẵng'},
     ),
     const Product(
@@ -715,7 +715,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '👜',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -733,7 +733,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🌫️',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'GreenLiving', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -751,7 +751,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '⌚',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -769,7 +769,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🍳',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1584990347449-397a61be6b8e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Bếp Xinh', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -787,7 +787,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🧴',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -805,7 +805,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🧲',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1622445262464-84b14e32452e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -823,7 +823,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🕶️',
       badges: ['YÊU THÍCH+', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -841,7 +841,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🫖',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1594213114663-dd9f85c490a6?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'SmartCleaner', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -859,7 +859,7 @@ class WebsiteData {
       location: 'Bình Dương',
       emoji: '🥿',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Sài Gòn Home', 'Gửi từ': 'Bình Dương'},
     ),
 
@@ -879,7 +879,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '📱',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1511707171634-5f897ff02560?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '12 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -897,7 +897,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '📲',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '24 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -915,7 +915,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '💻',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '24 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -933,7 +933,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🎮',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1599669454699-248893623440?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'NovaAudio', 'Bảo hành': '24 tháng', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -951,7 +951,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🔊',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'NovaAudio', 'Bảo hành': '12 tháng', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -969,7 +969,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🔋',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1618556450994-a6a128ef0d9d?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Bảo hành': '18 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -987,7 +987,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🔌',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1622445262464-84b14e32452e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Anker', 'Bảo hành': '18 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -1007,7 +1007,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '👔',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1025,7 +1025,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '👖',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1043,7 +1043,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '👗',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1061,7 +1061,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🧥',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'FashionHouse', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -1081,7 +1081,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '💄',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1099,7 +1099,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🧼',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1556228722-d0b5d5b7db5b?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1117,7 +1117,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🌸',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Cocoon', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -1137,7 +1137,7 @@ class WebsiteData {
       location: 'Đà Nẵng',
       emoji: '🧹',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'SmartCleaner', 'Bảo hành': '12 tháng', 'Gửi từ': 'Đà Nẵng'},
     ),
     const Product(
@@ -1155,7 +1155,7 @@ class WebsiteData {
       location: 'Đà Nẵng',
       emoji: '🍟',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1585515320310-259814833e62?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'SmartCleaner', 'Bảo hành': '12 tháng', 'Gửi từ': 'Đà Nẵng'},
     ),
     const Product(
@@ -1173,7 +1173,7 @@ class WebsiteData {
       location: 'Đà Nẵng',
       emoji: '💨',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'SmartCleaner', 'Bảo hành': '12 tháng', 'Gửi từ': 'Đà Nẵng'},
     ),
     const Product(
@@ -1191,7 +1191,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🍲',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1584990347449-397a61be6b8e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Bếp Xinh', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -1209,7 +1209,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🔪',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1593618998160-e34014e67546?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Bếp Xinh', 'Gửi từ': 'Hà Nội'},
     ),
 
@@ -1229,7 +1229,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🗄️',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Nhà Xinh', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -1247,7 +1247,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '💡',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Nhà Xinh', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -1265,7 +1265,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🛏️',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Nhà Xinh', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -1283,7 +1283,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '🪑',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1580481077111-96860d5b51c1?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Nhà Xinh', 'Gửi từ': 'Hà Nội'},
     ),
 
@@ -1303,7 +1303,7 @@ class WebsiteData {
       location: 'Cần Thơ',
       emoji: '🍼',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Mẹ & Bé', 'Gửi từ': 'Cần Thơ'},
     ),
     const Product(
@@ -1321,7 +1321,7 @@ class WebsiteData {
       location: 'Cần Thơ',
       emoji: '🧷',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Mẹ & Bé', 'Gửi từ': 'Cần Thơ'},
     ),
     const Product(
@@ -1339,7 +1339,7 @@ class WebsiteData {
       location: 'Cần Thơ',
       emoji: '🧒',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Mẹ & Bé', 'Gửi từ': 'Cần Thơ'},
     ),
 
@@ -1359,7 +1359,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🕯️',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'GreenLiving', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1377,7 +1377,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🪔',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'GreenLiving', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1395,7 +1395,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '☕',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'GreenLiving', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1413,7 +1413,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🍵',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'GreenLiving', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
 
@@ -1433,7 +1433,7 @@ class WebsiteData {
       location: 'Bình Dương',
       emoji: '🧶',
       badges: ['YÊU THÍCH+'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Sài Gòn Home', 'Gửi từ': 'Bình Dương'},
     ),
     const Product(
@@ -1451,7 +1451,7 @@ class WebsiteData {
       location: 'Bình Dương',
       emoji: '🥡',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Sài Gòn Home', 'Gửi từ': 'Bình Dương'},
     ),
     const Product(
@@ -1469,7 +1469,7 @@ class WebsiteData {
       location: 'Bình Dương',
       emoji: '🚲',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Sài Gòn Home', 'Bảo hành': '3 tháng', 'Gửi từ': 'Bình Dương'},
     ),
     const Product(
@@ -1487,7 +1487,7 @@ class WebsiteData {
       location: 'Bình Dương',
       emoji: '⚽',
       badges: ['Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'Sài Gòn Home', 'Bảo hành': '3 tháng', 'Gửi từ': 'Bình Dương'},
     ),
 
@@ -1507,7 +1507,7 @@ class WebsiteData {
       location: 'Hà Nội',
       emoji: '📷',
       badges: ['MALL', 'Freeship Xtra'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'NovaAudio', 'Bảo hành': '24 tháng', 'Gửi từ': 'Hà Nội'},
     ),
     const Product(
@@ -1525,7 +1525,7 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '🎥',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '24 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
     const Product(
@@ -1543,9 +1543,67 @@ class WebsiteData {
       location: 'TP. Hồ Chí Minh',
       emoji: '⌚',
       badges: ['MALL'],
-      imageUrl: '',
+      imageUrl: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=600&q=80',
       specs: {'Thương hiệu': 'TechZone', 'Bảo hành': '12 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
     ),
+    const Product(
+      id: 'p61',
+      name: 'Mũ Bảo Hiểm 3/4 Kính Âm Cao Cấp Phượt Thủ',
+      shopId: 'sg-home',
+      shopName: 'Sài Gòn Home Store',
+      categoryId: 'o-to-xe-may',
+      categoryName: 'Ô tô & Xe máy',
+      price: 349000,
+      originalPrice: 550000,
+      discount: 37,
+      rating: 4.8,
+      soldCount: 'Đã bán 4.1k',
+      location: 'TP. Hồ Chí Minh',
+      emoji: '🛵',
+      badges: ['MALL', 'Freeship Xtra'],
+      imageUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
+      description: 'Mũ bảo hiểm 3/4 kính âm chính hãng cao cấp, vỏ ABS chống va đập, lót êm kháng khuẩn thoáng khí.',
+      specs: {'Thương hiệu': 'Royal Helmet', 'Bảo hành': '12 tháng', 'Gửi từ': 'TP. Hồ Chí Minh'},
+    ),
+    const Product(
+      id: 'p62',
+      name: 'Bơm Lốp Ô Tô Điện Tử Tự Ngắt Mini 12V Đồng Hồ Số',
+      shopId: 'gia-dung-24h',
+      shopName: 'Gia Dụng Thông Minh 24h',
+      categoryId: 'o-to-xe-may',
+      categoryName: 'Ô tô & Xe máy',
+      price: 489000,
+      originalPrice: 790000,
+      discount: 38,
+      rating: 4.9,
+      soldCount: 'Đã bán 2.6k',
+      location: 'Hà Nội',
+      emoji: '🚗',
+      badges: ['MALL'],
+      imageUrl: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+      description: 'Máy bơm lốp ô tô xe máy điện tử tự ngắt khi đủ áp suất, đèn LED chiếu sáng ban đêm tiện lợi.',
+      specs: {'Thương hiệu': 'Baseus', 'Bảo hành': '12 tháng', 'Gửi từ': 'Hà Nội'},
+    ),
+    const Product(
+      id: 'p63',
+      name: 'Giá Đỡ Điện Thoại Xe Máy Chống Rung Hợp Kim Nhôm',
+      shopId: 'techzone',
+      shopName: 'TechZone Store',
+      categoryId: 'o-to-xe-may',
+      categoryName: 'Ô tô & Xe máy',
+      price: 189000,
+      originalPrice: 290000,
+      discount: 35,
+      rating: 4.7,
+      soldCount: 'Đã bán 6.8k',
+      location: 'Đà Nẵng',
+      emoji: '🏍️',
+      badges: ['YÊU THÍCH+'],
+      imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=600&q=80',
+      description: 'Giá kẹp điện thoại xe máy hợp kim nhôm CNC chống rung, xoay 360 độ, phù hợp mọi dòng smartphone.',
+      specs: {'Thương hiệu': 'Motowolf', 'Bảo hành': '6 tháng', 'Gửi từ': 'Đà Nẵng'},
+    ),
+
   ];
 
   // 7. TẠI SAO MUA HÀNG TẠI SHOPNOVA (src/data/homeContent.js -> commitments)

@@ -464,18 +464,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               child: Center(
-                child: _product?.imageUrl != null && _product!.imageUrl.startsWith('http')
+                child: _product != null
                     ? Image.network(
-                        _product!.imageUrl,
+                        _product!.effectiveImageUrl,
                         fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color: const Color(0xFFFFF5F2),
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Color(0xFFEE4D2D)),
+                            ),
+                          );
+                        },
                         errorBuilder: (_, __, ___) => Text(
                           _product?.emoji.isNotEmpty == true ? _product!.emoji : '🛍️',
                           style: const TextStyle(fontSize: 100),
                         ),
                       )
-                    : Text(
-                        _product?.emoji.isNotEmpty == true ? _product!.emoji : '🛍️',
-                        style: const TextStyle(fontSize: 100),
+                    : const Center(
+                        child: CircularProgressIndicator(color: Color(0xFFEE4D2D)),
                       ),
               ),
             ),

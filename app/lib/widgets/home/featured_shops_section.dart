@@ -6,6 +6,7 @@ import '../../services/shop_service.dart';
 import '../../screens/product_detail/product_detail_screen.dart';
 import '../../screens/shop/shop_screen.dart';
 import '../../screens/shop/shop_detail_screen.dart';
+import '../../utils/product_image_resolver.dart';
 
 /// Section Gian Hàng Nổi Bật trên Trang Chủ (Kết nối 100% dữ liệu Backend API)
 class FeaturedShopsSection extends StatefulWidget {
@@ -361,23 +362,20 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             clipBehavior: Clip.antiAlias,
-                                            child: p.imageUrl.isNotEmpty
-                                                ? Image.network(
-                                                    p.imageUrl,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) => Center(
-                                                      child: Text(
-                                                        p.emoji.isNotEmpty ? p.emoji : '🛍️',
-                                                        style: const TextStyle(fontSize: 26),
-                                                      ),
-                                                    ),
-                                                  )
-                                                : Center(
-                                                    child: Text(
-                                                      p.emoji.isNotEmpty ? p.emoji : '🛍️',
-                                                      style: const TextStyle(fontSize: 26),
-                                                    ),
+                                            child: Image.network(
+                                              p.effectiveImageUrl,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Image.network(
+                                                ProductImageResolver.resolve(categoryId: p.categoryId, name: p.name),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => Center(
+                                                  child: Text(
+                                                    p.emoji.isNotEmpty ? p.emoji : '🛍️',
+                                                    style: const TextStyle(fontSize: 26),
                                                   ),
+                                                ),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 4),

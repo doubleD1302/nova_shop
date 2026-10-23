@@ -19,11 +19,25 @@ INSERT INTO shops (id, owner_id, slug, name, province) VALUES
 
 INSERT INTO categories (id, slug, name, sort_order) VALUES
   (1, 'thoi-trang-nam', 'Thời trang nam', 1),
-  (2, 'dien-thoai', 'Điện thoại và phụ kiện', 2);
+  (2, 'dien-thoai', 'Điện thoại & Phụ kiện', 2),
+  (3, 'may-tinh', 'Máy tính & Laptop', 3),
+  (4, 'thiet-bi-gia-dung', 'Thiết bị gia dụng', 4),
+  (5, 'sac-dep', 'Sắc đẹp & Chăm sóc da', 5),
+  (6, 'nha-cua', 'Nhà cửa & Đời sống', 6),
+  (7, 'me-be', 'Mẹ & Bé yêu', 7),
+  (8, 'bach-hoa', 'Bách hóa Online', 8),
+  (9, 'the-thao', 'Thể thao & Du lịch', 9),
+  (10, 'o-to-xe-may', 'Ô tô & Xe máy', 10),
+  (11, 'may-anh', 'Máy ảnh & Máy quay', 11),
+  (12, 'thoi-trang-nu', 'Thời trang nữ', 12);
 
 INSERT INTO products (id, shop_id, category_id, slug, name, description, specs, badges, status, is_featured) VALUES
   (1, 1, 1, 'ao-thun-mau', 'Áo thun mẫu', 'Sản phẩm dev có hai SKU.', JSON_OBJECT('Chất liệu','Cotton'), JSON_ARRAY(), 'active', TRUE),
   (2, 2, 2, 'cu-sac-mau', 'Củ sạc mẫu', 'Sản phẩm dev có SKU mặc định.', JSON_OBJECT('Công suất','65W'), JSON_ARRAY(), 'active', TRUE);
+
+INSERT INTO product_images (product_id, url, sort_order) VALUES
+  (1, 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80', 1),
+  (2, 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80', 1);
 
 INSERT INTO product_variants (id, product_id, sku, variant_key, name, attributes, price, original_price, stock_qty) VALUES
   (1, 1, 'DEMO-AO-M', 'size=m', 'Size M', JSON_OBJECT('size','M'), 180000, 220000, 10),

@@ -126,6 +126,14 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   clipBehavior: Clip.antiAlias,
                   child: Stack(
                   children: [
+                    if (banner.imageUrl.isNotEmpty && banner.imageUrl.startsWith('http'))
+                      Positioned.fill(
+                        child: Image.network(
+                          banner.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox(),
+                        ),
+                      ),
                     // Gradient overlay
                     Positioned.fill(
                       child: DecoratedBox(

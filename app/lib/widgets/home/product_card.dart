@@ -4,6 +4,7 @@ import 'package:shopnova/models/product.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/favorite_service.dart';
+import '../../utils/product_image_resolver.dart';
 
 class ProductCard extends StatefulWidget {
   final Product product;
@@ -362,14 +363,40 @@ class _ProductCardState extends State<ProductCard> {
   }
 
   Widget _buildThumbnail(Product p) {
-    if (p.imageUrl.isNotEmpty && p.imageUrl.startsWith('http')) {
-      return Image.network(
-        p.imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildEmojiFallback(p),
-      );
-    }
-    return _buildEmojiFallback(p);
+    final imgUrl = p.effectiveImageUrl;
+    return Image.network(
+      imgUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: const Color(0xFFF9F9FA),
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: progress.expectedTotalBytes != null
+                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                    : null,
+                color: const Color(0xFFEE4D2D),
+              ),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => _buildFallbackImage(p),
+    );
+  }
+
+  Widget _buildFallbackImage(Product p) {
+    final fallbackUrl = ProductImageResolver.resolve(categoryId: p.categoryId, name: p.name);
+    return Image.network(
+      fallbackUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _buildEmojiFallback(p),
+    );
   }
 
   Widget _buildEmojiFallback(Product p) {

@@ -292,12 +292,12 @@ class _SearchScreenState extends State<SearchScreen> {
                               textInputAction: TextInputAction.search,
                               onSubmitted: _performSearch,
                               style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E2022)),
-                              decoration: const InputDecoration(
-                                hintText: 'Tìm kiếm trên ShopNova...',
-                                hintStyle: TextStyle(color: Color(0xFF8F90A6), fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: _categoryName != null ? 'Tìm trong $_categoryName...' : 'Tìm kiếm trên ShopNova...',
+                                hintStyle: const TextStyle(color: Color(0xFF8F90A6), fontSize: 13),
                                 border: InputBorder.none,
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 10),
                               ),
                             ),
                           ),
@@ -439,6 +439,43 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
+          if (_categoryId != null || _categoryName != null) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _categoryId = null;
+                  _categoryName = null;
+                  _pageTitle = null;
+                });
+                if (_currentQuery.isNotEmpty) {
+                  _performSearch(_currentQuery);
+                } else {
+                  _loadBrowsingProducts();
+                }
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFFDDD4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.close_rounded, size: 14, color: Color(0xFFEE4D2D)),
+                    SizedBox(width: 2),
+                    Text(
+                      'Bỏ lọc',
+                      style: TextStyle(fontSize: 11, color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -703,17 +740,21 @@ class _SearchScreenState extends State<SearchScreen> {
             child: const Icon(Icons.search_off_rounded, size: 40, color: Color(0xFFEE4D2D)),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Không tìm thấy sản phẩm nào cho "$_currentQuery"',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Hãy thử kiểm tra lại chính tả hoặc tìm kiếm bằng từ khóa ngắn gọn hơn như "tai nghe", "áo", "giày"...',
-            style: TextStyle(fontSize: 12, color: Color(0xFF8F90A6), height: 1.4),
-            textAlign: TextAlign.center,
-          ),
+            Text(
+              _currentQuery.isNotEmpty
+                  ? 'Không tìm thấy sản phẩm nào cho "$_currentQuery"'
+                  : (_categoryName != null ? 'Chưa có sản phẩm trong ngành hàng "$_categoryName"' : 'Chưa tìm thấy sản phẩm phù hợp'),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _categoryName != null
+                  ? 'Bạn có thể bấm bỏ lọc ngành hàng bên trên để xem toàn bộ sản phẩm trên sàn ShopNova.'
+                  : 'Hãy thử kiểm tra lại chính tả hoặc tìm kiếm bằng từ khóa ngắn gọn hơn như "tai nghe", "áo", "giày"...',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6), height: 1.4),
+              textAlign: TextAlign.center,
+            ),
           const SizedBox(height: 24),
           const Text('Từ khóa gợi ý phổ biến:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
           const SizedBox(height: 12),

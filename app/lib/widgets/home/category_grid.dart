@@ -62,7 +62,7 @@ class CategoryGrid extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => SearchScreen(
                             initialCategory: cat.name,
-                            categoryId: cat.id,
+                            categoryId: (cat.slug != null && cat.slug!.isNotEmpty) ? cat.slug : cat.id,
                             title: 'Ngành hàng: ${cat.name}',
                           ),
                         ),
@@ -172,7 +172,7 @@ class CategoryGrid extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => SearchScreen(
                         initialCategory: category.name,
-                        categoryId: category.id,
+                        categoryId: (category.slug != null && category.slug!.isNotEmpty) ? category.slug : category.id,
                         title: 'Ngành hàng: ${category.name}',
                       ),
                     ),
