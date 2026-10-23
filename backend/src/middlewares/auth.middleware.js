@@ -38,6 +38,43 @@ export function verifyAccessToken(token) {
 }
 
 /**
+ * Thẩm định các claim bắt buộc của Access Token:
+ * - payload phải là object
+ * - sub là chuỗi BIGINT UNSIGNED hợp lệ
+ * - iat và exp là số nguyên dương hợp lệ
+ * - iat không được ở tương lai quá dung sai CLOCK_SKEW_TOLERANCE_SECONDS
+ * - exp - iat bắt buộc phải bằng chính xác ACCESS_TOKEN_EXPIRES_IN (900 giây)
+ */
+export function validateAccessTokenClaims(payload) {
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.sub !== 'string' ||
+    !Number.isInteger(payload.iat) ||
+    payload.iat <= 0 ||
+    !Number.isInteger(payload.exp) ||
+    payload.exp <= payload.iat
+  ) {
+    return false
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  if (payload.iat > nowSeconds + CLOCK_SKEW_TOLERANCE_SECONDS) {
+    return false
+  }
+
+  if (payload.exp - payload.iat !== ACCESS_TOKEN_EXPIRES_IN) {
+    return false
+  }
+
+  if (!isValidBigIntUnsignedString(payload.sub)) {
+    return false
+  }
+
+  return true
+}
+
+/**
  * Middleware xác thực Bearer JWT cho các route yêu cầu đăng nhập.
  * - Kiểm tra Authorization header và cấu trúc 'Bearer <token>'.
  * - Giới hạn độ dài token <= 2048 ký tự.
@@ -106,51 +143,8 @@ export async function authenticate(req, res, next) {
     })
   }
 
-  // Thẩm định cấu trúc và kiểu dữ liệu của các claim bắt buộc
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    typeof payload.sub !== 'string' ||
-    !Number.isInteger(payload.iat) ||
-    payload.iat <= 0 ||
-    !Number.isInteger(payload.exp) ||
-    payload.exp <= payload.iat
-  ) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token xác thực không hợp lệ.',
-      error: {
-        code: 'AUTH_INVALID',
-      },
-    })
-  }
-
-  // Kiểm tra thời gian phát hành (iat) không được ở tương lai vượt quá dung sai lệch đồng hồ cho phép
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  if (payload.iat > nowSeconds + CLOCK_SKEW_TOLERANCE_SECONDS) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token xác thực không hợp lệ.',
-      error: {
-        code: 'AUTH_INVALID',
-      },
-    })
-  }
-
-  // Bắt buộc thời hạn access token khớp chính xác hằng số 900 giây (exp - iat === 900)
-  if (payload.exp - payload.iat !== ACCESS_TOKEN_EXPIRES_IN) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token xác thực không hợp lệ.',
-      error: {
-        code: 'AUTH_INVALID',
-      },
-    })
-  }
-
-  // Validate sub trước khi gọi Data API: chuỗi ID chuẩn, không khoảng trắng, không số 0 đầu, không ký tự lạ và không vượt BIGINT UNSIGNED.
-  // Token sai sub trả 401 AUTH_INVALID mà không gọi upstream.
-  if (!isValidBigIntUnsignedString(payload.sub)) {
+  // Thẩm định cấu trúc và kiểu dữ liệu của các claim bắt buộc (iat, exp, sub, thời hạn 900s)
+  if (!validateAccessTokenClaims(payload)) {
     return res.status(401).json({
       success: false,
       message: 'Token xác thực không hợp lệ.',
@@ -235,8 +229,9 @@ export function requireRole(...allowedRoles) {
 
 /**
  * Middleware xác thực tùy chọn (Optional Authentication).
- * - Nếu request có Bearer token hợp lệ: gắn thông tin userProfile vào req.user.
- * - Nếu không có Authorization header hoặc token không hợp lệ: gán req.user = null và cho tiếp tục.
+ * - Áp dụng chung quy tắc thẩm định JWT với authenticate (bắt buộc iat/exp hợp lệ, thời hạn 900s, sub hợp lệ).
+ * - Nếu token hợp lệ: gắn thông tin userProfile vào req.user.
+ * - Nếu không có Authorization header hoặc token không hợp lệ (bị authenticate từ chối): gán req.user = null, coi như khách vãng lai và KHÔNG gọi upstream.
  * - Phù hợp với các endpoint mở cho cả khách vãng lai và thành viên đăng nhập (như Chat AI).
  */
 export async function optionalAuthenticate(req, res, next) {
@@ -258,12 +253,8 @@ export async function optionalAuthenticate(req, res, next) {
 
   try {
     const payload = verifyAccessToken(token)
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      typeof payload.sub !== 'string' ||
-      !isValidBigIntUnsignedString(payload.sub)
-    ) {
+    if (!validateAccessTokenClaims(payload)) {
+      // Bị từ chối claim: coi như khách vãng lai, tuyệt đối không gọi Data API
       return next()
     }
 

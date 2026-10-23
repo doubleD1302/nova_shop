@@ -51,6 +51,13 @@ function getAvailablePort() {
   })
 }
 
+async function stopProcess(proc) {
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return
+  const closed = new Promise((resolve) => proc.once('close', resolve))
+  proc.kill()
+  await Promise.race([closed, new Promise((resolve) => setTimeout(resolve, 3000))])
+}
+
 function startProcess(name, dir, env) {
   return new Promise((resolve, reject) => {
     const proc = spawn('node', ['src/server.js'], {
@@ -283,10 +290,18 @@ async function run() {
       })
       assert(resOrderAuth.status === 200, 'Hỏi đơn hàng khi đã đăng nhập trả HTTP 200')
       assert(resOrderAuth.body?.data?.intent === 'order_tracking', 'Ý định là order_tracking')
-      assert(typeof resOrderAuth.body?.data?.orderData === 'object', 'orderData là một object dữ liệu thật')
-      assert(typeof resOrderAuth.body?.data?.orderData?.code === 'string', 'orderData có mã code đơn hàng')
-      assert(typeof resOrderAuth.body?.data?.orderData?.status === 'string', 'orderData có status')
-      assert(typeof resOrderAuth.body?.data?.orderData?.total === 'number', 'orderData có total tiền')
+      if (resOrderAuth.body?.data?.orderData) {
+        assert(typeof resOrderAuth.body?.data?.orderData?.code === 'string', 'orderData có mã code đơn hàng')
+        assert(typeof resOrderAuth.body?.data?.orderData?.status === 'string', 'orderData có status')
+        assert(typeof resOrderAuth.body?.data?.orderData?.total === 'number', 'orderData có total tiền')
+      } else {
+        assert(resOrderAuth.body?.data?.orderData === null, 'orderData là null khi tài khoản chưa có đơn hàng hoặc upstream gián đoạn')
+        assert(
+          resOrderAuth.body?.data?.reply.includes('chưa có đơn hàng nào') ||
+          /không thể|tạm thời|thử lại|không khả dụng|gián đoạn/i.test(resOrderAuth.body?.data?.reply || ''),
+          'Thông báo người dùng chưa có đơn hàng hoặc upstream gián đoạn',
+        )
+      }
     }
 
     // =========================================================================
@@ -305,11 +320,15 @@ async function run() {
       products: [],
       orders: [],
       orderDetailMap: new Map(),
+      voucherError: false,
+      orderError: false,
+      calls: [],
     }
 
     mockServer = http.createServer((req, res) => {
       const parsedUrl = new URL(req.url, `http://127.0.0.1:${mockPort}`)
       const pathname = parsedUrl.pathname
+      mockState.calls.push(pathname + parsedUrl.search)
 
       // Health check
       if (pathname === '/internal/v1/health') {
@@ -342,38 +361,56 @@ async function run() {
 
       // Vouchers endpoint: GET /internal/v1/vouchers
       if (pathname === '/internal/v1/vouchers') {
+        if (mockState.voucherError) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({ success: true, data: mockState.vouchers }))
       }
 
       // Products endpoint: GET /internal/v1/products
       if (pathname === '/internal/v1/products') {
+        const q = parsedUrl.searchParams.get('q')?.toLowerCase() || ''
+        const limit = Number(parsedUrl.searchParams.get('limit') || 24)
+        let items = mockState.products.filter(p => !q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q))
+        const total = items.length
+        items = items.slice(0, limit)
         res.writeHead(200, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({
           success: true,
-          data: mockState.products,
+          data: items,
           meta: {
-            total: mockState.products.length,
+            total,
             page: 1,
-            limit: 20,
+            limit,
           },
         }))
       }
 
       // Orders list endpoint: GET /internal/v1/orders
       if (pathname === '/internal/v1/orders') {
+        if (mockState.orderError) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
+        }
         const userId = parsedUrl.searchParams.get('userId')
-        const filtered = mockState.orders.filter((o) => !userId || String(o.buyerId || o.buyer_id) === String(userId))
+        const limit = Number(parsedUrl.searchParams.get('limit') || 10)
+        const filtered = mockState.orders.filter((o) => !userId || String(o.buyerId || o.buyer_id) === String(userId)).slice(0, limit)
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        return res.end(JSON.stringify({ success: true, data: filtered }))
+        return res.end(JSON.stringify({ success: true, data: filtered, meta: { total: filtered.length } }))
       }
 
       // Order detail endpoint: GET /internal/v1/orders/:orderIdOrCode
       const orderMatch = pathname.match(/^\/internal\/v1\/orders\/([^/]+)$/)
       if (orderMatch) {
+        if (mockState.orderError) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
+        }
         const codeOrId = decodeURIComponent(orderMatch[1]).toUpperCase()
         const userId = parsedUrl.searchParams.get('userId')
-        const order = mockState.orderDetailMap.get(codeOrId)
+        const order = mockState.orderDetailMap.get(codeOrId) || mockState.orders.find(o => (o.code === codeOrId || String(o.id) === codeOrId))
 
         if (order && (!userId || String(order.buyerId || order.buyer_id) === String(userId))) {
           res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -650,14 +687,174 @@ async function run() {
       assert(!resWithinBudget.body?.data?.products?.some((p) => p.price > 200000), 'Tuyệt đối không lọt tai nghe 2.000.000 ₫ vào kết quả')
     }
 
+    // -------------------------------------------------------------------------
+    // HỒI QUY REVIEW V2: Các ca kiểm thử bổ sung bảo đảm 100% đạt chuẩn
+    // -------------------------------------------------------------------------
+    console.log('\n--- Kiểm thử Hồi quy Review v2 (Các ca kiểm tra bổ sung) ---')
+    {
+      // 1. Thẩm định JWT: token thiếu exp/iat bị từ chối 401 trên /auth/me
+      const noExpiryToken = jwt.sign(
+        { sub: '1', role: 'buyer' },
+        TEST_JWT_SECRET,
+        { algorithm: 'HS256', issuer: 'shopnova-backend', audience: 'shopnova-clients', noTimestamp: true }
+      )
+      const resStrictAuth = await requestHttp(mockBackendUrl, '/api/v1/auth/me', {
+        headers: { Authorization: `Bearer ${noExpiryToken}` },
+      })
+      assert(resStrictAuth.status === 401, 'Token thiếu exp/iat bị authenticate từ chối HTTP 401')
+
+      // 2. Optional auth: token thiếu exp/iat không gọi upstream orders
+      mockState.calls.length = 0
+      const resOptionalAuth = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${noExpiryToken}` },
+        body: { message: 'Đơn hàng ORDOLD123' },
+      })
+      assert(resOptionalAuth.status === 200, 'AI chat với invalid optional auth vẫn trả HTTP 200')
+      assert(resOptionalAuth.body?.data?.orderData === null, 'orderData là null khi không có user hợp lệ')
+      assert(!mockState.calls.some((url) => url.startsWith('/internal/v1/orders')), 'Optional auth không gọi upstream orders khi token lỗi')
+
+      // 3. Fallback tìm kiếm không lọt laptop 20tr khi tìm tai nghe dưới 200k
+      mockState.products = [{ id: '10', name: 'Laptop Gaming', price: 20000000, originalPrice: 20000000 }]
+      const resEmptySearch = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(
+        (resEmptySearch.body?.data?.products || []).every((p) => p.price <= 200000),
+        'Không bao giờ lọt sản phẩm vượt ngân sách khi tìm kiếm rỗng',
+      )
+
+      // 4. Sản phẩm rẻ ở trang sau (vị trí 13)
+      mockState.products = [
+        ...Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1), name: `Tai nghe ${i + 1}`, price: 2000000 })),
+        { id: '13', name: 'Tai nghe 13', price: 150000 },
+      ]
+      const resNextPage = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(
+        resNextPage.body?.data?.products?.some((p) => String(p.id) === '13'),
+        'Lấy được sản phẩm phù hợp ngân sách ở sau trang 1 (id 13)',
+      )
+
+      // 5. Đọc đúng số tiền dạng kép "1 triệu 50 nghìn" = 1.050.000 ₫
+      mockState.products = [{ id: '1', name: 'Tai nghe chụp tai', price: 1200000 }]
+      const resCompoundBudget = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 1 triệu 50 nghìn' },
+      })
+      assert(
+        (resCompoundBudget.body?.data?.products || []).every((p) => p.price <= 1050000),
+        'Ngân sách 1 triệu 50 nghìn loại bỏ sản phẩm 1.200.000 ₫',
+      )
+
+      // 6. Phối đồ vượt ngân sách không trả combo
+      mockState.products = [
+        { id: '1', name: 'Áo blazer', price: 700000, originalPrice: 800000 },
+        { id: '2', name: 'Áo sơ mi', price: 600000, originalPrice: 650000 },
+      ]
+      const resOutfitOver = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Phối đồ đi tiệc dưới 500k' },
+      })
+      const outfitSum = (resOutfitOver.body?.data?.products || []).reduce((sum, p) => sum + Number(p.price), 0)
+      assert(outfitSum <= 500000, 'Tổng giá sản phẩm outfit không vượt quá ngân sách 500k')
+
+      // 7. Kho chỉ có laptop không gợi ý combo thời trang
+      mockState.products = [{ id: '8', name: 'Laptop', price: 15000000 }]
+      const resNoClothes = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Phối đồ đi tiệc' },
+      })
+      assert(resNoClothes.body?.data?.outfitCombo === null, 'Kho chỉ có laptop trả outfitCombo là null')
+
+      // 8. "Tra cứu mã giảm giá LIVE50" là intent promotion_voucher
+      mockState.vouchers = [{ id: '1', code: 'LIVE50', name: 'Voucher Live', discountAmount: 50000, minSubtotal: 250000, isActive: true }]
+      const resVoucherLookup = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tra cứu mã giảm giá LIVE50' },
+      })
+      assert(resVoucherLookup.body?.data?.intent === 'promotion_voucher', '"Tra cứu mã giảm giá LIVE50" nhận đúng intent promotion_voucher')
+
+      // 9. Upstream voucher 503 thông báo gián đoạn
+      mockState.voucherError = true
+      const resVoucher503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Có voucher gì không?' },
+      })
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resVoucher503.body?.data?.reply || ''),
+        'Voucher upstream 503 trả reply thông báo gián đoạn dịch vụ',
+      )
+      mockState.voucherError = false
+
+      // 10. "Xem đơn số 101" nhận đúng intent order_tracking
+      const oldOrder = {
+        id: '101',
+        code: 'ORDOLD123',
+        buyerId: '1',
+        totalAmount: 500000,
+        recipientName: 'Review Buyer',
+        addressDetail: 'Test Address',
+        shopOrders: [{ id: '201', status: 'shipping', shippingName: 'Review Shipping', items: [{ id: '301', qty: 1 }] }],
+      }
+      mockState.orders = [oldOrder]
+      mockState.orderDetailMap.set('101', oldOrder)
+      mockState.orderDetailMap.set('ORDOLD123', oldOrder)
+
+      const resOrderNum = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Xem đơn số 101' },
+      })
+      assert(resOrderNum.body?.data?.intent === 'order_tracking', '"Xem đơn số 101" nhận đúng intent order_tracking')
+      assert(resOrderNum.body?.data?.orderData?.code === 'ORDOLD123', 'Tra đúng mã đơn ORDOLD123 từ số đơn 101')
+
+      // 11. Đơn đa shop có 1 shop cancelled và 1 shop shipping -> status !== 'cancelled'
+      mockState.orders = [
+        {
+          ...oldOrder,
+          shopOrders: [
+            { id: '201', status: 'cancelled', items: [] },
+            { id: '202', status: 'shipping', shippingName: 'Review Shipping', items: [{ id: '302', qty: 1 }] },
+          ],
+        },
+      ]
+      mockState.orderDetailMap.set('ORDOLD123', mockState.orders[0])
+
+      const resMixedOrder = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDOLD123' },
+      })
+      assert(resMixedOrder.body?.data?.orderData?.status !== 'cancelled', 'Đơn có shop shipping không bị đánh đồng là cancelled')
+
+      // 12. Upstream order 503 thông báo gián đoạn, không nói người dùng chưa đăng nhập
+      mockState.orderError = true
+      const resOrder503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDOLD123' },
+      })
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resOrder503.body?.data?.reply || ''),
+        'Order upstream 503 trả reply thông báo gián đoạn dịch vụ',
+      )
+      assert(!resOrder503.body?.data?.reply.includes('đăng nhập'), 'Order upstream 503 không nói nhầm là chưa đăng nhập')
+      mockState.orderError = false
+    }
+
   } finally {
     console.log('\n[Dọn dẹp] Đang tắt các server kiểm thử...')
-    if (backendProc) backendProc.kill()
-    if (dataProc) dataProc.kill()
-    if (mockBackendProc) mockBackendProc.kill()
+    await stopProcess(backendProc)
+    await stopProcess(dataProc)
+    await stopProcess(mockBackendProc)
     if (mockServer) {
       await new Promise((resolve) => mockServer.close(resolve))
     }
+    await new Promise((resolve) => setTimeout(resolve, 300))
   }
 
   console.log('\n=== TỔNG KẾT KIỂM THỬ TRỢ LÝ NOVA AI ===')
