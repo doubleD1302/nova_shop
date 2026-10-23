@@ -251,19 +251,30 @@ export async function optionalAuthenticate(req, res, next) {
     return next()
   }
 
+  let payload
   try {
-    const payload = verifyAccessToken(token)
-    if (!validateAccessTokenClaims(payload)) {
-      // Bị từ chối claim: coi như khách vãng lai, tuyệt đối không gọi Data API
-      return next()
-    }
+    payload = verifyAccessToken(token)
+  } catch {
+    // Token không hợp lệ (sai signature, hỏng format): coi như khách vãng lai
+    return next()
+  }
 
+  if (!validateAccessTokenClaims(payload)) {
+    // Bị từ chối claim: coi như khách vãng lai, tuyệt đối không gọi Data API
+    return next()
+  }
+
+  try {
     const userProfile = await getUserAuthProfile(payload.sub)
     if (userProfile && userProfile.status === 'active') {
       req.user = userProfile
     }
-  } catch {
-    // Bỏ qua lỗi xác thực với optional auth, coi như khách vãng lai
+  } catch (err) {
+    // Nếu Data API bị lỗi dịch vụ upstream (5xx, timeout hoặc DATABASE_UNAVAILABLE):
+    // Ghi nhận lỗi hệ thống vào request để các controller phân biệt với trường hợp thiếu token hoặc token sai
+    if (err instanceof DataApiClientError && (err.status >= 500 || err.code === 'DATABASE_UNAVAILABLE' || err.code === 'DATA_API_UNAVAILABLE')) {
+      req.authServiceError = err
+    }
   }
 
   return next()

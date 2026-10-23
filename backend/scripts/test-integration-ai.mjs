@@ -322,6 +322,8 @@ async function run() {
       orderDetailMap: new Map(),
       voucherError: false,
       orderError: false,
+      productsError: false,
+      profileError: false,
       calls: [],
     }
 
@@ -339,6 +341,10 @@ async function run() {
       // User auth profile endpoint: GET /internal/v1/users/:id/auth-profile
       const userMatch = pathname.match(/^\/internal\/v1\/users\/([^/]+)\/auth-profile$/)
       if (userMatch) {
+        if (mockState.profileError) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
+        }
         const id = userMatch[1]
         res.writeHead(200, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({
@@ -369,21 +375,38 @@ async function run() {
         return res.end(JSON.stringify({ success: true, data: mockState.vouchers }))
       }
 
-      // Products endpoint: GET /internal/v1/products
+      // Products endpoint: GET /internal/v1/products (hỗ trợ sort price_asc và phân trang)
       if (pathname === '/internal/v1/products') {
+        if (mockState.productsError) {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
+        }
         const q = parsedUrl.searchParams.get('q')?.toLowerCase() || ''
+        const sort = parsedUrl.searchParams.get('sort')
+        const page = Number(parsedUrl.searchParams.get('page') || 1)
         const limit = Number(parsedUrl.searchParams.get('limit') || 24)
+
         let items = mockState.products.filter(p => !q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q))
+        if (sort === 'price_asc') {
+          items.sort((a, b) => Number(a.price) - Number(b.price))
+        } else if (sort === 'price_desc') {
+          items.sort((a, b) => Number(b.price) - Number(a.price))
+        }
+
         const total = items.length
-        items = items.slice(0, limit)
+        const totalPages = Math.ceil(total / limit) || 1
+        const offset = (page - 1) * limit
+        items = items.slice(offset, offset + limit)
+
         res.writeHead(200, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({
           success: true,
           data: items,
           meta: {
             total,
-            page: 1,
+            page,
             limit,
+            totalPages,
           },
         }))
       }
@@ -844,6 +867,173 @@ async function run() {
       )
       assert(!resOrder503.body?.data?.reply.includes('đăng nhập'), 'Order upstream 503 không nói nhầm là chưa đăng nhập')
       mockState.orderError = false
+
+      // -----------------------------------------------------------------------
+      // 8 CA KIỂM THỬ MỞ RỘNG TỪ BÁO CÁO REVIEW V3
+      // -----------------------------------------------------------------------
+
+      // E1: budget_cheap_product_101 (100 tai nghe đắt 2tr, tai nghe thứ 101 giá 150k)
+      mockState.products = [
+        ...Array.from({ length: 100 }, (_, i) => ({ id: String(i + 1), name: `Tai nghe ${i + 1}`, price: 2000000 })),
+        { id: '101', name: 'Tai nghe 101', price: 150000 },
+      ]
+      const resBudget101 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(
+        resBudget101.body?.data?.products?.some((p) => String(p.id) === '101'),
+        'E1: budget_cheap_product_101 - Tìm thấy tai nghe 150k ở vị trí 101 nhờ sort=price_asc',
+      )
+
+      // E2: outfit_affordable_product_101 (100 áo 700k, sau đó 3 món áo/quần/giày 100k/150k/150k)
+      mockState.products = [
+        ...Array.from({ length: 100 }, (_, i) => ({ id: `expensive_shirt_${i}`, name: `Áo khoác dạ ${i}`, price: 700000 })),
+        { id: 'cheap_shirt', name: 'Áo thun cotton', price: 100000 },
+        { id: 'cheap_pants', name: 'Quần short kaki', price: 150000 },
+        { id: 'cheap_shoes', name: 'Giày sneaker vải', price: 150000 },
+      ]
+      const resOutfit101 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Phối đồ đi tiệc dưới 500k' },
+      })
+      const comboTotal101 = (resOutfit101.body?.data?.products || []).reduce((sum, p) => sum + Number(p.price), 0)
+      assert(
+        resOutfit101.body?.data?.outfitCombo !== null && comboTotal101 > 0 && comboTotal101 <= 500000,
+        'E2: outfit_affordable_product_101 - Tạo được combo thời trang <= 500k khi món rẻ ở sau 100 món đắt',
+      )
+
+      // E3: multi_shop_delivered_pending (Shop 1 delivered, Shop 2 pending -> status !== shipping, không nói đang vận chuyển)
+      const multiShopDeliveredPending = {
+        id: '201',
+        code: 'ORDMULTI1',
+        buyerId: '1',
+        totalAmount: 600000,
+        recipientName: 'Review Buyer',
+        addressDetail: 'Test Address',
+        shopOrders: [
+          { id: '301', status: 'delivered', shippingName: 'Giao Hàng Nhanh', items: [{ id: '401', qty: 1 }] },
+          { id: '302', status: 'pending', shippingName: 'Tiết Kiệm', items: [{ id: '402', qty: 1 }] },
+        ],
+      }
+      mockState.orders = [multiShopDeliveredPending]
+      mockState.orderDetailMap.set('ORDMULTI1', multiShopDeliveredPending)
+
+      const resDeliveredPending = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDMULTI1' },
+      })
+      assert(
+        resDeliveredPending.body?.data?.orderData?.status !== 'shipping',
+        'E3: multi_shop_delivered_pending - Đơn delivered + pending không bị gán nhầm thành shipping',
+      )
+      assert(
+        !resDeliveredPending.body?.data?.reply.includes('đang trên đường vận chuyển an toàn'),
+        'E3: multi_shop_delivered_pending - Reply không bịa câu kiện hàng đang trên đường vận chuyển an toàn',
+      )
+
+      // E4: multi_shop_wrong_shipper (Shop 1 confirmed GHN, Shop 2 shipping GHTK -> shipper phải là GHTK)
+      const multiShopWrongShipper = {
+        id: '202',
+        code: 'ORDMULTI2',
+        buyerId: '1',
+        totalAmount: 700000,
+        recipientName: 'Review Buyer',
+        addressDetail: 'Test Address',
+        shopOrders: [
+          { id: '303', status: 'confirmed', shippingName: 'GHN Standard', items: [{ id: '403', qty: 1 }] },
+          { id: '304', status: 'shipping', shippingName: 'GHTK Express', estimatedDelivery: '2 ngày tới', items: [{ id: '404', qty: 1 }] },
+        ],
+      }
+      mockState.orders = [multiShopWrongShipper]
+      mockState.orderDetailMap.set('ORDMULTI2', multiShopWrongShipper)
+
+      const resWrongShipper = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDMULTI2' },
+      })
+      assert(
+        resWrongShipper.body?.data?.orderData?.status === 'shipping',
+        'E4: multi_shop_wrong_shipper - Trạng thái đơn tổng thể là shipping',
+      )
+      assert(
+        resWrongShipper.body?.data?.orderData?.shipper === 'GHTK Express',
+        'E4: multi_shop_wrong_shipper - Shipper lấy chính xác từ shop đang shipping (GHTK Express), không lấy từ shop confirmed',
+      )
+
+      // E5: outfit_upstream_503 (Endpoint products trả 503 khi hỏi outfit -> reply gián đoạn)
+      mockState.productsError = true
+      const resOutfit503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Phối đồ đi tiệc' },
+      })
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resOutfit503.body?.data?.reply || ''),
+        'E5: outfit_upstream_503 - Khi products lỗi 503, reply thông báo gián đoạn dịch vụ chứ không nói kho rỗng',
+      )
+      mockState.productsError = false
+
+      // E6: product_upstream_503 (Endpoint products trả 503 khi hỏi tìm sản phẩm -> reply gián đoạn, giữ intent product_recommendation)
+      mockState.productsError = true
+      const resProduct503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(
+        resProduct503.body?.data?.intent === 'product_recommendation',
+        'E6: product_upstream_503 - Giữ nguyên intent product_recommendation khi products 503',
+      )
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resProduct503.body?.data?.reply || ''),
+        'E6: product_upstream_503 - Khi products lỗi 503, reply thông báo gián đoạn dịch vụ chứ không nhảy xuống greeting',
+      )
+      mockState.productsError = false
+
+      // E7: profile_upstream_503 (Token hợp lệ, auth-profile 503 khi hỏi đơn -> reply gián đoạn, không bắt đăng nhập, không gọi orders)
+      mockState.calls.length = 0
+      mockState.profileError = true
+      const resProfile503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { message: 'Đơn hàng ORDOLD123' },
+      })
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resProfile503.body?.data?.reply || ''),
+        'E7: profile_upstream_503 - Khi auth-profile 503, reply thông báo gián đoạn xác thực tài khoản',
+      )
+      assert(
+        !resProfile503.body?.data?.reply.includes('đăng nhập'),
+        'E7: profile_upstream_503 - Tuyệt đối không yêu cầu người dùng đăng nhập khi token hợp lệ',
+      )
+      assert(
+        !mockState.calls.some((url) => url.startsWith('/internal/v1/orders')),
+        'E7: profile_upstream_503 - Tuyệt đối không gọi Data API orders khi chưa xác minh được profile',
+      )
+      mockState.profileError = false
+
+      // E8: voucher_generic_order_threshold (Hỏi "Có mã giảm giá cho đơn hàng từ 500k không?" -> intent promotion_voucher, gọi vouchers)
+      mockState.calls.length = 0
+      mockState.vouchers = [
+        { id: '1', code: 'LIVE50', name: 'Review Voucher', discountAmount: 50000, minSubtotal: 250000, isActive: true },
+      ]
+      const resVoucherThreshold = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Có mã giảm giá cho đơn hàng từ 500k không?' },
+      })
+      assert(
+        resVoucherThreshold.body?.data?.intent === 'promotion_voucher',
+        'E8: voucher_generic_order_threshold - Câu hỏi voucher có điều kiện đơn nhận đúng intent promotion_voucher',
+      )
+      assert(
+        mockState.calls.some((url) => url.startsWith('/internal/v1/vouchers')),
+        'E8: voucher_generic_order_threshold - Gọi đúng endpoint /internal/v1/vouchers',
+      )
+      assert(
+        resVoucherThreshold.body?.data?.vouchers?.length === 1 && resVoucherThreshold.body.data.vouchers[0].code === 'LIVE50',
+        'E8: voucher_generic_order_threshold - Trả về đúng mã giảm giá LIVE50',
+      )
     }
 
   } finally {

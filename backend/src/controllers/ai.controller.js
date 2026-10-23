@@ -182,7 +182,7 @@ function formatVnd(amount) {
 function isUpstreamFailure(err) {
   if (!err) return false
   if (err instanceof DataApiClientError) {
-    return err.status >= 500 || err.code === 'DATABASE_UNAVAILABLE' || err.code === 'SERVICE_UNAVAILABLE'
+    return err.status >= 500 || err.code === 'DATABASE_UNAVAILABLE' || err.code === 'SERVICE_UNAVAILABLE' || err.code === 'DATA_API_UNAVAILABLE'
   }
   return true
 }
@@ -225,26 +225,41 @@ export async function chatWithAi(req, res, next) {
       lower.includes('khuyến mãi') ||
       lower.includes('ưu đãi') ||
       lower.includes('freeship') ||
-      lower.includes('mã freeship')
+      lower.includes('mã freeship') ||
+      lower.includes('chiết khấu') ||
+      lower.includes('giảm giá')
 
     const detectedOrderCode = extractOrderCode(trimmedMessage)
 
-    const hasOrderExplicit =
-      Boolean(detectedOrderCode) ||
-      lower.includes('đơn hàng') ||
-      lower.includes('đơn mua') ||
+    // Nhận diện ý định tra cứu hành trình/trạng thái đơn hàng cá nhân
+    const hasPersonalOrderTrackingIntent =
       lower.includes('đơn của tôi') ||
+      lower.includes('đơn hàng của tôi') ||
+      lower.includes('đơn mua của tôi') ||
       lower.includes('tình trạng đơn') ||
-      lower.includes('hành trình') ||
       lower.includes('khi nào giao') ||
-      lower.includes('mã đơn') ||
+      lower.includes('hành trình') ||
+      lower.includes('kiểm tra đơn') ||
       lower.includes('xem đơn') ||
-      /(?:^|\s)đơn(?:\s|$|[0-9#])/i.test(lower) ||
-      /ord[-a-z0-9]+/i.test(lower)
+      lower.includes('hủy đơn') ||
+      /đơn hàng.*(?:ở đâu|khi nào|bao giờ|tới chưa|giao chưa)/i.test(lower)
 
-    // Ưu tiên: Nếu câu có từ voucher và không hỏi chi tiết về một đơn hàng cụ thể -> Voucher
-    const isVoucherIntent = hasVoucherWord && !hasOrderExplicit
-    const isOrderIntent = hasOrderExplicit || (!isVoucherIntent && (lower.includes('tra cứu') || lower.includes('vận chuyển')))
+    // Ưu tiên VOUCHER: Khi có từ khóa khuyến mãi/voucher, dù câu có chứa cụm "đơn hàng"
+    // (như "mã giảm giá cho đơn hàng từ 500k", "voucher cho đơn 200k"),
+    // miễn là không hỏi mã đơn cụ thể và không phải hỏi xem tiến trình đơn cá nhân -> Ý định là VOUCHER!
+    const isVoucherIntent = hasVoucherWord && !detectedOrderCode && !hasPersonalOrderTrackingIntent
+
+    // Tra cứu ĐƠN HÀNG: khi có mã đơn cụ thể, hoặc có ý định tra cứu đơn cá nhân,
+    // hoặc hỏi chung về đơn hàng mà không phải hỏi voucher
+    const isOrderIntent =
+      !isVoucherIntent &&
+      (Boolean(detectedOrderCode) ||
+        hasPersonalOrderTrackingIntent ||
+        lower.includes('đơn hàng') ||
+        lower.includes('đơn mua') ||
+        lower.includes('mã đơn') ||
+        lower.includes('tra cứu') ||
+        lower.includes('vận chuyển'))
 
     // CASE B: Khuyến mãi & Mã giảm giá Voucher (Promotion & Vouchers)
     if (isVoucherIntent) {
@@ -441,76 +456,92 @@ export async function chatWithAi(req, res, next) {
             const total = Number(selectedOrder.totalAmount || 0)
             const shopOrders = Array.isArray(selectedOrder.shopOrders) ? selectedOrder.shopOrders : []
 
-            // Tổng hợp trạng thái đa shop trung thực
+            // Phân loại và tổng hợp trạng thái đa shop trung thực
+            const activeShops = shopOrders.filter((so) => so.status !== 'cancelled')
+            const shippingShop = shopOrders.find((so) => so.status === 'shipping')
+            const deliveredShop = shopOrders.find((so) => so.status === 'delivered')
+            const confirmedShop = shopOrders.find((so) => so.status === 'confirmed')
+            const pendingShop = shopOrders.find((so) => so.status === 'pending')
+
             let aggregatedStatus = selectedOrder.status || 'pending'
             let statusLabel = 'Đang xử lý'
-
-            if (shopOrders.length > 0) {
-              const statuses = shopOrders.map((so) => so.status)
-              const allCancelled = statuses.every((s) => s === 'cancelled')
-              const anyShipping = statuses.includes('shipping')
-              const anyDelivered = statuses.includes('delivered')
-              const anyConfirmed = statuses.includes('confirmed')
-
-              if (allCancelled) {
-                aggregatedStatus = 'cancelled'
-              } else if (anyShipping) {
-                aggregatedStatus = 'shipping'
-              } else if (anyDelivered) {
-                aggregatedStatus = statuses.every((s) => s === 'delivered' || s === 'cancelled') ? 'delivered' : 'shipping'
-              } else if (anyConfirmed) {
-                aggregatedStatus = 'confirmed'
-              } else {
-                const activeShop = shopOrders.find((so) => so.status !== 'cancelled')
-                aggregatedStatus = activeShop ? activeShop.status : 'pending'
-              }
-            }
-
-            const statusMap = {
-              pending: 'Chờ người bán xác nhận',
-              confirmed: 'Người bán đang chuẩn bị hàng',
-              shipping: 'Đang vận chuyển giao hàng',
-              delivered: 'Giao hàng thành công',
-              cancelled: 'Đã hủy đơn hàng',
-            }
-            statusLabel = statusMap[aggregatedStatus] || 'Đang xử lý'
-
-            // Chọn shop order đang active để hiển thị thông tin vận chuyển
-            const activeShopOrder = shopOrders.find((so) => so.status !== 'cancelled') || shopOrders[0]
-
+            let chosenShop = null
             let location = 'Chưa xác định'
             let eta = 'Chưa xác định'
             let shipper = null
             let replyText = ''
 
-            if (aggregatedStatus === 'cancelled') {
-              location = 'Đơn hàng đã hủy'
-              eta = 'Không áp dụng'
-              shipper = null
-              const rawCancelReason = activeShopOrder?.cancelReason || selectedOrder.cancelReason
-              const reasonText = rawCancelReason ? ` (Lý do: ${rawCancelReason})` : ''
-              replyText = `Nova kiểm tra thấy đơn hàng #${orderCode} của bạn hiện ở trạng thái "${statusLabel}"${reasonText}. Đơn hàng này không còn trong tiến trình giao nhận.`
-            } else if (aggregatedStatus === 'delivered') {
-              location = 'Đã giao đến địa chỉ người nhận'
-              eta = 'Đã hoàn tất giao hàng'
-              shipper = activeShopOrder?.shippingName || null
-              replyText = `Đơn hàng #${orderCode} của bạn đã được giao thành công với tổng thanh toán ${formatVnd(total)}. Cảm ơn bạn đã mua sắm tại ShopNova!`
-            } else if (aggregatedStatus === 'shipping') {
-              location = activeShopOrder?.shippingName
-                ? `Đang vận chuyển qua ${activeShopOrder.shippingName}`
-                : 'Đang trên đường giao hàng'
-              eta = activeShopOrder?.estimatedDelivery || 'Chưa xác định'
-              shipper = activeShopOrder?.shippingName || null
-              replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "${statusLabel}". Kiện hàng đang trên đường vận chuyển an toàn!`
-            } else if (aggregatedStatus === 'confirmed') {
-              location = 'Người bán đang chuẩn bị hàng tại kho'
-              eta = 'Chờ bàn giao cho đơn vị vận chuyển'
-              shipper = null
-              replyText = `Đơn hàng #${orderCode} của bạn đã được người bán xác nhận và đang đóng gói chuẩn bị hàng tại kho.`
+            if (shopOrders.length > 0) {
+              if (activeShops.length === 0) {
+                // Toàn bộ các shop đều đã hủy
+                aggregatedStatus = 'cancelled'
+                statusLabel = 'Đã hủy đơn hàng'
+                chosenShop = shopOrders[0]
+                location = 'Đơn hàng đã hủy'
+                eta = 'Không áp dụng'
+                shipper = null
+                const rawCancelReason = chosenShop?.cancelReason || selectedOrder.cancelReason
+                const reasonText = rawCancelReason ? ` (Lý do: ${rawCancelReason})` : ''
+                replyText = `Nova kiểm tra thấy đơn hàng #${orderCode} của bạn hiện ở trạng thái "Đã hủy đơn hàng"${reasonText}. Đơn hàng này không còn trong tiến trình giao nhận.`
+              } else if (activeShops.every((so) => so.status === 'delivered')) {
+                // Toàn bộ shop (chưa hủy) đều đã giao thành công
+                aggregatedStatus = 'delivered'
+                statusLabel = 'Giao hàng thành công'
+                chosenShop = deliveredShop || activeShops[0]
+                location = 'Đã giao đến địa chỉ người nhận'
+                eta = 'Đã hoàn tất giao hàng'
+                shipper = chosenShop?.shippingName || null
+                replyText = `Đơn hàng #${orderCode} của bạn đã được giao thành công với tổng thanh toán ${formatVnd(total)}. Cảm ơn bạn đã mua sắm tại ShopNova!`
+              } else if (shippingShop) {
+                // Có shop đang vận chuyển -> BẮT BUỘC chọn shop đang shipping để lấy shipper và trackingCode
+                aggregatedStatus = 'shipping'
+                statusLabel = 'Đang vận chuyển giao hàng'
+                chosenShop = shippingShop
+                location = shippingShop.shippingName
+                  ? `Đang vận chuyển qua ${shippingShop.shippingName}`
+                  : 'Đang trên đường giao hàng'
+                eta = shippingShop.estimatedDelivery || 'Chưa xác định'
+                shipper = shippingShop.shippingName || null
+                replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "Đang vận chuyển giao hàng". Kiện hàng đang trên đường vận chuyển an toàn!`
+              } else if (deliveredShop && (pendingShop || confirmedShop)) {
+                // Có shop đã giao, nhưng các shop còn lại chưa shipping (đang pending hoặc confirmed)
+                // Tuyệt đối không suy diễn là shipping!
+                aggregatedStatus = confirmedShop ? 'confirmed' : 'pending'
+                statusLabel = confirmedShop ? 'Đã giao một phần - đang chuẩn bị' : 'Đã giao một phần - chờ xác nhận'
+                chosenShop = confirmedShop || pendingShop || deliveredShop
+                location = 'Một phần đơn hàng đã giao thành công, các sản phẩm còn lại đang được chuẩn bị tại kho'
+                eta = 'Chờ bàn giao vận chuyển'
+                shipper = null
+                replyText = `Đơn hàng #${orderCode} của bạn hiện có kiện hàng đã giao thành công và các sản phẩm còn lại đang được người bán tiếp nhận chuẩn bị đóng gói tại kho.`
+              } else if (confirmedShop) {
+                // Các shop chưa giao đều đang chuẩn bị hàng tại kho
+                aggregatedStatus = 'confirmed'
+                statusLabel = 'Người bán đang chuẩn bị hàng'
+                chosenShop = confirmedShop
+                location = 'Người bán đang chuẩn bị hàng tại kho'
+                eta = 'Chờ bàn giao cho đơn vị vận chuyển'
+                shipper = null
+                replyText = `Đơn hàng #${orderCode} của bạn đã được người bán xác nhận và đang đóng gói chuẩn bị hàng tại kho.`
+              } else {
+                // Còn lại là chờ người bán xác nhận
+                aggregatedStatus = 'pending'
+                statusLabel = 'Chờ người bán xác nhận'
+                chosenShop = pendingShop || activeShops[0]
+                location = 'Chờ người bán tiếp nhận đơn'
+                eta = 'Chờ xác nhận'
+                shipper = null
+                replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "Chờ người bán xác nhận" với tổng thanh toán ${formatVnd(total)}.`
+              }
             } else {
-              location = 'Chờ người bán tiếp nhận đơn'
-              eta = 'Chờ xác nhận'
-              shipper = null
+              // Đơn không có shopOrders chi tiết
+              const statusMap = {
+                pending: 'Chờ người bán xác nhận',
+                confirmed: 'Người bán đang chuẩn bị hàng',
+                shipping: 'Đang vận chuyển giao hàng',
+                delivered: 'Giao hàng thành công',
+                cancelled: 'Đã hủy đơn hàng',
+              }
+              statusLabel = statusMap[aggregatedStatus] || 'Đang xử lý'
               replyText = `Đơn hàng #${orderCode} của bạn đang ở trạng thái "${statusLabel}" với tổng thanh toán ${formatVnd(total)}.`
             }
 
@@ -536,10 +567,10 @@ export async function chatWithAi(req, res, next) {
                   address: [selectedOrder.addressDetail, selectedOrder.ward, selectedOrder.district, selectedOrder.province]
                     .filter(Boolean)
                     .join(', ') || 'Chưa xác định',
-                  shipper: aggregatedStatus === 'cancelled' ? null : (shipper || 'Chưa xác định'),
+                  shipper: aggregatedStatus === 'cancelled' ? null : shipper,
                   location,
                   eta,
-                  trackingCode: activeShopOrder?.trackingCode || null,
+                  trackingCode: chosenShop?.trackingCode || null,
                   itemCount: shopOrders.reduce((acc, so) => acc + (so.items?.length || 0), 0) || 1,
                 },
                 products: null,
@@ -589,7 +620,25 @@ export async function chatWithAi(req, res, next) {
         }
       }
 
-      // Khách chưa đăng nhập
+      // Khách chưa đăng nhập: Phân biệt giữa lỗi dịch vụ xác thực và khách vãng lai
+      if (req.authServiceError) {
+        return res.status(200).json({
+          success: true,
+          message: 'Hệ thống xác thực tài khoản tạm thời gián đoạn.',
+          data: {
+            reply: 'Hệ thống xác thực tài khoản tạm thời không khả dụng do gián đoạn kết nối dữ liệu. Bạn vui lòng thử lại sau ít phút nhé!',
+            intent: 'order_tracking',
+            intentTitle: 'Dịch Vụ Tạm Thời Không Khả Dụng',
+            intentMatch: 'Khớp 90%',
+            suggestions: ['Thử lại sau ít phút', 'Liên hệ bộ phận chăm sóc khách hàng'],
+            orderData: null,
+            products: null,
+            outfitCombo: null,
+            vouchers: null,
+          },
+        })
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Trợ lý Nova AI phản hồi thành công.',
@@ -624,10 +673,28 @@ export async function chatWithAi(req, res, next) {
     ) {
       let outfitProducts = []
       try {
-        const prodResult = await getProducts({ limit: 100 })
+        // Tận dụng sort=price_asc khi có yêu cầu ngân sách để các sản phẩm rẻ lên đầu
+        const prodResult = await getProducts({
+          limit: 100,
+          sort: budgetLimit !== null ? 'price_asc' : undefined,
+        })
         const rawList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
         // Chỉ chọn sản phẩm thời trang thật sự, loại trừ điện tử, laptop
-        const fashionProducts = rawList.filter(isFashionProduct)
+        let fashionProducts = rawList.filter(isFashionProduct)
+
+        // Nếu có nhiều trang và chưa đủ sản phẩm thời trang, fetch tiếp trang 2
+        const meta = prodResult?.meta || {}
+        if (fashionProducts.length < 3 && meta.totalPages > 1) {
+          try {
+            const page2 = await getProducts({
+              page: 2,
+              limit: 100,
+              sort: budgetLimit !== null ? 'price_asc' : undefined,
+            })
+            const list2 = Array.isArray(page2) ? page2 : (page2?.data || [])
+            fashionProducts = [...fashionProducts, ...list2.filter(isFashionProduct)]
+          } catch {}
+        }
 
         if (fashionProducts.length > 0) {
           if (budgetLimit !== null) {
@@ -650,7 +717,25 @@ export async function chatWithAi(req, res, next) {
             outfitProducts = fashionProducts.slice(0, 3)
           }
         }
-      } catch {}
+      } catch (err) {
+        if (isUpstreamFailure(err)) {
+          return res.status(200).json({
+            success: true,
+            message: 'Hệ thống tư vấn phối đồ tạm thời gián đoạn.',
+            data: {
+              reply: 'Hệ thống gợi ý phối đồ tạm thời không khả dụng do gián đoạn kết nối dữ liệu. Bạn vui lòng thử lại sau ít phút nhé!',
+              intent: 'outfit_combo',
+              intentTitle: 'Dịch Vụ Phối Đồ Tạm Thời Không Khả Dụng',
+              intentMatch: 'Khớp 90%',
+              suggestions: ['Thử lại sau ít phút', 'Xem các thông tin khác'],
+              outfitCombo: null,
+              products: null,
+              orderData: null,
+              vouchers: null,
+            },
+          })
+        }
+      }
 
       if (outfitProducts.length > 0) {
         // Tính toán số liệu THỰC TẾ dựa trên các sản phẩm thật
@@ -722,9 +807,28 @@ export async function chatWithAi(req, res, next) {
     if (keyword || budgetLimit !== null || lower.includes('giá') || lower.includes('mua') || lower.includes('gợi ý') || lower.includes('tìm')) {
       try {
         const searchQ = keyword || ''
-        // Lấy danh sách đủ lớn (100) để không bỏ sót sản phẩm phù hợp ngân sách ở trang sau
-        const prodResult = await getProducts({ q: searchQ, limit: 100 })
-        const rawProductsList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
+        // Tận dụng sort=price_asc khi có budgetLimit để sản phẩm rẻ lên trang đầu
+        const prodResult = await getProducts({
+          q: searchQ,
+          limit: 100,
+          sort: budgetLimit !== null ? 'price_asc' : undefined,
+        })
+        let rawProductsList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
+
+        // Nếu có nhiều trang và chưa có sản phẩm nào thỏa ngân sách, lấy thêm trang 2
+        const meta = prodResult?.meta || {}
+        if (budgetLimit !== null && meta.totalPages > 1 && !rawProductsList.some((p) => Number(p.price) <= budgetLimit)) {
+          try {
+            const page2 = await getProducts({
+              q: searchQ,
+              limit: 100,
+              page: 2,
+              sort: 'price_asc',
+            })
+            const list2 = Array.isArray(page2) ? page2 : (page2?.data || [])
+            rawProductsList = [...rawProductsList, ...list2]
+          } catch {}
+        }
 
         // Áp dụng giới hạn ngân sách nghiêm ngặt
         let productsList = rawProductsList
@@ -765,7 +869,7 @@ export async function chatWithAi(req, res, next) {
             success: true,
             message: 'Trợ lý Nova AI phản hồi thành công.',
             data: {
-              reply: `Hiện tại ShopNova chưa có sản phẩm "${searchQ || 'này'}" nào ở mức giá dưới ${formatVnd(budgetLimit)}. Mức giá tham khảo hiện có trong kho là từ **${formatVnd(minPrice)}**. Bạn có muốn tham khảo thêm không?`,
+              reply: `Nova chưa tìm thấy sản phẩm "${searchQ || trimmedMessage}" nào ở mức giá dưới ${formatVnd(budgetLimit)}. Mức giá tham khảo hiện có là từ **${formatVnd(minPrice)}**. Bạn có muốn tham khảo thêm không?`,
               intent: 'product_recommendation',
               intentTitle: 'Không Tìm Thấy Sản Phẩm Phù Hợp Ngân Sách',
               intentMatch: 'Khớp 95%',
@@ -805,7 +909,23 @@ export async function chatWithAi(req, res, next) {
           })
         }
       } catch (err) {
-        // Fallback
+        if (isUpstreamFailure(err)) {
+          return res.status(200).json({
+            success: true,
+            message: 'Hệ thống tìm kiếm sản phẩm tạm thời gián đoạn.',
+            data: {
+              reply: 'Hệ thống tìm kiếm sản phẩm tạm thời không khả dụng do gián đoạn kết nối dữ liệu. Bạn vui lòng thử lại sau ít phút nhé!',
+              intent: 'product_recommendation',
+              intentTitle: 'Dịch Vụ Tìm Kiếm Tạm Thời Không Khả Dụng',
+              intentMatch: 'Khớp 90%',
+              suggestions: ['Thử lại sau ít phút', 'Xem các thông tin khác'],
+              products: [],
+              orderData: null,
+              outfitCombo: null,
+              vouchers: null,
+            },
+          })
+        }
       }
     }
 
