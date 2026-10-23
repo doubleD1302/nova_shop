@@ -323,6 +323,7 @@ async function run() {
       voucherError: false,
       orderError: false,
       productsError: false,
+      productsErrorOnPage: null,
       profileError: false,
       calls: [],
     }
@@ -377,13 +378,13 @@ async function run() {
 
       // Products endpoint: GET /internal/v1/products (hỗ trợ sort price_asc và phân trang)
       if (pathname === '/internal/v1/products') {
-        if (mockState.productsError) {
+        const page = Number(parsedUrl.searchParams.get('page') || 1)
+        if (mockState.productsError || (mockState.productsErrorOnPage && mockState.productsErrorOnPage === page)) {
           res.writeHead(503, { 'Content-Type': 'application/json' })
           return res.end(JSON.stringify({ success: false, error: { code: 'DATABASE_UNAVAILABLE' } }))
         }
         const q = parsedUrl.searchParams.get('q')?.toLowerCase() || ''
         const sort = parsedUrl.searchParams.get('sort')
-        const page = Number(parsedUrl.searchParams.get('page') || 1)
         const limit = Number(parsedUrl.searchParams.get('limit') || 24)
 
         let items = mockState.products.filter(p => !q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q))
@@ -1034,6 +1035,98 @@ async function run() {
         resVoucherThreshold.body?.data?.vouchers?.length === 1 && resVoucherThreshold.body.data.vouchers[0].code === 'LIVE50',
         'E8: voucher_generic_order_threshold - Trả về đúng mã giảm giá LIVE50',
       )
+
+      // E9: outfit_page2_503_masked_as_empty (Trang 1 có 1 món thời trang, trang 2 bị 503 -> reply gián đoạn, không nuốt thành kho thiếu hàng)
+      mockState.calls.length = 0
+      mockState.products = [
+        { id: 'f1', name: 'Áo sơ mi lụa công sở', categoryName: 'Thời trang nam', price: 150000, originalPrice: 200000 },
+        ...Array.from({ length: 110 }, (_, i) => ({
+          id: `elec_${i}`,
+          name: `Tai nghe bluetooth chống ồn T${i}`,
+          categoryName: 'Thiết bị điện tử',
+          price: 50000,
+          originalPrice: 70000,
+        })),
+      ]
+      mockState.productsErrorOnPage = 2
+      const resOutfitPage2503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tư vấn outfit đi tiệc' },
+      })
+      assert(
+        resOutfitPage2503.status === 200,
+        'E9: outfit_page2_503_masked_as_empty - Trả HTTP 200 OK',
+      )
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resOutfitPage2503.body?.data?.reply || ''),
+        'E9: outfit_page2_503_masked_as_empty - Reply thông báo gián đoạn dịch vụ khi trang 2 gặp lỗi 503',
+      )
+      assert(
+        !resOutfitPage2503.body?.data?.reply.includes('nâng mức ngân sách') &&
+        !resOutfitPage2503.body?.data?.reply.includes('chưa có đủ sản phẩm thời trang'),
+        'E9: outfit_page2_503_masked_as_empty - Tuyệt đối không nuốt lỗi 503 thành phán kho thiếu hàng hay bảo nâng ngân sách',
+      )
+      mockState.productsErrorOnPage = null
+
+      // E10: outfit_page3_unsearched_claimed_empty (200 tai nghe ở trang 1 & 2, trang 3 có đồ thời trang -> duyệt đến trang 3 và tạo combo)
+      mockState.calls.length = 0
+      const headphones200 = Array.from({ length: 200 }, (_, i) => ({
+        id: `hp_${i}`,
+        name: `Tai nghe earphone mini ${i}`,
+        categoryName: 'Thiết bị âm thanh',
+        price: 50000,
+        originalPrice: 80000,
+      }))
+      const fashionPage3 = [
+        { id: 'f_ao', name: 'Áo thun cotton thoáng khí', categoryName: 'Thời trang', price: 100000, originalPrice: 150000 },
+        { id: 'f_quan', name: 'Quần jean slimfit phong cách', categoryName: 'Thời trang', price: 150000, originalPrice: 200000 },
+        { id: 'f_giay', name: 'Giày sneaker năng động', categoryName: 'Giày dép', price: 150000, originalPrice: 220000 },
+      ]
+      mockState.products = [...headphones200, ...fashionPage3] // Tổng 203 sản phẩm: limit 100 -> trang 1: 100, trang 2: 100, trang 3: 3 món thời trang
+      const resOutfitPage3 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tư vấn outfit đi chơi dưới 500k' },
+      })
+      assert(
+        resOutfitPage3.body?.data?.intent === 'outfit_combo',
+        'E10: outfit_page3_unsearched_claimed_empty - Ý định là outfit_combo',
+      )
+      assert(
+        resOutfitPage3.body?.data?.outfitCombo?.isOutfitCombo === true,
+        'E10: outfit_page3_unsearched_claimed_empty - Tìm thấy combo thời trang ở trang 3',
+      )
+      assert(
+        resOutfitPage3.body?.data?.outfitCombo?.comboPrice === '400.000 ₫',
+        'E10: outfit_page3_unsearched_claimed_empty - Giá combo 400.000 ₫ khớp đúng tổng 3 món thời trang ở trang 3',
+      )
+      assert(
+        resOutfitPage3.body?.data?.products?.length === 3,
+        'E10: outfit_page3_unsearched_claimed_empty - Combo có đủ 3 món thời trang',
+      )
+      assert(
+        !resOutfitPage3.body?.data?.reply.includes('nâng mức ngân sách'),
+        'E10: outfit_page3_unsearched_claimed_empty - Không bảo khách nâng ngân sách vì trang 3 đã có combo phù hợp',
+      )
+
+      // E11: search_page2_503_masked_as_empty (Trang 1 toàn sản phẩm vượt ngân sách, trang 2 lỗi 503 -> reply gián đoạn)
+      mockState.calls.length = 0
+      mockState.products = Array.from({ length: 150 }, (_, i) => ({
+        id: `ear_${i}`,
+        name: `Tai nghe chụp tai cao cấp Pro ${i}`,
+        categoryName: 'Âm thanh',
+        price: 800000 + i * 1000,
+        originalPrice: 1000000,
+      }))
+      mockState.productsErrorOnPage = 2
+      const resSearch503 = await requestHttp(mockBackendUrl, '/api/v1/ai/chat', {
+        method: 'POST',
+        body: { message: 'Tìm tai nghe dưới 200k' },
+      })
+      assert(
+        /không thể|tạm thời|thử lại|không khả dụng|gián đoạn|chưa thể|không truy cập/i.test(resSearch503.body?.data?.reply || ''),
+        'E11: search_page2_503_masked_as_empty - Khi trang 2 lỗi 503, reply thông báo gián đoạn chứ không phán không tìm thấy',
+      )
+      mockState.productsErrorOnPage = null
     }
 
   } finally {

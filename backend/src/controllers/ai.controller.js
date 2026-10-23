@@ -672,6 +672,7 @@ export async function chatWithAi(req, res, next) {
       lower.includes('phong cách')
     ) {
       let outfitProducts = []
+      let scannedAllPages = true
       try {
         // Tận dụng sort=price_asc khi có yêu cầu ngân sách để các sản phẩm rẻ lên đầu
         const prodResult = await getProducts({
@@ -682,18 +683,25 @@ export async function chatWithAi(req, res, next) {
         // Chỉ chọn sản phẩm thời trang thật sự, loại trừ điện tử, laptop
         let fashionProducts = rawList.filter(isFashionProduct)
 
-        // Nếu có nhiều trang và chưa đủ sản phẩm thời trang, fetch tiếp trang 2
+        // Duyệt tiếp các trang tiếp theo nếu chưa đủ ít nhất 3 sản phẩm thời trang
         const meta = prodResult?.meta || {}
-        if (fashionProducts.length < 3 && meta.totalPages > 1) {
-          try {
-            const page2 = await getProducts({
-              page: 2,
-              limit: 100,
-              sort: budgetLimit !== null ? 'price_asc' : undefined,
-            })
-            const list2 = Array.isArray(page2) ? page2 : (page2?.data || [])
-            fashionProducts = [...fashionProducts, ...list2.filter(isFashionProduct)]
-          } catch {}
+        const totalPages = Number(meta.totalPages || 1)
+        const maxPagesToScan = Math.min(totalPages, 5) // Quét tối đa 5 trang (500 sản phẩm)
+        let lastScannedPage = 1
+
+        for (let p = 2; p <= maxPagesToScan && fashionProducts.length < 3; p++) {
+          lastScannedPage = p
+          const nextPage = await getProducts({
+            page: p,
+            limit: 100,
+            sort: budgetLimit !== null ? 'price_asc' : undefined,
+          })
+          const nextList = Array.isArray(nextPage) ? nextPage : (nextPage?.data || [])
+          fashionProducts = [...fashionProducts, ...nextList.filter(isFashionProduct)]
+        }
+
+        if (lastScannedPage < totalPages) {
+          scannedAllPages = false
         }
 
         if (fashionProducts.length > 0) {
@@ -778,13 +786,22 @@ export async function chatWithAi(req, res, next) {
       }
 
       // Nếu không tìm thấy sản phẩm thời trang nào phù hợp ngân sách trong kho
+      let outfitEmptyReply
+      if (!scannedAllPages) {
+        outfitEmptyReply = budgetLimit !== null
+          ? `Nova chưa tìm thấy set đồ thời trang phù hợp với mức ngân sách dưới ${formatVnd(budgetLimit)} trong các sản phẩm đã kiểm tra. Bạn có thể thử tìm kiếm theo từng món đồ cụ thể hoặc quay lại sau nhé!`
+          : 'Nova chưa tìm thấy set đồ thời trang phù hợp trong các sản phẩm đã kiểm tra. Bạn có thể thử tìm kiếm theo từng món đồ cụ thể hoặc quay lại sau nhé!'
+      } else {
+        outfitEmptyReply = budgetLimit !== null
+          ? `Hiện tại trong kho chưa có đủ sản phẩm thời trang phù hợp với mức ngân sách dưới ${formatVnd(budgetLimit)} để tạo combo phối đồ hoàn chỉnh. Bạn vui lòng thử nâng mức ngân sách hoặc tham khảo các danh mục sản phẩm khác nhé!`
+          : 'Hiện tại trong kho chưa có đủ sản phẩm thời trang phù hợp để tạo combo phối đồ hoàn chỉnh. Bạn vui lòng quay lại sau hoặc xem các danh mục sản phẩm khác nhé!'
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Trợ lý Nova AI phản hồi thành công.',
         data: {
-          reply: budgetLimit !== null
-            ? `Hiện tại trong kho chưa có đủ sản phẩm thời trang phù hợp với mức ngân sách dưới ${formatVnd(budgetLimit)} để tạo combo phối đồ hoàn chỉnh. Bạn vui lòng thử nâng mức ngân sách hoặc tham khảo các danh mục sản phẩm khác nhé!`
-            : 'Hiện tại trong kho chưa có đủ sản phẩm thời trang phù hợp để tạo combo phối đồ hoàn chỉnh. Bạn vui lòng quay lại sau hoặc xem các danh mục sản phẩm khác nhé!',
+          reply: outfitEmptyReply,
           intent: 'outfit_combo',
           intentTitle: 'Tư Vấn Phối Đồ',
           intentMatch: 'Khớp 90%',
@@ -815,19 +832,26 @@ export async function chatWithAi(req, res, next) {
         })
         let rawProductsList = Array.isArray(prodResult) ? prodResult : (prodResult?.data || [])
 
-        // Nếu có nhiều trang và chưa có sản phẩm nào thỏa ngân sách, lấy thêm trang 2
+        // Nếu có nhiều trang và chưa có sản phẩm nào thỏa ngân sách, lấy thêm các trang tiếp theo (không nuốt lỗi 503)
         const meta = prodResult?.meta || {}
-        if (budgetLimit !== null && meta.totalPages > 1 && !rawProductsList.some((p) => Number(p.price) <= budgetLimit)) {
-          try {
-            const page2 = await getProducts({
-              q: searchQ,
-              limit: 100,
-              page: 2,
-              sort: 'price_asc',
-            })
-            const list2 = Array.isArray(page2) ? page2 : (page2?.data || [])
-            rawProductsList = [...rawProductsList, ...list2]
-          } catch {}
+        const totalPages = Number(meta.totalPages || 1)
+        const maxPagesToScan = Math.min(totalPages, 5)
+
+        for (
+          let p = 2;
+          p <= maxPagesToScan &&
+          budgetLimit !== null &&
+          !rawProductsList.some((prod) => Number(prod.price) <= budgetLimit);
+          p++
+        ) {
+          const nextPage = await getProducts({
+            q: searchQ,
+            limit: 100,
+            page: p,
+            sort: 'price_asc',
+          })
+          const nextList = Array.isArray(nextPage) ? nextPage : (nextPage?.data || [])
+          rawProductsList = [...rawProductsList, ...nextList]
         }
 
         // Áp dụng giới hạn ngân sách nghiêm ngặt
