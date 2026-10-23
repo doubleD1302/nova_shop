@@ -278,6 +278,147 @@ async function run() {
       assert(resCheck.body?.data?.shopOrders[0]?.status === 'cancelled', 'Trạng thái shop_order chuyển thành cancelled')
     }
 
+    // 8. Tích hợp Voucher vào quy trình Đặt hàng & Hủy đơn hoàn Voucher
+    console.log('\n--- 8. Tích hợp Voucher vào Đặt hàng & Hủy đơn hoàn trả ---')
+    let voucherOrderId = null
+
+    // 8.1 Voucher không tồn tại
+    {
+      const resInvalidVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 1 }],
+          voucherCode: 'VOUCHER_KHONG_TON_TAI_999',
+        },
+      })
+      assert(resInvalidVoucher.status === 404, 'Mã voucher không tồn tại trả HTTP 404')
+      assert(resInvalidVoucher.body?.error?.code === 'VOUCHER_NOT_FOUND', 'Mã lỗi là VOUCHER_NOT_FOUND')
+    }
+
+    // 8.2 Đơn chưa đạt giá trị tối thiểu của Voucher (NOVA20K yêu cầu tối thiểu 500k, 1 áo 180k)
+    {
+      const resMinNotMet = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 1 }],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      assert(resMinNotMet.status === 400, 'Đơn chưa đạt giá trị tối thiểu trả HTTP 400')
+      assert(resMinNotMet.body?.error?.code === 'VOUCHER_MIN_NOT_MET', 'Mã lỗi là VOUCHER_MIN_NOT_MET')
+    }
+
+    // 8.3 Đặt hàng thành công với Voucher hợp lệ (3 áo x 180k = 540k >= 500k)
+    {
+      const resVoucherOrder = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 3 }],
+          voucherCode: 'nova20k', // kiểm tra tự động chuẩn hóa chữ thường thành HOA
+        },
+      })
+      assert(resVoucherOrder.status === 201, 'Đặt hàng thành công với voucher hợp lệ trả HTTP 201')
+      assert(resVoucherOrder.body?.data?.voucherCode === 'NOVA20K', 'Lưu voucherCode là NOVA20K')
+      assert(resVoucherOrder.body?.data?.subtotal === 540000, 'Subtotal đúng 540.000 ₫')
+      assert(resVoucherOrder.body?.data?.discountAmount === 20000, 'Chiết khấu đúng 20.000 ₫')
+      assert(
+        resVoucherOrder.body?.data?.totalAmount ===
+          540000 + resVoucherOrder.body?.data?.shippingFee - 20000,
+        'Tổng tiền bằng subtotal + shippingFee - discountAmount',
+      )
+      assert(
+        resVoucherOrder.body?.data?.shopOrders[0]?.discountAmount === 20000,
+        'Chiết khấu được phân bổ vào shop order',
+      )
+
+      voucherOrderId = resVoucherOrder.body?.data?.id
+    }
+
+    // 8.4 Chi tiết đơn hàng trả về voucherCode và discountAmount
+    {
+      const resVoucherDetail = await requestHttp(backendUrl, `/api/v1/orders/${voucherOrderId}`, {
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+      })
+      assert(resVoucherDetail.status === 200, 'Xem chi tiết đơn voucher trả HTTP 200')
+      assert(resVoucherDetail.body?.data?.voucherCode === 'NOVA20K', 'Chi tiết đơn có voucherCode')
+      assert(resVoucherDetail.body?.data?.discountAmount === 20000, 'Chi tiết đơn có discountAmount')
+    }
+
+    // 8.5 Chặn vượt quá per_user_limit khi voucher đã được áp dụng
+    {
+      const resExceedLimit = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 3 }],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      assert(resExceedLimit.status === 400, 'Vượt quá số lượt dùng của user trả HTTP 400')
+      assert(
+        resExceedLimit.body?.error?.code === 'VOUCHER_USER_LIMIT_EXCEEDED',
+        'Mã lỗi là VOUCHER_USER_LIMIT_EXCEEDED',
+      )
+    }
+
+    // 8.6 Hủy đơn hàng và tự động hoàn trả voucher
+    {
+      const resCancelVoucherOrder = await requestHttp(backendUrl, `/api/v1/orders/${voucherOrderId}/cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: { reason: 'Tôi muốn áp dụng mã giảm giá khác' },
+      })
+      assert(resCancelVoucherOrder.status === 200, 'Hủy đơn voucher thành công trả HTTP 200')
+      assert(resCancelVoucherOrder.body?.data?.cancelled === true, 'Đã xác nhận hủy đơn')
+    }
+
+    // 8.7 Áp dụng lại voucher thành công sau khi đơn cũ đã hủy
+    {
+      const resReuseVoucher = await requestHttp(backendUrl, '/api/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: {
+          recipientName: 'Người nhận Voucher',
+          recipientPhone: '0988888888',
+          province: 'Hà Nội',
+          addressDetail: '99 Phố Test',
+          items: [{ variantId: '1', qty: 3 }],
+          voucherCode: 'NOVA20K',
+        },
+      })
+      assert(resReuseVoucher.status === 201, 'Tái sử dụng voucher đã hoàn trả thành công trả HTTP 201')
+      assert(resReuseVoucher.body?.data?.voucherCode === 'NOVA20K', 'Đơn mới nhận mã voucher')
+
+      // Dọn dẹp: Hủy luôn đơn tái sử dụng này để trả lại tồn kho & voucher cho hệ thống
+      const reuseOrderId = resReuseVoucher.body?.data?.id
+      if (reuseOrderId) {
+        await requestHttp(backendUrl, `/api/v1/orders/${reuseOrderId}/cancel`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${tokenUser1}` },
+          body: { reason: 'Dọn dẹp sau khi kiểm thử tự động hoàn tất' },
+        })
+      }
+    }
+
   } finally {
     console.log('\n[Dọn dẹp] Đang tắt các server kiểm thử...')
     if (backendProc) backendProc.kill()

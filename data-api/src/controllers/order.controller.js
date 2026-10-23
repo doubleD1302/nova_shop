@@ -22,6 +22,7 @@ function formatOrderSummary(row, shopOrders = []) {
     ward: row.ward || null,
     addressDetail: row.address_detail,
     note: row.note || null,
+    voucherCode: row.voucher_code || null,
     paymentMethod: row.payment_method,
     subtotal: Number(row.subtotal),
     shippingFee: Number(row.shipping_fee),
@@ -73,6 +74,7 @@ export async function createOrder(req, res, next) {
       addressDetail,
       note,
       paymentMethod = 'cod',
+      voucherCode,
       items: customItems,
     } = req.body
 
@@ -103,19 +105,24 @@ export async function createOrder(req, res, next) {
 
     const numericUserId = BigInt(userId)
     const cleanIdempotencyKey = idempotencyKey.trim().substring(0, 64)
+    const cleanVoucherCode = voucherCode && typeof voucherCode === 'string' && voucherCode.trim().length > 0
+      ? voucherCode.trim().toUpperCase()
+      : null
+
     const requestHash = hashRequest({
       userId,
       recipientName,
       recipientPhone,
       province,
       addressDetail,
+      voucherCode: cleanVoucherCode,
       customItems,
     })
 
     // 2. Kiểm tra đơn trùng idempotency key (Idempotent response)
     const existingOrderRows = await executeQuery(
       `SELECT id, code, recipient_name, recipient_phone, province, district, ward, address_detail,
-              note, payment_method, subtotal, shipping_fee, discount_amount, total_amount, created_at
+              note, voucher_code, payment_method, subtotal, shipping_fee, discount_amount, total_amount, created_at
        FROM orders
        WHERE buyer_id = ? AND idempotency_key = ?
        LIMIT 1`,
@@ -257,19 +264,101 @@ export async function createOrder(req, res, next) {
         grandShippingFee += shopShipFee
       }
 
-      const grandDiscount = 0
-      const grandTotal = grandSubtotal + grandShippingFee - grandDiscount
+      // 4. Thẩm định và áp dụng mã giảm giá (Voucher)
+      let appliedVoucher = null
+      let grandDiscount = 0
+
+      if (cleanVoucherCode) {
+        const vRows = await query(
+          `SELECT id, code, name, discount_amount, min_subtotal, starts_at, ends_at,
+                  usage_limit, per_user_limit, used_count, is_active
+           FROM vouchers
+           WHERE code = ?
+           FOR UPDATE`,
+          [cleanVoucherCode],
+        )
+
+        if (!vRows || vRows.length === 0) {
+          const err = new Error(`Mã giảm giá "${cleanVoucherCode}" không tồn tại.`)
+          err.code = 'VOUCHER_NOT_FOUND'
+          err.status = 404
+          throw err
+        }
+
+        const v = vRows[0]
+        const now = Date.now()
+        const startsAt = v.starts_at ? new Date(v.starts_at).getTime() : 0
+        const endsAt = v.ends_at ? new Date(v.ends_at).getTime() : Infinity
+
+        if (!v.is_active || now < startsAt || now > endsAt) {
+          const err = new Error(`Mã giảm giá "${cleanVoucherCode}" không còn hiệu lực hoặc chưa bắt đầu.`)
+          err.code = 'VOUCHER_EXPIRED'
+          err.status = 400
+          throw err
+        }
+
+        if (grandSubtotal < Number(v.min_subtotal)) {
+          const err = new Error(`Đơn hàng chưa đạt giá trị tối thiểu ${Number(v.min_subtotal).toLocaleString('vi-VN')} ₫ để áp dụng mã giảm giá này.`)
+          err.code = 'VOUCHER_MIN_NOT_MET'
+          err.status = 400
+          throw err
+        }
+
+        if (v.usage_limit !== null && v.usage_limit !== undefined && Number(v.used_count) >= Number(v.usage_limit)) {
+          const err = new Error(`Mã giảm giá "${cleanVoucherCode}" đã hết lượt sử dụng trên hệ thống.`)
+          err.code = 'VOUCHER_USAGE_EXCEEDED'
+          err.status = 400
+          throw err
+        }
+
+        // Kiểm tra số lượt đã dùng của người mua (per_user_limit)
+        const userUsageRows = await query(
+          `SELECT COUNT(*) AS count FROM voucher_uses WHERE voucher_id = ? AND buyer_id = ? AND state = 'applied'`,
+          [v.id, numericUserId],
+        )
+        const userUsedCount = Number(userUsageRows[0]?.count || 0)
+        if (userUsedCount >= Number(v.per_user_limit)) {
+          const err = new Error(`Bạn đã sử dụng hết lượt cho phép của mã giảm giá "${cleanVoucherCode}".`)
+          err.code = 'VOUCHER_USER_LIMIT_EXCEEDED'
+          err.status = 400
+          throw err
+        }
+
+        appliedVoucher = v
+        grandDiscount = Math.min(grandSubtotal, Number(v.discount_amount))
+      }
+
+      // Phân bổ discountAmount vào từng shop_orders theo tỷ lệ giá trị hàng
+      let remainingDiscount = grandDiscount
+      const shopGroupsList = Array.from(shopGroups.values())
+      for (let i = 0; i < shopGroupsList.length; i++) {
+        const group = shopGroupsList[i]
+        let shopDiscount = 0
+        if (grandDiscount > 0 && grandSubtotal > 0) {
+          if (i === shopGroupsList.length - 1) {
+            shopDiscount = remainingDiscount
+          } else {
+            shopDiscount = Math.round((group.subtotal / grandSubtotal) * grandDiscount)
+            shopDiscount = Math.min(shopDiscount, group.subtotal, remainingDiscount)
+            remainingDiscount -= shopDiscount
+          }
+        }
+        group.discountAmount = shopDiscount
+        group.totalAmount = Math.max(0, group.subtotal + group.shippingFee - shopDiscount)
+      }
+
+      const grandTotal = Math.max(0, grandSubtotal + grandShippingFee - grandDiscount)
 
       // Sinh mã đơn tổng
       const orderCode = 'ORD' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase()
 
-      // Insert bảng orders
+      // Insert bảng orders (bao gồm voucher_code)
       const insertOrderSql = `
         INSERT INTO orders (
           buyer_id, code, idempotency_key, request_hash,
           recipient_name, recipient_phone, province, district, ward, address_detail,
-          note, payment_method, subtotal, shipping_fee, discount_amount, total_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          note, voucher_code, payment_method, subtotal, shipping_fee, discount_amount, total_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       const orderInsertResult = await query(insertOrderSql, [
         numericUserId,
@@ -283,6 +372,7 @@ export async function createOrder(req, res, next) {
         ward ? ward.trim() : null,
         addressDetail.trim(),
         note ? note.trim() : null,
+        appliedVoucher ? appliedVoucher.code : null,
         paymentMethod,
         grandSubtotal,
         grandShippingFee,
@@ -291,6 +381,19 @@ export async function createOrder(req, res, next) {
       ])
 
       const newOrderId = orderInsertResult.insertId
+
+      // Ghi nhận voucher_uses và cập nhật used_count của voucher
+      if (appliedVoucher && grandDiscount > 0) {
+        await query(
+          `INSERT INTO voucher_uses (voucher_id, order_id, buyer_id, discount_amount, state)
+           VALUES (?, ?, ?, ?, 'applied')`,
+          [appliedVoucher.id, newOrderId, numericUserId, grandDiscount],
+        )
+        await query(
+          `UPDATE vouchers SET used_count = used_count + 1 WHERE id = ?`,
+          [appliedVoucher.id],
+        )
+      }
       const createdShopOrders = []
 
       // Xử lý từng đơn con shop_orders
@@ -409,6 +512,7 @@ export async function createOrder(req, res, next) {
         ward: ward ? ward.trim() : null,
         addressDetail: addressDetail.trim(),
         note: note ? note.trim() : null,
+        voucherCode: appliedVoucher ? appliedVoucher.code : null,
         paymentMethod,
         subtotal: grandSubtotal,
         shippingFee: grandShippingFee,
@@ -473,7 +577,7 @@ export async function getOrders(req, res, next) {
 
     // Lấy danh sách orders
     const orderRows = await executeQuery(
-      `SELECT o.id, o.code, o.recipient_name, o.recipient_phone, o.province, o.district, o.ward,
+      `SELECT o.id, o.code, o.voucher_code, o.recipient_name, o.recipient_phone, o.province, o.district, o.ward,
               o.address_detail, o.note, o.payment_method, o.subtotal, o.shipping_fee, o.discount_amount,
               o.total_amount, o.created_at
        FROM orders o
@@ -589,7 +693,7 @@ export async function getOrderDetail(req, res, next) {
     }
 
     const orderRows = await executeQuery(
-      `SELECT o.id, o.code, o.buyer_id, o.recipient_name, o.recipient_phone, o.province, o.district, o.ward,
+      `SELECT o.id, o.code, o.voucher_code, o.buyer_id, o.recipient_name, o.recipient_phone, o.province, o.district, o.ward,
               o.address_detail, o.note, o.payment_method, o.subtotal, o.shipping_fee, o.discount_amount,
               o.total_amount, o.created_at
        FROM orders o
@@ -741,6 +845,24 @@ export async function cancelOrder(req, res, next) {
            VALUES (?, ?, 'cancel', ?, ?, ?)`,
           [it.variant_id, it.id, Number(it.qty), numericUserId, reason.substring(0, 255)],
         )
+      }
+
+      // Hoàn trả voucher nếu đơn hàng có áp dụng
+      const appliedVoucherRows = await query(
+        `SELECT id, voucher_id FROM voucher_uses WHERE order_id = ? AND buyer_id = ? AND state = 'applied' FOR UPDATE`,
+        [orderId, numericUserId],
+      )
+      if (appliedVoucherRows && appliedVoucherRows.length > 0) {
+        for (const vu of appliedVoucherRows) {
+          await query(
+            `UPDATE voucher_uses SET state = 'released', released_at = NOW(3) WHERE id = ?`,
+            [vu.id],
+          )
+          await query(
+            `UPDATE vouchers SET used_count = GREATEST(0, used_count - 1) WHERE id = ?`,
+            [vu.voucher_id],
+          )
+        }
       }
     })
 

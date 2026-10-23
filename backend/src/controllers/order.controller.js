@@ -31,6 +31,7 @@ export async function createOrder(req, res, next) {
       addressDetail,
       note,
       paymentMethod = 'cod',
+      voucherCode,
       idempotencyKey,
       items,
     } = req.body
@@ -84,6 +85,10 @@ export async function createOrder(req, res, next) {
       addressDetail: addressDetail.trim(),
       note: note ? String(note).trim() : null,
       paymentMethod,
+      voucherCode:
+        voucherCode && typeof voucherCode === 'string' && voucherCode.trim().length > 0
+          ? voucherCode.trim().toUpperCase()
+          : undefined,
       items: Array.isArray(items) ? items : undefined,
     }
 
