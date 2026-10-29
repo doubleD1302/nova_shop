@@ -81,25 +81,69 @@ class _DepositScreenState extends State<DepositScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FF),
+      backgroundColor: const Color(0xFFF6F6F9),
       appBar: AppBar(
-        backgroundColor: Colors.white.withValues(alpha: 0.85),
+        backgroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 4,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Nạp Tiền Ví NovaPay', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('Nạp Tiền Ví NovaPay', style: TextStyle(color: Color(0xFF1E2022), fontWeight: FontWeight.w700, fontSize: 16)),
         actions: [
-          IconButton(icon: const Icon(Icons.history, color: Colors.black54), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.support_agent, color: Colors.black54), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: Color(0xFF666666)),
+            tooltip: 'Lịch sử giao dịch',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                builder: (ctx) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Lịch Sử Nạp / Rút Ví', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        leading: const Icon(Icons.arrow_downward, color: Colors.green),
+                        title: const Text('+500.000 ₫ (Nạp qua Vietcombank)'),
+                        subtitle: const Text('Hôm nay • Thành công'),
+                        trailing: const Text('Ví NovaPay', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.shopping_bag_outlined, color: Colors.red),
+                        title: const Text('-180.000 ₫ (Thanh toán đơn hàng)'),
+                        subtitle: const Text('Hôm qua • Đã quyết toán'),
+                        trailing: const Text('Đơn #ORD1203', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.support_agent_rounded, color: Color(0xFF666666)),
+            tooltip: 'Hỗ trợ khách hàng',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Tổng đài hỗ trợ Ví NovaPay: 1900 1228 (Miễn phí 24/7)')),
+              );
+            },
+          ),
           Container(
             margin: const EdgeInsets.only(right: 16),
             width: 32, height: 32,
-            decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
-            child: const Icon(Icons.person, color: Colors.white, size: 20),
+            decoration: const BoxDecoration(color: Color(0xFFEEEEF0), shape: BoxShape.circle),
+            child: const Icon(Icons.person, color: Color(0xFF888888), size: 18),
           )
         ],
       ),
@@ -109,6 +153,7 @@ class _DepositScreenState extends State<DepositScreen> {
             padding: const EdgeInsets.only(bottom: 120),
             child: Column(
               children: [
+                _buildNoApiBanner(),
                 _buildWalletCard(),
                 _buildAmountInputSection(),
                 _buildVoucherBanner(),
@@ -119,6 +164,45 @@ class _DepositScreenState extends State<DepositScreen> {
             ),
           ),
           _buildBottomActionBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoApiBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFEEBA)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Color(0xFF856404), size: 22),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CHƯA CÓ API KẾT NỐI BACKEND',
+                  style: TextStyle(
+                    color: Color(0xFF856404),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Tính năng Ví NovaPay và nạp tiền hiện chưa được phát triển API trên hệ thống Backend của website thương mại. Đây là giao diện xem trước (UI Prototype).',
+                  style: TextStyle(color: Color(0xFF856404), fontSize: 11, height: 1.3),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -240,7 +324,14 @@ class _DepositScreenState extends State<DepositScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -249,7 +340,7 @@ class _DepositScreenState extends State<DepositScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.payments, color: primaryColor, size: 18),
+                  Icon(Icons.payments_rounded, color: primaryColor, size: 18),
                   const SizedBox(width: 6),
                   const Text('Số tiền muốn nạp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
@@ -261,9 +352,12 @@ class _DepositScreenState extends State<DepositScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _amountFocus.hasFocus ? primaryColor.withValues(alpha: 0.3) : Colors.transparent, width: 2)
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _amountFocus.hasFocus ? primaryColor : const Color(0xFFEEEEF0),
+                width: 1.5,
+              ),
             ),
             child: Row(
               children: [
@@ -272,7 +366,7 @@ class _DepositScreenState extends State<DepositScreen> {
                     controller: _amountController,
                     focusNode: _amountFocus,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       hintText: '0',
@@ -288,8 +382,8 @@ class _DepositScreenState extends State<DepositScreen> {
                       onTap: _clearAmount,
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
-                        child: const Icon(Icons.close, size: 14, color: Colors.black54),
+                        decoration: const BoxDecoration(color: Color(0xFFEEEEF0), shape: BoxShape.circle),
+                        child: const Icon(Icons.close_rounded, size: 14, color: Colors.black54),
                       ),
                     ),
                   )
@@ -303,9 +397,9 @@ class _DepositScreenState extends State<DepositScreen> {
               const Text('Tối thiểu: 10.000đ', style: TextStyle(color: Colors.grey, fontSize: 11)),
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green[700], size: 12),
+                  Icon(Icons.check_circle_rounded, color: Colors.green[700], size: 12),
                   const SizedBox(width: 4),
-                  Text('Miễn phí nạp 100%', style: TextStyle(color: Colors.green[800], fontSize: 11, fontWeight: FontWeight.w500)),
+                  Text('Miễn phí nạp 100%', style: TextStyle(color: Colors.green[800], fontSize: 11, fontWeight: FontWeight.w600)),
                 ],
               )
             ],
@@ -326,9 +420,12 @@ class _DepositScreenState extends State<DepositScreen> {
                 onTap: () => _selectQuickAmount(amount),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isSelected ? primaryColor.withValues(alpha: 0.1) : const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
-                    border: isSelected ? Border.all(color: primaryColor.withValues(alpha: 0.8), width: 2) : null,
+                    color: isSelected ? const Color(0xFFFFF1EE) : const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? primaryColor : const Color(0xFFEEEEF0),
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
                   ),
                   alignment: Alignment.center,
                   child: Stack(
@@ -338,7 +435,7 @@ class _DepositScreenState extends State<DepositScreen> {
                         child: Text(
                           '${NumberFormat.currency(locale: 'vi_VN', symbol: '', decimalDigits: 0).format(amount).trim()}đ',
                           style: TextStyle(
-                            color: isSelected ? primaryColor : Colors.black87,
+                            color: isSelected ? primaryColor : const Color(0xFF1E2022),
                             fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -349,7 +446,11 @@ class _DepositScreenState extends State<DepositScreen> {
                           top: -8, right: -4,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 2)]),
+                            decoration: BoxDecoration(
+                              color: primaryColor,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 2)],
+                            ),
                             child: const Text('Đang chọn', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                           ),
                         ),
@@ -358,7 +459,11 @@ class _DepositScreenState extends State<DepositScreen> {
                           top: -8, right: -4,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.green[600], borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 2)]),
+                            decoration: BoxDecoration(
+                              color: Colors.green[600],
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 2)],
+                            ),
                             child: const Text('Phổ biến', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                           ),
                         ),
@@ -436,14 +541,21 @@ class _DepositScreenState extends State<DepositScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFEEEEF0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
+        ],
+      ),
       child: Column(
         children: [
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Nguồn tiền nạp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const Text('4 phương thức', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
+              Text('Nguồn tiền nạp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
+              Text('4 phương thức', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
           const SizedBox(height: 12),
@@ -480,7 +592,7 @@ class _DepositScreenState extends State<DepositScreen> {
             iconWidget: Container(
               width: 40, height: 40,
               decoration: BoxDecoration(color: Colors.blue[600], borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 22),
+              child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 22),
             ),
             badge: 'Nhanh',
             badgeColor: Colors.blue,
@@ -493,23 +605,27 @@ class _DepositScreenState extends State<DepositScreen> {
             iconWidget: Container(
               width: 40, height: 40,
               decoration: BoxDecoration(color: Colors.blueGrey[800], borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.credit_card, color: Colors.white, size: 22),
+              child: const Icon(Icons.credit_card_rounded, color: Colors.white, size: 22),
             ),
             badge: 'Phí 1.5%',
             badgeColor: Colors.red,
           ),
           const SizedBox(height: 12),
           InkWell(
-            onTap: () {},
-            borderRadius: BorderRadius.circular(12),
+            onTap: _showLinkBankAccountDialog,
+            borderRadius: BorderRadius.circular(10),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFEEEEF0)),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle, color: primaryColor, size: 20),
+                  Icon(Icons.add_circle_outline_rounded, color: primaryColor, size: 18),
                   const SizedBox(width: 8),
                   Text('Liên kết thêm tài khoản ngân hàng mới', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
                 ],
@@ -528,9 +644,12 @@ class _DepositScreenState extends State<DepositScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? primaryColor.withValues(alpha: 0.05) : Colors.white,
+          color: isSelected ? const Color(0xFFFFF7F5) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? primaryColor.withValues(alpha: 0.6) : Colors.transparent, width: 1.5),
+          border: Border.all(
+            color: isSelected ? primaryColor : const Color(0xFFEEEEF0),
+            width: isSelected ? 1.5 : 1.0,
+          ),
         ),
         child: Row(
           children: [
@@ -542,7 +661,7 @@ class _DepositScreenState extends State<DepositScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                      Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022)), overflow: TextOverflow.ellipsis)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(color: badgeColor[50], borderRadius: BorderRadius.circular(4)),
@@ -609,9 +728,12 @@ class _DepositScreenState extends State<DepositScreen> {
       bottom: 0, left: 0, right: 0,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, -4))]
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFEEEEF0))),
+          boxShadow: [
+            BoxShadow(color: Color(0x06000000), blurRadius: 16, offset: Offset(0, -4)),
+          ],
         ),
         child: Column(
           children: [
@@ -621,7 +743,7 @@ class _DepositScreenState extends State<DepositScreen> {
                 Row(
                   children: [
                     const Text('Nguồn nạp: ', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    Text(sourceLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(sourceLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E2022))),
                   ],
                 ),
                 Row(
@@ -651,25 +773,174 @@ class _DepositScreenState extends State<DepositScreen> {
                     )
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: _selectedAmount > 0 ? () {} : null,
-                  icon: const Icon(Icons.lock, size: 20),
-                  label: Text('Nạp ${_amountController.text.isEmpty ? '0' : _amountController.text}đ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey[300],
-                    disabledForegroundColor: Colors.grey[500],
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 4,
-                    shadowColor: primaryColor.withValues(alpha: 0.5),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: _selectedAmount > 0
+                        ? const LinearGradient(
+                            colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          )
+                        : null,
+                    color: _selectedAmount > 0 ? null : const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: _selectedAmount > 0
+                        ? [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
                   ),
-                )
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _selectedAmount > 0 ? _handleDeposit : null,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lock_outline_rounded,
+                              size: 18,
+                              color: _selectedAmount > 0 ? Colors.white : Colors.grey[600],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Nạp ${_amountController.text.isEmpty ? '0' : _amountController.text}đ',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: _selectedAmount > 0 ? Colors.white : Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             )
           ],
         ),
+      ),
+    );
+  }
+
+  void _handleDeposit() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFFEE4D2D)),
+            SizedBox(width: 8),
+            Text('Chưa Có API Kết Nối', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tính năng nạp tiền Ví NovaPay hiện chưa được xây dựng API trên máy chủ Backend của website thương mại.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Giao diện này hiện đóng vai trò mô phỏng (UI Prototype) để bạn tham khảo quy trình nạp tiền.',
+              style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLinkBankAccountDialog() {
+    final bankCtrl = TextEditingController();
+    final accCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Liên kết Ngân hàng Mới', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: bankCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Tên Ngân Hàng',
+                  hintText: 'Ví dụ: MB Bank, Techcombank...',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: accCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Số tài khoản ngân hàng',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Tên chủ tài khoản',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã liên kết tài khoản ngân hàng thành công!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Liên kết ngay'),
+          ),
+        ],
       ),
     );
   }

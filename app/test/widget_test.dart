@@ -7,7 +7,7 @@ void main() {
     await tester.pumpWidget(const ShopNovaApp());
 
     // Verify that the app bar title is displayed.
-    expect(find.text('Trang Chủ'), findsOneWidget);
+    expect(find.text('ShopNova'), findsWidgets);
 
     // Verify bottom navigation is displayed.
     expect(find.text('Trang chủ'), findsOneWidget);

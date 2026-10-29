@@ -14,4 +14,24 @@ class BannerItem {
     required this.subtitle,
     required this.backgroundColor,
   });
+
+  factory BannerItem.fromJson(Map<String, dynamic> json) {
+    Color bg = const Color(0xFFEE4D2D);
+    final colorHex = json['backgroundColor']?.toString();
+    if (colorHex != null && colorHex.startsWith('#')) {
+      final hex = colorHex.replaceFirst('#', '');
+      final val = int.tryParse('FF$hex', radix: 16);
+      if (val != null) {
+        bg = Color(val);
+      }
+    }
+
+    return BannerItem(
+      id: json['id']?.toString() ?? '',
+      imageUrl: json['imageUrl']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      subtitle: json['subtitle']?.toString() ?? '',
+      backgroundColor: bg,
+    );
+  }
 }
