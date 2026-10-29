@@ -1,5 +1,22 @@
+import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
-import { executeQuery, executeWithConnection } from '../config/database.js'
+import { executeQuery, executeTransaction } from '../config/database.js'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function validEmail(value) {
+  return typeof value === 'string' && value.length <= 254 && EMAIL_PATTERN.test(value.trim())
+}
+
+function slugify(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 140) || 'shop'
+}
 
 /**
  * Tạo một dummy hash hợp lệ chuẩn bcrypt cost 12 khi khởi động module.
@@ -53,9 +70,11 @@ export async function verifyCredentials(req, res, next) {
 
     // Truy vấn thông tin người dùng theo username đã chuẩn hóa
     const sql = `
-      SELECT u.id, u.username, u.password_hash, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status, s.id AS shop_id
+      SELECT u.id, u.username, u.password_hash, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
+             s.id AS shop_id, a.recipient_name, a.phone AS address_phone, a.province, a.district, a.ward, a.detail
       FROM users u
       LEFT JOIN shops s ON s.owner_id = u.id
+      LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = 1 AND a.deleted_at IS NULL
       WHERE u.username = ?
       LIMIT 1
     `
@@ -113,11 +132,138 @@ export async function verifyCredentials(req, res, next) {
           role: user.role,
           status: user.status,
           shopId: user.shop_id !== null && user.shop_id !== undefined ? String(user.shop_id) : null,
+          address: user.recipient_name ? {
+            fullName: user.recipient_name,
+            phone: user.address_phone,
+            province: user.province,
+            district: user.district || '',
+            ward: user.ward || '',
+            detail: user.detail,
+          } : null,
         },
       },
     })
   } catch (err) {
     next(err)
+  }
+}
+
+/**
+ * POST /internal/v1/auth/google
+ * Create or load the MySQL account for a Firebase identity verified by Backend.
+ */
+export async function loginWithGoogle(req, res, next) {
+  const body = req.body || {}
+  const firebaseUid = typeof body.firebaseUid === 'string' ? body.firebaseUid.trim() : ''
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
+  const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() : ''
+
+  if (
+    !firebaseUid ||
+    firebaseUid.length > 128 ||
+    !validEmail(email) ||
+    (fullName && fullName.length > 120) ||
+    (avatarUrl && avatarUrl.length > 1024)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Thông tin tài khoản Google không hợp lệ.',
+      error: { code: 'VALIDATION_ERROR' },
+    })
+  }
+
+  const findByFirebaseUid = () => executeQuery(
+    `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
+            s.id AS shop_id, a.recipient_name, a.phone AS address_phone, a.province, a.district, a.ward, a.detail
+     FROM users u
+     LEFT JOIN shops s ON s.owner_id = u.id
+     LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = 1 AND a.deleted_at IS NULL
+     WHERE u.firebase_uid = ?
+     LIMIT 1`,
+    [firebaseUid],
+  )
+
+  const respondWithUser = (user) => {
+    if (user.status === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản đang bị khóa.',
+        error: { code: 'ACCOUNT_BLOCKED' },
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đăng nhập Google thành công.',
+      data: {
+        user: {
+          id: String(user.id),
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phone: user.phone,
+          avatarUrl: user.avatar_url,
+          role: user.role,
+          status: user.status,
+          shopId: user.shop_id === null || user.shop_id === undefined ? null : String(user.shop_id),
+          address: user.recipient_name ? {
+            fullName: user.recipient_name,
+            phone: user.address_phone,
+            province: user.province,
+            district: user.district || '',
+            ward: user.ward || '',
+            detail: user.detail,
+          } : null,
+        },
+      },
+    })
+  }
+
+  try {
+    const existingUsers = await findByFirebaseUid()
+    if (existingUsers.length) return respondWithUser(existingUsers[0])
+
+    const emailUsers = await executeQuery('SELECT id, status FROM users WHERE email = ? LIMIT 1', [email])
+    if (emailUsers.length) {
+      await executeQuery(
+        'UPDATE users SET firebase_uid = ?, avatar_url = COALESCE(avatar_url, ?) WHERE id = ?',
+        [firebaseUid, avatarUrl || null, emailUsers[0].id],
+      )
+      const linkedUsers = await findByFirebaseUid()
+      if (linkedUsers.length) return respondWithUser(linkedUsers[0])
+    }
+
+    const username = `g_${crypto.createHash('sha256').update(firebaseUid).digest('hex').slice(0, 32)}`
+    const fullNameValue = fullName || email.split('@')[0]
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(48).toString('base64url'), 12)
+
+    await executeQuery(
+      `INSERT INTO users (username, password_hash, firebase_uid, full_name, email, avatar_url, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'buyer', 'active')`,
+      [username, passwordHash, firebaseUid, fullNameValue, email, avatarUrl || null],
+    )
+
+    const createdUsers = await findByFirebaseUid()
+    if (!createdUsers.length) {
+      throw new Error('Google account insert completed without a readable user record.')
+    }
+    return respondWithUser(createdUsers[0])
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      try {
+        const users = await findByFirebaseUid()
+        if (users.length) return respondWithUser(users[0])
+      } catch (lookupError) {
+        return next(lookupError)
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Email này đã thuộc một tài khoản Nova Shop. Hãy đăng nhập bằng tài khoản hiện có.',
+        error: { code: 'EMAIL_ACCOUNT_EXISTS' },
+      })
+    }
+    return next(err)
   }
 }
 
@@ -141,9 +287,11 @@ export async function getUserAuthProfile(req, res, next) {
     }
 
     const sql = `
-      SELECT u.id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status, s.id AS shop_id
+      SELECT u.id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
+             s.id AS shop_id, a.recipient_name, a.phone AS address_phone, a.province, a.district, a.ward, a.detail
       FROM users u
       LEFT JOIN shops s ON s.owner_id = u.id
+      LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = 1 AND a.deleted_at IS NULL
       WHERE u.id = ?
       LIMIT 1
     `
@@ -176,6 +324,14 @@ export async function getUserAuthProfile(req, res, next) {
           role: user.role,
           status: user.status,
           shopId: user.shop_id !== null && user.shop_id !== undefined ? String(user.shop_id) : null,
+          address: user.recipient_name ? {
+            fullName: user.recipient_name,
+            phone: user.address_phone,
+            province: user.province,
+            district: user.district || '',
+            ward: user.ward || '',
+            detail: user.detail,
+          } : null,
         },
       },
     })
@@ -186,334 +342,350 @@ export async function getUserAuthProfile(req, res, next) {
 
 /**
  * POST /internal/v1/auth/register
- * Đăng ký tài khoản người mua hoặc người bán mới vào cơ sở dữ liệu MySQL.
  */
 export async function registerUser(req, res, next) {
   try {
-    const {
-      username,
-      password,
-      fullName,
-      email,
-      phone,
-      role = 'buyer',
-      shopName,
-      shopTagline,
-    } = req.body || {}
+    const body = req.body || {}
+    const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : ''
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
+    const shopTagline = typeof body.shopTagline === 'string' ? body.shopTagline.trim() : ''
+    const role = body.role
+    const password = body.password
+    const rawAddress = body.address
+    const address = rawAddress && typeof rawAddress === 'object' && !Array.isArray(rawAddress)
+      ? {
+          fullName: typeof rawAddress.fullName === 'string' ? rawAddress.fullName.trim() : '',
+          phone: typeof rawAddress.phone === 'string' ? rawAddress.phone.trim() : '',
+          province: typeof rawAddress.province === 'string' ? rawAddress.province.trim() : '',
+          district: typeof rawAddress.district === 'string' ? rawAddress.district.trim() : '',
+          ward: typeof rawAddress.ward === 'string' ? rawAddress.ward.trim() : '',
+          detail: typeof rawAddress.detail === 'string' ? rawAddress.detail.trim() : '',
+        }
+      : null
+    const invalidAddress = rawAddress !== undefined && rawAddress !== null && (
+      !address || !address.fullName || address.fullName.length > 120 || !address.phone || address.phone.length > 20 ||
+      !address.province || address.province.length > 120 || address.district.length > 120 || address.ward.length > 120 ||
+      !address.detail || address.detail.length > 255
+    )
 
-    // 1. Kiểm tra username
     if (
-      typeof username !== 'string' ||
-      username.trim().length < 3 ||
-      username.trim().length > 50 ||
-      !/^[a-zA-Z0-9_.-]+$/.test(username.trim())
+      !/^[a-z0-9_]{3,50}$/.test(username) ||
+      !fullName ||
+      fullName.length > 120 ||
+      !validEmail(email) ||
+      invalidAddress ||
+      (phone && phone.length > 20) ||
+      (phone && !/^[+()\d .-]{8,20}$/.test(phone)) ||
+      shopTagline.length > 255 ||
+      !['buyer', 'seller'].includes(role) ||
+      (role === 'seller' && (typeof body.shopName !== 'string' || !body.shopName.trim() || body.shopName.trim().length > 160)) ||
+      typeof password !== 'string' ||
+      password.length < 8 ||
+      Buffer.byteLength(password, 'utf8') > 72
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Tên đăng nhập không hợp lệ (từ 3 đến 50 ký tự, chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang).',
-        error: { code: 'INVALID_USERNAME' },
+        message: !validEmail(email) ? 'Vui lòng nhập email hợp lệ.' : 'Thông tin đăng ký không hợp lệ.',
+        error: { code: !validEmail(email) ? 'INVALID_EMAIL' : 'VALIDATION_ERROR' },
       })
     }
 
-    // 2. Kiểm tra password
-    if (typeof password !== 'string' || password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mật khẩu phải có ít nhất 6 ký tự.',
-        error: { code: 'INVALID_PASSWORD' },
-      })
-    }
-
-    if (Buffer.byteLength(password, 'utf8') > 72) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mật khẩu vượt quá giới hạn 72 bytes UTF-8.',
-        error: { code: 'INVALID_PASSWORD' },
-      })
-    }
-
-    // 3. Kiểm tra fullName
-    if (typeof fullName !== 'string' || fullName.trim().length === 0 || fullName.trim().length > 120) {
-      return res.status(400).json({
-        success: false,
-        message: 'Họ và tên là bắt buộc và không quá 120 ký tự.',
-        error: { code: 'INVALID_FULLNAME' },
-      })
-    }
-
-    // 4. Kiểm tra role
-    if (role !== 'buyer' && role !== 'seller') {
-      return res.status(400).json({
-        success: false,
-        message: 'Vai trò người dùng phải là buyer hoặc seller.',
-        error: { code: 'INVALID_ROLE' },
-      })
-    }
-
-    // 5. Kiểm tra shopName nếu là seller
-    if (role === 'seller' && (typeof shopName !== 'string' || shopName.trim().length === 0 || shopName.trim().length > 160)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Người bán cần cung cấp tên gian hàng hợp lệ (tối đa 160 ký tự).',
-        error: { code: 'INVALID_SHOP_NAME' },
-      })
-    }
-
-    // 6. Chuẩn hóa dữ liệu
-    const normalizedUsername = username.trim().toLowerCase()
-    const normalizedEmail = email && typeof email === 'string' && email.trim().length > 0
-      ? email.trim().toLowerCase()
-      : null
-    const cleanedPhone = phone && typeof phone === 'string' && phone.trim().length > 0
-      ? phone.trim().slice(0, 20)
-      : null
-    const trimmedFullName = fullName.trim()
-
-    // 7. Kiểm tra trùng lặp username
-    const existingUsers = await executeQuery(
-      'SELECT id FROM users WHERE username = ? LIMIT 1',
-      [normalizedUsername]
-    )
-    if (existingUsers && existingUsers.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'Tên đăng nhập đã tồn tại trong hệ thống.',
-        error: { code: 'USERNAME_EXISTS' },
-      })
-    }
-
-    // 8. Kiểm tra trùng lặp email nếu có cung cấp
-    if (normalizedEmail) {
-      const existingEmail = await executeQuery(
-        'SELECT id FROM users WHERE email = ? LIMIT 1',
-        [normalizedEmail]
-      )
-      if (existingEmail && existingEmail.length > 0) {
-        return res.status(409).json({
-          success: false,
-          message: 'Email đã được đăng ký cho tài khoản khác.',
-          error: { code: 'EMAIL_EXISTS' },
-        })
-      }
-    }
-
-    // 9. Băm mật khẩu bằng bcrypt cost 12
     const passwordHash = await bcrypt.hash(password, 12)
-
-    // 10. Thực thi ghi dữ liệu an toàn trong transaction
-    const createdUser = await executeWithConnection(async (conn, remainingTime) => {
-      return new Promise((resolve, reject) => {
-        conn.beginTransaction((beginErr) => {
-          if (beginErr) return reject(beginErr)
-
-          const insertUserSql = `
-            INSERT INTO users (username, password_hash, full_name, email, phone, role, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'active')
-          `
-          conn.query(
-            { sql: insertUserSql, timeout: remainingTime },
-            [normalizedUsername, passwordHash, trimmedFullName, normalizedEmail, cleanedPhone, role],
-            (userErr, userResult) => {
-              if (userErr) {
-                if (userErr.code === 'ER_DUP_ENTRY') {
-                  return conn.rollback(() => {
-                    const conflictErr = new Error('Tên đăng nhập hoặc email đã tồn tại.')
-                    conflictErr.statusCode = 409
-                    conflictErr.code = 'CONFLICT'
-                    reject(conflictErr)
-                  })
-                }
-                return conn.rollback(() => reject(userErr))
-              }
-
-              const newUserId = userResult.insertId
-
-              if (role === 'seller') {
-                const baseSlug = String(shopName)
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '')
-                  .toLowerCase()
-                  .replace(/[đĐ]/g, 'd')
-                  .replace(/[^a-z0-9]+/g, '-')
-                  .replace(/^-+|-+$/g, '') || `shop-${newUserId}`
-
-                const uniqueSlug = `${baseSlug}-${newUserId}`.slice(0, 160)
-                const trimmedShopName = shopName.trim().slice(0, 160)
-                const trimmedTagline = shopTagline && typeof shopTagline === 'string'
-                  ? shopTagline.trim().slice(0, 255)
-                  : null
-
-                const insertShopSql = `
-                  INSERT INTO shops (owner_id, slug, name, tagline, province, status)
-                  VALUES (?, ?, ?, ?, 'Toàn quốc', 'active')
-                `
-                conn.query(
-                  { sql: insertShopSql, timeout: remainingTime },
-                  [newUserId, uniqueSlug, trimmedShopName, trimmedTagline],
-                  (shopErr, shopResult) => {
-                    if (shopErr) {
-                      return conn.rollback(() => reject(shopErr))
-                    }
-
-                    conn.commit((commitErr) => {
-                      if (commitErr) {
-                        return conn.rollback(() => reject(commitErr))
-                      }
-                      resolve({
-                        id: String(newUserId),
-                        username: normalizedUsername,
-                        fullName: trimmedFullName,
-                        email: normalizedEmail,
-                        phone: cleanedPhone,
-                        avatarUrl: null,
-                        role,
-                        status: 'active',
-                        shopId: String(shopResult.insertId),
-                      })
-                    })
-                  }
-                )
-              } else {
-                conn.commit((commitErr) => {
-                  if (commitErr) {
-                    return conn.rollback(() => reject(commitErr))
-                  }
-                  resolve({
-                    id: String(newUserId),
-                    username: normalizedUsername,
-                    fullName: trimmedFullName,
-                    email: normalizedEmail,
-                    phone: cleanedPhone,
-                    avatarUrl: null,
-                    role,
-                    status: 'active',
-                    shopId: null,
-                  })
-                })
-              }
-            }
-          )
-        })
-      })
+    const shopSlug = role === 'seller'
+      ? `${slugify(body.shopName)}-${crypto.randomBytes(4).toString('hex')}`
+      : null
+    const user = await executeTransaction(async (query) => {
+      const userResult = await query(
+        `INSERT INTO users (username, password_hash, full_name, email, phone, role)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [username, passwordHash, fullName, email, phone || null, role],
+      )
+      const userId = String(userResult.insertId)
+      let shopId = null
+      if (role === 'seller') {
+        const shopResult = await query(
+          `INSERT INTO shops (owner_id, slug, name, tagline, province, status)
+           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+          [userId, shopSlug, body.shopName.trim(), shopTagline || null],
+        )
+        shopId = String(shopResult.insertId)
+      }
+      if (address) {
+        await query(
+          `INSERT INTO addresses (user_id, recipient_name, phone, province, district, ward, detail, is_default)
+           VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+          [userId, address.fullName, address.phone, address.province, address.district || null, address.ward || null, address.detail],
+        )
+      }
+      return {
+        id: userId,
+        username,
+        fullName,
+        email,
+        phone: phone || null,
+        avatarUrl: null,
+        role,
+        status: 'active',
+        shopId,
+        address,
+      }
     })
 
     return res.status(201).json({
       success: true,
       message: 'Đăng ký tài khoản thành công.',
-      data: {
-        user: createdUser,
-      },
+      data: { user },
     })
   } catch (err) {
-    if (err.statusCode === 409) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      const constraint = String(err.constraint || err.sqlMessage || '')
+      const emailConflict = constraint.includes('uq_users_email')
+      const phoneConflict = constraint.includes('uq_users_phone')
       return res.status(409).json({
         success: false,
-        message: err.message,
-        error: { code: err.code || 'CONFLICT' },
+        message: emailConflict ? 'Email này đã được sử dụng.' : phoneConflict ? 'Số điện thoại này đã được sử dụng.' : 'Tên đăng nhập này đã được sử dụng.',
+        error: { code: emailConflict ? 'EMAIL_TAKEN' : phoneConflict ? 'PHONE_TAKEN' : 'USERNAME_TAKEN' },
       })
     }
-    next(err)
+    return next(err)
   }
 }
 
 /**
- * PUT /internal/v1/users/:userId/change-password
- * Đổi mật khẩu tài khoản người dùng:
- * - Nhận { currentPassword, newPassword }.
- * - Kiểm tra mật khẩu hiện tại bằng bcrypt.compare.
- * - Mã hóa mật khẩu mới bằng bcrypt cost 12.
- * - Cập nhật password_hash trong bảng users.
+ * PUT /internal/v1/users/:userId/profile
  */
-export async function changePassword(req, res, next) {
+export async function updateUserProfile(req, res, next) {
   try {
-    const { userId } = req.params
-    const { currentPassword, newPassword } = req.body || {}
-
-    if (!userId || !/^\d+$/.test(String(userId))) {
+    const userId = req.params.userId
+    const body = req.body || {}
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
+    const avatarUrl = body.avatarUrl === null ? null : typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() : undefined
+    const address = body.address
+    if (address !== undefined && (
+      !address ||
+      typeof address !== 'object' ||
+      typeof address.fullName !== 'string' ||
+      !address.fullName.trim() ||
+      address.fullName.trim().length > 120 ||
+      typeof address.phone !== 'string' ||
+      !address.phone.trim() ||
+      address.phone.trim().length > 20 ||
+      typeof address.province !== 'string' ||
+      !address.province.trim() ||
+      address.province.trim().length > 120 ||
+      typeof address.detail !== 'string' ||
+      !address.detail.trim() ||
+      address.detail.trim().length > 255 ||
+      (address.district && (typeof address.district !== 'string' || address.district.trim().length > 120)) ||
+      (address.ward && (typeof address.ward !== 'string' || address.ward.trim().length > 120))
+    )) {
       return res.status(400).json({
         success: false,
-        message: 'Mã tài khoản không hợp lệ.',
-        error: { code: 'INVALID_USER_ID' },
+        message: 'Địa chỉ nhận hàng không hợp lệ.',
+        error: { code: 'INVALID_ADDRESS' },
       })
     }
 
     if (
-      typeof currentPassword !== 'string' ||
-      typeof newPassword !== 'string' ||
-      currentPassword.length === 0 ||
-      newPassword.length === 0
+      !fullName ||
+      fullName.length > 120 ||
+      !validEmail(email) ||
+      (phone && phone.length > 20) ||
+      (avatarUrl !== undefined && avatarUrl.length > 1024)
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng cung cấp đầy đủ mật khẩu hiện tại và mật khẩu mới.',
-        error: { code: 'VALIDATION_ERROR' },
+        message: !validEmail(email) ? 'Vui lòng nhập email hợp lệ.' : 'Thông tin hồ sơ không hợp lệ.',
+        error: { code: !validEmail(email) ? 'INVALID_EMAIL' : 'VALIDATION_ERROR' },
       })
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
-        error: { code: 'PASSWORD_TOO_SHORT' },
-      })
-    }
+    const user = await executeTransaction(async (query) => {
+      await query(
+        `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
+         WHERE id = ? AND status = 'active'`,
+        [fullName, email, phone || null, avatarUrl ?? null, userId],
+      )
+      const users = await query(
+        `SELECT id FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
+        [userId],
+      )
+      if (!users.length) return null
+      if (address !== undefined) {
+        const addresses = await query(
+          `SELECT id FROM addresses WHERE user_id = ? AND is_default = 1 AND deleted_at IS NULL FOR UPDATE`,
+          [userId],
+        )
+        const addressValues = [
+          address.fullName.trim(),
+          address.phone.trim(),
+          address.province.trim(),
+          address.district?.trim() || null,
+          address.ward?.trim() || null,
+          address.detail.trim(),
+        ]
+        if (addresses.length) {
+          await query(
+            `UPDATE addresses SET recipient_name = ?, phone = ?, province = ?, district = ?, ward = ?, detail = ?
+             WHERE id = ?`,
+            [...addressValues, addresses[0].id],
+          )
+        } else {
+          await query(
+            `INSERT INTO addresses (user_id, recipient_name, phone, province, district, ward, detail, is_default)
+             VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+            [userId, ...addressValues],
+          )
+        }
+      }
 
-    if (Buffer.byteLength(newPassword, 'utf8') > 72) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mật khẩu mới vượt quá giới hạn 72 bytes.',
-        error: { code: 'PASSWORD_TOO_LONG' },
-      })
-    }
-
-    const numericUserId = BigInt(userId)
-
-    const rows = await executeQuery(
-      'SELECT id, password_hash, status FROM users WHERE id = ? LIMIT 1',
-      [numericUserId]
-    )
-
-    if (!rows || rows.length === 0) {
+      const rows = await query(
+        `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
+                s.id AS shop_id, a.recipient_name, a.phone AS address_phone, a.province, a.district, a.ward, a.detail
+         FROM users u
+         LEFT JOIN shops s ON s.owner_id = u.id
+         LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = 1 AND a.deleted_at IS NULL
+         WHERE u.id = ? LIMIT 1`,
+        [userId],
+      )
+      return rows[0]
+    })
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy người dùng.',
+        message: 'Không tìm thấy tài khoản.',
         error: { code: 'USER_NOT_FOUND' },
       })
     }
 
-    const user = rows[0]
-
-    if (user.status !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Tài khoản đã bị tạm khóa hoặc ngừng kích hoạt.',
-        error: { code: 'ACCOUNT_BLOCKED' },
-      })
-    }
-
-    // So sánh mật khẩu hiện tại
-    const isMatch = await bcrypt.compare(currentPassword, user.password_hash)
-    if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mật khẩu hiện tại không chính xác.',
-        error: { code: 'INVALID_CURRENT_PASSWORD' },
-      })
-    }
-
-    // Băm mật khẩu mới bằng bcrypt cost 12
-    const newHash = await bcrypt.hash(newPassword, 12)
-
-    await executeQuery(
-      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [newHash, numericUserId]
-    )
-
     return res.status(200).json({
       success: true,
-      message: 'Đổi mật khẩu tài khoản thành công.',
+      message: 'Cập nhật hồ sơ thành công.',
+      data: {
+        user: {
+          id: String(user.id),
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phone: user.phone,
+          avatarUrl: user.avatar_url,
+          role: user.role,
+          status: user.status,
+          shopId: user.shop_id === null ? null : String(user.shop_id),
+          address: user.recipient_name ? {
+            fullName: user.recipient_name,
+            phone: user.address_phone,
+            province: user.province,
+            district: user.district || '',
+            ward: user.ward || '',
+            detail: user.detail,
+          } : null,
+        },
+      },
     })
   } catch (err) {
-    next(err)
+    if (err.code === 'ER_DUP_ENTRY') {
+      const constraint = String(err.constraint || err.sqlMessage || '')
+      const phoneConflict = constraint.includes('uq_users_phone')
+      return res.status(409).json({
+        success: false,
+        message: phoneConflict ? 'Số điện thoại này đã được sử dụng.' : 'Email này đã được sử dụng.',
+        error: { code: phoneConflict ? 'PHONE_TAKEN' : 'EMAIL_TAKEN' },
+      })
+    }
+    return next(err)
+  }
+}
+
+export async function createSellerShop(req, res, next) {
+  try {
+    const userId = req.params.userId
+    const shopName = typeof req.body?.shopName === 'string' ? req.body.shopName.trim() : ''
+    if (!/^[1-9]\d{0,19}$/.test(userId) || !shopName || shopName.length > 160) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập tên gian hàng hợp lệ (tối đa 160 ký tự).',
+        error: { code: 'INVALID_SHOP_NAME' },
+      })
+    }
+
+    const result = await executeTransaction(async (query) => {
+      const users = await query(
+        `SELECT id, username, full_name, email, phone, avatar_url, role, status
+         FROM users WHERE id = ? FOR UPDATE`,
+        [userId],
+      )
+      if (!users.length || users[0].status !== 'active') return { error: 'USER_NOT_FOUND' }
+
+      // 1. Kiểm tra trùng tên gian hàng với gian hàng của người khác (case-insensitive)
+      const duplicateShops = await query(
+        `SELECT id FROM shops WHERE LOWER(name) = LOWER(?) AND owner_id <> ? LIMIT 1`,
+        [shopName, userId],
+      )
+      if (duplicateShops.length > 0) {
+        return { error: 'DUPLICATE_SHOP_NAME' }
+      }
+
+      // 2. Kiểm tra xem người dùng đã sở hữu gian hàng hay chưa (tránh tạo trùng lặp)
+      const existingShops = await query('SELECT id, name FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
+      let shopId
+      if (existingShops.length) {
+        shopId = String(existingShops[0].id)
+      } else {
+        const shopSlug = `${slugify(shopName)}-${crypto.randomBytes(4).toString('hex')}`
+        const shop = await query(
+          `INSERT INTO shops (owner_id, slug, name, province, status)
+           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+          [userId, shopSlug, shopName],
+        )
+        shopId = String(shop.insertId)
+      }
+
+      // 3. Phân quyền: Người dùng buyer được nâng cấp thành seller; Admin giữ nguyên quyền admin
+      const nextRole = users[0].role === 'admin' ? 'admin' : 'seller'
+      if (users[0].role !== nextRole) {
+        await query(`UPDATE users SET role = ? WHERE id = ?`, [nextRole, userId])
+      }
+
+      return {
+        user: {
+          id: String(users[0].id),
+          username: users[0].username,
+          fullName: users[0].full_name,
+          email: users[0].email,
+          phone: users[0].phone,
+          avatarUrl: users[0].avatar_url,
+          role: nextRole,
+          status: users[0].status,
+          shopId,
+        },
+      }
+    })
+
+    if (result.error === 'USER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tài khoản đang hoạt động.',
+        error: { code: 'USER_NOT_FOUND' },
+      })
+    }
+    if (result.error === 'DUPLICATE_SHOP_NAME') {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên gian hàng này đã được sử dụng bởi người bán khác. Vui lòng chọn tên khác.',
+        error: { code: 'DUPLICATE_SHOP_NAME' },
+      })
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Đã mở gian hàng thành công.',
+      data: { user: result.user },
+    })
+  } catch (err) {
+    return next(err)
   }
 }

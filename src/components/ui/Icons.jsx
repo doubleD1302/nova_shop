@@ -38,8 +38,37 @@ export const IconCart = (p) => (
 
 export const IconBell = (p) => (
   <Svg {...p}>
-    <path d="M18 8a6 6 0 10-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
-    <path d="M10.3 20a2 2 0 003.4 0" />
+    <path d="M18 9a6 6 0 00-12 0c0 6.2-2.5 7.2-2.5 9h17S18 15.2 18 9Z" />
+    <path d="M9.5 21h5" />
+    <path d="m4.1 5.8-1.3-1.2m17.1 1.2 1.3-1.2" />
+  </Svg>
+)
+
+export const IconTicketPercent = (p) => (
+  <Svg {...p}>
+    <path d="M4 8a2.5 2.5 0 010 5v3a2 2 0 002 2h12a2 2 0 002-2v-3a2.5 2.5 0 010-5V7a2 2 0 00-2-2H6a2 2 0 00-2 2v1Z" />
+    <path d="M9 6v2m0 3v2m0 3v2" strokeDasharray="1 1" />
+    <path d="m16 9-4 6" />
+    <circle cx="12.2" cy="9.2" r=".8" fill="currentColor" stroke="none" />
+    <circle cx="15.8" cy="14.8" r=".8" fill="currentColor" stroke="none" />
+  </Svg>
+)
+
+export const IconMedalCheck = (p) => (
+  <Svg {...p}>
+    <path d="M8 3h8l-1.2 6H9.2L8 3Z" />
+    <circle cx="12" cy="14" r="5" />
+    <path d="m9.8 14 1.5 1.5 3-3" />
+    <path d="m8.3 18-1 3 3.4-1.2m5-1.8 1 3-3.4-1.2" />
+  </Svg>
+)
+
+export const IconRefreshReturn = (p) => (
+  <Svg {...p}>
+    <path d="M20 7v5h-5" />
+    <path d="M20 12a8 8 0 00-14.7-4L4 10" />
+    <path d="M4 17v-5h5" />
+    <path d="M4 12a8 8 0 0014.7 4L20 14" />
   </Svg>
 )
 
@@ -273,4 +302,150 @@ export const IconBolt = ({ className = 'h-4 w-4', filled = true, ...rest }) => (
   >
     <path d="M13.5 2L5 13.2h5.2L9.6 22 19 10.4h-5.4z" />
   </svg>
+)
+
+export const IconArrowRight = (p) => (
+  <Svg {...p}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Svg>
+)
+
+export const IconDress = (p) => (
+  <Svg {...p}>
+    <path d="M9 3a3 3 0 0 0 6 0" />
+    <path d="M9 3 5 7l2.5 2L6 21h12l-1.5-12 2.5-2-4-4" />
+    <path d="M10 12h4" />
+  </Svg>
+)
+
+export const IconTShirt = (p) => (
+  <Svg {...p}>
+    <path d="M6 4 2 8l3 3 2-2v11h10V9l2 2 3-3-4-4c-2 2-6 2-8 0z" />
+  </Svg>
+)
+
+export const IconDeviceMobile = (p) => (
+  <Svg {...p}>
+    <rect x="6" y="2" width="12" height="20" rx="3" />
+    <circle cx="12" cy="18" r="1" />
+  </Svg>
+)
+
+export const IconLaptopScreen = (p) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="12" rx="1.5" />
+    <path d="M1 20h22" />
+  </Svg>
+)
+
+export const IconHeadphones = (p) => (
+  <Svg {...p}>
+    <path d="M3 14v-3a9 9 0 0 1 18 0v3" />
+    <rect x="2" y="14" width="4" height="6" rx="1.5" />
+    <rect x="18" y="14" width="4" height="6" rx="1.5" />
+  </Svg>
+)
+
+export const IconBeautyCosmetics = (p) => (
+  <Svg {...p}>
+    <path d="m12 3 1.5 3.5L17 8l-3.5 1.5L12 13l-1.5-3.5L7 8l3.5-1.5z" />
+    <path d="M19 14l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" />
+    <path d="M5 16l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" />
+  </Svg>
+)
+
+export const IconArmchair = (p) => (
+  <Svg {...p}>
+    <path d="M5 11V7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v4" />
+    <path d="M3 13a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5H3v-5z" />
+    <path d="M6 18v3M18 18v3" />
+  </Svg>
+)
+
+export const IconSneaker = (p) => (
+  <Svg {...p}>
+    <path d="M3 18h18l-1.5-4a2 2 0 0 0-1.8-1.2H14l-3-4-3 1-3 4-2 1v3.2z" />
+    <path d="M7 10l3 3M11 8l3 3" />
+  </Svg>
+)
+
+export const IconBabyStroller = (p) => (
+  <Svg {...p}>
+    <circle cx="8" cy="19" r="2" />
+    <circle cx="17" cy="19" r="2" />
+    <path d="M3 5h3l2.5 8h9.5M19 7h-9M12 7l1 6" />
+  </Svg>
+)
+
+export const IconBookOpen = (p) => (
+  <Svg {...p}>
+    <path d="M2 5.5A2.5 2.5 0 0 1 4.5 3h6a2.5 2.5 0 0 1 2.5 2.5v13a2.5 2.5 0 0 0-2.5-2.5h-6A2.5 2.5 0 0 0 2 18.5v-13z" />
+    <path d="M22 5.5A2.5 2.5 0 0 0 19.5 3h-6A2.5 2.5 0 0 0 11 5.5v13a2.5 2.5 0 0 1 2.5-2.5h6a2.5 2.5 0 0 1 2.5 2.5v-13z" />
+  </Svg>
+)
+
+export const IconLock = (p) => (
+  <Svg {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </Svg>
+)
+
+export const IconHelpCircle = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </Svg>
+)
+
+export const IconMegaphone = (p) => (
+  <Svg {...p}>
+    <path d="m3 11 18-5v12L3 14v-3z" />
+    <path d="M11.6 16.8a3 3 0 0 1-4.2 1.2" />
+  </Svg>
+)
+
+export const IconWallet = (p) => (
+  <Svg {...p}>
+    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+    <path d="M18 12a2 2 0 0 0 0 4h4v-4z" />
+  </Svg>
+)
+
+export const IconWarehouse = (p) => (
+  <Svg {...p}>
+    <path d="M3 21V9l9-6 9 6v12H3z" />
+    <path d="M9 21v-8h6v8" />
+  </Svg>
+)
+
+export const IconShoppingBag = (p) => (
+  <Svg {...p}>
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+    <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
+  </Svg>
+)
+
+export const IconCopy = (p) => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </Svg>
+)
+
+export const IconSettings = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </Svg>
+)
+
+export const IconDotsHorizontal = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  </Svg>
 )

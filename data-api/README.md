@@ -30,8 +30,8 @@ MySQL 8.4 Server (Port 3306)
 - **Trạng thái:**
   - Các endpoint hệ thống (`health`, `ready`) đã **implemented** và kiểm chứng toàn diện (hoàn thiện quyền sở hữu connection theo vòng đời và thu hồi các kết nối pool đang khởi tạo trong DB-002-R4).
   - Client Backend (`backend/src/clients/data.client.js`) đã kết nối và bổ sung readiness cho Backend trong DB-003.
-  - Các endpoint xác thực nội bộ BE-003A (`/internal/v1/auth/verify-credentials` và `/internal/v1/users/:userId/auth-profile`) đã **implemented** với bcrypt so sánh bất đồng bộ, dummy hash chống timing attack, giới hạn mật khẩu 72 bytes và truy vấn có tham số an toàn qua helper `executeWithConnection`.
-  - Các endpoint nghiệp vụ khác (catalog, shops, orders...) vẫn ở trạng thái **planned** (sẽ triển khai từ BE-003B / BE-004).
+  - Các endpoint xác thực (`verify-credentials`, `register`, hồ sơ, mở và cập nhật gian hàng) đã được triển khai. Đăng ký tạo tài khoản và gian hàng trong cùng transaction.
+  - Catalog, danh mục, gian hàng, sản phẩm seller, đánh giá, đơn hàng và tồn kho được truy vấn qua endpoint nghiệp vụ nội bộ; thao tác sản phẩm/đơn seller giới hạn theo chủ sở hữu trong SQL.
 
 ---
 
@@ -50,9 +50,9 @@ Hệ thống phân biệt rõ ràng giữa dải phiên bản khai báo (Depende
 | `dotenv` | `^16.4.7` | `16.6.1` | Tải biến môi trường từ file `.env` |
 | `helmet` | `^8.0.0` | `8.3.0` | Thiết lập các HTTP security headers cơ bản |
 
-> **Quy định triển khai:** Luôn sử dụng lệnh `npm ci` khi triển khai hoặc chạy kiểm thử CI/CD để đảm bảo sử dụng chính xác các phiên bản đã được khóa trong `package-lock.json`. Bắt buộc chạy lại toàn bộ test suite (`npm run smoke`, `npm run check:timeout`, `npm run check:tls`, `npm run check:db`) trước khi cập nhật bất kỳ dependency nào.
+> **Quy định triển khai:** Luôn sử dụng lệnh `npm ci` khi triển khai hoặc chạy kiểm thử CI/CD để đảm bảo sử dụng chính xác các phiên bản đã được khóa trong `package-lock.json`.
 
-> **Quy định quyền CSDL runtime:** Tài khoản `shopnova_data_api@127.0.0.1` chỉ cần quyền `GRANT SELECT` trên CSDL `shopnova_dev.*` cho các endpoint hiện tại (`health`, `ready`, `verify-credentials`, `auth-profile`). Các tác vụ migration schema, nạp seed mẫu hoặc ghi fixture test sử dụng tài khoản bootstrap/fixture riêng có quyền ghi (`INSERT, UPDATE, DELETE`).
+> **Quyền CSDL runtime:** Data API tạo tài khoản/gian hàng, cập nhật hồ sơ, quản lý sản phẩm, tồn kho và đơn hàng. Tài khoản runtime cần `SELECT, INSERT, UPDATE, DELETE` trên `shopnova_dev.*` (không cần quyền thay đổi schema). Chỉ cấp quyền này cho database và host cụ thể của Data API; dùng tài khoản bootstrap riêng cho migration và seed. Schema cũ cần chạy `database/migrations/2026-10-19-add-unique-user-phone.sql` để bảo đảm số điện thoại không trùng.
 
 ### 2.2 Cấu hình môi trường
 Tạo file `.env` tại thư mục gốc của `data-api/` (tham khảo mẫu tại `.env.example`):

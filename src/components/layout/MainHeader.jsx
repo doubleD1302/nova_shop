@@ -1,57 +1,81 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
-import { IconBell, IconCart } from '../ui/Icons'
+import { IconCart, IconUser } from '../ui/Icons'
 import AccountMenu from './AccountMenu'
+import NotificationBell from './NotificationBell'
 import SearchBar from './SearchBar'
 
-/** Header chính: logo + ô tìm kiếm + thông báo/giỏ hàng/tài khoản */
+/** Header chính: Logo NovaShop Terracotta + Ô tìm kiếm bo tròn + Đăng ký / Đăng nhập / Giỏ hàng */
 export default function MainHeader() {
   const { cartCount } = useCart()
+  const { user } = useAuth()
 
   return (
-    <div className="bg-gradient-to-b from-topbar to-[#f8faff]">
-      <div className="container-shop flex items-center gap-4 py-3 lg:gap-8">
-        {/* Logo */}
-        <Link to="/" className="flex shrink-0 items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-gradient-to-br from-[#f86a4b] to-[#ee4d2d] text-[19px] font-black text-white shadow-sm">
-            S
-          </span>
-          <span className="hidden text-[22px] font-extrabold tracking-tight text-[#14224a] sm:block">
-            Shop<span className="text-brand">Nova</span>
-          </span>
+    <header className="border-b border-[#E6D5C2] bg-[#FFFCF7]">
+      <div className="container-shop flex flex-wrap items-center gap-x-4 gap-y-2.5 py-3 lg:flex-nowrap lg:gap-8 lg:py-3.5">
+        {/* Logo NovaShop chuẩn theo thiết kế Terracotta */}
+        <Link to="/" className="group order-1 flex shrink-0 items-center gap-2.5">
+          <img
+            src="/images/logo.png"
+            alt="NovaShop"
+            className="h-10 w-10 sm:h-11 sm:w-11 object-contain transition-transform duration-300 group-hover:scale-105"
+          />
+          <div className="flex flex-col">
+            <span className="max-[360px]:hidden text-[22px] sm:text-[24px] font-black tracking-tight text-[#49352D]">
+              Nova<span className="text-[#BD6E49]">Shop</span>
+            </span>
+          </div>
         </Link>
 
-        {/* Ô tìm kiếm */}
-        <div className="flex-1">
+        {/* Thanh tìm kiếm bo tròn pill ở giữa */}
+        <div className="order-3 w-full flex-none lg:order-2 lg:w-auto lg:flex-1">
           <SearchBar />
         </div>
 
-        {/* Thông báo / Giỏ hàng / Tài khoản */}
-        <div className="flex shrink-0 items-center gap-4">
-          <Link
-            to="/don-hang"
-            className="relative hidden items-center gap-1.5 text-[13px] text-ink transition hover:text-brand md:flex"
-          >
-            <IconBell className="h-5 w-5" />
-            <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-              3
-            </span>
-          </Link>
+        {/* Nhóm tài khoản & Giỏ hàng bên phải */}
+        <div className="order-2 ml-auto flex shrink-0 items-center gap-3 sm:gap-4 lg:order-3 lg:ml-0">
+          <NotificationBell />
 
-          <Link to="/gio-hang" className="relative flex items-center text-ink transition hover:text-brand">
-            <IconCart className="h-6 w-6" />
-            {cartCount > 0 ? (
-              <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full border border-white bg-brand px-1 text-[10px] font-bold text-white">
+          {/* Đăng ký / Đăng nhập nếu chưa login */}
+          {!user ? (
+            <div className="flex items-center gap-2 text-[14px] font-medium text-[#49352D]">
+              <Link
+                to="/dang-ky"
+                className="flex items-center gap-1.5 transition hover:text-[#BD6E49]"
+              >
+                <IconUser className="h-4 w-4 text-[#8B7566]" />
+                <span>Đăng Ký</span>
+              </Link>
+              <span className="h-3 w-px bg-[#E6D5C2]" />
+              <Link
+                to="/dang-nhap"
+                className="transition hover:text-[#BD6E49]"
+              >
+                Đăng Nhập
+              </Link>
+            </div>
+          ) : (
+            <AccountMenu />
+          )}
+
+          <span className="h-4 w-px bg-[#E6D5C2]" />
+
+          {/* Giỏ hàng với badge terracotta */}
+          <Link
+            to="/gio-hang"
+            className="flex items-center gap-1.5 text-[14px] font-medium text-[#49352D] transition hover:text-[#BD6E49]"
+          >
+            <div className="relative">
+              <IconCart className="h-5 w-5 text-[#49352D]" />
+              <span className="absolute -right-2.5 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#BD6E49] px-1 text-[10px] font-bold text-[#FFFCF7] shadow-xs">
                 {cartCount > 99 ? '99+' : cartCount}
               </span>
-            ) : null}
+            </div>
+            <span className="hidden sm:inline">Giỏ hàng</span>
           </Link>
-
-          <span className="hidden h-6 w-px bg-line sm:block" />
-
-          <AccountMenu />
         </div>
       </div>
-    </div>
+    </header>
   )
 }

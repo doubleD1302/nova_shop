@@ -8,8 +8,10 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "smoke": "node scripts/smoke-test.mjs",
+    "test:seller-product-validation": "node scripts/test-seller-product-validation.mjs",
     "check:db": "node scripts/check-db.mjs",
     "check:timeout": "node scripts/test-timeout-hang.mjs",
+    "grant-admin": "node scripts/grant-admin.mjs",
     "check:tls": "node scripts/test-tls.mjs"
   },
   "dependencies": {

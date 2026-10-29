@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCatalog } from '../context/CatalogContext'
@@ -10,65 +10,97 @@ import Breadcrumb from '../components/ui/Breadcrumb'
 import AvatarPicker from '../components/ui/AvatarPicker'
 import { IconHeart, IconPackage, IconStore, IconUser } from '../components/ui/Icons'
 import SmartImage from '../components/ui/SmartImage'
-
-import { apiCreateAddress, apiGetAddresses } from '../utils/api'
+import { isValidEmail, normalizeEmail } from '../utils/validation'
 
 const TABS = [
-  { id: 'profile', label: 'Hồ sơ', icon: <IconUser className="h-4 w-4" /> },
-  { id: 'address', label: 'Địa chỉ nhận hàng', icon: <IconPackage className="h-4 w-4" /> },
-  { id: 'shop', label: 'Gian hàng của tôi', icon: <IconStore className="h-4 w-4" /> },
+  { id: 'profile', label: 'Há»“ sÆ¡', icon: <IconUser className="h-4 w-4" /> },
+  { id: 'address', label: 'Äá»‹a chá»‰ nháº­n hĂ ng', icon: <IconPackage className="h-4 w-4" /> },
+  { id: 'shop', label: 'Gian hĂ ng cá»§a tĂ´i', icon: <IconStore className="h-4 w-4" /> },
 ]
 
-/** TRANG TÀI KHOẢN — hồ sơ, địa chỉ, thông tin gian hàng (nếu là người bán) */
+/** TRANG TĂ€I KHOáº¢N â€” há»“ sÆ¡, Ä‘á»‹a chá»‰, thĂ´ng tin gian hĂ ng (náº¿u lĂ  ngÆ°á»i bĂ¡n) */
 export default function AccountPage() {
-  const { user, avatar, updateProfile, allUsers } = useAuth()
-  const { getShop, getProductsByShop, followedShopIds } = useCatalog()
-  const { getOrdersByBuyer } = useOrders()
+  const { user, avatar, updateProfile } = useAuth()
+  const { getShop, loadShop, followedShopIds } = useCatalog()
+  const { loadBuyerOrders, buyerOrdersSummary } = useOrders()
   const { pushToast } = useToast()
   const [tab, setTab] = useState('profile')
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', email: '', phone: '' })
+  const [addressDraft, setAddressDraft] = useState({})
+  const [emailError, setEmailError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    loadBuyerOrders({ limit: 0, force: true }).catch((error) => console.error('Could not load account order summary:', error))
+  }, [loadBuyerOrders])
+
+  useEffect(() => {
+    if (tab === 'shop' && user?.shopId) {
+      loadShop(user.shopId).catch((error) => console.error('Could not load account shop:', error))
+    }
+  }, [tab, user?.shopId, loadShop])
+
+  useEffect(() => {
+    if (!user) return
+    setProfileDraft({ fullName: user.fullName || '', email: user.email || '', phone: user.phone || '' })
+    setAddressDraft(user.address || {})
+  }, [user])
 
   if (!user) {
     return (
       <div className="rounded-sm border border-line bg-white px-6 py-16 text-center">
-        <p className="text-[15px] font-semibold text-ink">Bạn chưa đăng nhập</p>
+        <p className="text-[15px] font-semibold text-ink">Báº¡n chÆ°a Ä‘Äƒng nháº­p</p>
         <Link
           to="/dang-nhap"
           className="mt-4 inline-block rounded-sm bg-brand px-5 py-2.5 text-[13px] font-medium text-white"
         >
-          Đăng nhập ngay
+          ÄÄƒng nháº­p ngay
         </Link>
       </div>
     )
   }
 
-  const address = user.address || {}
+  const address = addressDraft
   const shop = user.shopId ? getShop(user.shopId) : null
-  const shopProducts = user.shopId ? getProductsByShop(user.shopId) : []
-  const orders = getOrdersByBuyer(user.id)
-  const spent = orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0)
-  
-  const [profileForm, setProfileForm] = useState({
-    fullName: user.fullName || '',
-    phone: user.phone || '',
-    email: user.email || '',
-  })
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
-
-  const [addressForm, setAddressForm] = useState({
-    recipientName: address.fullName || user.fullName || '',
-    phone: address.phone || user.phone || '',
-    province: address.province || '',
-    district: address.district || '',
-    ward: address.ward || '',
-    detail: address.detail || '',
-  })
-  const [isSavingAddress, setIsSavingAddress] = useState(false)
-
+  const spent = buyerOrdersSummary.spent
+  const setAddressField = (key) => (e) => setAddressDraft((current) => ({ ...current, [key]: e.target.value }))
   const inputClass = 'w-full rounded-sm border border-line px-3 py-2 text-[13px] outline-none focus:border-brand'
+
+  const saveProfile = async () => {
+    if (!profileDraft.fullName.trim()) {
+      pushToast('Vui lĂ²ng nháº­p há» vĂ  tĂªn.', 'error')
+      return
+    }
+    if (!isValidEmail(profileDraft.email)) {
+      setEmailError('Vui lĂ²ng nháº­p email Ä‘Ăºng Ä‘á»‹nh dáº¡ng.')
+      return
+    }
+    setSaving(true)
+    const result = await updateProfile({ ...profileDraft, email: normalizeEmail(profileDraft.email) })
+    setSaving(false)
+    if (!result.ok) {
+      if (result.error?.toLowerCase().includes('email')) setEmailError(result.error)
+      else pushToast(result.error || 'KhĂ´ng thá»ƒ cáº­p nháº­t há»“ sÆ¡.', 'error')
+      return
+    }
+    setEmailError('')
+    pushToast('ÄĂ£ cáº­p nháº­t há»“ sÆ¡.', 'success')
+  }
+
+  const saveAddress = async () => {
+    setSaving(true)
+    const result = await updateProfile({ address: addressDraft })
+    setSaving(false)
+    if (!result.ok) {
+      pushToast(result.error || 'KhĂ´ng thá»ƒ lÆ°u Ä‘á»‹a chá»‰.', 'error')
+      return
+    }
+    pushToast('ÄĂ£ lÆ°u Ä‘á»‹a chá»‰ nháº­n hĂ ng.', 'success')
+  }
 
   return (
     <div>
-      <Breadcrumb className="mb-2" items={[{ label: 'Trang chủ', to: '/' }, { label: 'Tài khoản của tôi' }]} />
+      <Breadcrumb className="mb-2" items={[{ label: 'Trang chá»§', to: '/' }, { label: 'TĂ i khoáº£n cá»§a tĂ´i' }]} />
 
       <div className="flex flex-wrap items-center gap-4 rounded-sm bg-white px-4 py-4">
         <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-line">
@@ -77,7 +109,7 @@ export default function AccountPage() {
         <div className="min-w-0">
           <p className="text-[16px] font-semibold text-ink">{user.fullName}</p>
           <p className="text-[12px] text-muted">
-            @{user.username} · {user.email} · {user.role === 'seller' ? 'Người bán' : 'Người mua'}
+            @{user.username} Â· {user.email} Â· {user.role === 'seller' || user.shopId ? 'Kênh Người Bán' : 'Đăng ký bán hàng'}
           </p>
           <span className="mt-1 inline-block rounded-sm bg-brand-soft px-2 py-[2px] text-[11px] text-brand">
             {user.rank}
@@ -86,19 +118,19 @@ export default function AccountPage() {
 
         <div className="ml-auto grid grid-cols-3 gap-4 text-center">
           <span>
-            <b className="block text-[16px] text-brand">{orders.length}</b>
-            <span className="text-[11px] text-muted">Đơn hàng</span>
+            <b className="block text-[16px] text-brand">{buyerOrdersSummary.orderCount}</b>
+            <span className="text-[11px] text-muted">ÄÆ¡n hĂ ng</span>
           </span>
           <span>
             <b className="block text-[16px] text-brand">{formatVnd(spent)}</b>
-            <span className="text-[11px] text-muted">Đã chi tiêu</span>
+            <span className="text-[11px] text-muted">ÄĂ£ chi tiĂªu</span>
           </span>
           <span>
             <b className="flex items-center justify-center gap-1 text-[16px] text-brand">
               <IconHeart className="h-4 w-4" />
               {followedShopIds.length}
             </b>
-            <span className="text-[11px] text-muted">Shop theo dõi</span>
+            <span className="text-[11px] text-muted">Shop theo dĂµi</span>
           </span>
         </div>
       </div>
@@ -119,18 +151,18 @@ export default function AccountPage() {
             </button>
           ))}
           <Link
-            to={user.role === 'seller' ? '/nguoi-ban' : '/dang-ky'}
+            to="/nguoi-ban"
             className="mt-1 flex w-full items-center gap-2 rounded-sm px-3 py-2 text-[13px] text-ink-soft transition hover:text-brand"
           >
             <IconStore className="h-4 w-4" />
-            {user.role === 'seller' ? 'Kênh Người Bán' : 'Đăng ký bán hàng'}
+            {user.role === 'seller' ? 'KĂªnh NgÆ°á»i BĂ¡n' : 'ÄÄƒng kĂ½ bĂ¡n hĂ ng'}
           </Link>
         </aside>
 
         <section className="rounded-sm border border-line bg-white p-4">
           {tab === 'profile' ? (
             <div className="max-w-[720px] space-y-4">
-              {/* ĐỔI ẢNH ĐẠI DIỆN */}
+              {/* Äá»”I áº¢NH Äáº I DIá»†N */}
               <AvatarPicker
                 value={{
                   avatarUrl: user.avatarUrl,
@@ -139,55 +171,57 @@ export default function AccountPage() {
                   name: user.fullName,
                 }}
                 onChange={(patch) => {
-                  const res = updateProfile(patch)
-                  pushToast(res?.error || 'Tính năng đổi ảnh đại diện chưa được hỗ trợ trên Backend API.', 'info')
+                  updateProfile(patch).then((result) => {
+                    pushToast(result.ok ? 'ÄĂ£ cáº­p nháº­t áº£nh Ä‘áº¡i diá»‡n.' : result.error, result.ok ? 'success' : 'error')
+                  })
                 }}
-                title="Ảnh đại diện của bạn"
-                note="Tải ảnh từ máy tính, hoặc chọn biểu tượng và màu nền. Ảnh đổi ngay trên header và đơn hàng."
+                title="áº¢nh Ä‘áº¡i diá»‡n cá»§a báº¡n"
+                note="Táº£i áº£nh Ä‘áº¡i diá»‡n tháº­t lĂªn mĂ¡y chá»§. áº¢nh sáº½ hiá»ƒn thá»‹ trĂªn header vĂ  Ä‘Æ¡n hĂ ng."
               />
 
               <div className="grid gap-3 md:grid-cols-2">
               <label className="text-[12px] text-muted">
-                Họ và tên
+                Há» vĂ  tĂªn
                 <input
-                  value={profileForm.fullName}
-                  onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
+                  value={profileDraft.fullName}
+                  onChange={(e) => setProfileDraft((current) => ({ ...current, fullName: e.target.value }))}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
-                Số điện thoại
+                Sá»‘ Ä‘iá»‡n thoáº¡i
                 <input
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  value={profileDraft.phone}
+                  onChange={(e) => setProfileDraft((current) => ({ ...current, phone: e.target.value }))}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted md:col-span-2">
                 Email
                 <input
-                  value={profileForm.email}
-                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
+                  type="email"
+                  required
+                  value={profileDraft.email}
+                  onChange={(e) => {
+                    setProfileDraft((current) => ({ ...current, email: e.target.value }))
+                    setEmailError('')
+                  }}
+                  onBlur={() => {
+                    if (!isValidEmail(profileDraft.email)) setEmailError('Vui lĂ²ng nháº­p email Ä‘Ăºng Ä‘á»‹nh dáº¡ng.')
+                  }}
+                  aria-invalid={Boolean(emailError)}
+                  className={`mt-1 ${inputClass} ${emailError ? 'border-rose-500' : ''}`}
                 />
+                {emailError ? <span className="mt-1 block text-[12px] text-rose-600">{emailError}</span> : null}
               </label>
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  disabled={isSavingProfile}
-                  onClick={async () => {
-                    setIsSavingProfile(true)
-                    const res = await updateProfile(profileForm)
-                    setIsSavingProfile(false)
-                    if (res.ok) {
-                      pushToast('Cập nhật hồ sơ tài khoản thành công!', 'success')
-                    } else {
-                      pushToast(res.error || 'Cập nhật thất bại.', 'error')
-                    }
-                  }}
+                  onClick={saveProfile}
+                  disabled={saving}
                   className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
                 >
-                  {isSavingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  {saving ? 'Äang lÆ°u...' : 'LÆ°u thay Ä‘á»•i'}
                 </button>
               </div>
               </div>
@@ -197,29 +231,25 @@ export default function AccountPage() {
           {tab === 'address' ? (
             <div className="grid max-w-[720px] gap-3 md:grid-cols-2">
               <label className="text-[12px] text-muted">
-                Người nhận
+                NgÆ°á»i nháº­n
                 <input
-                  value={addressForm.recipientName}
-                  onChange={(e) => setAddressForm({ ...addressForm, recipientName: e.target.value })}
+                  value={address.fullName || ''}
+                  onChange={setAddressField('fullName')}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
-                Số điện thoại
-                <input
-                  value={addressForm.phone}
-                  onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
-                />
+                Sá»‘ Ä‘iá»‡n thoáº¡i
+                <input value={address.phone || ''} onChange={setAddressField('phone')} className={`mt-1 ${inputClass}`} />
               </label>
               <label className="text-[12px] text-muted">
-                Tỉnh / Thành phố
+                Tá»‰nh / ThĂ nh phá»‘
                 <select
-                  value={addressForm.province}
-                  onChange={(e) => setAddressForm({ ...addressForm, province: e.target.value })}
+                  value={address.province || ''}
+                  onChange={setAddressField('province')}
                   className={`mt-1 ${inputClass}`}
                 >
-                  <option value="">Chọn Tỉnh / Thành phố</option>
+                  <option value="">Chá»n Tá»‰nh / ThĂ nh phá»‘</option>
                   {vietnamProvinces.map((p) => (
                     <option key={p.name} value={p.name}>
                       {p.name}
@@ -228,61 +258,33 @@ export default function AccountPage() {
                 </select>
               </label>
               <label className="text-[12px] text-muted">
-                Quận / Huyện
+                Quáº­n / Huyá»‡n
                 <input
-                  value={addressForm.district}
-                  onChange={(e) => setAddressForm({ ...addressForm, district: e.target.value })}
+                  value={address.district || ''}
+                  onChange={setAddressField('district')}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <label className="text-[12px] text-muted">
-                Phường / Xã
-                <input
-                  value={addressForm.ward}
-                  onChange={(e) => setAddressForm({ ...addressForm, ward: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
-                />
+                PhÆ°á»ng / XĂ£
+                <input value={address.ward || ''} onChange={setAddressField('ward')} className={`mt-1 ${inputClass}`} />
               </label>
               <label className="text-[12px] text-muted">
-                Địa chỉ chi tiết
+                Äá»‹a chá»‰ chi tiáº¿t
                 <input
-                  value={addressForm.detail}
-                  onChange={(e) => setAddressForm({ ...addressForm, detail: e.target.value })}
+                  value={address.detail || ''}
+                  onChange={setAddressField('detail')}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  disabled={isSavingAddress}
-                  onClick={async () => {
-                    const token = sessionStorage.getItem('novashop_token')
-                    if (!token) {
-                      pushToast('Vui lòng đăng nhập lại.', 'error')
-                      return
-                    }
-                    if (!addressForm.recipientName || !addressForm.phone || !addressForm.province || !addressForm.detail) {
-                      pushToast('Vui lòng điền đủ người nhận, số điện thoại, tỉnh thành và địa chỉ chi tiết.', 'error')
-                      return
-                    }
-                    setIsSavingAddress(true)
-                    try {
-                      const res = await apiCreateAddress(token, addressForm)
-                      const data = await res.json().catch(() => null)
-                      setIsSavingAddress(false)
-                      if (res.ok && data?.success) {
-                        pushToast('Đã lưu địa chỉ nhận hàng lên máy chủ thành công!', 'success')
-                      } else {
-                        pushToast(data?.message || 'Lưu địa chỉ thất bại.', 'error')
-                      }
-                    } catch (err) {
-                      setIsSavingAddress(false)
-                      pushToast('Không thể kết nối đến máy chủ Backend.', 'error')
-                    }
-                  }}
-                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
+                  onClick={saveAddress}
+                  disabled={saving}
+                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  {isSavingAddress ? 'Đang lưu...' : 'Lưu địa chỉ'}
+                  LÆ°u Ä‘á»‹a chá»‰
                 </button>
               </div>
             </div>
@@ -303,14 +305,14 @@ export default function AccountPage() {
                     to={`/shop/${shop.id}`}
                     className="ml-auto rounded-sm border border-line px-3 py-1.5 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
                   >
-                    Xem gian hàng
+                    Xem gian hĂ ng
                   </Link>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: 'Sản phẩm đang bán', value: formatNumber(shopProducts.length) },
-                    { label: 'Người theo dõi', value: formatNumber(shop.followers) },
-                    { label: 'Đánh giá shop', value: `${shop.rating}/5` },
+                    { label: 'Sáº£n pháº©m Ä‘ang bĂ¡n', value: formatNumber(shop.productCount) },
+                    { label: 'NgÆ°á»i theo dĂµi', value: formatNumber(shop.followers) },
+                    { label: 'ÄĂ¡nh giĂ¡ shop', value: `${shop.rating}/5` },
                   ].map((s) => (
                     <div key={s.label} className="rounded-sm border border-line bg-page/60 px-3 py-2">
                       <p className="text-[16px] font-semibold text-brand">{s.value}</p>
@@ -322,26 +324,28 @@ export default function AccountPage() {
                   to="/nguoi-ban"
                   className="mt-4 inline-block rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  Vào Kênh Người Bán
+                  VĂ o KĂªnh NgÆ°á»i BĂ¡n
                 </Link>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-[14px] font-medium text-ink">Bạn chưa có gian hàng</p>
+                <p className="text-[14px] font-medium text-ink">Báº¡n chÆ°a cĂ³ gian hĂ ng</p>
                 <p className="mt-1 text-[13px] text-muted">
-                  Nâng cấp tài khoản thành người bán để bắt đầu đăng sản phẩm và nhận đơn hàng.
+                  NĂ¢ng cáº¥p tĂ i khoáº£n thĂ nh ngÆ°á»i bĂ¡n Ä‘á»ƒ báº¯t Ä‘áº§u Ä‘Äƒng sáº£n pháº©m vĂ  nháº­n Ä‘Æ¡n hĂ ng.
                 </p>
                 <Link
                   to="/dang-ky"
                   className="mt-4 inline-block rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  Đăng ký bán hàng
+                  ÄÄƒng kĂ½ bĂ¡n hĂ ng
                 </Link>
               </div>
             )
           ) : null}
         </section>
       </div>
+
+      <p className="mt-3 text-center text-[11px] text-muted">ThĂ´ng tin há»“ sÆ¡ Ä‘Æ°á»£c Ä‘á»“ng bá»™ vá»›i tĂ i khoáº£n ShopNova cá»§a báº¡n.</p>
     </div>
   )
 }

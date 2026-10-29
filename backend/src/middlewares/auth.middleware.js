@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
-import { getUserAuthProfile, isValidBigIntUnsignedString, DataApiClientError } from '../clients/data.client.js'
+import { DataApiClientError, getUserAuthProfile } from '../clients/data.client.js'
 
 export const ACCESS_TOKEN_EXPIRES_IN = 900 // 15 phút (900 giây)
 export const TOKEN_ISSUER = 'shopnova-backend'
@@ -15,6 +15,7 @@ export function signAccessToken(user) {
   const payload = {
     sub: String(user.id),
     role: user.role,
+    authVersion: 2,
   }
 
   return jwt.sign(payload, env.jwtSecret, {
@@ -35,43 +36,6 @@ export function verifyAccessToken(token) {
     audience: TOKEN_AUDIENCE,
     clockTolerance: CLOCK_SKEW_TOLERANCE_SECONDS,
   })
-}
-
-/**
- * Thẩm định các claim bắt buộc của Access Token:
- * - payload phải là object
- * - sub là chuỗi BIGINT UNSIGNED hợp lệ
- * - iat và exp là số nguyên dương hợp lệ
- * - iat không được ở tương lai quá dung sai CLOCK_SKEW_TOLERANCE_SECONDS
- * - exp - iat bắt buộc phải bằng chính xác ACCESS_TOKEN_EXPIRES_IN (900 giây)
- */
-export function validateAccessTokenClaims(payload) {
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    typeof payload.sub !== 'string' ||
-    !Number.isInteger(payload.iat) ||
-    payload.iat <= 0 ||
-    !Number.isInteger(payload.exp) ||
-    payload.exp <= payload.iat
-  ) {
-    return false
-  }
-
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  if (payload.iat > nowSeconds + CLOCK_SKEW_TOLERANCE_SECONDS) {
-    return false
-  }
-
-  if (payload.exp - payload.iat !== ACCESS_TOKEN_EXPIRES_IN) {
-    return false
-  }
-
-  if (!isValidBigIntUnsignedString(payload.sub)) {
-    return false
-  }
-
-  return true
 }
 
 /**
@@ -143,8 +107,17 @@ export async function authenticate(req, res, next) {
     })
   }
 
-  // Thẩm định cấu trúc và kiểu dữ liệu của các claim bắt buộc (iat, exp, sub, thời hạn 900s)
-  if (!validateAccessTokenClaims(payload)) {
+  // Thẩm định cấu trúc và kiểu dữ liệu của các claim bắt buộc
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.sub !== 'string' ||
+    payload.authVersion !== 2 ||
+    !Number.isInteger(payload.iat) ||
+    payload.iat <= 0 ||
+    !Number.isInteger(payload.exp) ||
+    payload.exp <= payload.iat
+  ) {
     return res.status(401).json({
       success: false,
       message: 'Token xác thực không hợp lệ.',
@@ -154,35 +127,59 @@ export async function authenticate(req, res, next) {
     })
   }
 
-  // Đọc thông tin tài khoản mới nhất từ Data API để xác nhận status và role
+  // Kiểm tra thời gian phát hành (iat) không được ở tương lai vượt quá dung sai lệch đồng hồ cho phép
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  if (payload.iat > nowSeconds + CLOCK_SKEW_TOLERANCE_SECONDS) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token xác thực không hợp lệ.',
+      error: {
+        code: 'AUTH_INVALID',
+      },
+    })
+  }
+
+  // Bắt buộc thời hạn access token khớp chính xác hằng số 900 giây (exp - iat === 900)
+  if (payload.exp - payload.iat !== ACCESS_TOKEN_EXPIRES_IN) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token xác thực không hợp lệ.',
+      error: {
+        code: 'AUTH_INVALID',
+      },
+    })
+  }
+
+  // Validate sub: must be a non-empty numeric string
+  if (!/^\d+$/.test(payload.sub) || payload.sub === '0') {
+    return res.status(401).json({
+      success: false,
+      message: 'Token xác thực không hợp lệ.',
+      error: {
+        code: 'AUTH_INVALID',
+      },
+    })
+  }
+
   try {
     const userProfile = await getUserAuthProfile(payload.sub)
-
-    // Nếu tài khoản không còn tồn tại hoặc đang bị khóa (status !== 'active')
-    if (!userProfile || userProfile.status !== 'active') {
+    if (userProfile.status !== 'active') {
       return res.status(401).json({
         success: false,
         message: 'Tài khoản không tồn tại hoặc đã bị khóa.',
-        error: {
-          code: 'AUTH_INVALID',
-        },
+        error: { code: 'AUTH_INVALID' },
       })
     }
 
     req.user = userProfile
-    next()
+    return next()
   } catch (err) {
-    if (err instanceof DataApiClientError) {
-      if (err.code === 'USER_NOT_FOUND') {
-        return res.status(401).json({
-          success: false,
-          message: 'Tài khoản không tồn tại hoặc đã bị khóa.',
-          error: {
-            code: 'AUTH_INVALID',
-          },
-        })
-      }
-      return next(err)
+    if (err instanceof DataApiClientError && err.status === 404) {
+      return res.status(401).json({
+        success: false,
+        message: 'Tài khoản không tồn tại hoặc đã bị khóa.',
+        error: { code: 'AUTH_INVALID' },
+      })
     }
     return next(err)
   }
@@ -209,8 +206,13 @@ export function requireRole(...allowedRoles) {
     }
 
     const userRole = req.user.role
-    // Seller kế thừa toàn bộ quyền của buyer (seller vẫn có quyền mua hàng)
-    const effectiveRoles = userRole === 'seller' ? ['seller', 'buyer'] : [userRole]
+    // Admin kế thừa toàn bộ quyền của seller và buyer; Seller kế thừa toàn bộ quyền của buyer
+    let effectiveRoles = [userRole]
+    if (userRole === 'admin') {
+      effectiveRoles = ['admin', 'seller', 'buyer']
+    } else if (userRole === 'seller') {
+      effectiveRoles = ['seller', 'buyer']
+    }
     const hasPermission = flattenedRoles.some((role) => effectiveRoles.includes(role))
 
     if (!hasPermission) {
@@ -225,57 +227,4 @@ export function requireRole(...allowedRoles) {
 
     next()
   }
-}
-
-/**
- * Middleware xác thực tùy chọn (Optional Authentication).
- * - Áp dụng chung quy tắc thẩm định JWT với authenticate (bắt buộc iat/exp hợp lệ, thời hạn 900s, sub hợp lệ).
- * - Nếu token hợp lệ: gắn thông tin userProfile vào req.user.
- * - Nếu không có Authorization header hoặc token không hợp lệ (bị authenticate từ chối): gán req.user = null, coi như khách vãng lai và KHÔNG gọi upstream.
- * - Phù hợp với các endpoint mở cho cả khách vãng lai và thành viên đăng nhập (như Chat AI).
- */
-export async function optionalAuthenticate(req, res, next) {
-  req.user = null
-  const authHeader = req.headers['authorization']
-  if (!authHeader || typeof authHeader !== 'string') {
-    return next()
-  }
-
-  const trimmedHeader = authHeader.trim()
-  if (!trimmedHeader.startsWith('Bearer ')) {
-    return next()
-  }
-
-  const token = trimmedHeader.slice(7).trim()
-  if (!token || token.length > MAX_TOKEN_LENGTH) {
-    return next()
-  }
-
-  let payload
-  try {
-    payload = verifyAccessToken(token)
-  } catch {
-    // Token không hợp lệ (sai signature, hỏng format): coi như khách vãng lai
-    return next()
-  }
-
-  if (!validateAccessTokenClaims(payload)) {
-    // Bị từ chối claim: coi như khách vãng lai, tuyệt đối không gọi Data API
-    return next()
-  }
-
-  try {
-    const userProfile = await getUserAuthProfile(payload.sub)
-    if (userProfile && userProfile.status === 'active') {
-      req.user = userProfile
-    }
-  } catch (err) {
-    // Nếu Data API bị lỗi dịch vụ upstream (5xx, timeout hoặc DATABASE_UNAVAILABLE):
-    // Ghi nhận lỗi hệ thống vào request để các controller phân biệt với trường hợp thiếu token hoặc token sai
-    if (err instanceof DataApiClientError && (err.status >= 500 || err.code === 'DATABASE_UNAVAILABLE' || err.code === 'DATA_API_UNAVAILABLE')) {
-      req.authServiceError = err
-    }
-  }
-
-  return next()
 }

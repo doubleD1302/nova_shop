@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useOrders } from '../context/OrderContext'
 import { PAYMENT_LABEL } from '../data/orders'
@@ -11,9 +12,14 @@ import SmartImage from '../components/ui/SmartImage'
 /** TRANG ĐẶT HÀNG THÀNH CÔNG */
 export default function OrderSuccessPage() {
   const { orderId } = useParams()
-  const { getOrderById } = useOrders()
+  const { getOrderById, loadBuyerOrders, buyerOrdersLoading } = useOrders()
   const order = getOrderById(orderId)
 
+  useEffect(() => {
+    if (!order) loadBuyerOrders({ orderId, force: true, append: true }).catch((error) => console.error('Could not load successful order:', error))
+  }, [order, loadBuyerOrders])
+
+  if (!order && buyerOrdersLoading) return <div className="rounded-sm bg-white p-8 text-center text-sm text-muted">Đang tải đơn hàng...</div>
   if (!order) {
     return (
       <div className="rounded-sm border border-line bg-white px-6 py-16 text-center">
@@ -101,7 +107,7 @@ export default function OrderSuccessPage() {
               <div key={`${item.productId}-${item.variant}`} className="flex items-center gap-3 px-4 py-3">
                 <SmartImage
                   src={item.image}
-                  fallback={item.image}
+                  fallback={item.imageFallback || item.image}
                   alt={item.name}
                   className="h-[64px] w-[64px] rounded-sm border border-line object-cover"
                 />

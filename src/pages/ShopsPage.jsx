@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCatalog } from '../context/CatalogContext'
 import { useToast } from '../context/ToastContext'
@@ -10,18 +10,36 @@ import SmartImage from '../components/ui/SmartImage'
 
 /** TRANG DANH SÁCH GIAN HÀNG — thể hiện rõ "nhiều người bán" trên sàn */
 export default function ShopsPage() {
-  const { shops, toggleFollow } = useCatalog()
+  const { toggleFollow, loadShops } = useCatalog()
   const { pushToast } = useToast()
   const [keyword, setKeyword] = useState('')
   const [onlyMall, setOnlyMall] = useState(false)
+  const [debouncedKeyword, setDebouncedKeyword] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [result, setResult] = useState({ shops: [], total: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const list = useMemo(() => {
-    const k = keyword.trim().toLowerCase()
-    return shops
-      .filter((s) => (onlyMall ? s.mall : true))
-      .filter((s) => (k ? s.name.toLowerCase().includes(k) || s.tagline.toLowerCase().includes(k) : true))
-      .sort((a, b) => b.totalSold - a.totalSold)
-  }, [shops, keyword, onlyMall])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedKeyword(keyword.trim()), 250)
+    return () => window.clearTimeout(timer)
+  }, [keyword])
+
+  useEffect(() => {
+    let current = true
+    setLoading(true)
+    setError('')
+    loadShops({ q: debouncedKeyword, mall: onlyMall, limit: 24, offset })
+      .then((data) => {
+        if (!current) return
+        setResult((old) => ({ shops: offset ? [...old.shops, ...data.shops] : data.shops, total: offset ? old.total : Number(data.total || 0) }))
+      })
+      .catch((loadError) => { if (current) setError(loadError.message || 'Không thể tải gian hàng.') })
+      .finally(() => { if (current) setLoading(false) })
+    return () => { current = false }
+  }, [debouncedKeyword, onlyMall, offset, loadShops])
+
+  const list = result.shops
 
   return (
     <div>
@@ -30,7 +48,7 @@ export default function ShopsPage() {
       <div className="flex flex-wrap items-center gap-3 rounded-sm border border-line bg-white px-4 py-3">
         <h1 className="text-[16px] font-bold text-ink">Gian Hàng Trên ShopNova</h1>
         <span className="text-[13px] text-muted">
-          {shops.length} người bán · {formatNumber(shops.reduce((s, x) => s + x.productCount, 0))} sản phẩm
+              {formatNumber(result.total)} người bán
         </span>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -38,14 +56,14 @@ export default function ShopsPage() {
             <IconSearch className="h-4 w-4 text-muted" />
             <input
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={(e) => { setKeyword(e.target.value); setOffset(0) }}
               placeholder="Tìm gian hàng..."
               className="w-[180px] text-[13px] outline-none"
             />
           </label>
           <button
             type="button"
-            onClick={() => setOnlyMall((v) => !v)}
+            onClick={() => { setOnlyMall((v) => !v); setOffset(0) }}
             className={`flex h-9 items-center gap-1.5 rounded-sm border px-3 text-[13px] transition ${
               onlyMall ? 'border-mall bg-mall text-white' : 'border-line text-ink-soft hover:border-mall hover:text-mall'
             }`}
@@ -56,6 +74,8 @@ export default function ShopsPage() {
         </div>
       </div>
 
+      {error ? <p role="alert" className="mt-3 rounded-sm bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+      {loading && !list.length ? <p className="mt-3 rounded-sm bg-white p-8 text-center text-sm text-muted">Đang tải gian hàng...</p> : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((shop) => (
           <div key={shop.id} className="overflow-hidden rounded-sm border border-line bg-white">
@@ -128,6 +148,7 @@ export default function ShopsPage() {
           </div>
         ))}
       </div>
+      {offset + 24 < result.total ? <div className="mt-4 text-center"><button type="button" disabled={loading} onClick={() => setOffset((value) => value + 24)} className="rounded-sm border border-line bg-white px-8 py-2.5 text-sm text-ink-soft disabled:opacity-50">{loading ? 'Đang tải...' : 'Xem thêm gian hàng'}</button></div> : null}
     </div>
   )
 }

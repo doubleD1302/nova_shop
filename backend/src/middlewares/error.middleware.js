@@ -22,7 +22,7 @@ export function errorHandler(err, req, res, next) {
     console.error('[Backend Error] Event: BODY_TOO_LARGE')
     return res.status(413).json({
       success: false,
-      message: 'Dung lượng dữ liệu vượt quá giới hạn cho phép (1MB).',
+      message: 'Dung lượng dữ liệu vượt quá giới hạn cho phép (8MB).',
       error: {
         code: 'BODY_TOO_LARGE',
       },

@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCatalog } from '../../context/CatalogContext'
-import { toSlug } from '../../utils/format'
 import { IconSearch } from '../ui/Icons'
 import SearchSuggestions from './SearchSuggestions'
 
-/** Ô tìm kiếm trên header — có gợi ý sản phẩm, gian hàng và từ khoá phổ biến */
+/** Ô tìm kiếm bo tròn pill - Phong cách Terracotta + Cream */
 export default function SearchBar() {
   const navigate = useNavigate()
-  const { queryProducts, shops } = useCatalog()
+  const { loadProducts, loadShops } = useCatalog()
   const [keyword, setKeyword] = useState('')
+  const [debouncedKeyword, setDebouncedKeyword] = useState('')
+  const [productHits, setProductHits] = useState([])
+  const [shopHits, setShopHits] = useState([])
   const [open, setOpen] = useState(false)
   const boxRef = useRef(null)
 
@@ -28,16 +30,30 @@ export default function SearchBar() {
     }
   }, [])
 
-  const productHits = useMemo(
-    () => (keyword.trim() ? queryProducts({ q: keyword, limit: 5, sort: 'popular' }) : []),
-    [keyword, queryProducts],
-  )
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedKeyword(keyword.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [keyword])
 
-  const shopHits = useMemo(() => {
-    const k = toSlug(keyword).replace(/-/g, '')
-    if (!k) return []
-    return shops.filter((s) => toSlug(s.name).replace(/-/g, '').includes(k)).slice(0, 2)
-  }, [keyword, shops])
+  useEffect(() => {
+    const query = debouncedKeyword.trim()
+    let current = true
+    const controller = new AbortController()
+    if (!open || query.length < 2) {
+      setProductHits([])
+      setShopHits([])
+      return () => { current = false }
+    }
+    Promise.all([
+      loadProducts({ q: query, limit: 5, offset: 0, sort: 'popular', signal: controller.signal }),
+      loadShops({ q: query, limit: 2, offset: 0, signal: controller.signal }),
+    ]).then(([products, shopResults]) => {
+      if (!current) return
+      setProductHits(products.products)
+      setShopHits(shopResults.shops)
+    }).catch((error) => { if (error.name !== 'AbortError') console.error('Could not load search suggestions:', error) })
+    return () => { current = false; controller.abort() }
+  }, [debouncedKeyword, open, loadProducts, loadShops])
 
   const go = (path) => {
     setOpen(false)
@@ -56,11 +72,9 @@ export default function SearchBar() {
           e.preventDefault()
           submit()
         }}
-        className="flex h-10 items-center rounded-sm bg-white p-[3px] shadow-sm"
+        className="flex h-11 items-center rounded-full border border-[#E6D5C2] bg-[#FFFCF7] p-1 pl-4 shadow-2xs transition focus-within:border-[#BD6E49] focus-within:ring-2 focus-within:ring-[#BD6E49]/20"
       >
-        <button type="submit" className="grid h-full w-9 place-items-center text-ink-soft" aria-label="Tìm kiếm">
-          <IconSearch className="h-5 w-5" />
-        </button>
+        <IconSearch className="h-4.5 w-4.5 text-[#8B7566] shrink-0" />
         <input
           value={keyword}
           onFocus={() => setOpen(true)}
@@ -68,13 +82,13 @@ export default function SearchBar() {
             setKeyword(e.target.value)
             setOpen(true)
           }}
-          placeholder="ShopNova siêu sale - Tìm kiếm thương hiệu, sản phẩm hot nhất"
-          className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 text-[14px] text-ink outline-none placeholder:text-[#9a9a9a]"
+          placeholder="Tìm kiếm sản phẩm, thương hiệu, danh mục..."
+          className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-[14px] text-[#49352D] outline-none placeholder:text-[#8B7566]"
           aria-label="Tìm kiếm sản phẩm"
         />
         <button
           type="submit"
-          className="flex h-full shrink-0 items-center gap-1.5 rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] px-5 text-[14px] font-medium text-white transition hover:brightness-105"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#BD6E49] hover:bg-[#A95532] px-5 text-[14px] font-medium text-[#FFFCF7] shadow-xs transition active:scale-95 cursor-pointer"
         >
           <IconSearch className="h-4 w-4" />
           <span className="hidden sm:inline">Tìm kiếm</span>
@@ -82,7 +96,7 @@ export default function SearchBar() {
       </form>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[44px] z-40 overflow-hidden rounded-b-sm border border-t-0 border-line bg-white shadow-pop">
+        <div className="absolute left-0 right-0 top-[48px] z-40 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-lg">
           <SearchSuggestions
             keyword={keyword}
             productHits={productHits}

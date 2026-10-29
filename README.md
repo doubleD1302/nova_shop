@@ -44,7 +44,7 @@ Hệ thống ShopNova tuân thủ mô hình phân tách trách nhiệm đa tần
 │       Cơ sở Dữ liệu (MySQL Database)         │
 │   • MySQL Server 8.4 LTS (InnoDB)            │
 │   • Charset utf8mb4, Collation chuẩn Unicode │
-│   • 22 bảng nghiệp vụ, ràng buộc khóa ngoại  │
+│   • 23 bảng nghiệp vụ, ràng buộc khóa ngoại  │
 │   • Port mặc định: 3306                      │
 └──────────────────────────────────────────────┘
 ```
@@ -82,13 +82,14 @@ nova_shop/
 - **Styling:** Tailwind CSS v4 (`^4.1.8`), `@tailwindcss/vite`
 - **Routing:** React Router DOM v7 (`^7.6.2`)
 - **State Management:** React Context API (`AuthContext`, `CartContext`, `CatalogContext`, `OrderContext`, `ToastContext`)
-- **Persistence:** LocalStorage qua `storage.js` (tiền tố `shopnova:`) kết hợp bộ dữ liệu mẫu tiếng Việt phong phú
+- **Persistence:** Catalog, tài khoản mật khẩu/Google, gian hàng, giá/tồn kho, trạng thái duyệt, đánh giá và đơn hàng đọc/ghi qua Backend API vào MySQL. Google ID token được Backend xác minh bằng Firebase Admin trước khi tạo/đọc tài khoản DB; `localStorage` chỉ giữ giỏ hàng, lượt theo dõi và thông báo theo trình duyệt.
 
 ### B. Mobile App (`app/`)
 - **Framework:** Flutter (Dart SDK `^3.13.3` theo khai báo `pubspec.yaml`)
 - **Nền tảng mục tiêu:** Android, iOS, Web, Windows, macOS, Linux
 - **Thư viện chính:** `cupertino_icons`, `intl`
 - **Cấu trúc:** Phân tách rõ ràng theo `screens/`, `widgets/`, `models/`, `theme/`, `data/`
+- **Phạm vi dữ liệu:** App hiện là prototype độc lập, còn dùng `app/lib/data/mock_data.dart` và chưa kết nối Backend/MySQL; các thay đổi lưu bền vững trong phiên này áp dụng cho website React và API.
 
 ### C. Backend Server (`backend/`)
 - **Runtime:** Node.js (Mục tiêu: Node 24 LTS, tương thích Node 20+)
@@ -106,7 +107,7 @@ nova_shop/
 ### E. Cơ sở Dữ liệu (`database/`)
 - **Hệ quản trị CSDL:** MySQL Server 8.4 LTS
 - **Engine & Charset:** InnoDB, Charset `utf8mb4`, Collation `utf8mb4_0900_ai_ci`
-- **Cấu trúc:** 22 bảng nghiệp vụ chuẩn hóa, ràng buộc CHECK, khóa ngoại composite chống nhầm shop/SKU, múi giờ UTC
+- **Cấu trúc:** 23 bảng nghiệp vụ chuẩn hóa, ràng buộc CHECK, khóa ngoại composite chống nhầm shop/SKU, múi giờ UTC
 
 ---
 
@@ -133,13 +134,13 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
 ### 5.1. Thiết Lập Cơ Sở Dữ Liệu MySQL 8.4
 
 1. **Khởi động MySQL Server 8.4:** Đảm bảo dịch vụ MySQL đang chạy trên cổng `3306`.
-2. **Tạo Database phát triển:**
+2. **Chỉ trên database phát triển trống lần đầu**, tạo database và import schema/seed. Không chạy lại schema hoặc `seed.sql` trên database đang chứa dữ liệu; không xóa database để khắc phục lỗi kết nối.
    ```sql
    CREATE DATABASE IF NOT EXISTS shopnova_dev
      CHARACTER SET utf8mb4
      COLLATE utf8mb4_0900_ai_ci;
    ```
-3. **Import Cấu trúc 22 Bảng (`database/schema.sql`) và Dữ liệu mẫu (`database/seed.sql`):**
+3. **Trên database phát triển mới**, import cấu trúc 23 bảng (`database/schema.sql`) và dữ liệu demo được đánh dấu rõ (`database/seed.sql`):
 
    - **Cách 1: Sử dụng MySQL Client & Lệnh SOURCE (Khuyến nghị trên PowerShell & Terminal):**
      ```bash
@@ -160,13 +161,15 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
      ```
 
 4. **Tạo tài khoản chuyên dụng cho Data API:**
-   - **Tài khoản runtime Data API (`shopnova_data_api`):** Ở giai đoạn hiện tại, Data API chỉ mở các endpoint đọc dữ liệu (`health`, `ready`, `verify-credentials`, `auth-profile`), do đó chỉ cần cấp quyền `SELECT`:
+   - **Tài khoản runtime Data API (`shopnova_data_api`):** Data API cần đọc và ghi dữ liệu tài khoản, gian hàng, sản phẩm, tồn kho và đơn hàng. Cấp quyền DML trên database ứng dụng:
      ```sql
      CREATE USER IF NOT EXISTS 'shopnova_data_api'@'127.0.0.1' IDENTIFIED BY 'MatKhauDataApiCuaBan!';
-     GRANT SELECT ON shopnova_dev.* TO 'shopnova_data_api'@'127.0.0.1';
+     GRANT SELECT, INSERT, UPDATE, DELETE ON shopnova_dev.* TO 'shopnova_data_api'@'127.0.0.1';
      FLUSH PRIVILEGES;
      ```
    - **Tài khoản khởi tạo & nạp fixture (Bootstrap / Fixture):** Các thao tác tạo cấu trúc bảng (`database/schema.sql`), nạp seed dữ liệu mẫu (`database/seed.sql`) hoặc ghi fixture kiểm thử được thực hiện tách biệt bằng tài khoản quản trị (như `root`) hoặc tài khoản fixture chuyên dụng có quyền ghi (`INSERT, UPDATE, DELETE`), không dùng tài khoản runtime `shopnova_data_api`.
+
+**Lưu trữ bền vững:** Dữ liệu nghiệp vụ nằm trong MySQL; MySQL cần chạy trên máy chủ có data directory trên ổ đĩa bền vững hoặc dịch vụ database managed. Backend/Data API không tự chạy schema, seed hay reset dữ liệu khi khởi động. Không dùng database tạm trong RAM hoặc filesystem tạm của nền tảng hosting. Ảnh trên hosting dùng S3-compatible object storage theo [hướng dẫn triển khai](docs/web/HOSTING.md); không dựa vào filesystem của Render Free.
 
 ---
 
@@ -247,6 +250,8 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
    JWT_SECRET=ChuoiBiMatKyJwtToiThieu32KyTuDocLapVoiApiKey!
    ```
 
+   Để dùng đăng nhập Google, đặt `FIREBASE_SERVICE_ACCOUNT_JSON` trong `backend/.env` bằng JSON Service Account của cùng Firebase project; đây là secret phía máy chủ, tuyệt đối không đưa vào `src/.env`, Git hoặc frontend hosting. Không cấu hình thì API trả lỗi cấu hình rõ ràng và không giả đăng nhập bằng dữ liệu trình duyệt.
+
    *Gợi ý sinh chuỗi bí mật an toàn:*
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -289,9 +294,43 @@ Thứ tự chuẩn bị và khởi chạy khuyến nghị: **MySQL Database → 
 
 ---
 
+### 5.5. Khởi động lại dịch vụ trên Windows
+
+Sau khi bật máy, khởi động MySQL trước rồi mở ba terminal tại thư mục gốc dự án (`nova_shop-main`). Trên máy đã kiểm tra, MySQL chạy qua XAMPP chứ không phải Windows service; mở XAMPP Control Panel và bấm **Start** ở dòng MySQL. Nếu máy khác cài MySQL như Windows service, tìm đúng tên service trước:
+
+```powershell
+Get-Service *mysql*
+# Chỉ chạy nếu lệnh trên tìm thấy service; nhập đúng tên đã liệt kê.
+$mysqlServiceName = Read-Host 'Tên Windows service MySQL'
+Start-Service -Name $mysqlServiceName
+```
+
+Khởi chạy Data API, Backend và Frontend trong các terminal riêng:
+
+```powershell
+# Terminal 1 — Data API -> MySQL
+npm --prefix data-api run dev
+
+# Terminal 2 — Backend -> Data API
+npm --prefix backend run dev
+
+# Terminal 3 — Frontend; Vite proxy API tới localhost:3000
+npm run dev
+```
+
+Xác nhận Backend, Data API và MySQL cùng sẵn sàng:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/ready
+```
+
+Kết quả cần có `success: true` và `database: connected`. Nếu chưa sẵn sàng, không import lại schema/seed; kiểm tra MySQL đang chạy, `data-api/.env` trỏ đúng database và `backend/.env`/`data-api/.env` có cùng `DATA_API_KEY`. Sau khi tắt máy, chỉ cần chạy lại ba lệnh `dev`; không chạy setup hoặc seed database.
+
+Luồng Google mới trên database hiện có cần áp dụng một lần `database/migrations/2026-10-22-add-firebase-uid-to-users.sql` bằng tài khoản schema owner trước khi deploy; migration chỉ thêm cột/index nullable và không cập nhật hay xóa người dùng hiện có. Cấu hình `FIREBASE_SERVICE_ACCOUNT_JSON` chỉ ở Backend, dùng Service Account của cùng Firebase project với frontend. Email Google đã thuộc tài khoản mật khẩu hiện có sẽ không tự liên kết; đăng nhập bằng phương thức hiện tại để tránh chiếm nhầm tài khoản.
+
 Hướng dẫn triển khai frontend trên Vercel, Backend/Data API trên Render và MySQL Aiven: [Triển khai web](docs/web/HOSTING.md).
 
-### 5.5. Khởi Chạy Mobile App (`app/`)
+### 5.6. Khởi Chạy Mobile App (`app/`)
 
 1. **Cài đặt thư viện phụ thuộc:**
    ```bash
@@ -349,3 +388,9 @@ Tất cả các API tuân thủ envelope JSON thống nhất:
   - `DATA_API_UNAVAILABLE` (503): Data API hoặc CSDL MySQL tạm thời không khả dụng.
   - `DATA_API_TIMEOUT` (504): Quá hạn thời gian phản hồi (deadline 5000ms).
 - **An toàn thông tin:** Tuyệt đối không để lộ dữ liệu nhạy cảm (câu lệnh SQL, tham số truy vấn, stack trace, secret key, credential) ra log, phản hồi HTTP hay tài liệu công khai.
+
+## Existing database upgrades and admin bootstrap
+
+A fresh database created from the current `database/schema.sql` already includes phone uniqueness, the `admin` role, and abuse reports. For an existing database, inspect duplicate phone numbers first, then apply `database/migrations/2026-10-19-add-unique-user-phone.sql` and `database/migrations/2026-10-19-admin-and-reports.sql` with a schema owner account. Do not apply the phone index migration to a database created from the current schema. Promote only an explicitly approved account to admin using the reviewed SQL at the bottom of the admin migration. The runtime MySQL account needs `SELECT, INSERT, UPDATE, DELETE` on the application schema.
+
+New seller products are saved as drafts and become public after an admin approves them at `/quan-tri`. Product and shop images uploaded in local development are stored in `backend/uploads`; hosted deployments use the configured S3-compatible object storage so image URLs remain valid after service restarts.

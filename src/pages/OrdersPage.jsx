@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useOrders } from '../context/OrderContext'
@@ -20,10 +20,14 @@ const TABS = [
 /** TRANG ĐƠN MUA CỦA NGƯỜI MUA */
 export default function OrdersPage() {
   const { user } = useAuth()
-  const { getOrdersByBuyer, cancelOrder, confirmReceived } = useOrders()
+  const { getOrdersByBuyer, cancelOrder, confirmReceived, loadBuyerOrders, buyerOrdersLoading, buyerOrdersSummary } = useOrders()
   const { pushToast } = useToast()
   const [tab, setTab] = useState('all')
   const [keyword, setKeyword] = useState('')
+
+  useEffect(() => {
+    loadBuyerOrders().catch((error) => console.error('Could not load buyer orders:', error))
+  }, [loadBuyerOrders])
 
   const orders = getOrdersByBuyer(user?.id)
 
@@ -48,7 +52,7 @@ export default function OrdersPage() {
             <IconPackage className="h-5 w-5 text-brand" />
             Đơn Mua Của Tôi
           </h1>
-          <span className="text-[13px] text-muted">{orders.length} đơn hàng</span>
+          <span className="text-[13px] text-muted">{orders.length}/{buyerOrdersSummary.orderCount} đơn đã tải</span>
           <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -73,6 +77,7 @@ export default function OrdersPage() {
         </div>
 
         <div className="space-y-3 bg-page p-3">
+          {buyerOrdersLoading ? <p className="rounded-sm bg-white p-5 text-sm text-muted">Đang tải đơn hàng...</p> : null}
           {filtered.length ? (
             filtered.map((order) => (
               <OrderCard
@@ -85,9 +90,8 @@ export default function OrdersPage() {
                     {order.status === 'pending' ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          cancelOrder(order.id)
-                          pushToast('Đã huỷ đơn hàng', 'success')
+                        onClick={async () => {
+                          if (await cancelOrder(order.id)) pushToast('Đã huỷ đơn hàng', 'success')
                         }}
                         className="rounded-sm border border-line px-3 py-1.5 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
                       >
@@ -97,9 +101,8 @@ export default function OrdersPage() {
                     {order.status === 'shipping' ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          confirmReceived(order.id)
-                          pushToast('Đã xác nhận nhận hàng. Cảm ơn bạn!', 'success')
+                        onClick={async () => {
+                          if (await confirmReceived(order.id)) pushToast('Đã xác nhận nhận hàng. Cảm ơn bạn!', 'success')
                         }}
                         className="rounded-sm bg-brand px-3 py-1.5 text-[13px] font-medium text-white transition hover:brightness-105"
                       >
@@ -133,6 +136,7 @@ export default function OrdersPage() {
               />
             </div>
           )}
+          {orders.length < buyerOrdersSummary.orderCount ? <div className="text-center"><button type="button" disabled={buyerOrdersLoading} onClick={() => loadBuyerOrders({ limit: 50, offset: orders.length, append: true }).catch((error) => console.error('Could not load more orders:', error))} className="rounded-sm border border-line bg-white px-6 py-2.5 text-sm text-ink-soft disabled:opacity-50">{buyerOrdersLoading ? 'Đang tải...' : 'Tải thêm 50 đơn hàng'}</button></div> : null}
         </div>
       </div>
     </div>

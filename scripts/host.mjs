@@ -72,6 +72,9 @@ function start(name, directory, env) {
 
 process.on('SIGINT', () => stop(0))
 process.on('SIGTERM', () => stop(0))
+process.on('message', (message) => {
+  if (message === 'shutdown') stop(0)
+})
 
 start('Data API', 'data-api', dataEnv)
 start('Backend', 'backend', backendEnv)

@@ -1,106 +1,149 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCatalog } from '../../context/CatalogContext'
 import { useToast } from '../../context/ToastContext'
-import { formatFollowers } from '../../utils/format'
-import { MallBadge } from '../ui/Badge'
-import { IconChat, IconChevronRight, IconEye } from '../ui/Icons'
-import ProductCard from '../product/ProductCard'
-import SmartImage from '../ui/SmartImage'
+import { IconChevronRight, IconStore } from '../ui/Icons'
 
-/** Header của 1 gian hàng nổi bật */
-function ShopHeader({ shop }) {
-  const { toggleFollow } = useCatalog()
+function ShopLogo({ shop }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => setFailed(false), [shop.logoUrl])
+
+  if (!shop.logoUrl || failed) {
+    return (
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#F5E7D4] text-sm font-bold text-[#BD6E49]">
+        {shop.name.trim().slice(0, 2).toUpperCase()}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={shop.logoUrl}
+      alt={`Logo ${shop.name}`}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-12 w-12 shrink-0 rounded-full border border-[#E6D5C2] bg-[#FFFCF7] object-cover"
+    />
+  )
+}
+
+function FeaturedShopCard({ shop, categoryNames, onFollow }) {
+  return (
+    <article className="flex min-w-0 flex-col rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-4 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-[#BD6E49] hover:shadow-md">
+      <div className="flex min-w-0 items-center gap-3">
+        <ShopLogo shop={shop} />
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-[#49352D]" title={shop.name}>{shop.name}</h3>
+          <p className="mt-1 line-clamp-1 text-xs text-[#8B7566]">
+            {categoryNames.length ? categoryNames.join(' · ') : shop.tagline || 'Gian hàng NovaShop'}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#E6D5C2] pt-3">
+        <span className="text-xs text-[#8B7566]">{Number(shop.productCount) || 0} sản phẩm</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onFollow(shop)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition cursor-pointer ${
+              shop.followed
+                ? 'border-[#E6D5C2] text-[#8B7566] hover:border-[#BD6E49] hover:text-[#BD6E49]'
+                : 'border-[#E6D5C2] bg-[#F5E7D4] text-[#BD6E49] hover:bg-[#F4E6D2]'
+            }`}
+          >
+            {shop.followed ? 'Đang theo dõi' : 'Theo dõi'}
+          </button>
+          <Link
+            to={`/shop/${shop.id}`}
+            className="rounded-full bg-[#BD6E49] hover:bg-[#A95532] px-3 py-1.5 text-xs font-semibold text-[#FFFCF7] transition"
+          >
+            Xem gian hàng
+          </Link>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+export default function FeaturedShops() {
+  const { loadShops, loadProducts, loadCategories, toggleFollow } = useCatalog()
   const { pushToast } = useToast()
+  const [featuredShops, setFeaturedShops] = useState([])
+  const [categoryNames, setCategoryNames] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const onFollow = () => {
+  useEffect(() => {
+    let current = true
+    const controller = new AbortController()
+
+    Promise.all([
+      loadShops({ featured: true, limit: 12, offset: 0, signal: controller.signal }),
+      loadCategories({ signal: controller.signal }),
+    ]).then(async ([shopResult, categories]) => {
+      const activeShops = shopResult.shops.filter((shop) => Number(shop.productCount) > 0)
+      const productResults = await Promise.all(activeShops.map((shop) => (
+        loadProducts({ shopId: shop.id, limit: 50, offset: 0, signal: controller.signal })
+      )))
+      if (!current) return
+
+      const namesByShop = {}
+      const shopsWithProducts = activeShops.filter((shop, index) => {
+        const products = productResults[index]?.products || []
+        namesByShop[shop.id] = [...new Set(products.map((product) => (
+          categories.find((category) => category.id === product.categoryId)?.name
+        )).filter(Boolean))].slice(0, 2)
+        return products.length > 0
+      })
+      setCategoryNames(namesByShop)
+      setFeaturedShops(shopsWithProducts.length ? shopsWithProducts : activeShops.slice(0, 6))
+    }).catch((loadError) => {
+      if (current && loadError.name !== 'AbortError') setError(loadError.message || 'Không thể tải gian hàng nổi bật.')
+    }).finally(() => { if (current) setLoading(false) })
+
+    return () => { current = false; controller.abort() }
+  }, [loadCategories, loadProducts, loadShops])
+
+  const onFollow = (shop) => {
     toggleFollow(shop.id)
     pushToast(shop.followed ? `Đã bỏ theo dõi ${shop.name}` : `Đang theo dõi ${shop.name}`, 'info')
   }
 
   return (
-    <div className="relative overflow-hidden">
-      <div
-        className="h-[84px] w-full"
-        style={{ backgroundImage: `linear-gradient(120deg, hsl(${shop.hue} 85% 52%), hsl(${(shop.hue + 40) % 360} 80% 62%))` }}
-      />
-      <div className="absolute inset-x-0 top-0 flex h-[84px] items-center gap-3 px-4">
-        <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-white bg-white">
-          <SmartImage src={shop.avatar} fallback={shop.avatar} alt={shop.name} className="h-full w-full object-cover" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-[14px] font-semibold text-white drop-shadow-sm">{shop.name}</span>
-            {shop.mall ? <MallBadge /> : null}
-          </span>
-          <span className="mt-0.5 line-clamp-1 text-[11px] text-white/90">{shop.tagline}</span>
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 bg-white px-4 py-2">
-        <div className="flex items-center gap-3 text-[11px] text-muted">
-          <span>
-            <b className="text-ink">{shop.productCount}</b> Sản phẩm
-          </span>
-          <span className="h-3 w-px bg-line" />
-          <span className="flex items-center gap-1">
-            <IconEye className="h-3.5 w-3.5 text-brand" />
-            <b className="text-ink">{formatFollowers(shop.followers)}</b> Theo dõi
-          </span>
+    <section className="mt-5 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs">
+      <div className="flex items-center justify-between gap-3 border-b border-[#E6D5C2] bg-[#F5E7D4] px-4 py-4 sm:px-5">
+        <div className="flex items-center gap-2">
+          <IconStore className="h-5 w-5 text-[#BD6E49]" />
+          <h2 className="text-base font-bold uppercase tracking-tight text-[#49352D] sm:text-lg">Gian hàng nổi bật</h2>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onFollow}
-            className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 text-[12px] font-medium transition ${
-              shop.followed
-                ? 'border-line bg-white text-ink-soft hover:border-brand hover:text-brand'
-                : 'border-brand bg-brand text-white hover:brightness-105'
-            }`}
-          >
-            {shop.followed ? 'Đang Theo Dõi' : '+ Theo Dõi'}
-          </button>
-          <Link
-            to={`/shop/${shop.id}`}
-            className="flex items-center gap-1 rounded-sm border border-line px-2.5 py-1 text-[12px] text-ink-soft transition hover:border-brand hover:text-brand"
-          >
-            <IconChat className="h-3.5 w-3.5" />
-            Xem Shop
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** Khu "Gian hàng nổi bật" — 2 shop mỗi shop 3 sản phẩm */
-export default function FeaturedShops() {
-  const { featuredShops, getProductsByShop } = useCatalog()
-
-  return (
-    <section className="mt-3 rounded-sm border border-line bg-white">
-      <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
-        <h2 className="text-[15px] font-bold uppercase tracking-tight text-ink md:text-[16px]">Gian Hàng Nổi Bật</h2>
-        <Link to="/shop" className="flex items-center gap-0.5 text-[13px] text-brand transition hover:underline">
-          Xem tất cả
-          <IconChevronRight className="h-3.5 w-3.5" />
+        <Link to="/shop" className="flex shrink-0 items-center gap-1 text-xs font-medium text-[#BD6E49] transition hover:text-[#A95532] sm:text-sm">
+          Tất cả gian hàng
+          <IconChevronRight className="h-4 w-4" />
         </Link>
       </div>
 
-      <div className="grid gap-3 p-3 lg:grid-cols-2">
-        {featuredShops.map((shop) => {
-          const products = getProductsByShop(shop.id).slice(0, 3)
-          return (
-            <div key={shop.id} className="overflow-hidden rounded-sm border border-line">
-              <ShopHeader shop={shop} />
-              <div className="grid grid-cols-3 gap-2.5 p-3">
-                {products.map((p) => (
-                  <ProductCard key={p.id} product={p} variant="mini" />
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {error && !featuredShops.length ? (
+        <p role="alert" className="m-4 rounded-lg bg-rose-50 p-3 text-sm text-[#B93832]">
+          {error}
+        </p>
+      ) : null}
+      {loading ? (
+        <p className="px-5 py-10 text-center text-sm text-[#8B7566]">Đang tải gian hàng...</p>
+      ) : featuredShops.length ? (
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+          {featuredShops.map((shop) => (
+            <FeaturedShopCard
+              key={shop.id}
+              shop={shop}
+              categoryNames={categoryNames[shop.id] || []}
+              onFollow={onFollow}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="px-5 py-10 text-center text-sm text-[#8B7566]">Chưa có gian hàng nổi bật đang bán sản phẩm.</p>
+      )}
     </section>
   )
 }

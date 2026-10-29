@@ -17,6 +17,8 @@ process.env.DOTENV_CONFIG_PATH = path.join(__dirname, 'non-existent-smoke.env')
 
 // Nạp ứng dụng sau khi đã thiết lập biến môi trường test cô lập
 const { default: app } = await import('../src/app.js')
+const { validateAuthUserProfile } = await import('../src/clients/data.client.js')
+const { requireRole } = await import('../src/middlewares/auth.middleware.js')
 
 // Khởi chạy server trên cổng ngẫu nhiên khả dụng (port 0) để chạy kiểm thử
 const server = http.createServer(app)
@@ -36,6 +38,28 @@ function assert(condition, testName, detail = '') {
 
 async function runTests() {
   console.log('=== BẮT ĐẦU SMOKE TEST CHO BACKEND SHOPNOVA ===\n')
+
+  {
+    const adminProfile = validateAuthUserProfile({
+      id: '99', username: 'admin', fullName: 'ShopNova Admin', email: null, phone: null,
+      avatarUrl: null, role: 'admin', status: 'active', shopId: null, address: null,
+    })
+    assert(adminProfile.role === 'admin' && adminProfile.shopId === null, 'Admin auth profile is accepted without a shop')
+
+    const denied = { statusCode: 0, status(code) { this.statusCode = code; return this }, json(body) { this.body = body; return this } }
+    let nextCalled = false
+    requireRole('admin')({ user: { role: 'buyer' } }, denied, () => { nextCalled = true })
+    assert(denied.statusCode === 403 && denied.body?.error?.code === 'FORBIDDEN' && !nextCalled, 'Buyer cannot access admin middleware')
+
+    const sellerGate = { statusCode: 0, status(code) { this.statusCode = code; return this }, json(body) { this.body = body; return this } }
+    let sellerGateNext = false
+    requireRole('buyer', 'seller')({ user: adminProfile }, sellerGate, () => { sellerGateNext = true })
+    assert(sellerGate.statusCode === 403 && !sellerGateNext, 'Admin cannot convert the account into a seller')
+
+    let adminNextCalled = false
+    requireRole('admin')({ user: { role: 'admin' } }, {}, () => { adminNextCalled = true })
+    assert(adminNextCalled, 'Admin can access admin middleware')
+  }
 
   await new Promise((resolve, reject) => {
     server.listen(0, '127.0.0.1', () => resolve())
@@ -124,20 +148,7 @@ async function runTests() {
       assert(data.error?.code === 'VALIDATION_ERROR', 'Mã lỗi là VALIDATION_ERROR')
     }
 
-    // 6.2. Auth endpoints smoke: POST /api/v1/auth/register thiếu body trả 400 VALIDATION_ERROR
-    {
-      const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const data = await res.json()
-      assert(res.status === 400, 'POST /api/v1/auth/register thiếu thông tin trả HTTP 400')
-      assert(data.success === false, 'Phản hồi register thiếu thông tin có success === false')
-      assert(data.error?.code === 'VALIDATION_ERROR', 'Mã lỗi register là VALIDATION_ERROR')
-    }
-
-    // 6.3. Auth endpoints smoke: GET /api/v1/auth/me thiếu header Authorization trả 401 AUTH_REQUIRED
+    // 6.2. Auth endpoints smoke: GET /api/v1/auth/me thiếu header Authorization trả 401 AUTH_REQUIRED
     {
       const res = await fetch(`${baseUrl}/api/v1/auth/me`)
       const data = await res.json()
@@ -158,6 +169,14 @@ async function runTests() {
     // -------------------------------------------------------------
     // 7. Kiểm tra xác thực cấu hình môi trường (src/config/env.js)
     // -------------------------------------------------------------
+    for (const route of ['/api/v1/admin/reports', '/api/v1/reports']) {
+      const method = route === '/api/v1/reports' ? 'POST' : 'GET'
+      const res = await fetch(`${baseUrl}${route}`, { method })
+      const data = await res.json()
+      assert(res.status === 401, `${method} ${route} rejects a request without a session`)
+      assert(data.error?.code === 'AUTH_REQUIRED', `${method} ${route} returns AUTH_REQUIRED without a session`)
+    }
+
     const baseTestEnv = {
       NODE_ENV: 'test',
       PORT: '3000',

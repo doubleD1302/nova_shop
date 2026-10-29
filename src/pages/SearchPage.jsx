@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useCatalog } from '../context/CatalogContext'
 import { formatNumber, formatVnd } from '../utils/format'
@@ -12,8 +12,11 @@ import { PAGE_SIZE, SORT_OPTIONS, makeBulkParamSetter, makeParamSetter, parseSea
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams()
-  const { categories, shops, products, getCategory, queryProducts } = useCatalog()
+  const { categories, shops, loadCategories, loadShops, loadProducts, getCategory } = useCatalog()
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const [result, setResult] = useState({ products: [], total: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const paramsKey = params.toString()
   const query = useMemo(() => parseSearchParams(new URLSearchParams(paramsKey)), [paramsKey])
@@ -24,10 +27,41 @@ export default function SearchPage() {
   )
 
   /** Kết quả tìm kiếm — nơi này sẽ gọi API khi có backend */
-  const result = useMemo(() => queryProducts(query), [query, queryProducts])
-  const totalPages = Math.max(1, Math.ceil(result.length / PAGE_SIZE))
+  useEffect(() => {
+    let current = true
+    const controller = new AbortController()
+    setLoading(true)
+    setError('')
+    Promise.all([
+      loadCategories({ signal: controller.signal }),
+      loadShops({ limit: 50, signal: controller.signal }),
+      loadProducts({
+        q: query.q,
+        categoryId: query.category,
+        shopId: query.shop,
+        mall: query.mall,
+        freeship: query.freeship,
+        flash: query.flash,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        minRating: query.rating,
+        location: query.location,
+        sort: query.sort,
+        limit: PAGE_SIZE,
+        offset: (query.page - 1) * PAGE_SIZE,
+        signal: controller.signal,
+      }),
+    ]).then(([, , data]) => {
+      if (current) setResult({ products: data.products, total: data.total })
+    }).catch((loadError) => {
+      if (current && loadError.name !== 'AbortError') setError(loadError.message || 'Không thể tải kết quả tìm kiếm.')
+    }).finally(() => { if (current) setLoading(false) })
+    return () => { current = false; controller.abort() }
+  }, [loadCategories, loadProducts, loadShops, query])
+
+  const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
   const page = Math.min(query.page, totalPages)
-  const pageItems = result.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const pageItems = result.products
   const currentCategory = query.category ? getCategory(query.category) : null
 
   const activeFilters = [
@@ -63,7 +97,7 @@ export default function SearchPage() {
     setParams: setParamsBulk,
     categories,
     shops,
-    products,
+    products: result.products,
     onClearAll: () => setParams(new URLSearchParams()),
   }
 
@@ -98,7 +132,7 @@ export default function SearchPage() {
                   onClick={() => setMobileFilterOpen(false)}
                   className="w-full rounded-sm bg-brand py-2 text-[13px] font-medium text-white"
                 >
-                  Xem {result.length} sản phẩm
+                  Xem {result.total} sản phẩm
                 </button>
               </div>
             </div>
@@ -110,13 +144,14 @@ export default function SearchPage() {
             query={query}
             setParam={setParam}
             sortOptions={SORT_OPTIONS}
-            total={result.length}
+            total={result.total}
             activeFilters={activeFilters}
             onClearFilter={clearFilter}
             onOpenFilters={() => setMobileFilterOpen(true)}
           />
 
-          {pageItems.length ? (
+          {error ? <p role="alert" className="rounded-sm bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+          {loading ? <p className="mt-3 rounded-sm bg-white p-6 text-center text-sm text-muted">Đang tải sản phẩm...</p> : pageItems.length ? (
             <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
               {pageItems.map((p) => (
                 <ProductCard key={p.id} product={p} />
@@ -143,7 +178,7 @@ export default function SearchPage() {
           <Paginator page={page} totalPages={totalPages} onChange={(p) => setParam('page', p)} />
 
           <p className="pb-4 text-center text-[11px] text-muted">
-            {formatNumber(result.length)} sản phẩm từ {new Set(result.map((p) => p.shopId)).size} gian hàng khác nhau
+            {formatNumber(result.total)} sản phẩm trên ShopNova.
             trên ShopNova.
           </p>
         </div>

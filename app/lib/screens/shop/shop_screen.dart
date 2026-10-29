@@ -1,321 +1,81 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../../models/product.dart';
-import '../../services/auth_service.dart';
-import '../../services/catalog_service.dart';
-import '../../services/shop_service.dart';
-import '../../services/cart_service.dart';
-import '../cart/cart_screen.dart';
-import '../product_detail/product_detail_screen.dart';
-import 'shop_detail_screen.dart';
 
-class ShopScreen extends StatefulWidget {
+class ShopScreen extends StatelessWidget {
   const ShopScreen({super.key});
-
-  @override
-  State<ShopScreen> createState() => _ShopScreenState();
-}
-
-class _ShopScreenState extends State<ShopScreen> {
   final Color primaryColor = const Color(0xFFEE4D2D);
-  final CatalogService _catalogService = CatalogService();
-  final ShopService _shopService = ShopService();
-
-  int _selectedTabIndex = 0; // 0: Tất cả, 1: Nova Mall, 2: Yêu Thích, 3: Giao Hỏa Tốc
-  String _activeFilterChip = ''; // 'Nova Mall', 'Yêu Thích+', 'Giao 2H', 'Đánh giá 4*+'
-  String _searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
-
-  final Set<String> _followingShopIds = {};
-  final Set<String> _savedVouchers = {};
-
-  List<Map<String, dynamic>> _shops = [];
-  Map<String, List<Product>> _shopProductsMap = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadShops();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadShops() async {
-    setState(() => _isLoading = true);
-    try {
-      final shopListRes = await _shopService.getShops();
-      List<Map<String, dynamic>> shops = [];
-      if (shopListRes.shops.isNotEmpty) {
-        shops = shopListRes.shops.map((s) => {
-          'id': s.id,
-          'name': s.name,
-          'slug': s.slug,
-          'logoUrl': s.logoUrl,
-          'bannerUrl': s.bannerUrl,
-          'tagline': s.tagline,
-          'description': s.description,
-          'province': s.province,
-          'location': s.province,
-          'isMall': s.isMall,
-          'rating': s.rating,
-          'ratingCount': s.ratingCount,
-          'followersCount': s.followersCount,
-          'productsCount': s.productsCount,
-        }).toList();
-      } else {
-        shops = await _catalogService.getShops();
-      }
-
-      final Map<String, List<Product>> pMap = {};
-      final allProducts = await _catalogService.getProducts();
-      for (final p in allProducts) {
-        final sid = p.shopId.isNotEmpty ? p.shopId : '1';
-        pMap.putIfAbsent(sid, () => []).add(p);
-      }
-
-      for (final s in shops.take(5)) {
-        final sId = s['id']?.toString() ?? '';
-        if (sId.isNotEmpty && (!pMap.containsKey(sId) || pMap[sId]!.isEmpty)) {
-          try {
-            final res = await _shopService.getShopProducts(sId, limit: 4);
-            if (res.products.isNotEmpty) {
-              pMap[sId] = res.products;
-            }
-          } catch (_) {}
-        }
-      }
-
-      if (AuthService().isAuthenticated) {
-        for (final s in shops) {
-          final sId = s['id']?.toString();
-          if (sId != null) {
-            try {
-              final isFol = await _shopService.getFollowStatus(sId);
-              if (isFol) _followingShopIds.add(sId);
-            } catch (_) {}
-          }
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _shops = shops;
-          _shopProductsMap = pMap;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _toggleFollowShop(String shopId, String shopName, bool isCurrentlyFollowing) async {
-    if (!AuthService().isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng đăng nhập để theo dõi gian hàng.')),
-      );
-      return;
-    }
-
-    final nextStatus = !isCurrentlyFollowing;
-    setState(() {
-      if (nextStatus) {
-        _followingShopIds.add(shopId);
-      } else {
-        _followingShopIds.remove(shopId);
-      }
-    });
-
-    final ok = await _shopService.toggleFollow(shopId, !nextStatus);
-    if (mounted) {
-      setState(() {
-        if (ok) {
-          _followingShopIds.add(shopId);
-        } else {
-          _followingShopIds.remove(shopId);
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok ? 'Đã theo dõi $shopName!' : 'Đã hủy theo dõi $shopName'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  List<Map<String, dynamic>> _getFilteredShops() {
-    List<Map<String, dynamic>> list = List.from(_shops);
-
-    if (_selectedTabIndex == 1) {
-      list = list.where((s) => s['isMall'] == true || s['is_mall'] == true).toList();
-    } else if (_selectedTabIndex == 2) {
-      list = list.where((s) => _followingShopIds.contains(s['id']?.toString())).toList();
-    }
-
-    if (_activeFilterChip == 'Nova Mall') {
-      list = list.where((s) => s['isMall'] == true || s['is_mall'] == true).toList();
-    } else if (_activeFilterChip == 'Yêu Thích+') {
-      list = list.where((s) => _followingShopIds.contains(s['id']?.toString())).toList();
-    }
-
-    if (_searchQuery.trim().isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      list = list.where((s) {
-        final name = (s['name'] ?? '').toString().toLowerCase();
-        final desc = (s['description'] ?? '').toString().toLowerCase();
-        return name.contains(q) || desc.contains(q);
-      }).toList();
-    }
-
-    return list;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredShops = _getFilteredShops();
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        titleSpacing: 0,
-        leadingWidth: 120,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 14),
+        leadingWidth: 130,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.storefront_rounded, color: Color(0xFFEE4D2D), size: 18),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'ShopNova',
-                style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.5),
-              ),
+              Icon(Icons.shopping_bag, color: Color(0xFFEE4D2D)),
+              SizedBox(width: 4),
+              Text('ShopNova', style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold)),
             ],
           ),
         ),
         title: Container(
-          height: 38,
-          margin: const EdgeInsets.only(right: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F7),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E2E6)),
-          ),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (val) => setState(() => _searchQuery = val),
-            style: const TextStyle(fontSize: 13, color: Color(0xFF1E2022)),
+          height: 36,
+          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(4)),
+          child: const TextField(
             decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Tìm gian hàng, thương hiệu...',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6), overflow: TextOverflow.ellipsis),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF8F90A6)),
-              prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 16, color: Color(0xFF8F90A6)),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
+              hintText: 'Tìm kiếm gian hàng, thương hi...',
+              hintStyle: TextStyle(fontSize: 13),
+              prefixIcon: Icon(Icons.storefront, size: 18),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
         actions: [
-          AnimatedBuilder(
-            animation: CartService(),
-            builder: (context, _) {
-              final count = CartService().itemCount;
-              return Container(
-                width: 40,
-                height: 40,
-                margin: const EdgeInsets.only(right: 6),
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.shopping_cart_outlined, color: Color(0xFF1E2022), size: 22),
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (ctx) => const CartScreen()));
-                      },
-                    ),
-                    if (count > 0)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: const BoxDecoration(color: Color(0xFFEE4D2D), shape: BoxShape.circle),
-                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                          child: Center(
-                            child: Text(
-                              count > 99 ? '99+' : '$count',
-                              style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87), onPressed: () {}),
+              Positioned(
+                right: 8, top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(10)),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: const Text('0', style: TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center),
                 ),
-              );
-            },
+              )
+            ],
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(88),
+          preferredSize: const Size.fromHeight(84),
           child: Column(
             children: [
-              // Filter Chips
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   children: [
-                    _buildFilterChip('Nova Mall', Icons.stars_rounded, const Color(0xFFD0011B)),
-                    _buildFilterChip('Yêu Thích+', Icons.favorite_rounded, const Color(0xFFFF5224)),
-                    _buildFilterChip('Giao 2H', Icons.bolt_rounded, const Color(0xFF00BFA5)),
-                    _buildFilterChip('Đánh giá 4*+', Icons.star_rounded, const Color(0xFFFFB800)),
+                    _buildFilterChip('Nova Mall', Icons.stars, Colors.red),
+                    _buildFilterChip('Yêu Thích+', Icons.favorite_border, Colors.grey),
+                    _buildFilterChip('Giao 2H', Icons.bolt, Colors.green),
+                    _buildFilterChip('Đánh giá 4*+', Icons.star_border, Colors.orange),
                   ],
                 ),
               ),
-              // Category Tabs
               Container(
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFFEEEEF0))),
-                ),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey[200]!))),
                 child: Row(
                   children: [
-                    _buildTab(0, 'Tất cả Shop'),
-                    _buildTab(1, 'Nova Mall'),
-                    _buildTab(2, 'Shop Yêu Thích'),
-                    _buildTab(3, 'Giao Hỏa Tốc'),
+                    _buildTab('Tất cả Shop', true),
+                    _buildTab('Nova Mall', false),
+                    _buildTab('Shop Yêu Thích', false),
+                    _buildTab('Giao Hỏa Tốc', false),
                   ],
                 ),
               ),
@@ -323,138 +83,55 @@ class _ShopScreenState extends State<ShopScreen> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadShops,
-        color: primaryColor,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              _buildMainBanner(),
-              _buildAiBanner(),
-              if (_isLoading)
-                Container(
-                  height: 160,
-                  alignment: Alignment.center,
-                  child: CircularProgressIndicator(color: primaryColor),
-                )
-              else if (filteredShops.isEmpty)
-                Container(
-                  margin: const EdgeInsets.all(20),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEEEEF0)),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.storefront_outlined, size: 54, color: Color(0xFF8F90A6)),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Không tìm thấy gian hàng phù hợp',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E2022)),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Hãy thử đổi từ khóa tìm kiếm hoặc chọn bộ lọc "Tất cả Shop".',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFF8F90A6), fontSize: 12),
-                      ),
-                      const SizedBox(height: 18),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedTabIndex = 0;
-                            _activeFilterChip = '';
-                            _searchQuery = '';
-                            _searchController.clear();
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Xem tất cả Shop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                ..._buildShopsList(filteredShops),
-              const SizedBox(height: 24),
-            ],
-          ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildMainBanner(),
+            _buildAiBanner(),
+            _buildOfficialStores(),
+            _buildTrendingShops(),
+            _buildAllShops(),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildFilterChip(String label, IconData icon, Color iconColor) {
-    final isActive = _activeFilterChip == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _activeFilterChip = isActive ? '' : label;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFFFF0EC) : Colors.white,
-          border: Border.all(
-            color: isActive ? primaryColor : const Color(0xFFE2E2E6),
-            width: isActive ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [
-            BoxShadow(color: Color(0x04000000), blurRadius: 4, offset: Offset(0, 1)),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isActive ? primaryColor : iconColor),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? primaryColor : const Color(0xFF28293D),
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 12)),
+        ],
       ),
     );
   }
 
-  Widget _buildTab(int index, String title) {
-    final isActive = _selectedTabIndex == index;
+  Widget _buildTab(String title, bool isActive) {
     return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTabIndex = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              bottom: BorderSide(
-                color: isActive ? primaryColor : Colors.transparent,
-                width: 2.5,
-              ),
-            ),
-          ),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isActive ? primaryColor : const Color(0xFF555770),
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 13,
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: isActive ? primaryColor : Colors.transparent, width: 2)),
+        ),
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isActive ? primaryColor : Colors.grey[600],
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
           ),
         ),
       ),
@@ -463,18 +140,11 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Widget _buildMainBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: primaryColor.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        gradient: LinearGradient(colors: [Colors.red[800]!, Colors.orange[800]!]),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,49 +153,40 @@ class _ShopScreenState extends State<ShopScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.25), borderRadius: BorderRadius.circular(4)),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
                 child: const Text('SIÊU ĐẠI HỘI THƯƠNG HIỆU', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
-              const Icon(Icons.stars_rounded, color: Color(0xFFFFD54F), size: 22),
+              const Icon(Icons.stars, color: Colors.amber),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Tuần Lễ Thương Hiệu & Siêu Sale Gian Hàng',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-          ),
+          const Text('Tuần Lễ Thương Hiệu & Siêu Sale Gian Hàng', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Voucher đến 100k, đại tiệc giảm giá tới 50% + Freeship toàn quốc.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          const Text('Voucher đến 100k, đại tiệc giảm giá tới 50% + Freeship...', style: TextStyle(color: Colors.white70, fontSize: 12)),
           const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: const Color(0xFFFFD54F), borderRadius: BorderRadius.circular(6)),
-                child: const Text('MÃ: MALLWEEK80', style: TextStyle(color: Color(0xFF3E2723), fontWeight: FontWeight.w800, fontSize: 12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(4)),
+                child: const Text('MÃ: MALLWEEK80', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Hạn dùng: 23:59 hôm nay', style: TextStyle(color: Colors.white, fontSize: 12)),
               ),
               ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đã thu thập mã MALLWEEK80 giảm 50% vào kho voucher của bạn!'),
-                      backgroundColor: Color(0xFF00BFA5),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
+                onPressed: () {},
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: primaryColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
-                child: const Text('Lấy Mã Ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
+                child: const Text('Lấy Mã Ngay', style: TextStyle(fontWeight: FontWeight.bold)),
+              )
             ],
-          ),
+          )
         ],
       ),
     );
@@ -533,15 +194,321 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Widget _buildAiBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEF0)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x04000000), blurRadius: 6, offset: Offset(0, 2)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red[100]!),
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(color: Color(0xFFEE4D2D), shape: BoxShape.circle),
+                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Nova AI • Gợi Ý Gian Hàng Cho Bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        SizedBox(width: 4),
+                        Text('ĐỀ XUẤT', style: TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Dựa vào các sản phẩm bạn vừa xem, Nova AI đề xuất 3 shop thời trang tối giản & phụ kiện công nghệ có hỗ trợ giao hỏa tốc 2H.',
+                      style: TextStyle(color: Colors.grey, fontSize: 11),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildAiShopChip('Nova Official Store', Icons.store),
+                _buildAiShopChip('Baseus Vietnam', Icons.headphones),
+                _buildAiShopChip('Coolmate', Icons.checkroom),
+              ],
+            ),
+          )
         ],
+      ),
+    );
+  }
+
+  Widget _buildAiShopChip(String name, IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        children: [
+          Icon(icon, size: 12, color: primaryColor),
+          const SizedBox(width: 4),
+          Text(name, style: const TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOfficialStores() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      color: Colors.white,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.verified, color: Colors.red, size: 18),
+                    SizedBox(width: 4),
+                    Text('Thương Hiệu Chính Hãng Nova Mall', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
+                Text('Xem tất cả (48) >', style: TextStyle(color: primaryColor, fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildStoreCard('Nova Official Store', '1.2M', 'Giảm 50.000đ đơn từ 300k', ['99.000đ', '165.000đ', '65.000đ']),
+          const Divider(),
+          _buildStoreCard('TechNova Global', '850k', 'Giảm 20% phụ kiện sạc nhanh', ['249.000đ', '490.000đ', '89.000đ']),
+          const Divider(),
+          _buildStoreCard('Coolmate Official', '420k', 'Freeship Xtra mọi đơn hàng từ 99k', ['149.000đ', '199.000đ', '129.000đ']),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreCard(String name, String followers, String voucher, List<String> prices) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.grey[300]!)),
+                child: const Icon(Icons.store, color: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 12),
+                        const Text(' 4.9 • ', style: TextStyle(fontSize: 12)),
+                        Text('$followers theo dõi • TP.HCM', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 32)),
+                child: const Text('+ Theo dõi', style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 32)),
+                child: const Text('Vào Shop', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(4)),
+            child: Row(
+              children: [
+                const Icon(Icons.local_activity, color: Colors.red, size: 14),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Voucher shop: $voucher', style: const TextStyle(color: Colors.red, fontSize: 12))),
+                const Text('Lưu mã', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: prices.map((price) => Expanded(
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(price, style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+            )).toList(),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendingShops() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.thumb_up, color: Colors.red, size: 18),
+                    SizedBox(width: 4),
+                    Text('Shop Yêu Thích Nổi Bật Tuần Này', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
+                Text('Xem thêm >', style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildTrendingTile('Gốm Xinh Studio & Decor', '4.9', '12.5k', 'Giảm 15k'),
+          _buildTrendingTile('Bếp Chay An Lạc - Thực Phẩm...', '5.0', '8.5k', 'Freeship 0đ'),
+          _buildTrendingTile('Tiệm Giày Sneaker 247', '4.8', '15.2k', 'Giảm 30k'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendingTile(String name, String rating, String sold, String tag) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
+            child: const Icon(Icons.store, color: Colors.grey),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 12),
+                    Text(' $rating', style: const TextStyle(fontSize: 11)),
+                    Text(' • Đã bán $sold', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(2)),
+                      child: Text(tag, style: const TextStyle(color: Colors.red, fontSize: 9)),
+                    )
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(4)),
+            child: const Text('Vào Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllShops() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Tất Cả Gian Hàng Đang Có Ưu Đãi Lớn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Row(
+                children: [
+                  const Text('Lọc:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(width: 4),
+                  const Text('Gần bạn', style: TextStyle(fontSize: 12, color: Color(0xFFEE4D2D))),
+                  Icon(Icons.keyboard_arrow_down, size: 14, color: primaryColor),
+                ],
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1.5,
+            children: [
+              _buildSmallShopCard('Arden & Vinamik', 'TP. Hồ Chí Minh', 'Mã -40.000đ'),
+              _buildSmallShopCard('Baseus Vietnam', 'Hà Nội', 'Mã -50.000đ'),
+              _buildSmallShopCard('X-Street Studio', 'Đà Nẵng', 'Mã -15%'),
+              _buildSmallShopCard('Cosmetics Korea', 'TP. Hồ Chí Minh', 'Freeship 0đ'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(20)),
+              child: const Text('Xem thêm 3.420 gian hàng v', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallShopCard(String name, String loc, String promo) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -549,292 +516,27 @@ class _ShopScreenState extends State<ShopScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)]),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
+                width: 24, height: 24,
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
+                child: const Icon(Icons.store, size: 14, color: Colors.grey),
               ),
               const SizedBox(width: 8),
-              const Text('Nova AI • Gợi Ý Gian Hàng Cho Bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(4)),
-                child: const Text('ĐỀ XUẤT', style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 9, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Dựa vào sản phẩm bạn vừa xem, Nova AI đề xuất các gian hàng chính hãng giao hỏa tốc 2H uy tín nhất.',
-            style: TextStyle(color: Color(0xFF8F90A6), fontSize: 11, height: 1.3),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildShopsList(List<Map<String, dynamic>> shops) {
-    return shops.map((shop) {
-      final id = (shop['id'] ?? '1').toString();
-      final name = shop['name'] ?? 'Gian hàng Nova';
-      final isMall = shop['isMall'] == true || shop['is_mall'] == true;
-      final rating = shop['rating']?.toString() ?? '4.9';
-      final location = shop['location'] ?? 'TP. Hồ Chí Minh';
-      final isFollowing = _followingShopIds.contains(id);
-      final isVoucherSaved = _savedVouchers.contains(id);
-      final shopProducts = _shopProductsMap[id] ?? [];
-
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFEEEEF0)),
-          boxShadow: const [
-            BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
-          ],
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Shop Header
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    color: const Color(0xFFF7F7F8),
-                    child: shop['logoUrl'] != null && shop['logoUrl'].toString().isNotEmpty
-                        ? Image.network(shop['logoUrl'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.store, color: Colors.grey))
-                        : Icon(Icons.storefront_rounded, color: primaryColor, size: 28),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          if (isMall) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFFD0011B), borderRadius: BorderRadius.circular(4)),
-                              child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFFFFB800), size: 14),
-                          Text(' $rating • $location', style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Nút Follow
-                OutlinedButton(
-                  onPressed: () => _toggleFollowShop(id, name, isFollowing),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    minimumSize: const Size(0, 32),
-                    side: BorderSide(color: isFollowing ? const Color(0xFF00BFA5) : primaryColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(isFollowing ? Icons.check_rounded : Icons.add_rounded, size: 14, color: isFollowing ? const Color(0xFF00BFA5) : primaryColor),
-                      const SizedBox(width: 3),
-                      Text(
-                        isFollowing ? 'Đã theo dõi' : 'Theo dõi',
-                        style: TextStyle(color: isFollowing ? const Color(0xFF00BFA5) : primaryColor, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // Nút Vào Shop
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ShopDetailScreen(shopId: id, initialShopName: name),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    minimumSize: const Size(0, 32),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Vào Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Voucher Shop
-            InkWell(
-              onTap: () {
-                setState(() {
-                  if (isVoucherSaved) {
-                    _savedVouchers.remove(id);
-                  } else {
-                    _savedVouchers.add(id);
-                  }
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isVoucherSaved ? 'Đã bỏ lưu voucher' : 'Đã lưu voucher giảm 50k của $name!'),
-                    backgroundColor: isVoucherSaved ? Colors.grey : const Color(0xFF00BFA5),
-                    duration: const Duration(seconds: 1),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(6)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.local_activity_rounded, color: Color(0xFFEE4D2D), size: 14),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        'Voucher: Giảm 50.000đ cho đơn hàng từ 300k',
-                        style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 11, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                    Text(
-                      isVoucherSaved ? 'Đã lưu' : 'Lưu mã',
-                      style: TextStyle(
-                        color: isVoucherSaved ? const Color(0xFF00BFA5) : const Color(0xFFEE4D2D),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Sản phẩm thực tế của Shop
-            if (shopProducts.isNotEmpty)
-              Row(
-                children: shopProducts.take(3).map((p) {
-                  final priceFormatted = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(p.price);
-                  return _buildShopProductPreview(p.name, priceFormatted, p.id, p.effectiveImageUrl, p.emoji);
-                }).toList(),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F7F8),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEEEEF0)),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.inventory_2_outlined, size: 15, color: Color(0xFF8F90A6)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Gian hàng chính hãng • Chạm "Vào Shop" để xem danh mục sản phẩm',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF555770)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildShopProductPreview(String name, String price, String productId, String imageUrl, String emoji) {
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (ctx) => ProductDetailScreen(productId: productId),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F7F8),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFEEEEF0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const Spacer(),
+          Text(loc, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: imageUrl.startsWith('http')
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(emoji.isNotEmpty ? emoji : '🛍️', style: const TextStyle(fontSize: 22)),
-                            ),
-                          )
-                        : Center(
-                            child: Text(emoji.isNotEmpty ? emoji : '🛍️', style: const TextStyle(fontSize: 22)),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1E2022)),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                price,
-                style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 12),
-              ),
+              Text(promo, style: TextStyle(color: primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
+              const Text('Xem Shop', style: TextStyle(color: Colors.blue, fontSize: 10)),
             ],
-          ),
-        ),
+          )
+        ],
       ),
     );
   }

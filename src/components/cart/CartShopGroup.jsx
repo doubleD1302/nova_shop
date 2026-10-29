@@ -57,7 +57,7 @@ export default function CartShopGroup({ group }) {
           <Link to={`/san-pham/${item.slug}`} className="shrink-0">
             <SmartImage
               src={item.image}
-              fallback={item.image}
+              fallback={item.imageFallback || item.image}
               alt={item.name}
               className="h-[80px] w-[80px] rounded-sm border border-line object-cover"
             />
@@ -84,7 +84,16 @@ export default function CartShopGroup({ group }) {
           </div>
 
           <div className="shrink-0">
-            <QuantityStepper value={item.qty} onChange={(v) => updateQty(item.key, v)} max={Math.min(99, item.stock)} size="sm" />
+            {item.unavailable ? (
+              <span className="text-[12px] text-rose-600">Không còn trong danh mục</span>
+            ) : (
+              <QuantityStepper
+                value={item.qty}
+                onChange={(v) => updateQty(item.key, v)}
+                max={Math.max(1, Math.min(99, item.stock))}
+                size="sm"
+              />
+            )}
           </div>
 
           <div className="w-[110px] shrink-0 text-right">

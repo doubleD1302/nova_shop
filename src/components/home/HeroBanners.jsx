@@ -1,138 +1,189 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { useCatalog } from '../../context/CatalogContext'
-import { heroBanners } from '../../data/homeContent'
-import SmartImage from '../ui/SmartImage'
-import { IconBolt, IconSparkle, IconTruck } from '../ui/Icons'
+import { IconChevronLeft, IconChevronRight } from '../ui/Icons'
 
-/** Banner chính (bên trái) — tự động chuyển slide + dải sản phẩm nhỏ phía dưới */
-function BigBanner() {
-  const { queryProducts } = useCatalog()
-  const slides = useMemo(() => heroBanners.slice(0, 2), [])
-  const [index, setIndex] = useState(0)
-  const thumbs = useMemo(() => queryProducts({ limit: 3, sort: 'popular' }), [queryProducts])
+const SLIDES = [
+  {
+    id: 'fashion-collection',
+    image: '/images/banners/banner-fashion-collection.jpg',
+    link: '/tim-kiem?category=thoi-trang-nam',
+    title: 'New Collection 2026',
+    subtitle: 'Phong cách thời trang thượng lưu Terracotta',
+    alt: 'NovaShop New Collection - Thời trang phong cách sống',
+  },
+  {
+    id: 'luxury-bags',
+    image: '/images/banners/banner-bags-luxury.jpg',
+    link: '/tim-kiem?category=tui-vi',
+    title: 'Bags - Style In Every Detail',
+    subtitle: 'Túi xách cao cấp chính hãng · Thiết kế tinh tế',
+    alt: 'Bags Style in every detail - Bộ sưu tập túi xách sang trọng',
+  },
+  {
+    id: 'beauty-skin',
+    image: '/images/banners/banner-beauty-skin.jpg',
+    link: '/tim-kiem?category=my-pham',
+    title: 'Chăm Sóc & Tái Tạo Làn Da',
+    subtitle: 'Flash Sale giảm đến 40% · Voucher 20$',
+    alt: 'Be soft, smooth and hydrated skin - Flash sale mỹ phẩm',
+  },
+]
+
+export default function HeroBanners() {
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % SLIDES.length)
+  }, [])
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length)
+  }, [])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setIndex((i) => (i + 1) % slides.length), 5000)
-    return () => window.clearInterval(timer)
-  }, [slides.length])
-
-  const slide = slides[index]
+    if (isPaused) return
+    const timer = setInterval(nextSlide, 5000)
+    return () => clearInterval(timer)
+  }, [isPaused, nextSlide])
 
   return (
-    <div className="relative flex h-[210px] w-1/2 shrink-0 flex-col overflow-hidden rounded-md">
-      <div className={`absolute inset-0 bg-gradient-to-br`} style={{ backgroundImage: `linear-gradient(135deg, ${slide.from}, ${slide.to})` }} />
-      <span className="absolute -right-6 -top-10 text-[120px] opacity-20">{slide.emojis}</span>
+    <section className="grid gap-3.5 lg:grid-cols-12 items-stretch">
+      {/* Slider Banner lớn bên trái (7 cột trên Desktop) */}
+      <div
+        className="group relative isolate overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#F5E7D4] shadow-xs lg:col-span-7 h-[260px] sm:h-[320px] lg:h-[370px]"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {SLIDES.map((slide, idx) => (
+          <Link
+            key={slide.id}
+            to={slide.link}
+            className={`absolute inset-0 block h-full w-full transition-opacity duration-700 ease-in-out ${
+              idx === currentSlide ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+            }`}
+          >
+            <img
+              src={slide.image}
+              alt={slide.alt}
+              className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02]"
+              loading={idx === 0 ? 'eager' : 'lazy'}
+            />
+          </Link>
+        ))}
 
-      <div className="relative flex flex-1 flex-col justify-center px-5">
-        <span className="mb-1 w-fit rounded-sm bg-black/25 px-2 py-0.5 text-[11px] font-medium text-white">
-          Và đặc quyền Freeship bù Ủ Ủ toàn quốc hôm nay.
-        </span>
-        <h2 className="text-[28px] font-black uppercase leading-tight text-white drop-shadow-sm">{slide.title}</h2>
-        <p className="mt-1 max-w-[320px] text-[12px] text-white/95">{slide.subtitle}</p>
+        {/* Nút mũi tên chuyển slide */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            prevSlide()
+          }}
+          aria-label="Slide trước"
+          className="absolute left-3.5 top-1/2 z-20 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-[#FFFCF7]/90 text-[#49352D] shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 hover:bg-[#FFFCF7] hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <IconChevronLeft className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            nextSlide()
+          }}
+          aria-label="Slide tiếp theo"
+          className="absolute right-3.5 top-1/2 z-20 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-[#FFFCF7]/90 text-[#49352D] shadow-md backdrop-blur-xs transition opacity-0 group-hover:opacity-100 hover:bg-[#FFFCF7] hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <IconChevronRight className="h-5 w-5" />
+        </button>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {slide.cta.map((label, i) => (
-            <Link
-              key={label}
-              to={slide.to_link}
-              className={`flex items-center gap-1.5 rounded-sm px-4 py-1.5 text-[13px] font-semibold transition ${
-                i === 0
-                  ? 'bg-white text-brand hover:bg-brand-soft'
-                  : 'border border-white/80 bg-white/15 text-white hover:bg-white/25'
+        {/* Chấm tròn chỉ số slide dạng thanh thuốc pill */}
+        <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-[#FFFCF7]/85 px-3 py-1.5 backdrop-blur-xs border border-[#E6D5C2] shadow-2xs">
+          {SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setCurrentSlide(idx)}
+              aria-label={`Đi tới slide ${idx + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                currentSlide === idx ? 'w-6 bg-[#BD6E49]' : 'w-2 bg-[#8B7566]/40 hover:bg-[#8B7566]'
               }`}
-            >
-              {i === 0 ? <IconBolt className="h-3.5 w-3.5" /> : <IconSparkle className="h-3.5 w-3.5" />}
-              {label}
-            </Link>
+            />
           ))}
         </div>
       </div>
 
-      <div className="relative flex items-center gap-2 bg-black/25 px-3 py-1.5">
-        {thumbs.map((p) => (
-          <Link key={p.id} to={`/san-pham/${p.slug}`} className="block h-8 w-8 overflow-hidden rounded-[3px] bg-white/80">
-            <SmartImage src={p.image} fallback={p.image} alt="" className="h-full w-full object-cover" />
-          </Link>
-        ))}
-        <span className="ml-1 text-[11px] font-medium text-white/90">ShopNova - Trang Chủ Sàn TMĐT</span>
+      {/* 2 Banner phụ bên phải (5 cột trên Desktop) */}
+      <div className="flex flex-col gap-3.5 lg:col-span-5 h-[260px] sm:h-[320px] lg:h-[370px]">
+        {/* Banner 1 (Trên): Túi xách & Phụ kiện thời thượng */}
+        <Link
+          to="/tim-kiem?category=tui-vi"
+          className="group relative flex flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
+        >
+          <div className="relative z-10 flex flex-1 flex-col justify-between p-4 sm:p-5">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded-md bg-[#F5E7D4] border border-[#E6D5C2] text-[10px] font-bold tracking-[0.14em] text-[#80513B] uppercase shadow-2xs">
+                HOT TREND 2026
+              </span>
+              <h3 className="mt-1.5 text-[17px] sm:text-[19px] font-extrabold leading-tight text-[#49352D] group-hover:text-[#BD6E49] transition-colors">
+                Túi Xách & Phụ Kiện
+              </h3>
+              <p className="mt-1 text-[12px] text-[#8B7566] line-clamp-1">
+                BST Mới · Thiết Kế Tinh Xảo Sang Trọng
+              </p>
+            </div>
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5E7D4] text-[11px] font-semibold text-[#80513B] border border-[#E6D5C2] shadow-2xs transition-all duration-200 group-hover:bg-[#BD6E49] group-hover:text-[#FFFCF7] group-hover:border-[#BD6E49]">
+                <span>Khám phá ngay</span>
+                <span className="text-[12px] transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+              </span>
+            </div>
+          </div>
+          {/* Ảnh banner bên phải với hiệu ứng bo tròn */}
+          <div className="relative w-[40%] sm:w-[42%] shrink-0 overflow-hidden bg-[#F5E7D4]/40">
+            <img
+              src="/images/banners/banner-bags-luxury.jpg"
+              alt="Bags Style in every detail"
+              className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        </Link>
+
+        {/* Banner 2 (Dưới): Sắc đẹp & Chăm sóc da */}
+        <Link
+          to="/tim-kiem?category=my-pham"
+          className="group relative flex flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
+        >
+          <div className="relative z-10 flex flex-1 flex-col justify-between p-4 sm:p-5">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded-md bg-[#F5E7D4] border border-[#E6D5C2] text-[10px] font-bold tracking-[0.14em] text-[#80513B] uppercase shadow-2xs">
+                FLASH SALE 40%
+              </span>
+              <h3 className="mt-1.5 text-[17px] sm:text-[19px] font-extrabold leading-tight text-[#49352D] group-hover:text-[#BD6E49] transition-colors">
+                Làn Da Ẩm Mịn & Rạng Ngời
+              </h3>
+              <p className="mt-1 text-[12px] text-[#8B7566] line-clamp-1">
+                Body Lotion & Dầu Dưỡng Jojoba
+              </p>
+            </div>
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5E7D4] text-[11px] font-semibold text-[#80513B] border border-[#E6D5C2] shadow-2xs transition-all duration-200 group-hover:bg-[#BD6E49] group-hover:text-[#FFFCF7] group-hover:border-[#BD6E49]">
+                <span>Khám phá ngay</span>
+                <span className="text-[12px] transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+              </span>
+            </div>
+          </div>
+          {/* Ảnh banner bên phải */}
+          <div className="relative w-[40%] sm:w-[42%] shrink-0 overflow-hidden bg-[#F5E7D4]/40">
+            <img
+              src="/images/banners/banner-beauty-skin.jpg"
+              alt="Be soft, smooth and hydrated skin"
+              className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        </Link>
       </div>
-
-      <div className="absolute bottom-[46px] left-1/2 flex -translate-x-1/2 gap-1.5">
-        {slides.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setIndex(i)}
-            aria-label={`Banner ${i + 1}`}
-            className={`h-1.5 rounded-full transition-all ${i === index ? 'w-4 bg-white' : 'w-2 bg-white/50'}`}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** Banner giữa */
-function MiddleBanner() {
-  const banner = heroBanners[1]
-  return (
-    <Link
-      to={banner.to_link}
-      className="relative flex h-[210px] flex-1 flex-col justify-center overflow-hidden rounded-md px-5"
-      style={{ backgroundImage: `linear-gradient(150deg, ${banner.from}, ${banner.to})` }}
-    >
-      <span className="absolute -bottom-6 -right-2 text-[110px] opacity-25">{banner.emojis}</span>
-      <span className="mb-1 w-fit rounded-sm bg-white/25 px-2 py-0.5 text-[11px] font-semibold text-white">
-        Ưu đãi độc quyền
-      </span>
-      <h3 className="text-[22px] font-black uppercase leading-tight text-white">{banner.title}</h3>
-      <p className="mt-1 max-w-[220px] text-[12px] text-white/95">{banner.subtitle}</p>
-      <span className="mt-3 flex w-fit items-center gap-1.5 rounded-sm bg-white px-3 py-1.5 text-[12px] font-semibold text-brand">
-        <IconTruck className="h-3.5 w-3.5" />
-        {banner.cta[0]}
-      </span>
-    </Link>
-  )
-}
-
-/** Cột banner bên phải: 1 banner tối + 1 banner Nova Mall */
-function RightBanners() {
-  const top = heroBanners[2]
-  const mall = heroBanners[3]
-  return (
-    <div className="flex w-[190px] shrink-0 flex-col gap-2">
-      <Link
-        to={top.to_link}
-        className="relative flex h-[101px] flex-col justify-center overflow-hidden rounded-md px-3"
-        style={{ backgroundImage: `linear-gradient(140deg, ${top.from}, ${top.to})` }}
-      >
-        <span className="absolute -right-1 top-1 text-[44px] opacity-30">{top.emojis}</span>
-        <span className="text-[13px] font-bold uppercase text-white">{top.title}</span>
-        <span className="mt-0.5 text-[11px] text-white/85">{top.subtitle}</span>
-      </Link>
-
-      <Link
-        to={mall.to_link}
-        className="relative flex h-[101px] flex-col justify-center overflow-hidden rounded-md px-3"
-        style={{ backgroundImage: `linear-gradient(140deg, ${mall.from}, ${mall.to})` }}
-      >
-        <span className="absolute -right-2 bottom-0 text-[46px] opacity-25">{mall.emojis}</span>
-        <span className="text-[13px] font-black uppercase tracking-wide text-white">Nova Mall</span>
-        <span className="mt-0.5 text-[11px] font-semibold text-white">Hàng hiệu 100%</span>
-        <span className="text-[10px] text-white/85">Chính hãng trả góp 0%</span>
-        <span className="text-[10px] text-white/85">Đổi trả miễn phí 15 ngày</span>
-      </Link>
-    </div>
-  )
-}
-
-export default function HeroBanners() {
-  return (
-    <div className="flex gap-2">
-      <BigBanner />
-      <MiddleBanner />
-      <RightBanners />
-    </div>
+    </section>
   )
 }

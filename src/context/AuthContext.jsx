@@ -1,10 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { users as seedUsers } from '../data/users'
 import { shopAvatar } from '../utils/image'
-import { apiGetMe, apiLogin, apiRegister, apiUpdateProfile } from '../utils/api'
+import { apiCreateSellerShop, apiGetMe, apiGoogleLogin, apiLogin, apiRegister, apiUpdateProfile } from '../utils/api'
+import {
+  getFirebaseConfigError,
+  isFirebaseConfigured,
+  signInWithGooglePopup,
+  firebaseSignOut,
+  subscribeToFirebaseAuthState,
+} from '../services/firebase'
 
 const AuthContext = createContext(null)
 const TOKEN_KEY = 'novashop_token'
+const AUTH_PROVIDER_KEY = 'novashop_auth_provider'
 
 /**
  * Chuẩn hóa đối tượng người dùng từ Backend API để tương thích hoàn toàn với giao diện.
@@ -29,7 +36,7 @@ function normalizeUser(apiUser) {
     email: apiUser.email || '',
     phone: apiUser.phone || '',
     avatarUrl: apiUser.avatarUrl || null,
-    rank: role === 'seller' ? 'Người bán' : 'Thành viên',
+    rank: role === 'admin' ? '\u0051u\u1EA3n tr\u1ECB vi\u00EAn' : role === 'seller' ? 'Ng\u01B0\u1EDDi b\u00E1n' : 'Th\u00E0nh vi\u00EAn',
     avatarEmoji: role === 'seller' ? '🏪' : '🙂',
     hue: (username.length * 37) % 360,
     address: apiUser.address || {
@@ -55,24 +62,22 @@ function normalizeUser(apiUser) {
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY))
   const [isInitializing, setIsInitializing] = useState(true)
+  const [authError, setAuthError] = useState('')
 
   // Version của hành động auth để ngăn chặn race condition từ các request bất đồng bộ cũ
   const authVersionRef = useRef(0)
   const restoreAbortRef = useRef(null)
+  const googleLoginInProgressRef = useRef(false)
 
   // Khôi phục phiên từ sessionStorage khi khởi tạo
   useEffect(() => {
     let isMounted = true
 
     const restoreSession = async () => {
-      const storedToken = sessionStorage.getItem(TOKEN_KEY)
-      if (!storedToken) {
-        if (isMounted) {
-          setToken(null)
-          setIsInitializing(false)
-        }
+      const token = sessionStorage.getItem(TOKEN_KEY)
+      if (!token) {
+        if (!isFirebaseConfigured() && isMounted) setIsInitializing(false)
         return
       }
 
@@ -83,23 +88,23 @@ export function AuthProvider({ children }) {
       restoreAbortRef.current = controller
 
       try {
-        const res = await apiGetMe(storedToken, { signal: controller.signal })
+        const res = await apiGetMe(token, { signal: controller.signal })
 
         // Nếu đã có hành động auth mới hơn (login mới hoặc logout) hoặc token trong sessionStorage đã đổi: hủy bỏ xử lý
-        if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== storedToken) {
+        if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
           return
         }
 
         if (res.ok) {
           const data = await res.json().catch(() => null)
           // Kiểm tra lại version sau khi await json
-          if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== storedToken) {
+          if (authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY) !== token) {
             return
           }
           if (data?.success && data?.data?.user) {
             if (isMounted) {
-              setToken(storedToken)
               setUser(normalizeUser(data.data.user))
+              setAuthError('')
             }
             return
           }
@@ -107,11 +112,11 @@ export function AuthProvider({ children }) {
 
         // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi):
         // Chỉ xóa token và đặt user null nếu version vẫn khớp và token chưa bị thay thế
-        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === storedToken) {
+        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === token) {
           sessionStorage.removeItem(TOKEN_KEY)
           if (isMounted) {
-            setToken(null)
             setUser(null)
+            setAuthError('')
           }
         }
       } catch (err) {
@@ -134,6 +139,64 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // Lắng nghe trạng thái đăng nhập Firebase (khi người dùng đăng nhập bằng Google)
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return
+    let isMounted = true
+
+    const unsubscribe = subscribeToFirebaseAuthState((firebaseUser) => {
+      const token = sessionStorage.getItem(TOKEN_KEY)
+      if (token) return
+      if (googleLoginInProgressRef.current) return
+
+      if (firebaseUser) {
+        const version = ++authVersionRef.current
+        restoreAbortRef.current?.abort()
+        const controller = new AbortController()
+        restoreAbortRef.current = controller
+        setIsInitializing(true)
+        setAuthError('')
+
+        Promise.resolve()
+          .then(() => firebaseUser.getIdToken())
+          .then((idToken) => apiGoogleLogin(idToken, { signal: controller.signal }))
+          .then(async (res) => {
+            const data = await res.json().catch(() => null)
+            if (!isMounted || authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY)) return
+            if (!res.ok || !data?.success || !data?.data?.token || !data?.data?.user) {
+              setUser(null)
+              try { await firebaseSignOut() } catch {}
+              return
+            }
+            sessionStorage.setItem(TOKEN_KEY, data.data.token)
+            sessionStorage.setItem(AUTH_PROVIDER_KEY, 'google')
+            setUser(normalizeUser(data.data.user))
+          })
+          .catch(async (error) => {
+            if (!isMounted || error?.name === 'AbortError' || authVersionRef.current !== version) return
+            setUser(null)
+            try { await firebaseSignOut() } catch {}
+          })
+          .finally(() => {
+            if (isMounted && authVersionRef.current === version) setIsInitializing(false)
+          })
+      } else {
+        const currentProvider = sessionStorage.getItem(AUTH_PROVIDER_KEY)
+        if (currentProvider === 'google') {
+          sessionStorage.removeItem(AUTH_PROVIDER_KEY)
+          setUser(null)
+        }
+        setIsInitializing(false)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+      restoreAbortRef.current?.abort()
+    }
+  }, [])
+
   /**
    * Đăng nhập async/await bằng tên đăng nhập và mật khẩu qua Backend API.
    */
@@ -146,6 +209,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
+      setAuthError('')
       const res = await apiLogin(u, p)
       const data = await res.json().catch(() => null)
 
@@ -154,9 +218,9 @@ export function AuthProvider({ children }) {
         restoreAbortRef.current?.abort()
         authVersionRef.current += 1
 
-        const { token: receivedToken, user: apiUser } = data.data
-        sessionStorage.setItem(TOKEN_KEY, receivedToken)
-        setToken(receivedToken)
+        const { token, user: apiUser } = data.data
+        sessionStorage.setItem(TOKEN_KEY, token)
+        sessionStorage.setItem(AUTH_PROVIDER_KEY, 'password')
         const normalized = normalizeUser(apiUser)
         setUser(normalized)
         return { ok: true, user: normalized }
@@ -205,143 +269,178 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  /**
-   * Đăng ký tài khoản mới qua Backend API.
-   */
-  const register = useCallback(async (formData) => {
+  const register = useCallback(async (payload) => {
     try {
-      const res = await apiRegister(formData)
+      const res = await apiRegister(payload)
       const data = await res.json().catch(() => null)
-
-      if (res.ok && data?.success && data?.data?.token) {
-        restoreAbortRef.current?.abort()
-        authVersionRef.current += 1
-
-        const { token: receivedToken, user: apiUser } = data.data
-        sessionStorage.setItem(TOKEN_KEY, receivedToken)
-        setToken(receivedToken)
-        const normalized = normalizeUser(apiUser)
-        setUser(normalized)
-        return { ok: true, user: normalized }
+      if (!res.ok || !data?.success || !data?.data?.token || !data?.data?.user) {
+        const responseType = res.headers.get('content-type') || ''
+        const error = data?.message || (responseType.includes('application/json')
+          ? `Máy chủ từ chối đăng ký (HTTP ${res.status}). Vui lòng kiểm tra dữ liệu và cấu hình dịch vụ.`
+          : `API không trả về JSON hợp lệ (HTTP ${res.status}). Hãy kiểm tra địa chỉ API và bảo đảm Backend đang chạy.`)
+        return { ok: false, error }
       }
-
-      if (res.status === 409) {
-        return {
-          ok: false,
-          error: data?.message || 'Tên đăng nhập hoặc email đã tồn tại.',
-        }
-      }
-
-      if (res.status === 400) {
-        return {
-          ok: false,
-          error: data?.message || 'Thông tin đăng ký không hợp lệ.',
-        }
-      }
-
+      restoreAbortRef.current?.abort()
+      authVersionRef.current += 1
+      sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      sessionStorage.setItem(AUTH_PROVIDER_KEY, 'password')
+      const normalized = normalizeUser(data.data.user)
+      setAuthError('')
+      setUser(normalized)
+      return { ok: true, user: normalized }
+    } catch (error) {
       return {
         ok: false,
-        error: data?.message || `Lỗi máy chủ (${res.status}). Vui lòng thử lại sau.`,
+        error: error?.name === 'TypeError'
+          ? 'Không thể kết nối Backend. Hãy khởi động Backend API hoặc kiểm tra địa chỉ API.'
+          : 'Có lỗi khi gửi yêu cầu đăng ký. Vui lòng thử lại.',
       }
+    }
+  }, [])
+
+  /**
+   * Đăng nhập bằng Google qua Firebase Authentication.
+   */
+  const loginWithGoogle = useCallback(async () => {
+    const configError = getFirebaseConfigError()
+    if (configError) {
+      return {
+        ok: false,
+        error: configError,
+      }
+    }
+
+    googleLoginInProgressRef.current = true
+    restoreAbortRef.current?.abort()
+    const version = ++authVersionRef.current
+    setAuthError('')
+
+    try {
+      const res = await signInWithGooglePopup()
+      if (!res.ok) {
+        return res
+      }
+
+      const response = await apiGoogleLogin(res.idToken)
+      const data = await response.json().catch(() => null)
+      if (authVersionRef.current !== version) {
+        return { ok: false, error: 'Yêu cầu đăng nhập Google đã bị hủy.' }
+      }
+      if (!response.ok || !data?.success || !data?.data?.token || !data?.data?.user) {
+        return {
+          ok: false,
+          error: data?.message || 'Backend không thể xác thực và lưu tài khoản Google.',
+        }
+      }
+
+      sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      sessionStorage.setItem(AUTH_PROVIDER_KEY, 'google')
+      const normalized = normalizeUser(data.data.user)
+      setUser(normalized)
+      setAuthError('')
+      return { ok: true, user: normalized }
     } catch (err) {
       return {
         ok: false,
-        error: 'Không thể kết nối đến máy chủ Backend. Vui lòng kiểm tra kết nối mạng và thử lại.',
+        error: err?.name === 'TypeError'
+          ? 'Không thể kết nối Backend. Hãy khởi động Backend API rồi thử lại.'
+          : err?.message || 'Không thể hoàn tất đăng nhập Google. Vui lòng thử lại.',
       }
+    } finally {
+      googleLoginInProgressRef.current = false
+      if (authVersionRef.current === version) setIsInitializing(false)
     }
   }, [])
 
-  /**
-   * Cập nhật hồ sơ kết nối trực tiếp với Backend API.
-   */
-  const updateProfile = useCallback(async (profileData) => {
-    const curToken = sessionStorage.getItem(TOKEN_KEY)
-    if (!curToken) {
-      return { ok: false, error: 'Chưa đăng nhập hoặc phiên đã hết hạn.' }
+  const updateProfile = useCallback(async (patch) => {
+    const current = user
+    if (!current) return { ok: false, error: 'Vui lòng đăng nhập để cập nhật hồ sơ.' }
+    const payload = {
+      fullName: patch.fullName ?? current.fullName,
+      email: patch.email ?? current.email,
+      phone: patch.phone ?? current.phone,
+      avatarUrl: patch.avatarUrl === undefined ? current.avatarUrl : patch.avatarUrl,
+      ...(patch.address === undefined ? {} : { address: patch.address }),
     }
     try {
-      const res = await apiUpdateProfile(curToken, profileData)
+      const res = await apiUpdateProfile(payload)
       const data = await res.json().catch(() => null)
-      if (res.ok && data?.success) {
-        if (data.data?.user) {
-          setUser(normalizeUser(data.data.user))
-        } else {
-          setUser((prev) => ({ ...prev, ...profileData }))
-        }
-        return { ok: true }
+      if (!res.ok || !data?.success || !data?.data?.user) {
+        return { ok: false, error: data?.message || 'Không thể cập nhật hồ sơ.' }
       }
-      return { ok: false, error: data?.message || 'Cập nhật hồ sơ thất bại.' }
-    } catch (err) {
-      return { ok: false, error: 'Không thể kết nối đến máy chủ Backend.' }
+      const normalized = normalizeUser(data.data.user)
+      setAuthError('')
+      setUser(normalized)
+      return { ok: true, user: normalized }
+    } catch {
+      return { ok: false, error: 'Không thể kết nối đến máy chủ Backend. Vui lòng thử lại.' }
     }
-  }, [])
+  }, [user])
 
-  /**
-   * Cập nhật phiên sau khi đăng ký gian hàng người bán thành công.
-   */
-  const applyShopRegistration = useCallback(({ token: newToken, user: updatedUser }) => {
-    if (newToken) {
-      sessionStorage.setItem(TOKEN_KEY, newToken)
-      setToken(newToken)
-    }
-    if (updatedUser) {
-      setUser(normalizeUser(updatedUser))
-    }
-  }, [])
-
-  /**
-   * Tải lại thông tin người dùng từ Backend API.
-   */
-  const refreshUser = useCallback(async () => {
-    const curToken = sessionStorage.getItem(TOKEN_KEY)
-    if (!curToken) return null
+  const openSellerShop = useCallback(async (shopName) => {
+    if (!user) return { ok: false, error: 'Vui lòng đăng nhập để mở gian hàng.' }
     try {
-      const res = await apiGetMe(curToken)
-      if (res.ok) {
-        const data = await res.json().catch(() => null)
-        if (data?.success && data?.data?.user) {
-          const norm = normalizeUser(data.data.user)
-          setUser(norm)
-          return norm
+      const res = await apiCreateSellerShop(shopName)
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success || !data?.data?.user) {
+        if (res.status === 401 || data?.error?.code === 'AUTH_EXPIRED') {
+          sessionStorage.removeItem(TOKEN_KEY)
+          setUser(null)
+          return { ok: false, error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để mở gian hàng.' }
         }
+        return { ok: false, error: data?.message || 'Không thể mở gian hàng.' }
       }
-    } catch (e) {
-      console.warn('refreshUser failed:', e)
+      if (data?.data?.token) {
+        sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      }
+      const normalized = normalizeUser(data.data.user)
+      setAuthError('')
+      setUser(normalized)
+      return { ok: true, user: normalized }
+    } catch {
+      return { ok: false, error: 'Không thể kết nối đến máy chủ Backend. Vui lòng thử lại.' }
     }
-    return null
-  }, [])
+  }, [user])
 
   /**
-   * Đăng xuất: hủy bỏ restoreSession đang bay, tăng version auth, xóa token và xóa toàn bộ phiên.
+   * Đăng xuất: hủy bỏ restoreSession đang bay, tăng version auth, xóa token và xóa toàn bộ phiên (cả Backend và Firebase).
    */
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     restoreAbortRef.current?.abort()
     authVersionRef.current += 1
     sessionStorage.removeItem(TOKEN_KEY)
-    setToken(null)
+    sessionStorage.removeItem(AUTH_PROVIDER_KEY)
+    setAuthError('')
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseSignOut()
+      } catch (err) {
+        console.warn('Lỗi khi đăng xuất Firebase:', err)
+      }
+    }
     setUser(null)
   }, [])
 
   const value = useMemo(
     () => ({
       user,
-      token,
-      allUsers: seedUsers,
       isInitializing,
+      authError,
       isAuthenticated: Boolean(user),
-      isSeller: user?.role === 'seller',
+      isSeller: Boolean(user?.role === 'seller' || user?.shopId),
+      isFirebaseConfigured: isFirebaseConfigured(),
       avatar: user
         ? user.avatarUrl || shopAvatar({ name: user.fullName, emoji: user.avatarEmoji || '🙂', hue: user.hue ?? 12 })
         : '',
       login,
+      loginWithGoogle,
       loginAs,
       register,
+      openSellerShop,
       logout,
       updateProfile,
-      applyShopRegistration,
-      refreshUser,
     }),
-    [user, token, isInitializing, login, loginAs, register, logout, updateProfile, applyShopRegistration, refreshUser],
+    [user, isInitializing, authError, login, loginWithGoogle, loginAs, register, openSellerShop, logout, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

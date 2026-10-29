@@ -1,249 +1,304 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
 import { useToast } from '../../context/ToastContext'
 import { formatFollowers, formatNumber } from '../../utils/format'
-import { shopAvatar } from '../../utils/image'
 import { vietnamProvinces } from '../../data/locations'
 import AvatarPicker from '../../components/ui/AvatarPicker'
 import { IconCheck, IconEye, IconStore } from '../../components/ui/Icons'
 import SmartImage from '../../components/ui/SmartImage'
-import { apiGetSellerShop, apiUpdateSellerShop } from '../../utils/api'
+import { API_BASE_URL, apiUploadSellerImage } from '../../utils/api'
 
-/** THÔNG TIN GIAN HÀNG (người bán) — Kết nối trực tiếp Backend API */
+/**
+ * THÔNG TIN GIAN HÀNG (NGƯỜI BÁN) - PHONG CÁCH SHOPEE SELLER CENTRE HỒNG PASTEL
+ */
 export default function SellerShopPage() {
-  const { user, token } = useAuth()
-  const { getShop, getProductsByShop, upsertProduct, updateShop } = useCatalog()
+  const { user } = useAuth()
+  const { getShop, loadShop, updateShop } = useCatalog()
   const { pushToast } = useToast()
-
   const shop = getShop(user?.shopId)
-  const products = getProductsByShop(user?.shopId)
-
+  const [shopError, setShopError] = useState('')
+  const bannerFileRef = useRef(null)
+  const [saving, setSaving] = useState(false)
+  const [bannerBusy, setBannerBusy] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState(() => ({
     name: shop?.name || '',
     tagline: shop?.tagline || '',
+    description: shop?.description || '',
+    address: shop?.address || '',
     location: shop?.location || 'TP. Hồ Chí Minh',
-    emoji: shop?.emoji || '🏪',
-    hue: shop?.hue ?? 20,
-    responseTime: shop?.responseTime || 'trong vài giờ',
-    avatarUrl: shop?.avatarUrl || null,
+    avatarUrl: shop?.logoUrl || null,
+    bannerUrl: shop?.bannerUrl || null,
   }))
 
   useEffect(() => {
-    if (!token) return
-    let active = true
-    apiGetSellerShop(token)
-      .then(async (res) => {
-        if (!active) return
-        const data = await res.json().catch(() => null)
-        if (res.ok && data?.success && data?.data) {
-          const s = data.data
-          setForm((f) => ({
-            ...f,
-            name: s.name || f.name,
-            tagline: s.tagline || f.tagline,
-            location: s.province || f.location,
-            avatarUrl: s.logoUrl || f.avatarUrl,
-          }))
-        }
-      })
-      .catch((err) => {
-        console.warn('Lỗi lấy thông tin gian hàng từ backend:', err)
-      })
-
-    return () => {
-      active = false
+    if (user?.shopId) {
+      loadShop(user.shopId)
+        .then(() => setShopError(''))
+        .catch((err) => setShopError(err.message || 'Không thể tải gian hàng.'))
     }
-  }, [token])
+  }, [loadShop, user?.shopId])
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
-  const inputClass = 'w-full rounded-sm border border-line px-3 py-2 text-[13px] outline-none focus:border-brand'
-  const previewAvatar =
-    form.avatarUrl || shopAvatar({ name: form.name || 'Shop', emoji: form.emoji, hue: Number(form.hue) || 20 })
+  useEffect(() => {
+    if (!shop) return
+    setForm({
+      name: shop.name || '',
+      tagline: shop.tagline || '',
+      description: shop.description || '',
+      address: shop.address || '',
+      location: shop.location || 'TP. Hồ Chí Minh',
+      avatarUrl: shop.logoUrl || null,
+      bannerUrl: shop.bannerUrl || null,
+    })
+  }, [shop?.id])
 
-  /** Lưu toàn bộ thông tin gian hàng (kết nối Backend API) */
-  const save = async () => {
-    if (token) {
-      try {
-        await apiUpdateSellerShop(token, {
-          name: form.name.trim() || shop?.name,
-          tagline: form.tagline,
-          province: form.location,
-          logoUrl: form.avatarUrl,
-        })
-      } catch (err) {
-        console.warn('Lỗi lưu thông tin gian hàng trên backend:', err)
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
+  const inputClass =
+    'w-full rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-3.5 py-2.5 text-[13px] text-[#49352D] outline-none transition focus:border-[#BD6E49] focus:ring-2 focus:ring-[#BD6E49]/20'
+  const imageSrc = (url) => (url?.startsWith('/') ? `${API_BASE_URL}${url}` : url)
+
+  const uploadBanner = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setError('Chọn ảnh PNG, JPG hoặc WebP có dung lượng tối đa 5 MB.')
+      return
+    }
+    setBannerBusy(true)
+    setError('')
+    try {
+      const response = await apiUploadSellerImage(file)
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.success || !result?.data?.url) {
+        throw new Error(result?.message || `Không thể tải ảnh bìa lên (HTTP ${response.status}).`)
       }
+      setForm((current) => ({ ...current, bannerUrl: result.data.url }))
+      pushToast('Đã tải ảnh bìa lên thành công', 'success')
+    } catch (uploadError) {
+      setError(uploadError.message || 'Không thể tải ảnh bìa lên.')
+    } finally {
+      setBannerBusy(false)
     }
-    if (shop?.id) {
-      updateShop(shop.id, {
-        name: form.name.trim() || shop.name,
+  }
+
+  const save = async () => {
+    if (!shop) return
+    setSaving(true)
+    setError('')
+    try {
+      await updateShop(shop.id, {
+        name: form.name.trim(),
         tagline: form.tagline,
+        description: form.description,
+        address: form.address,
         location: form.location,
-        emoji: form.emoji,
-        hue: Number(form.hue) || 20,
-        responseTime: form.responseTime,
-        avatarUrl: form.avatarUrl,
+        logoUrl: form.avatarUrl,
+        bannerUrl: form.bannerUrl,
       })
+      pushToast('Đã lưu thông tin gian hàng thành công', 'success')
+    } catch (saveError) {
+      setError(saveError.message || 'Không thể cập nhật gian hàng.')
+    } finally {
+      setSaving(false)
     }
-    pushToast('Đã lưu thông tin gian hàng thành công', 'success')
+  }
+
+  if (!shop) {
+    return (
+      <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-6 text-[13px] text-[#8B7566]">
+        {shopError || 'Đang tải thông tin gian hàng từ hệ thống...'}
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3 rounded-sm bg-white px-4 py-3">
-        <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-soft text-brand">
-          <IconStore className="h-6 w-6" />
-        </span>
-        <div>
-          <h1 className="text-[16px] font-bold text-ink">Thông Tin Gian Hàng</h1>
-          <p className="text-[12px] text-muted">Mỗi người bán sở hữu một gian hàng riêng trên ShopNova</p>
+    <div className="space-y-4">
+      {/* Header trang */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] px-5 py-4 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#F5E7D4] text-[#A95532]">
+            <IconStore className="h-6 w-6" />
+          </span>
+          <div>
+            <h1 className="text-[18px] font-bold text-[#49352D]">Thông Tin Gian Hàng</h1>
+            <p className="mt-0.5 text-[12px] text-[#8B7566]">
+              Hồ sơ này hiển thị công khai tới người mua trên sàn NovaShop.
+            </p>
+          </div>
         </div>
+
         <Link
-          to={`/shop/${shop?.id}`}
-          className="ml-auto flex items-center gap-1.5 rounded-sm border border-line px-4 py-2 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
+          to={`/shop/${shop.id}`}
+          className="flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-2 text-[13px] font-medium text-[#8B7566] transition hover:border-[#BD6E49] hover:text-[#A95532] hover:bg-[#FBF3E8]"
         >
           <IconEye className="h-4 w-4" />
-          Xem gian hàng công khai
+          <span>Xem gian hàng công khai</span>
         </Link>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_300px]">
-        <section className="rounded-sm border border-line bg-white p-4">
-          <h2 className="mb-3 text-[14px] font-semibold text-ink">Ảnh đại diện gian hàng</h2>
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Form chỉnh sửa chính */}
+        <section className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-5 shadow-2xs">
+          <h2 className="mb-3 text-[15px] font-bold text-[#49352D]">Ảnh đại diện gian hàng (Logo)</h2>
           <AvatarPicker
-            value={{ avatarUrl: form.avatarUrl, emoji: form.emoji, hue: Number(form.hue) || 20, name: form.name }}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            value={{ avatarUrl: imageSrc(form.avatarUrl) }}
+            onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
             title="Ảnh đại diện gian hàng"
-            note="Ảnh này hiển thị trên thẻ sản phẩm, trang shop và trong giỏ hàng của người mua."
+            note="Tải ảnh logo vuông hoặc tròn, tỷ lệ 1:1, tối đa 5 MB."
           />
 
-          <h2 className="mb-3 mt-5 text-[14px] font-semibold text-ink">Hồ sơ gian hàng</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-[12px] text-muted md:col-span-2">
-              Tên gian hàng
-              <input value={form.name} onChange={set('name')} className={`mt-1 ${inputClass}`} />
-            </label>
-            <label className="text-[12px] text-muted md:col-span-2">
-              Slogan / giới thiệu
-              <input value={form.tagline} onChange={set('tagline')} className={`mt-1 ${inputClass}`} />
-            </label>
-            <label className="text-[12px] text-muted">
-              Khu vực gửi hàng
-              <select value={form.location} onChange={set('location')} className={`mt-1 ${inputClass}`}>
-                {vietnamProvinces.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} ({p.region})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[12px] text-muted">
-              Thời gian phản hồi
-              <select value={form.responseTime} onChange={set('responseTime')} className={`mt-1 ${inputClass}`}>
-                {['trong vài phút', 'trong vài giờ', 'trong ngày', 'trong 2 ngày'].map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[12px] text-muted">
-              Biểu tượng gian hàng (emoji)
-              <input value={form.emoji} onChange={set('emoji')} maxLength={4} className={`mt-1 ${inputClass}`} />
-            </label>
-            <label className="text-[12px] text-muted">
-              Màu thương hiệu (0 - 360)
+          {/* Ảnh bìa gian hàng */}
+          <div className="mt-5 rounded-2xl border border-[#E6D5C2] bg-[#FBF3E8] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-bold text-[#49352D]">Ảnh bìa gian hàng (Banner)</h3>
+                <p className="mt-0.5 text-[11px] text-[#8B7566]">Khuyến nghị kích thước 1200 x 300 px (tối đa 5 MB)</p>
+              </div>
+              <div className="flex gap-2">
+                {form.bannerUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, bannerUrl: null }))}
+                    className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-3 py-1.5 text-[12px] text-[#8B7566] hover:text-rose-600"
+                  >
+                    Xóa
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => bannerFileRef.current?.click()}
+                  disabled={bannerBusy}
+                  className="rounded-xl bg-[#BD6E49] hover:bg-[#A95532] px-3.5 py-1.5 text-[12px] font-medium text-[#FFFCF7] transition disabled:opacity-60 shadow-2xs"
+                >
+                  {bannerBusy ? 'Đang tải...' : 'Tải ảnh bìa'}
+                </button>
+              </div>
               <input
-                type="range"
-                min="0"
-                max="360"
-                value={form.hue}
-                onChange={set('hue')}
-                className="mt-3 w-full accent-[#ee4d2d]"
+                ref={bannerFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={uploadBanner}
+                className="hidden"
               />
+            </div>
+            <SmartImage
+              src={imageSrc(form.bannerUrl)}
+              alt="Ảnh bìa gian hàng"
+              className="h-32 w-full rounded-xl object-cover border border-[#E6D5C2]"
+            />
+          </div>
+
+          <h2 className="mb-3 mt-6 text-[15px] font-bold text-[#49352D]">Hồ sơ gian hàng</h2>
+          <div className="grid gap-3.5 md:grid-cols-2">
+            <label className="text-[12px] font-medium text-[#8B7566] md:col-span-2">
+              Tên gian hàng
+              <input value={form.name} onChange={set('name')} maxLength={160} className={`mt-1 ${inputClass}`} />
+            </label>
+            <label className="text-[12px] font-medium text-[#8B7566] md:col-span-2">
+              Slogan / Lời giới thiệu ngắn
+              <input value={form.tagline} onChange={set('tagline')} maxLength={255} className={`mt-1 ${inputClass}`} />
+            </label>
+            <label className="text-[12px] font-medium text-[#8B7566] md:col-span-2">
+              Mô tả chi tiết gian hàng
+              <textarea
+                value={form.description}
+                onChange={set('description')}
+                maxLength={5000}
+                rows={4}
+                className={`mt-1 ${inputClass} resize-y`}
+              />
+            </label>
+            <label className="text-[12px] font-medium text-[#8B7566] md:col-span-2">
+              Địa chỉ kho / liên hệ
+              <input value={form.address} onChange={set('address')} maxLength={255} className={`mt-1 ${inputClass}`} />
+            </label>
+            <label className="text-[12px] font-medium text-[#8B7566] md:col-span-2">
+              Tỉnh / Thành phố gửi hàng
+              <select value={form.location} onChange={set('location')} className={`mt-1 ${inputClass}`}>
+                {vietnamProvinces.map((province) => (
+                  <option key={province.name} value={province.name}>
+                    {province.name} ({province.region})
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={save}
-              className="flex items-center gap-1.5 rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-xl bg-[#BD6E49] hover:bg-[#A95532] px-5 py-2.5 text-[13px] font-semibold text-[#FFFCF7] shadow-2xs transition disabled:opacity-60"
             >
               <IconCheck className="h-4 w-4" />
-              Lưu thay đổi
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!products.length) {
-                  pushToast('Chưa có sản phẩm nào để cập nhật', 'info')
-                  return
-                }
-                products.forEach((p) => upsertProduct({ ...p, location: form.location }))
-                pushToast(`Đã cập nhật khu vực gửi hàng cho ${products.length} sản phẩm`, 'success')
-              }}
-              className="rounded-sm border border-line px-4 py-2 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
-            >
-              Áp dụng khu vực gửi hàng cho toàn bộ sản phẩm
+              {saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}
             </button>
           </div>
 
-          <p className="mt-3 text-[11px] text-muted">
-            Người bán: {user.fullName} · Tài khoản: @{user.username} · Mã gian hàng: {shop?.id}
+          {error ? (
+            <p className="mt-3 rounded-xl border border-[#E6D5C2] bg-[#F5E7D4] px-3.5 py-2 text-[12px] text-[#A95532]">
+              {error}
+            </p>
+          ) : null}
+
+          <p className="mt-4 text-[11px] text-[#8B7566]">
+            Chủ sở hữu: {user.fullName} · Tài khoản: @{user.username} · ID: #{shop.id}
           </p>
         </section>
 
-        <aside className="h-fit space-y-3">
-          <section className="rounded-sm border border-line bg-white p-4">
-            <h2 className="mb-3 text-[14px] font-semibold text-ink">Xem trước</h2>
-            <div className="overflow-hidden rounded-sm border border-line">
-              <div
-                className="h-[70px] w-full"
-                style={{
-                  backgroundImage: `linear-gradient(120deg, hsl(${form.hue} 80% 48%), hsl(${
-                    (Number(form.hue) + 45) % 360
-                  } 78% 62%))`,
-                }}
+        {/* Cột Xem trước & Thống kê */}
+        <aside className="h-fit space-y-4">
+          <section className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-5 shadow-2xs">
+            <h2 className="mb-3 text-[14px] font-bold text-[#49352D]">Xem trước giao diện Shop</h2>
+            <div className="overflow-hidden rounded-xl border border-[#E6D5C2]">
+              <SmartImage
+                src={imageSrc(form.bannerUrl)}
+                alt="Ảnh bìa gian hàng"
+                className="h-20 w-full object-cover"
               />
               <div className="-mt-7 px-3 pb-3">
-                <span className="grid h-14 w-14 place-items-center overflow-hidden rounded-full border-2 border-white bg-white">
+                <span className="grid h-14 w-14 place-items-center overflow-hidden rounded-full border-2 border-[#FFFCF7] bg-[#FFFCF7] shadow-xs">
                   <SmartImage
-                    src={previewAvatar}
-                    fallback={previewAvatar}
-                    alt=""
+                    src={imageSrc(form.avatarUrl)}
+                    alt="Ảnh đại diện gian hàng"
                     className="h-full w-full object-cover"
                   />
                 </span>
-                <p className="mt-1.5 text-[14px] font-semibold text-ink">{form.name || 'Tên gian hàng'}</p>
-                <p className="line-clamp-2 text-[12px] text-muted">{form.tagline || 'Slogan gian hàng'}</p>
-                <p className="mt-1 text-[11px] text-muted">
-                  {form.location} · Phản hồi {form.responseTime}
-                </p>
+                <p className="mt-2 text-[14px] font-bold text-[#49352D]">{form.name || 'Tên gian hàng'}</p>
+                <p className="line-clamp-2 text-[12px] text-[#8B7566]">{form.tagline || 'Chưa có giới thiệu'}</p>
+                <p className="mt-1 text-[11px] text-[#A95532] font-medium">{form.location}</p>
               </div>
             </div>
           </section>
 
-          <section className="rounded-sm border border-line bg-white p-4">
-            <h2 className="mb-3 text-[14px] font-semibold text-ink">Thống kê gian hàng</h2>
-            <div className="space-y-2 text-[13px]">
-              <p className="flex justify-between text-ink-soft">
+          <section className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-5 shadow-2xs">
+            <h2 className="mb-3 text-[14px] font-bold text-[#49352D]">Thống kê gian hàng</h2>
+            <div className="space-y-2.5 text-[13px]">
+              <p className="flex justify-between text-[#8B7566]">
                 <span>Sản phẩm đang bán</span>
-                <b className="text-ink">{formatNumber(products.length)}</b>
+                <b className="text-[#49352D]">{formatNumber(shop.productCount || 0)}</b>
               </p>
-              <p className="flex justify-between text-ink-soft">
+              <p className="flex justify-between text-[#8B7566]">
                 <span>Người theo dõi</span>
-                <b className="text-ink">{formatFollowers(shop?.followers || 0)}</b>
+                <b className="text-[#49352D]">{formatFollowers(shop.followers || 0)}</b>
               </p>
-              <p className="flex justify-between text-ink-soft">
+              <p className="flex justify-between text-[#8B7566]">
                 <span>Đánh giá gian hàng</span>
-                <b className="text-ink">{shop?.rating}/5</b>
+                <b className="text-[#49352D]">
+                  {Number(shop.rating || 0).toFixed(1)} / 5 ({formatNumber(shop.ratingCount || 0)})
+                </b>
               </p>
-              <p className="flex justify-between text-ink-soft">
+              <p className="flex justify-between text-[#8B7566]">
                 <span>Tham gia từ</span>
-                <b className="text-ink">{shop?.joined}</b>
+                <b className="text-[#49352D]">{shop.joined || '—'}</b>
+              </p>
+              <p className="flex justify-between text-[#8B7566]">
+                <span>Đã bán</span>
+                <b className="text-[#49352D]">{formatNumber(shop.totalSold || 0)}</b>
               </p>
             </div>
           </section>

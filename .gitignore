@@ -106,6 +106,14 @@ mcp_config.json
 /tree.txt
 /tree2.txt
 
+# Local uploads, user data stores, test screenshots and caches
+/backend/uploads/
+/backend/data/
+/scratch/
+/product_images_cache/
+/verification-screenshots/
+/*.png
+
 # Local configuration
 /.agent/
 /AGENTS.md

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { useCatalog } from '../context/CatalogContext'
 import { useOrders } from '../context/OrderContext'
 import { useToast } from '../context/ToastContext'
 import { checkoutPayments, shippingUnits } from '../data/homeContent'
@@ -22,8 +23,9 @@ const VOUCHERS = [
 /** TRANG ĐẶT HÀNG — nhiều shop trong 1 đơn, chọn địa chỉ / vận chuyển / thanh toán */
 export default function CheckoutPage() {
   const navigate = useNavigate()
-  const { user, updateProfile } = useAuth()
+  const { user, isInitializing } = useAuth()
   const { selectedItems, updateQty, removeFromCart, removeSelected } = useCart()
+  const { loadProducts } = useCatalog()
   const { createOrder } = useOrders()
   const { pushToast } = useToast()
 
@@ -38,9 +40,15 @@ export default function CheckoutPage() {
   const [editingAddress, setEditingAddress] = useState(false)
   const [payment, setPayment] = useState('cod')
   const [shippingUnit, setShippingUnit] = useState('tietkiem')
-  const [voucherId, setVoucherId] = useState('v20')
+  const [voucherId, setVoucherId] = useState('v0')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const ids = [...new Set(selectedItems.filter((item) => item.unavailable).map((item) => item.productId).filter(Boolean))]
+    if (ids.length) loadProducts({ ids: ids.slice(0, 50).join(','), limit: Math.min(ids.length, 50), offset: 0 })
+      .catch((error) => console.error('Không thể làm mới sản phẩm khi thanh toán:', error))
+  }, [loadProducts, selectedItems])
 
   /** Nhóm theo shop cho phần hiển thị */
   const shopGroups = useMemo(() => {
@@ -55,10 +63,12 @@ export default function CheckoutPage() {
       return {
         ...g,
         subtotal,
-        shippingFee: hasFreeship || subtotal >= 1000000 ? 0 : 16500,
+        shippingFee: hasFreeship || subtotal >= 1000000
+          ? 0
+          : shippingUnits.find((unit) => unit.id === shippingUnit)?.fee || 0,
       }
     })
-  }, [selectedItems])
+  }, [selectedItems, shippingUnit])
 
   const totals = useMemo(() => {
     const subtotal = selectedItems.reduce((s, i) => s + i.price * i.qty, 0)
@@ -80,6 +90,12 @@ export default function CheckoutPage() {
 
   const addressComplete = Boolean(address.fullName && address.phone && address.province && address.detail)
 
+  useEffect(() => {
+    if (!isInitializing && !user) {
+      navigate('/dang-nhap', { replace: true, state: { from: '/dat-hang' } })
+    }
+  }, [isInitializing, user, navigate])
+
   if (!selectedItems.length) {
     return (
       <div className="rounded-sm border border-line bg-white px-6 py-16 text-center">
@@ -94,28 +110,40 @@ export default function CheckoutPage() {
     )
   }
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
+    if (!user) {
+      navigate('/dang-nhap', { state: { from: '/dat-hang' } })
+      return
+    }
     if (!addressComplete) {
       setEditingAddress(true)
       pushToast('Vui lòng nhập đầy đủ địa chỉ nhận hàng', 'error')
       return
     }
+    if (selectedItems.some((item) => !item.variantId || item.unavailable || item.qty > item.stock)) {
+      pushToast('Giỏ hàng có sản phẩm không còn đủ tồn kho. Vui lòng cập nhật lại số lượng.', 'error')
+      return
+    }
     setSubmitting(true)
-    const order = createOrder({
-      buyerId: user?.id || 'guest',
-      buyerName: user?.fullName || address.fullName,
-      items: selectedItems,
-      address,
-      payment,
-      shippingUnit: shippingUnits.find((s) => s.id === shippingUnit)?.name,
-      shippingFee: totals.shippingTotal,
-      voucher: totals.voucherValue,
-      note,
-    })
-    updateProfile({ address })
-    removeSelected()
-    pushToast('Đặt hàng thành công!', 'success')
-    navigate(`/dat-hang-thanh-cong/${order.id}`)
+    try {
+      const order = await createOrder({
+        buyerName: user.fullName || address.fullName,
+        items: selectedItems,
+        address,
+        paymentMethod: payment,
+        shippingMethod: shippingUnit,
+        shippingUnit: shippingUnits.find((item) => item.id === shippingUnit)?.name,
+        voucherCode: VOUCHERS.find((voucher) => voucher.id === voucherId)?.value ? VOUCHERS.find((voucher) => voucher.id === voucherId)?.code : '',
+        note,
+      })
+      removeSelected()
+      pushToast('Đặt hàng thành công!', 'success')
+      navigate(`/dat-hang-thanh-cong/${order.id}`)
+    } catch (error) {
+      pushToast(error.message || 'Không thể đặt hàng. Vui lòng thử lại.', 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -246,7 +274,7 @@ export default function CheckoutPage() {
                 <Link to={`/san-pham/${item.slug}`} className="shrink-0">
                   <SmartImage
                     src={item.image}
-                    fallback={item.image}
+                    fallback={item.imageFallback || item.image}
                     alt={item.name}
                     className="h-[70px] w-[70px] rounded-sm border border-line object-cover"
                   />
@@ -423,7 +451,7 @@ export default function CheckoutPage() {
               type="button"
               onClick={placeOrder}
               disabled={submitting}
-              className="rounded-sm bg-gradient-to-b from-[#f86a4b] to-[#ee4d2d] px-10 py-2.5 text-[14px] font-medium text-white transition hover:brightness-105 disabled:opacity-60"
+              className="rounded-xl bg-[#BD6E49] hover:bg-[#A95532] px-10 py-2.5 text-[14px] font-semibold text-[#FFFCF7] transition cursor-pointer shadow-xs disabled:opacity-60"
             >
               {submitting ? 'Đang xử lý...' : 'Đặt Hàng'}
             </button>

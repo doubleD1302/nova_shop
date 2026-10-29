@@ -46,7 +46,7 @@ function launch(publicPort, dataPort) {
       DB_READINESS_TIMEOUT_MS: '1000',
       DOTENV_CONFIG_PATH: path.join(os.tmpdir(), `missing-${key}.env`),
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   })
   const closed = new Promise((resolve) => child.once('close', resolve))
   return { child, closed, key }
@@ -80,13 +80,8 @@ async function waitForExit(closed) {
 
 async function cleanup(run) {
   if (run.child.exitCode !== null) return
-  if (process.platform === 'win32') {
-    // Chỉ dừng cây tiến trình do kiểm tra này vừa tạo.
-    const kill = spawn('taskkill', ['/PID', String(run.child.pid), '/T', '/F'], { stdio: 'ignore' })
-    await new Promise((resolve) => kill.once('close', resolve))
-  } else {
-    run.child.kill('SIGTERM')
-  }
+  if (run.child.connected) run.child.send('shutdown')
+  else run.child.kill('SIGTERM')
   await waitForExit(run.closed)
 }
 

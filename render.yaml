@@ -17,6 +17,8 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
       - key: CORS_ORIGINS
         sync: false
       - key: DB_HOST
@@ -33,3 +35,17 @@ services:
         value: "true"
       - key: DB_SSL_CA
         value: /etc/secrets/aiven-ca.pem
+      - key: UPLOAD_STORAGE
+        value: s3
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: "false"

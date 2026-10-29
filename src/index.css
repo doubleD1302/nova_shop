@@ -2,26 +2,49 @@
 
 /* ============================================================
    ShopNova Design Tokens (Tailwind CSS v4 @theme)
+   Terracotta + Cream Palette
    ============================================================ */
+:root {
+  --color-primary: #BD6E49;
+  --color-primary-hover: #A95532;
+  --color-earth: #80513B;
+  --color-text: #49352D;
+  --color-text-muted: #8B7566;
+  --color-background: #FBF3E8;
+  --color-surface: #FFFCF7;
+  --color-surface-alt: #F5E7D4;
+  --color-product-card: #F4E6D2;
+  --color-border: #E6D5C2;
+  --color-success: #547653;
+  --color-error: #B93832;
+}
+
 @theme {
-  --color-brand: #ee4d2d;
-  --color-brand-dark: #d73211;
-  --color-brand-light: #f86041;
-  --color-brand-soft: #fff2ee;
-  --color-mall: #153a9c;
-  --color-topbar: #f0f5ff;
-  --color-page: #f5f5f5;
-  --color-ink: #222222;
-  --color-ink-soft: #4a4a4a;
-  --color-muted: #757575;
-  --color-line: #e8e8e8;
-  --color-free: #26aa99;
-  --color-footer: #16243d;
+  --color-brand: #BD6E49;
+  --color-brand-dark: #A95532;
+  --color-brand-light: #C97D58;
+  --color-brand-soft: #F5E7D4;
+  --color-earth: #80513B;
+  --color-mall: #BD6E49;
+  --color-topbar: #F5E7D4;
+  --color-page: #FBF3E8;
+  --color-secondary: #F5E7D4;
+  --color-card: #FFFCF7;
+  --color-product-card: #F4E6D2;
+  --color-ink: #49352D;
+  --color-ink-soft: #634C40;
+  --color-muted: #8B7566;
+  --color-line: #E6D5C2;
+  --color-free: #BD6E49;
+  --color-footer: #F5E7D4;
+  --color-success: #547653;
+  --color-error: #B93832;
 
-  --font-sans: 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Be Vietnam Pro', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Be Vietnam Pro', -apple-system, sans-serif;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-pop: 0 6px 24px rgba(0, 0, 0, 0.14);
+  --shadow-card: 0 2px 8px rgba(128, 81, 59, 0.08);
+  --shadow-pop: 0 8px 30px rgba(189, 110, 73, 0.15);
 }
 
 html {
@@ -34,6 +57,11 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: #F5E7D4;
+  color: #80513B;
 }
 
 /* ---------- Utilities ---------- */
@@ -57,8 +85,11 @@ body {
   height: 6px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #c9c9c9;
+  background: #D4C2B0;
   border-radius: 999px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: #BD6E49;
 }
 
 .line-clamp-1,

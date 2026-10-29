@@ -4,26 +4,23 @@ import helmet from 'helmet'
 import { env } from './config/env.js'
 import healthRouter from './routes/health.routes.js'
 import authRouter from './routes/auth.routes.js'
-import catalogRouter from './routes/catalog.routes.js'
-import { shopRouter } from './routes/shop.routes.js'
-import cartRouter from './routes/cart.routes.js'
-import { orderRouter } from './routes/order.routes.js'
-import { addressRouter } from './routes/address.routes.js'
-import { reviewRouter } from './routes/review.routes.js'
-import { favoriteRouter } from './routes/favorite.routes.js'
-import { sellerOrderRouter } from './routes/seller-order.routes.js'
-import { sellerProductRouter } from './routes/seller-product.routes.js'
-import { sellerHubRouter } from './routes/seller-hub.routes.js'
-import voucherRouter from './routes/voucher.routes.js'
-import aiRouter from './routes/ai.routes.js'
+import productsRouter from './routes/products.routes.js'
+import ordersRouter from './routes/orders.routes.js'
+import sellerRouter from './routes/seller.routes.js'
+import shopsRouter from './routes/shops.routes.js'
+import uploadsRouter from './routes/uploads.routes.js'
+import { serveUploadedImage } from './controllers/uploads.controller.js'
+import adminRouter from './routes/admin.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
 // Khởi tạo instance ứng dụng Express
 const app = express()
 
-// 1. Thiết lập các header bảo mật HTTP cơ bản
-app.use(helmet())
+// 1. Thiết lập các header bảo mật HTTP cơ bản (cho phép tải ảnh tĩnh cross-origin)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}))
 
 // 2. Cấu hình CORS (Cross-Origin Resource Sharing)
 const corsOptions = {
@@ -45,24 +42,24 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-// 3. Phân tích cú pháp dữ liệu JSON từ body request (giới hạn tối đa 1MB)
-app.use(express.json({ limit: '1mb' }))
+// 3. Phân tích cú pháp JSON và ảnh tải lên đã mã hóa base64 (giới hạn 8MB)
+app.use(express.json({ limit: '8mb' }))
+
+if (env.uploadStorage === 's3') {
+  app.get('/uploads/:filename', serveUploadedImage)
+} else {
+  app.use('/uploads', express.static(env.uploadDir, { maxAge: '1y', immutable: true }))
+}
 
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
-app.use('/api/v1', catalogRouter)
-app.use('/api/v1/shops', shopRouter)
-app.use('/api/v1/cart', cartRouter)
-app.use('/api/v1/orders', orderRouter)
-app.use('/api/v1/addresses', addressRouter)
-app.use('/api/v1', reviewRouter)
-app.use('/api/v1', favoriteRouter)
-app.use('/api/v1/seller', sellerOrderRouter)
-app.use('/api/v1/seller', sellerProductRouter)
-app.use('/api/v1/seller', sellerHubRouter)
-app.use('/api/v1/vouchers', voucherRouter)
-app.use('/api/v1/ai', aiRouter)
+app.use('/api/v1', shopsRouter)
+app.use('/api/v1', uploadsRouter)
+app.use('/api/v1', adminRouter)
+app.use('/api/v1/products', productsRouter)
+app.use('/api/v1/orders', ordersRouter)
+app.use('/api/v1/seller', sellerRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

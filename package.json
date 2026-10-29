@@ -5,13 +5,17 @@
   "type": "module",
   "description": "ShopNova - Sàn thương mại điện tử đa người bán (frontend React + Vite + Tailwind CSS)",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-all.mjs",
+    "dev:vite": "vite",
+    "dev:backend": "cd backend && node src/server.js",
+    "dev:data": "cd data-api && node src/server.js",
     "build": "vite build",
     "preview": "vite preview",
     "start:hosting": "node scripts/host.mjs",
     "check:hosting": "node scripts/check-hosting.mjs"
   },
   "dependencies": {
+    "firebase": "^13.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2"
@@ -19,6 +23,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.8",
     "@vitejs/plugin-react": "^4.5.1",
+    "puppeteer-core": "^25.15.0",
     "tailwindcss": "^4.1.8",
     "vite": "^6.3.5"
   }

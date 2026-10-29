@@ -119,7 +119,24 @@ async function runSmokeTests() {
       assert(data.error?.code === 'NOT_FOUND', '404 ngoài prefix error code là NOT_FOUND')
     }
 
-    // 1.6 JSON body sai cú pháp trả HTTP 400 với mã BAD_JSON
+    // 1.6 Google account provisioning rejects incomplete identities before database access.
+    {
+      const res = await fetch(`${baseUrl}/internal/v1/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-key': env.dataApiKey,
+        },
+        body: JSON.stringify({ firebaseUid: 'uid-without-verified-email' }),
+        signal: AbortSignal.timeout(4000),
+      })
+      const data = await res.json()
+      assert(res.status === 400, 'Google account provisioning rejects incomplete verified identity before database access')
+      assert(data.success === false, 'Invalid Google identity response has success === false')
+      assert(data.error?.code === 'VALIDATION_ERROR', 'Invalid Google identity returns VALIDATION_ERROR')
+    }
+
+    // 1.7 JSON body sai cú pháp trả HTTP 400 với mã BAD_JSON
     {
       const res = await fetch(`${baseUrl}/internal/v1/health`, {
         method: 'POST',
@@ -136,7 +153,7 @@ async function runSmokeTests() {
       assert(data.error?.code === 'BAD_JSON', 'Bad JSON error code là BAD_JSON')
     }
 
-    // 1.7 Body vượt quá giới hạn 1MB trả về HTTP 413 với mã BODY_TOO_LARGE
+    // 1.8 Body vượt quá giới hạn 1MB trả về HTTP 413 với mã BODY_TOO_LARGE
     {
       const largePayload = JSON.stringify({ data: 'A'.repeat(1.2 * 1024 * 1024) })
       const res = await fetch(`${baseUrl}/internal/v1/health`, {
@@ -152,23 +169,6 @@ async function runSmokeTests() {
       assert(res.status === 413, 'Payload vượt quá giới hạn 1MB trả HTTP 413')
       assert(data.success === false, 'Payload quá lớn có success === false')
       assert(data.error?.code === 'BODY_TOO_LARGE', 'Mã lỗi payload quá lớn là BODY_TOO_LARGE')
-    }
-
-    // 1.8 POST /internal/v1/auth/register thiếu thông tin trả về HTTP 400
-    {
-      const res = await fetch(`${baseUrl}/internal/v1/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-service-key': env.dataApiKey,
-        },
-        body: JSON.stringify({}),
-        signal: AbortSignal.timeout(4000),
-      })
-      const data = await res.json()
-      assert(res.status === 400, 'POST /internal/v1/auth/register thiếu dữ liệu trả HTTP 400')
-      assert(data.success === false, 'Phản hồi thất bại có success === false')
-      assert(data.error?.code === 'INVALID_USERNAME', 'Mã lỗi là INVALID_USERNAME')
     }
 
     // -------------------------------------------------------------

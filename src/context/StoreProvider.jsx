@@ -6,18 +6,18 @@ import { ToastProvider } from './ToastContext'
 
 /**
  * Gom toàn bộ provider của ứng dụng vào 1 chỗ.
- * Thứ tự: Toast -> Catalog -> Auth -> Cart -> Orders (không phụ thuộc vòng).
+ * Provider order: Toast -> Auth -> Catalog -> Cart -> Orders.
  */
 export default function StoreProvider({ children }) {
   return (
     <ToastProvider>
-      <CatalogProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <CatalogProvider>
           <CartProvider>
             <OrderProvider>{children}</OrderProvider>
           </CartProvider>
-        </AuthProvider>
-      </CatalogProvider>
+        </CatalogProvider>
+      </AuthProvider>
     </ToastProvider>
   )
 }

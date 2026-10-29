@@ -545,28 +545,24 @@ export async function executeQuery(sql, values = [], timeoutMs = env.dbReadiness
 }
 
 /**
- * Thực thi một khối thao tác trong Transaction với tự động COMMIT và ROLLBACK.
+ * Thực thi một nhóm truy vấn trên cùng kết nối trong một transaction có deadline.
  */
-export async function executeTransaction(callback, timeoutMs = env.dbReadinessTimeoutMs) {
+export async function executeTransaction(operationFn, timeoutMs = env.dbReadinessTimeoutMs) {
   return executeWithConnection(async (conn, remainingTime) => {
-    const queryAsync = (sql, values = []) => {
-      return new Promise((resolve, reject) => {
-        conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
-          if (err) return reject(err)
-          resolve(rows)
-        })
+    const query = (sql, values = []) => new Promise((resolve, reject) => {
+      conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
+        if (err) return reject(err)
+        resolve(rows)
       })
-    }
+    })
 
-    await queryAsync('START TRANSACTION')
+    await query('START TRANSACTION')
     try {
-      const result = await callback(queryAsync, conn)
-      await queryAsync('COMMIT')
+      const result = await operationFn(query)
+      await query('COMMIT')
       return result
     } catch (err) {
-      try {
-        await queryAsync('ROLLBACK')
-      } catch {}
+      await query('ROLLBACK')
       throw err
     }
   }, timeoutMs)

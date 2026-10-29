@@ -1,26 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { readStorage, writeStorage } from '../utils/storage'
 
-/**
- * useState + tự động đồng bộ vào localStorage.
- * Dùng cho giỏ hàng / đơn hàng / sản phẩm của người bán / phiên đăng nhập.
- */
+function initialForKey(key, initialValue) {
+  const stored = readStorage(key, undefined)
+  if (stored !== undefined) return stored
+  return typeof initialValue === 'function' ? initialValue() : initialValue
+}
+
+/** useState mirrored to localStorage, with immediate isolation when the key changes. */
 export function useLocalStorageState(key, initialValue) {
-  const [value, setValue] = useState(() => {
-    const stored = readStorage(key, undefined)
-    if (stored === undefined) return typeof initialValue === 'function' ? initialValue() : initialValue
-    return stored
-  })
+  const initialValueRef = useRef(initialValue)
+  initialValueRef.current = initialValue
+  const [storedState, setStoredState] = useState(() => ({ key, value: initialForKey(key, initialValue) }))
 
-  const firstRun = useRef(true)
+  if (storedState.key !== key) {
+    setStoredState({ key, value: initialForKey(key, initialValueRef.current) })
+  }
+
   useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false
-    }
-    writeStorage(key, value)
-  }, [key, value])
+    if (storedState.key === key) writeStorage(key, storedState.value)
+  }, [key, storedState])
 
-  return [value, setValue]
+  const setValue = useCallback((nextValue) => {
+    setStoredState((current) => {
+      const currentValue = current.key === key ? current.value : initialForKey(key, initialValueRef.current)
+      return { key, value: typeof nextValue === 'function' ? nextValue(currentValue) : nextValue }
+    })
+  }, [key])
+
+  return [storedState.value, setValue]
 }
 
 export default useLocalStorageState

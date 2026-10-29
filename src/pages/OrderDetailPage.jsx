@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useOrders } from '../context/OrderContext'
 import { useToast } from '../context/ToastContext'
@@ -15,10 +16,15 @@ import SmartImage from '../components/ui/SmartImage'
 export default function OrderDetailPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
-  const { getOrderById, cancelOrder, confirmReceived } = useOrders()
+  const { getOrderById, cancelOrder, confirmReceived, loadBuyerOrders, buyerOrdersLoading } = useOrders()
   const { pushToast } = useToast()
   const order = getOrderById(orderId)
 
+  useEffect(() => {
+    if (!order) loadBuyerOrders({ orderId, force: true, append: true }).catch((error) => console.error('Could not load order details:', error))
+  }, [order, loadBuyerOrders])
+
+  if (!order && buyerOrdersLoading) return <div className="rounded-sm bg-white p-8 text-center text-sm text-muted">Đang tải đơn hàng...</div>
   if (!order) {
     return (
       <div className="rounded-sm border border-line bg-white">
@@ -104,7 +110,7 @@ export default function OrderDetailPage() {
               <div key={`${item.productId}-${item.variant}`} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <SmartImage
                   src={item.image}
-                  fallback={item.image}
+                  fallback={item.imageFallback || item.image}
                   alt={item.name}
                   className="h-[70px] w-[70px] rounded-sm border border-line object-cover"
                 />
@@ -171,9 +177,8 @@ export default function OrderDetailPage() {
         {order.status === 'pending' ? (
           <button
             type="button"
-            onClick={() => {
-              cancelOrder(order.id)
-              pushToast('Đã huỷ đơn hàng', 'success')
+            onClick={async () => {
+              if (await cancelOrder(order.id)) pushToast('Đã huỷ đơn hàng', 'success')
             }}
             className="rounded-sm border border-line bg-white px-4 py-2 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
           >
@@ -183,9 +188,8 @@ export default function OrderDetailPage() {
         {order.status === 'shipping' ? (
           <button
             type="button"
-            onClick={() => {
-              confirmReceived(order.id)
-              pushToast('Đã xác nhận nhận hàng', 'success')
+            onClick={async () => {
+              if (await confirmReceived(order.id)) pushToast('Đã xác nhận nhận hàng', 'success')
             }}
             className="flex items-center gap-1.5 rounded-sm bg-brand px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
           >

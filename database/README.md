@@ -1099,7 +1099,7 @@ Ràng buộc và index:
 | Schema/seed an toàn | PASS | Không có DROP, TRUNCATE, DELETE, REPLACE hoặc thay đổi schema cũ |
 | Mô hình ràng buộc portable | PASS: 42 cases | SQLite in-memory chuyển kiểu từ metadata; thử unique, FK ghép, check tiền/qty, rollback, retry/hoàn kho và phân bổ số nguyên |
 | Runtime MySQL 8.4 thật | PASS | Kiểm chứng trên MySQL Server 8.4.4 LTS (port 3306, utf8mb4_0900_ai_ci): 22 bảng InnoDB, đủ 35 FK, 28 UNIQUE, 34 CHECK; nạp đúng số lượng seed; 4/4 negative test cases (qty=0, giá âm, FK sai, cart trùng) bị từ chối chính xác và rollback an toàn |
-| Tích hợp Data API, race/deadlock/ownership qua HTTP | NOT RUN | Chưa có runtime Data API trong source; Data API là tác vụ kế tiếp (BE-002B) |
+| Data API integration and seller workflow | NOT RUN in this workspace | Requires MySQL configuration; `DB_USER` and the remaining local database values are unset |
 
 Toàn bộ 22 bảng, seed dữ liệu mẫu và các ràng buộc toàn vẹn đã được chạy và kiểm chứng thực tế trên MySQL 8.4 LTS mà không gặp lỗi. Bằng chứng chi tiết được lưu trong báo cáo bàn giao.
 
@@ -1111,3 +1111,23 @@ Toàn bộ 22 bảng, seed dữ liệu mẫu và các ràng buộc toàn vẹn �
 - [MySQL 8.4: Locking reads](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html): đọc có khóa trong transaction.
 
 Các phương án một shop/user, SKU mặc định, COD, voucher cố định, phân bổ và hủy một phần là quyết định thiết kế đề xuất cho ShopNova. Chốt chúng với nhóm trước migration vào môi trường dùng chung.
+
+## Current runtime status (2026-10-19)
+
+The Backend and Data API now contain the runtime routes and database controllers described by this project. The validation table above documents the earlier schema baseline; it does not verify the newer phone/admin migration or run the current seller workflow. In this workspace, Data API smoke tests pass, but `npm run check:db` cannot connect because `DB_USER` and the remaining local database values are unset. Apply the migrations and run the seller-to-order workflow against a configured MySQL instance before treating that flow as verified.
+
+## Abuse reports table
+
+The current schema includes `abuse_reports`: a signed-in reporter, a polymorphic target (`shop`, `product`, `user`, or `review`), a reason, and open/resolved/dismissed status. Reporter and resolver reference `users`; target IDs are validated by the Data API because the target table varies by target type.
+
+## Seller catalog changes (2026-10-21)
+
+- Apply `migrations/2026-10-21-product-images-attribution.sql` once before deploying the updated Data API. It adds Commons source, author, and license metadata to `product_images`.
+- New products can be active only after four distinct images have loaded in the seller form. The first image is the card image; the detail gallery shows all four and keeps the source and license credit links.
+- Commons search is served by the Backend, and candidates are restricted to public-domain/CC0/CC BY/CC BY-SA metadata with an author and HTTPS file/license links. Sellers still need to confirm the images depict the same product and comply with the file's terms. Wikimedia's file page can identify other legal or personality-rights limitations.
+- `seed.sql` adds explicitly labeled demo categories and draft product records. Those records intentionally have no photos, zero stock, and no order/review history; they stay out of the public catalog until a seller completes the four-image set and publishes them.
+- Set `WIKIMEDIA_API_USER_AGENT` in the Backend environment to a descriptive application identifier with the deployment's support URL or email. Do not send a browser User-Agent string as an identity substitute.
+
+The web app and Backend can start without MySQL, but authenticated seller/catalog operations require the Data API and its configured database. The sample `.env` templates contain no database credentials; use the team's configured MySQL environment and do not copy user records or secrets into this repository.
+
+- A legacy account in `backend/data/users.json` is copied into MySQL only after a successful password check at login. Its matching legacy shop and a complete saved shipping address are included. The JSON files are read-only and existing DB accounts are never overwritten; username/email/phone conflicts need manual resolution.

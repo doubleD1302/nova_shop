@@ -44,18 +44,14 @@ class _FlashSaleSectionState extends State<FlashSaleSection> {
   Widget _buildTimeBox(String time) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF222222),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         time,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -74,48 +70,39 @@ class _FlashSaleSectionState extends State<FlashSaleSection> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFECE8),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.local_fire_department, color: Color(0xFFEE4D2D), size: 18),
-              ),
-              const SizedBox(width: 6),
+              const Icon(Icons.flash_on, color: Colors.orange, size: 24),
+              const SizedBox(width: 4),
               const Text(
-                'FLASH SALE',
+                '⚡ FLASH SALE',
                 style: TextStyle(
-                  color: Color(0xFFEE4D2D),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  letterSpacing: 0.2,
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
               const SizedBox(width: 8),
               _buildTimeBox(hours),
-              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF222222))),
+              const Text(':', style: TextStyle(fontWeight: FontWeight.bold)),
               _buildTimeBox(minutes),
-              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF222222))),
+              const Text(':', style: TextStyle(fontWeight: FontWeight.bold)),
               _buildTimeBox(seconds),
               const Spacer(),
               Text(
                 'Xem tất cả >',
                 style: TextStyle(
                   color: AppColors.primary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 190,
+            height: 180,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: widget.items.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 return FlashSaleItemCard(item: widget.items[index]);
               },

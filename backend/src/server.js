@@ -1,5 +1,6 @@
 import app from './app.js'
 import { env } from './config/env.js'
+import { closeObjectStorage } from './services/object-storage.js'
 
 /**
  * Khởi động máy chủ HTTP trên cổng đã cấu hình
@@ -31,9 +32,16 @@ server.on('error', (err) => {
 /**
  * Lắng nghe tín hiệu dừng chương trình (Ctrl + C) để giải phóng tài nguyên gọn gàng
  */
-function handleShutdown(signal) {
+async function handleShutdown(signal) {
   console.log(`\n[ShopNova Backend] Đang đóng server an toàn (tín hiệu: ${signal})...`)
-  server.close(() => {
+  server.close(async () => {
+    try {
+      closeObjectStorage()
+      console.log('[ShopNova Backend] Kết nối object storage đã đóng.')
+    } catch (err) {
+      console.error('[ShopNova Backend] Không thể đóng kết nối object storage:', err.message || err)
+      process.exit(1)
+    }
     console.log('[ShopNova Backend] Server đã đóng hoàn toàn.')
     process.exit(0)
   })

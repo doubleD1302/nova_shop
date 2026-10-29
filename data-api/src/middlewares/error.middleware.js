@@ -50,6 +50,24 @@ export function errorHandler(err, req, res, next) {
     })
   }
 
+  if (err.code === 'ER_TABLEACCESS_DENIED_ERROR' || err.code === 'ER_DBACCESS_DENIED_ERROR') {
+    console.error('[Data API Error] Event: DATABASE_PERMISSION_DENIED')
+    return res.status(503).json({
+      success: false,
+      message: 'Tài khoản MySQL của Data API chưa có quyền ghi. Cần cấp SELECT, INSERT, UPDATE và DELETE trên database của ShopNova.',
+      error: { code: 'DATABASE_PERMISSION_DENIED' },
+    })
+  }
+
+  if (err.code === 'ER_NO_SUCH_TABLE') {
+    console.error('[Data API Error] Event: DATABASE_SCHEMA_MISSING')
+    return res.status(503).json({
+      success: false,
+      message: 'Thiếu bảng dữ liệu ShopNova. Hãy áp dụng schema và các migration trước khi chạy API.',
+      error: { code: 'DATABASE_SCHEMA_MISSING' },
+    })
+  }
+
   // 4. Các lỗi hệ thống khác (500 Internal Server Error)
   // Chỉ ghi nhận mã sự kiện cố định, tuyệt đối không in err.message/err.sql/parameters/stack
   console.error('[Data API Error] Event: INTERNAL_SERVER_ERROR')

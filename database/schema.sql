@@ -11,17 +11,20 @@ CREATE TABLE users (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Khóa chính; API gửi dạng chuỗi',
   username VARCHAR(50) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'Tên đăng nhập đã chuẩn hóa chữ thường',
   password_hash VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'Hash mật khẩu; không trả qua API',
+  firebase_uid VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'UID Firebase đã xác minh; NULL với tài khoản mật khẩu',
   full_name VARCHAR(120) NOT NULL COMMENT 'Họ tên hiển thị',
   email VARCHAR(254) CHARACTER SET ascii COLLATE ascii_general_ci NULL COMMENT 'Email duy nhất nếu có; chuẩn hóa trước lưu',
   phone VARCHAR(20) NULL COMMENT 'Số điện thoại dạng chuỗi',
   avatar_url VARCHAR(1024) NULL COMMENT 'URL ảnh đại diện',
-  role ENUM('buyer','seller') NOT NULL DEFAULT 'buyer' COMMENT 'Seller vẫn có quyền mua hàng',
+  role ENUM('buyer','seller','admin') NOT NULL DEFAULT 'buyer' COMMENT 'Seller vẫn có quyền mua hàng; admin chỉ được cấp bởi vận hành',
   status ENUM('active','blocked') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái tài khoản',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật, UTC',
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_username (username),
-  UNIQUE KEY uq_users_email (email)
+  UNIQUE KEY uq_users_firebase_uid (firebase_uid),
+  UNIQUE KEY uq_users_email (email),
+  UNIQUE KEY uq_users_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Tài khoản người mua và người bán';
 
 -- Phiên đăng nhập để thu hồi refresh token
@@ -140,6 +143,10 @@ CREATE TABLE product_images (
   url VARCHAR(1024) NOT NULL COMMENT 'URL ảnh',
   alt_text VARCHAR(200) NULL COMMENT 'Mô tả thay thế',
   sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Thứ tự; ảnh đầu là ảnh đại diện',
+  source_page_url VARCHAR(1024) NULL COMMENT 'Trang tệp nguồn cần ghi công, NULL nếu do seller tải lên',
+  author VARCHAR(400) NULL COMMENT 'Tác giả theo metadata tệp hoặc người cung cấp ảnh',
+  license_name VARCHAR(100) NULL COMMENT 'Giấy phép nguồn hoặc ảnh do seller cung cấp',
+  license_url VARCHAR(1024) NULL COMMENT 'Liên kết tới điều khoản giấy phép nguồn',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
   PRIMARY KEY (id),
   UNIQUE KEY uq_product_images_position (product_id, sort_order),
@@ -429,6 +436,27 @@ CREATE TABLE review_likes (
   CONSTRAINT fk_review_likes_review FOREIGN KEY (review_id) REFERENCES reviews (id),
   CONSTRAINT fk_review_likes_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Lượt thích đánh giá, mỗi user tối đa một lượt';
+
+-- Báo cáo vi phạm do tài khoản đăng nhập gửi; chỉ admin được xử lý
+CREATE TABLE abuse_reports (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reporter_id BIGINT UNSIGNED NOT NULL,
+  target_type ENUM('shop','product','user','review') NOT NULL,
+  target_id BIGINT UNSIGNED NOT NULL,
+  reason VARCHAR(2000) NOT NULL,
+  status ENUM('open','resolved','dismissed') NOT NULL DEFAULT 'open',
+  resolved_by BIGINT UNSIGNED NULL,
+  resolved_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_abuse_reports_status_created (status, created_at, id),
+  KEY ix_abuse_reports_target (target_type, target_id),
+  KEY ix_abuse_reports_reporter (reporter_id, created_at),
+  CONSTRAINT fk_abuse_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users (id),
+  CONSTRAINT fk_abuse_reports_resolver FOREIGN KEY (resolved_by) REFERENCES users (id),
+  CONSTRAINT ck_abuse_reports_resolution CHECK ((status = 'open' AND resolved_by IS NULL AND resolved_at IS NULL) OR (status <> 'open' AND resolved_by IS NOT NULL AND resolved_at IS NOT NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Báo cáo vi phạm do người dùng gửi';
 
 -- Shop mà tài khoản đang theo dõi
 CREATE TABLE shop_follows (

@@ -1,66 +1,14 @@
 /**
- * Sinh ảnh SVG placeholder ngay trên trình duyệt (data URI).
- * => Website chạy được hoàn toàn OFFLINE, không phụ thuộc CDN ảnh.
- *
- * Muốn dùng ảnh thật: chỉ cần điền `image` (URL) cho sản phẩm/shop trong src/data.
- * Component <SmartImage /> sẽ tự ưu tiên dùng URL thật và fallback về SVG này.
+ * Decorative SVGs for category and shop UI only. Product photos always come
+ * from the catalog API or the seller's uploaded/licensed product images.
  */
 
-const CATEGORY_PALETTE = {
-  'thoi-trang-nam': ['#dbeafe', '#bfdbfe', '#1e40af'],
-  'thoi-trang-nu': ['#fce7f3', '#fbcfe8', '#9d174d'],
-  'dien-thoai': ['#e0e7ff', '#c7d2fe', '#3730a3'],
-  'may-tinh': ['#e2e8f0', '#cbd5e1', '#334155'],
-  'thiet-bi-gia-dung': ['#cffafe', '#a5f3fc', '#155e75'],
-  'sac-dep': ['#ffe4e6', '#fecdd3', '#9f1239'],
-  'nha-cua': ['#dcfce7', '#bbf7d0', '#166534'],
-  'me-be': ['#fef3c7', '#fde68a', '#92400e'],
-  'bach-hoa': ['#ecfccb', '#d9f99d', '#3f6212'],
-  'the-thao': ['#ffedd5', '#fed7aa', '#9a3412'],
-  'o-to-xe-may': ['#e5e7eb', '#d1d5db', '#374151'],
-  'may-anh': ['#ede9fe', '#ddd6fe', '#5b21b6'],
-}
-
-const DEFAULT_PALETTE = ['#eef2f7', '#dde5ee', '#334155']
-
 function esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function toDataUri(svg) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-}
-
-/**
- * Ảnh sản phẩm: nền gradient pastel + emoji lớn + nhãn nhỏ.
- */
-export function productImage({ emoji = '🛍️', name = '', categoryId = '', tone = 0, watermark = 'SHOPNOVA' } = {}) {
-  const [c1, c2, ink] = CATEGORY_PALETTE[categoryId] || DEFAULT_PALETTE
-  const shift = (tone % 4) * 22
-  const label = esc(name.length > 30 ? name.slice(0, 30) + '…' : name)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${c1}"/>
-      <stop offset="100%" stop-color="${c2}"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="42%" r="52%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="480" height="480" fill="url(#bg)"/>
-  <circle cx="150" cy="120" r="120" fill="#ffffff" opacity="0.35"/>
-  <circle cx="380" cy="390" r="150" fill="#ffffff" opacity="0.25"/>
-  <circle cx="240" cy="215" r="132" fill="url(#glow)"/>
-  <ellipse cx="240" cy="372" rx="120" ry="18" fill="${ink}" opacity="0.12"/>
-  <text x="240" y="268" font-size="164" text-anchor="middle" dominant-baseline="middle">${emoji}</text>
-  <text x="240" y="416" font-size="21" font-family="Segoe UI, Arial" font-weight="700" text-anchor="middle" fill="${ink}" opacity="0.55">${label}</text>
-  <text x="240" y="446" font-size="15" font-family="Segoe UI, Arial" font-weight="600" text-anchor="middle" fill="${ink}" opacity="0.32" letter-spacing="2">${esc(
-    watermark,
-  )}</text>
-</svg>`
-  return toDataUri(svg)
 }
 
 /** Avatar shop: nền gradient + chữ cái đầu / emoji */
@@ -84,21 +32,36 @@ export function shopAvatar({ name = 'Shop', emoji = '🏬', hue = 12 } = {}) {
 }
 
 /** Ảnh danh mục (vòng tròn) */
-export function categoryImage({ emoji = '📦', hue = 200 } = {}) {
-  const c1 = `hsl(${hue} 92% 96%)`
-  const c2 = `hsl(${hue} 86% 84%)`
+export function categoryImage({ emoji = '', hue, name = '', slug = '' } = {}) {
+  const category = `${name} ${slug}`.toLowerCase()
+  const categoryStyles = [
+    { match: /thoi-trang-nu|thời trang nữ|my-pham|mỹ phẩm|sắc đẹp/, emoji: '👗', hue: 338 },
+    { match: /thoi-trang|thời trang|quần áo/, emoji: '👕', hue: 18 },
+    { match: /giay|giày|dep|dép/, emoji: '👟', hue: 28 },
+    { match: /tui|túi|balo|vali/, emoji: '👜', hue: 292 },
+    { match: /dien-thoai|điện thoại|phu-kien-cong-nghe|công nghệ|may-tinh|máy tính/, emoji: '📱', hue: 210 },
+    { match: /nha-cua|nhà cửa|gia-dung|gia dụng|bếp/, emoji: '🏠', hue: 142 },
+    { match: /the-thao|thể thao|du-lich|du lịch/, emoji: '⚽', hue: 116 },
+    { match: /me-be|mẹ bé|trẻ em/, emoji: '🧸', hue: 42 },
+    { match: /thuc-pham|thực phẩm|đồ ăn|đồ uống/, emoji: '🥗', hue: 82 },
+  ]
+  const style = categoryStyles.find(({ match }) => match.test(category))
+  const categoryEmoji = emoji || style?.emoji || '📦'
+  const categoryHue = hue ?? style?.hue ?? 200
+  const c1 = `hsl(${categoryHue} 92% 96%)`
+  const c2 = `hsl(${categoryHue} 86% 84%)`
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
   <rect width="160" height="160" fill="#ffffff"/>
   <circle cx="80" cy="80" r="78" fill="${c1}"/>
   <circle cx="80" cy="80" r="52" fill="#ffffff" opacity="0.75"/>
-  <text x="80" y="104" font-size="62" text-anchor="middle">${emoji}</text>
+  <text x="80" y="104" font-size="62" text-anchor="middle">${categoryEmoji}</text>
   <circle cx="120" cy="52" r="16" fill="${c2}"/>
 </svg>`
   return toDataUri(svg)
 }
 
 /** Ảnh banner (dùng cho hero slider) */
-export function bannerImage({ title = '', subtitle = '', emojis = '🛍️', from = '#ee4d2d', to = '#ff9d5c' } = {}) {
+export function bannerImage({ title = '', subtitle = '', emojis = '🛍️', from = '#BD6E49', to = '#80513B' } = {}) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="400" viewBox="0 0 900 400">
   <defs>
     <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
@@ -116,4 +79,35 @@ export function bannerImage({ title = '', subtitle = '', emojis = '🛍️', fro
   )}</text>
 </svg>`
   return toDataUri(svg)
+}
+
+/** Ảnh sản phẩm dự phòng phong cách Nova Shop (Terracotta & Cream) */
+export function productPlaceholder({ name = 'Sản phẩm Nova Shop', emoji = '📦' } = {}) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <defs>
+    <linearGradient id="p" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FBF3E8"/>
+      <stop offset="100%" stop-color="#F5E7D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="300" fill="url(#p)" rx="16"/>
+  <rect x="10" y="10" width="280" height="280" fill="none" stroke="#E6D5C2" stroke-width="2" stroke-dasharray="6,6" rx="12"/>
+  <circle cx="150" cy="130" r="54" fill="#FFFCF7" stroke="#E6D5C2" stroke-width="1.5"/>
+  <text x="150" y="152" font-size="52" text-anchor="middle">${emoji}</text>
+  <text x="150" y="215" font-size="13" font-family="'Segoe UI', Arial, sans-serif" font-weight="bold" fill="#80513B" text-anchor="middle">NOVA SHOP</text>
+  <text x="150" y="235" font-size="11" font-family="'Segoe UI', Arial, sans-serif" fill="#8B7566" text-anchor="middle">${esc(name.slice(0, 32))}</text>
+</svg>`
+  return toDataUri(svg)
+}
+
+/** Chuyển đổi an toàn đường dẫn ảnh (uploads / relative / external) */
+export function resolveImageUrl(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return null
+  const trimmed = url.trim()
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  if (trimmed.startsWith('/')) {
+    return `http://localhost:3000${trimmed}`
+  }
+  return trimmed
 }

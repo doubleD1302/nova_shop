@@ -64,7 +64,7 @@ export default function OrderCard({ order, role = 'buyer', actions = null }) {
               <Link to={`/san-pham/${item.slug}`} className="shrink-0">
                 <SmartImage
                   src={item.image}
-                  fallback={item.image}
+                  fallback={item.imageFallback || item.image}
                   alt={item.name}
                   className="h-[72px] w-[72px] rounded-sm border border-line object-cover"
                 />
