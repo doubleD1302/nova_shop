@@ -80,19 +80,35 @@ class _OtpScreenState extends State<OtpScreen> {
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0EC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border, width: 0.8),
             ),
             child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'ShopNova',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+          RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Nova',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Shop',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -128,7 +144,7 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -164,8 +180,8 @@ class _OtpScreenState extends State<OtpScreen> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: const Color(0xFFEEEEF0), borderRadius: BorderRadius.circular(10)),
-            child: const Text('Bước 2/2', style: TextStyle(color: Color(0xFF555770), fontSize: 11, fontWeight: FontWeight.bold)),
+            decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(10)),
+            child: const Text('Bước 2/2', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -183,10 +199,11 @@ class _OtpScreenState extends State<OtpScreen> {
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF0EC),
+                color: AppColors.surfaceAlt,
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
                 boxShadow: [
-                  BoxShadow(color: AppColors.primary.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4)),
+                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4)),
                 ],
               ),
               child: const Icon(Icons.phonelink_lock_rounded, color: AppColors.primary, size: 32),
@@ -378,13 +395,13 @@ class _OtpScreenState extends State<OtpScreen> {
       decoration: BoxDecoration(
         gradient: canSubmit
             ? const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
               )
             : null,
         borderRadius: BorderRadius.circular(12),
         boxShadow: canSubmit
             ? [
-                BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3)),
+                BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
               ]
             : null,
       ),

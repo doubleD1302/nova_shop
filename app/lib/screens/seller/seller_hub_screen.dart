@@ -5,6 +5,7 @@ import '../../services/api_client.dart';
 import '../../services/seller_order_service.dart';
 import '../../services/seller_product_service.dart';
 import 'seller_register_screen.dart';
+import '../../theme/app_colors.dart';
 
 /// Màn hình Kênh Người Bán / Seller Hub (Kết nối trực tiếp Backend API)
 class SellerHubScreen extends StatefulWidget {
@@ -15,7 +16,7 @@ class SellerHubScreen extends StatefulWidget {
 }
 
 class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProviderStateMixin {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   late TabController _tabController;
 
   final SellerOrderService _orderService = SellerOrderService();
@@ -198,7 +199,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       height: 50,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                          colors: [AppColors.primary, AppColors.earth],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -331,17 +332,17 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                   width: 90,
                   height: 90,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0EC),
+                    color: AppColors.surfaceAlt,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFEE4D2D).withValues(alpha: 0.15),
+                        color: AppColors.primary.withValues(alpha: 0.15),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.storefront_rounded, color: Color(0xFFEE4D2D), size: 48),
+                  child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 48),
                 ),
                 const SizedBox(height: 20),
                 const Text(
@@ -373,7 +374,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEE4D2D),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
@@ -396,9 +397,9 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
@@ -410,10 +411,10 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
             Container(
               padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF0EC),
+                color: AppColors.surfaceAlt,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.storefront_rounded, color: Color(0xFFEE4D2D), size: 18),
+              child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 18),
             ),
             const SizedBox(width: 8),
             const Text('Kênh Người Bán ShopNova', style: TextStyle(color: Color(0xFF1E2022), fontWeight: FontWeight.w700, fontSize: 16)),
@@ -464,7 +465,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
 
   Widget _buildDashboardTab() {
     if (_isLoadingDashboard) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     final revenue = (_dashboard['revenue'] as num?) ?? 0;
@@ -483,7 +484,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -548,8 +549,8 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                   ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Color(0xFFFFF0EC), shape: BoxShape.circle),
-                      child: const Icon(Icons.add_box_outlined, color: Color(0xFFEE4D2D), size: 20),
+                      decoration: const BoxDecoration(color: AppColors.surfaceAlt, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_box_outlined, color: AppColors.primary, size: 20),
                     ),
                     title: const Text('Đăng bán sản phẩm mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
                     subtitle: const Text('Tải ảnh và cấu hình biến thể sản phẩm', style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
@@ -633,7 +634,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
         ),
         Expanded(
           child: _isLoadingOrders
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)))
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
               : _orders.isEmpty
                   ? Center(
                       child: Column(
@@ -670,7 +671,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
-        selectedColor: const Color(0xFFFFF0EC),
+        selectedColor: AppColors.surfaceAlt,
         backgroundColor: const Color(0xFFF7F7F8),
         side: BorderSide(color: isSelected ? primaryColor : const Color(0xFFE2E2E6)),
         labelStyle: TextStyle(
@@ -820,7 +821,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
 
   Widget _buildProductsTab() {
     return _isLoadingProducts
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)))
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
         : _products.isEmpty
             ? Center(
                 child: Column(

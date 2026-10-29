@@ -359,7 +359,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFFEE4D2D),
+                                  color: AppColors.primary,
                                   borderRadius: BorderRadius.all(Radius.circular(10)),
                                 ),
                                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
@@ -401,8 +401,8 @@ class _SearchScreenState extends State<SearchScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: const BoxDecoration(
-        color: Color(0xFFFFF7F5),
-        border: Border(bottom: BorderSide(color: Color(0xFFFFDDD4))),
+        color: AppColors.surfaceAlt,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -410,7 +410,7 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -461,16 +461,16 @@ class _SearchScreenState extends State<SearchScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFDDD4)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.close_rounded, size: 14, color: Color(0xFFEE4D2D)),
+                    Icon(Icons.close_rounded, size: 14, color: AppColors.primary),
                     SizedBox(width: 2),
                     Text(
                       'Bỏ lọc',
-                      style: TextStyle(fontSize: 11, color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -533,10 +533,10 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF0EC) : const Color(0xFFF8F9FA),
+          color: isSelected ? AppColors.surfaceAlt : const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFEEEEF0),
+            color: isSelected ? AppColors.primary : AppColors.border,
             width: isSelected ? 1.2 : 1.0,
           ),
         ),
@@ -546,7 +546,7 @@ class _SearchScreenState extends State<SearchScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFF1E2022),
+            color: isSelected ? AppColors.primary : AppColors.textPrimary,
           ),
         ),
       ),
@@ -599,7 +599,7 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Color(0xFFEE4D2D)),
+          CircularProgressIndicator(color: AppColors.primary),
           SizedBox(height: 16),
           Text(
             'Đang tìm kiếm sản phẩm liên quan...',
@@ -616,7 +616,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFFEE4D2D),
+      color: AppColors.primary,
       onRefresh: () => _performSearch(_currentQuery),
       child: CustomScrollView(
         slivers: [
@@ -702,7 +702,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 const TextSpan(text: 'Tìm thấy '),
                 TextSpan(
                   text: '${_products.length}',
-                  style: const TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
                 ),
                 TextSpan(
                   text: _currentQuery.isNotEmpty
@@ -735,10 +735,10 @@ class _SearchScreenState extends State<SearchScreen> {
             width: 80,
             height: 80,
             decoration: const BoxDecoration(
-              color: Color(0xFFFFF0EC),
+              color: AppColors.surfaceAlt,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.search_off_rounded, size: 40, color: Color(0xFFEE4D2D)),
+            child: const Icon(Icons.search_off_rounded, size: 40, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
             Text(
@@ -854,7 +854,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
           const Row(
             children: [
-              Icon(Icons.local_fire_department_rounded, color: Color(0xFFEE4D2D), size: 18),
+              Icon(Icons.local_fire_department_rounded, color: AppColors.primary, size: 18),
               SizedBox(width: 6),
               Text(
                 'Từ khóa xu hướng & hot nhất hôm nay',

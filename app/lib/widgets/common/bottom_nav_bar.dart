@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class ShopNovaBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -14,8 +15,9 @@ class ShopNovaBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: const Color(0xFFEE4D2D),
-      unselectedItemColor: Colors.grey,
+      backgroundColor: AppColors.surface,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.bottomNavInactive,
       selectedFontSize: 11,
       unselectedFontSize: 11,
       currentIndex: currentIndex,

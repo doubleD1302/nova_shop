@@ -16,7 +16,7 @@ class BannerItem {
   });
 
   factory BannerItem.fromJson(Map<String, dynamic> json) {
-    Color bg = const Color(0xFFEE4D2D);
+    Color bg = const Color(0xFFBD6E49);
     final colorHex = json['backgroundColor']?.toString();
     if (colorHex != null && colorHex.startsWith('#')) {
       final hex = colorHex.replaceFirst('#', '');

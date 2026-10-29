@@ -5,6 +5,7 @@ import '../../services/order_service.dart';
 import '../cart/cart_screen.dart';
 import '../orders/orders_screen.dart';
 import '../search/search_screen.dart';
+import '../../theme/app_colors.dart';
 
 /// Screen Nova AI Copilot - Trợ lý mua sắm và theo dõi đơn hàng thông minh
 class NovaAIScreen extends StatefulWidget {
@@ -22,11 +23,11 @@ class NovaAIScreen extends StatefulWidget {
 }
 
 class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMixin {
-  // Theme Color Tokens (Chuẩn theo thiết kế ShopNova Brand)
-  static const Color colorPrimary = Color(0xFFEE4D2D);
-  static const Color colorPrimaryContainer = Color(0xFFD73211);
-  static const Color colorPrimaryFixed = Color(0xFFFFE8E2);
-  static const Color colorOnPrimaryFixed = Color(0xFF3E0500);
+  // Theme Color Tokens (Chuẩn theo thiết kế ShopNova Brand Terracotta & Cream)
+  static const Color colorPrimary = AppColors.primary;
+  static const Color colorPrimaryContainer = AppColors.earth;
+  static const Color colorPrimaryFixed = AppColors.surfaceAlt;
+  static const Color colorOnPrimaryFixed = AppColors.textPrimary;
 
   static const Color colorSecondary = Color(0xFF515F7A);
   static const Color colorSecondaryContainer = Color(0xFFE8EEF8);
@@ -887,7 +888,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: Color(0x33EE4D2D), blurRadius: 8, offset: Offset(0, 2)),
+                          BoxShadow(color: Color(0x33BD6E49), blurRadius: 8, offset: Offset(0, 2)),
                         ],
                       ),
                       child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
@@ -1081,7 +1082,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   topRight: Radius.circular(4),
                 ),
                 boxShadow: [
-                  BoxShadow(color: Color(0x22EE4D2D), blurRadius: 6, offset: Offset(0, 2)),
+                  BoxShadow(color: Color(0x22BD6E49), blurRadius: 6, offset: Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -1948,7 +1949,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                       color: colorPrimary,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: Color(0x33EE4D2D), blurRadius: 4, offset: Offset(0, 2)),
+                        BoxShadow(color: Color(0x33BD6E49), blurRadius: 4, offset: Offset(0, 2)),
                       ],
                     ),
                     child: const Icon(Icons.arrow_upward, color: Colors.white, size: 19),

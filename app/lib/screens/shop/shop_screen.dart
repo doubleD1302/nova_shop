@@ -10,6 +10,7 @@ import '../product_detail/product_detail_screen.dart';
 import 'shop_detail_screen.dart';
 import '../seller/seller_register_screen.dart';
 import '../seller/seller_hub_screen.dart';
+import '../../theme/app_colors.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -19,7 +20,7 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final CatalogService _catalogService = CatalogService();
   final ShopService _shopService = ShopService();
 
@@ -186,9 +187,9 @@ class _ShopScreenState extends State<ShopScreen> {
     final filteredShops = _getFilteredShops();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
@@ -201,15 +202,36 @@ class _ShopScreenState extends State<ShopScreen> {
               Container(
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                 ),
-                child: const Icon(Icons.storefront_rounded, color: Color(0xFFEE4D2D), size: 18),
+                child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 6),
-              const Text(
-                'ShopNova',
-                style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.5),
+              RichText(
+                text: const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Nova',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Shop',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -218,23 +240,23 @@ class _ShopScreenState extends State<ShopScreen> {
           height: 38,
           margin: const EdgeInsets.only(right: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F7),
+            color: AppColors.surfaceAlt,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E2E6)),
+            border: Border.all(color: AppColors.border),
           ),
           child: TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
-            style: const TextStyle(fontSize: 13, color: Color(0xFF1E2022)),
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Tìm gian hàng, thương hiệu...',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6), overflow: TextOverflow.ellipsis),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF8F90A6)),
+              hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSecondary, overflow: TextOverflow.ellipsis),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
               prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 16, color: Color(0xFF8F90A6)),
+                      icon: const Icon(Icons.clear_rounded, size: 16, color: AppColors.textSecondary),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onPressed: () {
@@ -253,7 +275,7 @@ class _ShopScreenState extends State<ShopScreen> {
             tooltip: AuthService().currentUser?.role == 'seller' ? 'Kênh người bán' : 'Mở shop bán hàng',
             icon: Icon(
               AuthService().currentUser?.role == 'seller' ? Icons.store_mall_directory_rounded : Icons.add_business_outlined,
-              color: const Color(0xFFEE4D2D),
+              color: AppColors.primary,
               size: 22,
             ),
             onPressed: () {
@@ -288,7 +310,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         right: 4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: const BoxDecoration(color: Color(0xFFEE4D2D), shape: BoxShape.circle),
+                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                           constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           child: Center(
                             child: Text(
@@ -316,7 +338,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 child: Row(
                   children: [
                     _buildFilterChip('Nova Mall', Icons.stars_rounded, const Color(0xFFD0011B)),
-                    _buildFilterChip('Yêu Thích+', Icons.favorite_rounded, const Color(0xFFFF5224)),
+                    _buildFilterChip('Yêu Thích+', Icons.favorite_rounded, AppColors.primary),
                     _buildFilterChip('Giao 2H', Icons.bolt_rounded, const Color(0xFF00BFA5)),
                     _buildFilterChip('Đánh giá 4*+', Icons.star_rounded, const Color(0xFFFFB800)),
                   ],
@@ -420,7 +442,7 @@ class _ShopScreenState extends State<ShopScreen> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFFFF0EC) : Colors.white,
+          color: isActive ? AppColors.surfaceAlt : Colors.white,
           border: Border.all(
             color: isActive ? primaryColor : const Color(0xFFE2E2E6),
             width: isActive ? 1.5 : 1,
@@ -485,13 +507,13 @@ class _ShopScreenState extends State<ShopScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+          colors: [AppColors.primary, AppColors.earth],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: primaryColor.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: primaryColor.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -554,9 +576,9 @@ class _ShopScreenState extends State<ShopScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEF0)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(color: Color(0x04000000), blurRadius: 6, offset: Offset(0, 2)),
         ],
@@ -569,25 +591,25 @@ class _ShopScreenState extends State<ShopScreen> {
               Container(
                 padding: const EdgeInsets.all(5),
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)]),
+                  gradient: LinearGradient(colors: [AppColors.primary, AppColors.earth]),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
               ),
               const SizedBox(width: 8),
-              const Text('Nova AI • Gợi Ý Gian Hàng Cho Bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
+              const Text('Nova AI • Gợi Ý Gian Hàng Cho Bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(4)),
-                child: const Text('ĐỀ XUẤT', style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 9, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(4)),
+                child: const Text('ĐỀ XUẤT', style: TextStyle(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
           const SizedBox(height: 6),
           const Text(
             'Dựa vào sản phẩm bạn vừa xem, Nova AI đề xuất các gian hàng chính hãng giao hỏa tốc 2H uy tín nhất.',
-            style: TextStyle(color: Color(0xFF8F90A6), fontSize: 11, height: 1.3),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 11, height: 1.3),
           ),
         ],
       ),
@@ -615,11 +637,11 @@ class _ShopScreenState extends State<ShopScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFEE4D2D).withOpacity(0.15),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFEE4D2D).withOpacity(0.4)),
+              border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.storefront_rounded, color: Color(0xFFFF7A45), size: 26),
+            child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 26),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -636,7 +658,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEE4D2D),
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -668,7 +690,7 @@ class _ShopScreenState extends State<ShopScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEE4D2D),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: Size.zero,
@@ -825,21 +847,21 @@ class _ShopScreenState extends State<ShopScreen> {
               borderRadius: BorderRadius.circular(6),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(6)),
+                decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(6)),
                 child: Row(
                   children: [
-                    const Icon(Icons.local_activity_rounded, color: Color(0xFFEE4D2D), size: 14),
+                    const Icon(Icons.local_activity_rounded, color: AppColors.primary, size: 14),
                     const SizedBox(width: 6),
                     const Expanded(
                       child: Text(
                         'Voucher: Giảm 50.000đ cho đơn hàng từ 300k',
-                        style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 11, fontWeight: FontWeight.w500),
+                        style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w500),
                       ),
                     ),
                     Text(
                       isVoucherSaved ? 'Đã lưu' : 'Lưu mã',
                       style: TextStyle(
-                        color: isVoucherSaved ? const Color(0xFF00BFA5) : const Color(0xFFEE4D2D),
+                        color: isVoucherSaved ? const Color(0xFF00BFA5) : AppColors.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
                       ),

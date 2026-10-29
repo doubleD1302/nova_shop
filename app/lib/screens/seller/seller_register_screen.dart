@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import 'seller_hub_screen.dart';
+import '../../theme/app_colors.dart';
 
 /// Màn hình Đăng Ký Đối Tác Bán Hàng / Mở Gian Hàng ShopNova
 /// Kết nối trực tiếp Backend API:
@@ -204,7 +205,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified_rounded, color: Color(0xFFEE4D2D), size: 18),
+                  Icon(Icons.verified_rounded, color: AppColors.primary, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -228,7 +229,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEE4D2D),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -255,18 +256,18 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     final isLoggedIn = user != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F8),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'Đăng Ký Đối Tác Bán Hàng',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         elevation: 0,
-        backgroundColor: const Color(0xFFEE4D2D),
+        backgroundColor: AppColors.primary,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+              colors: [AppColors.primary, AppColors.earth],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
@@ -282,7 +283,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                  colors: [AppColors.primary, AppColors.earth],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -382,7 +383,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                       Expanded(
                         child: _buildPerkCard(
                           icon: Icons.flash_on_rounded,
-                          color: const Color(0xFFEE4D2D),
+                          color: AppColors.primary,
                           title: 'Khung Giờ Flash',
                           desc: 'Ưu tiên đẩy sản phẩm vào khung giờ chớp nhoáng',
                         ),
@@ -422,7 +423,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                             width: 4,
                             height: 18,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEE4D2D),
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -445,15 +446,15 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF0EC),
+                            color: AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFFD4C8)),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             children: [
                               const CircleAvatar(
                                 radius: 16,
-                                backgroundColor: Color(0xFFEE4D2D),
+                                backgroundColor: AppColors.primary,
                                 child: Icon(Icons.person, color: Colors.white, size: 18),
                               ),
                               const SizedBox(width: 10),
@@ -537,10 +538,10 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                               duration: const Duration(milliseconds: 180),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                               decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFFFF0EC) : const Color(0xFFF7F7F8),
+                                color: isSelected ? AppColors.surfaceAlt : const Color(0xFFF7F7F8),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFE2E2E6),
+                                  color: isSelected ? AppColors.primary : const Color(0xFFE2E2E6),
                                   width: isSelected ? 1.5 : 1.0,
                                 ),
                               ),
@@ -554,7 +555,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                      color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFF333333),
+                                      color: isSelected ? AppColors.primary : const Color(0xFF333333),
                                     ),
                                   ),
                                 ],
@@ -651,7 +652,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                               },
                               child: const Text(
                                 'Đăng nhập ngay',
-                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D)),
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primary),
                               ),
                             ),
                           ],
@@ -669,7 +670,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                             height: 24,
                             child: Checkbox(
                               value: _agreeTerms,
-                              activeColor: const Color(0xFFEE4D2D),
+                              activeColor: AppColors.primary,
                               onChanged: (val) => setState(() => _agreeTerms = val ?? false),
                             ),
                           ),
@@ -691,14 +692,14 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                         height: 50,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                            colors: [AppColors.primary, AppColors.earth],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           ),
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFEE4D2D).withValues(alpha: 0.35),
+                              color: AppColors.primary.withValues(alpha: 0.35),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -773,7 +774,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFEE4D2D), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
   }

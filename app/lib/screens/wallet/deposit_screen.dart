@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../theme/app_colors.dart';
 
 class DepositScreen extends StatefulWidget {
   const DepositScreen({super.key});
@@ -10,7 +11,7 @@ class DepositScreen extends StatefulWidget {
 }
 
 class _DepositScreenState extends State<DepositScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   bool _isBalanceVisible = true;
   final String _realBalance = "350.000";
   
@@ -216,7 +217,7 @@ class _DepositScreenState extends State<DepositScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [Color(0xFFEE4D2D), Color(0xFFD63C1E), Color(0xFFFF5722)],
+          colors: [AppColors.primary, AppColors.earth, AppColors.primaryDark],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -644,10 +645,10 @@ class _DepositScreenState extends State<DepositScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF7F5) : Colors.white,
+          color: isSelected ? AppColors.surfaceAlt.withValues(alpha: 0.5) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? primaryColor : const Color(0xFFEEEEF0),
+            color: isSelected ? primaryColor : AppColors.border,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -777,7 +778,7 @@ class _DepositScreenState extends State<DepositScreen> {
                   decoration: BoxDecoration(
                     gradient: _selectedAmount > 0
                         ? const LinearGradient(
-                            colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                            colors: [AppColors.primary, AppColors.earth],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           )
@@ -839,7 +840,7 @@ class _DepositScreenState extends State<DepositScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.info_outline, color: Color(0xFFEE4D2D)),
+            Icon(Icons.info_outline, color: AppColors.primary),
             SizedBox(width: 8),
             Text('Chưa Có API Kết Nối', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],

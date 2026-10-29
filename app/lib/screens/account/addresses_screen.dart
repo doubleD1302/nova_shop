@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/address.dart';
 import '../../services/address_service.dart';
+import '../../theme/app_colors.dart';
 
 /// Màn hình Quản Lý Sổ Địa Chỉ Nhận Hàng (Kết nối trực tiếp Backend API)
 class AddressesScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class AddressesScreen extends StatefulWidget {
 }
 
 class _AddressesScreenState extends State<AddressesScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final AddressService _addressService = AddressService();
 
   List<Address> _addresses = [];
@@ -201,7 +202,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                       height: 50,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                          colors: [AppColors.primary, AppColors.earth],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -265,14 +266,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+          child: Container(color: AppColors.border, height: 1),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
@@ -284,7 +285,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : _addresses.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
@@ -303,7 +304,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           boxShadow: [
             BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, -3)),
           ],
@@ -312,7 +313,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
           child: Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
               ),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
@@ -399,7 +400,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0EC),
+                      color: AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(

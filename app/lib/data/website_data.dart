@@ -396,7 +396,7 @@ class WebsiteData {
       location: 'Hà Nội',
       tagline: 'Chảo, nồi và dụng cụ nhà bếp cao cấp',
       emoji: '🍳',
-      primaryColor: Color(0xFFFF5722),
+      primaryColor: Color(0xFFBD6E49),
     ),
     WebsiteShop(
       id: 'green-living-vn',

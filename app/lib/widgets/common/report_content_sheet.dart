@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../screens/auth/login_screen.dart';
+import '../../theme/app_colors.dart';
 
 class ReportReasonOption {
   final String id;
@@ -205,10 +206,10 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEE4D2D).withValues(alpha: 0.1),
+                    color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.shield_outlined, color: Color(0xFFEE4D2D), size: 22),
+                  child: const Icon(Icons.shield_outlined, color: AppColors.primary, size: 22),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -285,9 +286,9 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFFFF0EC) : Colors.white,
+                    color: isSelected ? AppColors.surfaceAlt : Colors.white,
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFE0E0E0),
+                      color: isSelected ? AppColors.primary : AppColors.border,
                       width: isSelected ? 1.5 : 1,
                     ),
                     borderRadius: BorderRadius.circular(10),
@@ -297,7 +298,7 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
                       Icon(
                         opt.icon,
                         size: 20,
-                        color: isSelected ? const Color(0xFFEE4D2D) : Colors.grey,
+                        color: isSelected ? AppColors.primary : Colors.grey,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -309,7 +310,7 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFF222222),
+                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -323,7 +324,7 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
                       Radio<String>(
                         value: opt.id,
                         groupValue: _selectedReason,
-                        activeColor: const Color(0xFFEE4D2D),
+                        activeColor: AppColors.primary,
                         onChanged: (v) {
                           if (v != null) setState(() => _selectedReason = v);
                         },
@@ -375,7 +376,7 @@ class _ReportContentSheetState extends State<ReportContentSheet> {
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitReport,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEE4D2D),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -117,7 +117,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFEE4D2D), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
   }
@@ -246,7 +246,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0EC),
+                    color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -272,12 +272,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                      colors: [AppColors.primary, AppColors.earth],
                     ),
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withOpacity(0.3),
+                        color: primaryColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -370,7 +370,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             height: 3.5,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFF00BFA5), Color(0xFFEE4D2D), Color(0xFF28293D)],
+                colors: [AppColors.primary, AppColors.earth, AppColors.primary, AppColors.textPrimary],
               ),
             ),
           ),
@@ -414,10 +414,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.location_on_rounded, color: Color(0xFFEE4D2D), size: 20),
+                child: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 8),
               const Text(
@@ -439,7 +439,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0EC),
+                    color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(
@@ -620,7 +620,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFEE4D2D)),
+                borderSide: const BorderSide(color: AppColors.primary),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
@@ -650,10 +650,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.payment_rounded, color: Color(0xFFEE4D2D), size: 20),
+                child: const Icon(Icons.payment_rounded, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 8),
               const Text('Phương Thức Thanh Toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E2022))),
@@ -673,10 +673,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFFFF7F4) : Colors.white,
+        color: isSelected ? AppColors.surfaceAlt.withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFEEEEF0),
+          color: isSelected ? AppColors.primary : AppColors.border,
           width: isSelected ? 1.5 : 1,
         ),
       ),
@@ -744,10 +744,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFFEE4D2D), size: 20),
+                child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 8),
               const Text('Chi Tiết Thanh Toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E2022))),
@@ -850,12 +850,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                    colors: [AppColors.primary, AppColors.earth],
                   ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: primaryColor.withOpacity(0.3),
+                      color: primaryColor.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),

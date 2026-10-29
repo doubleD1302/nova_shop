@@ -12,6 +12,7 @@ import 'package:shopnova/screens/shop/shop_screen.dart';
 import 'package:shopnova/screens/shop/shop_detail_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
 import 'package:shopnova/widgets/common/report_content_sheet.dart';
+import 'package:shopnova/theme/app_colors.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String? productId;
@@ -24,7 +25,7 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final CatalogService _catalogService = CatalogService();
   final FavoriteService _favoriteService = FavoriteService();
   final ReviewService _reviewService = ReviewService();
@@ -408,22 +409,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Container(
             width: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFFFF0EC), Color(0xFFFFE8E0)],
-              ),
+              color: AppColors.surfaceAlt,
               border: Border(
-                top: BorderSide(color: Color(0xFFFFDDD4), width: 0.8),
-                bottom: BorderSide(color: Color(0xFFFFDDD4), width: 0.8),
+                top: BorderSide(color: AppColors.border, width: 0.8),
+                bottom: BorderSide(color: AppColors.border, width: 0.8),
               ),
             ),
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
             child: const Row(
               children: [
-                Icon(Icons.verified_outlined, size: 15, color: Color(0xFFEE4D2D)),
+                Icon(Icons.verified_outlined, size: 15, color: AppColors.primary),
                 SizedBox(width: 6),
                 Text(
                   'HÀNG CHÍNH HÃNG 100% • ĐỔI TRẢ MIỄN PHÍ 15 NGÀY',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D), letterSpacing: 0.2),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 0.2),
                 ),
               ],
             ),
@@ -456,9 +455,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A000000),
@@ -475,10 +474,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEE4D2D).withValues(alpha: 0.1),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                 ),
-                child: const Icon(Icons.verified_user_outlined, color: Color(0xFFEE4D2D), size: 22),
+                child: const Icon(Icons.verified_user_outlined, color: AppColors.primary, size: 22),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -487,12 +487,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   children: [
                     Text(
                       'Bảo vệ người mua hàng NovaShop',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                     SizedBox(height: 2),
                     Text(
                       'Hoàn tiền 100% nếu phát hiện hàng giả, hàng nhái',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -502,20 +502,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 10),
           const Text(
             'Nếu phát hiện sản phẩm có dấu hiệu hàng giả, hàng nhái hoặc vi phạm chính sách của sàn, hãy gửi báo cáo để Ban Quản Trị xác minh và xử lý ngay.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.4),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.flag_outlined, size: 16, color: Color(0xFFEE4D2D)),
+              icon: const Icon(Icons.flag_outlined, size: 16, color: AppColors.primary),
               label: const Text(
                 'Báo cáo sản phẩm vi phạm / hàng giả',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFEE4D2D)),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFFFCCBD)),
-                backgroundColor: const Color(0xFFFFF9F8),
+                side: const BorderSide(color: AppColors.border),
+                backgroundColor: AppColors.surfaceAlt,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
@@ -560,9 +560,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         loadingBuilder: (context, child, progress) {
                           if (progress == null) return child;
                           return Container(
-                            color: const Color(0xFFFFF5F2),
+                            color: AppColors.surfaceAlt,
                             child: const Center(
-                              child: CircularProgressIndicator(color: Color(0xFFEE4D2D)),
+                              child: CircularProgressIndicator(color: AppColors.primary),
                             ),
                           );
                         },
@@ -572,7 +572,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                       )
                     : const Center(
-                        child: CircularProgressIndicator(color: Color(0xFFEE4D2D)),
+                        child: CircularProgressIndicator(color: AppColors.primary),
                       ),
               ),
             ),
@@ -633,7 +633,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF7337)],
+          colors: [AppColors.flashSaleRed, AppColors.primary],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
@@ -1237,9 +1237,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_shopping_cart_rounded, size: 20, color: Color(0xFFEE4D2D)),
+                      Icon(Icons.add_shopping_cart_rounded, size: 20, color: AppColors.primary),
                       SizedBox(height: 2),
-                      Text('Thêm giỏ', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFFEE4D2D))),
+                      Text('Thêm giỏ', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
                     ],
                   ),
                 ),
@@ -1280,7 +1280,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                        colors: [AppColors.primary, AppColors.earth],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),

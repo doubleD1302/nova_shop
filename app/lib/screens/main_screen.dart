@@ -141,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEE4D2D),
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             constraints: const BoxConstraints(minWidth: 15, minHeight: 15),

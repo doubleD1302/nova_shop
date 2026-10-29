@@ -100,15 +100,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(color: const Color(0xFFEEEEF0), height: 1),
+        child: Container(color: AppColors.border, height: 1),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF1E2022)),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textPrimary),
         onPressed: () => Navigator.maybePop(context),
       ),
       title: Row(
@@ -117,19 +117,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0EC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border, width: 0.8),
             ),
             child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'ShopNova',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+          RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Nova',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Shop',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -137,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF555770), size: 22),
+          icon: const Icon(Icons.help_outline_rounded, color: AppColors.textSecondary, size: 22),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Tổng đài hỗ trợ đăng ký: 1900 1234')),
@@ -152,7 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 32),
@@ -181,7 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: const [
               Text(
                 'Tạo tài khoản mới ',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               ),
               Text('✨', style: TextStyle(fontSize: 20)),
             ],
@@ -189,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 4),
           RichText(
             text: const TextSpan(
-              style: TextStyle(color: Color(0xFF8F90A6), fontSize: 13, height: 1.4),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
               children: [
                 TextSpan(text: 'Đăng ký nhận ngay gói Voucher '),
                 TextSpan(text: '500.000đ ', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
@@ -208,14 +224,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+          colors: [AppColors.primary, AppColors.earth],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
+            color: AppColors.primary.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -301,8 +317,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFFEAEAEE),
+          color: AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 0.8),
         ),
         child: Row(
           children: [
@@ -316,7 +333,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   child: const Center(
-                    child: Text('Đăng Nhập', style: TextStyle(color: Color(0xFF555770), fontWeight: FontWeight.w700, fontSize: 15)),
+                    child: Text('Đăng Nhập', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 15)),
                   ),
                 ),
               ),
@@ -325,8 +342,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                   boxShadow: const [
                     BoxShadow(color: Color(0x0C000000), blurRadius: 4, offset: Offset(0, 1))
                   ],
@@ -364,10 +382,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     String strengthLabel = "Chưa nhập";
-    Color strengthColor = const Color(0xFF8F90A6);
+    Color strengthColor = AppColors.textSecondary;
     if (strength == 1) {
       strengthLabel = "Yếu";
-      strengthColor = const Color(0xFFD0011B);
+      strengthColor = AppColors.flashSaleRed;
     } else if (strength == 2) {
       strengthLabel = "Trung bình";
       strengthColor = Colors.orange;
@@ -380,9 +398,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEEEEF0)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3))
         ],
@@ -390,25 +408,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Họ và tên', style: TextStyle(color: Color(0xFF555770), fontSize: 12, fontWeight: FontWeight.bold)),
+          const Text('Họ và tên', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E2E6)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
-                const Icon(Icons.person_outline_rounded, color: Color(0xFF8F90A6), size: 20),
+                const Icon(Icons.person_outline_rounded, color: AppColors.textSecondary, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _fullNameController,
+                    style: const TextStyle(color: AppColors.textPrimary),
                     decoration: const InputDecoration(
                       hintText: 'Nhập họ và tên của bạn',
-                      hintStyle: TextStyle(color: Color(0xFF8F90A6), fontSize: 13),
+                      hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -418,14 +437,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text('Số điện thoại / Tên đăng nhập', style: TextStyle(color: Color(0xFF555770), fontSize: 12, fontWeight: FontWeight.bold)),
+          const Text('Số điện thoại / Tên đăng nhập', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E2E6)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -596,12 +615,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: AppColors.primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),

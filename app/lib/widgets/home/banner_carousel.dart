@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shopnova/models/banner_item.dart';
 import '../../screens/search/search_screen.dart';
+import '../../theme/app_colors.dart';
 
 class BannerCarousel extends StatefulWidget {
   final List<BannerItem> banners;
@@ -187,7 +188,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                            colors: [AppColors.primary, AppColors.earth],
                           ),
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
@@ -229,7 +230,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 height: 5,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(3),
-                  color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFD6D6D6),
+                  color: isSelected ? AppColors.primary : AppColors.border,
                 ),
               );
             },

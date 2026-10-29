@@ -7,6 +7,7 @@ import '../../services/cart_service.dart';
 import '../../services/shop_service.dart';
 import '../cart/cart_screen.dart';
 import '../product_detail/product_detail_screen.dart';
+import '../../theme/app_colors.dart';
 
 /// Màn hình Chi Tiết Gian Hàng (Kết nối trực tiếp Backend API)
 class ShopDetailScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class ShopDetailScreen extends StatefulWidget {
 }
 
 class _ShopDetailScreenState extends State<ShopDetailScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final ShopService _shopService = ShopService();
 
   Shop? _shop;
@@ -122,14 +123,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     final filtered = _getFilteredProducts();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+          child: Container(color: AppColors.border, height: 1),
         ),
         titleSpacing: 0,
         leading: IconButton(
@@ -193,7 +194,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(2),
                           decoration: const BoxDecoration(
-                            color: Color(0xFFEE4D2D),
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                           constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
@@ -261,7 +262,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               gradient: LinearGradient(
                 colors: isMall
                     ? [const Color(0xFFD0011B), const Color(0xFF8B0000)]
-                    : [const Color(0xFFEE4D2D), const Color(0xFFFF5224)],
+                    : [AppColors.primary, AppColors.earth],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -565,7 +566,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                               const SizedBox(width: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(color: const Color(0xFFFFF0EC), borderRadius: BorderRadius.circular(3)),
+                                decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(3)),
                                 child: Text('-${p.discount}%', style: TextStyle(color: primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
                               ),
                             ],

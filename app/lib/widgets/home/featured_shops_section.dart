@@ -87,7 +87,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
 
   Color _getShopColor(int index) {
     const colors = [
-      Color(0xFFEE4D2D),
+      AppColors.primary,
       Color(0xFF0055AA),
       Color(0xFF2D884D),
       Color(0xFF7A2098),

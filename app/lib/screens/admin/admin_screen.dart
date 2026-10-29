@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_colors.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -170,7 +171,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFEE4D2D)),
+            Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary),
             SizedBox(width: 8),
             Text(
               'Trung Tâm Quản Trị Admin',
@@ -182,9 +183,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         backgroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFFEE4D2D),
+          labelColor: AppColors.primary,
           unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFFEE4D2D),
+          indicatorColor: AppColors.primary,
           indicatorWeight: 3,
           tabs: const [
             Tab(text: 'Báo Cáo Vi Phạm', icon: Icon(Icons.shield_outlined, size: 20)),
@@ -207,7 +208,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   // TAB 1: BÁO CÁO VI PHẠM & HÀNG GIẢ
   Widget _buildReportsTab() {
     if (_isLoadingReports) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     final filtered = _reports.where((r) {
@@ -277,7 +278,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: targetType == 'product' ? const Color(0xFFFFF0EC) : const Color(0xFFE8F5E9),
+                                      color: targetType == 'product' ? AppColors.surfaceAlt : const Color(0xFFE8F5E9),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -285,7 +286,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
-                                        color: targetType == 'product' ? const Color(0xFFEE4D2D) : Colors.green.shade700,
+                                        color: targetType == 'product' ? AppColors.primary : Colors.green.shade700,
                                       ),
                                     ),
                                   ),
@@ -369,7 +370,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   // TAB 2: DUYỆT SẢN PHẨM
   Widget _buildProductsTab() {
     if (_isLoadingProducts) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     final filtered = _products.where((p) {
@@ -447,7 +448,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                     Text(
                                       _currencyFormat.format(price),
                                       style: const TextStyle(
-                                        color: Color(0xFFEE4D2D),
+                                        color: AppColors.primary,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
                                       ),
@@ -502,7 +503,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   // TAB 3: QUẢN LÝ GIAN HÀNG
   Widget _buildShopsTab() {
     if (_isLoadingShops) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     return RefreshIndicator(
@@ -526,10 +527,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: isSuspended ? Colors.red.shade100 : const Color(0xFFEE4D2D).withValues(alpha: 0.1),
+                backgroundColor: isSuspended ? Colors.red.shade100 : AppColors.surfaceAlt,
                 child: Icon(
                   Icons.storefront_rounded,
-                  color: isSuspended ? Colors.red : const Color(0xFFEE4D2D),
+                  color: isSuspended ? Colors.red : AppColors.primary,
                 ),
               ),
               title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -564,9 +565,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         label: Text(label),
         selected: isSelected,
         onSelected: (_) => onSelect(value),
-        selectedColor: const Color(0xFFEE4D2D).withValues(alpha: 0.15),
+        selectedColor: AppColors.surfaceAlt,
         labelStyle: TextStyle(
-          color: isSelected ? const Color(0xFFEE4D2D) : Colors.black87,
+          color: isSelected ? AppColors.primary : Colors.black87,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           fontSize: 12,
         ),

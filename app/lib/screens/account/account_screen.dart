@@ -184,7 +184,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                          colors: [AppColors.primary, AppColors.earth],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -277,7 +277,7 @@ class _AccountScreenState extends State<AccountScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Row(
                 children: [
-                  Icon(Icons.lock_reset_rounded, color: Color(0xFFEE4D2D)),
+                  Icon(Icons.lock_reset_rounded, color: AppColors.primary),
                   SizedBox(width: 8),
                   Text('Đổi mật khẩu', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                 ],
@@ -562,7 +562,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isLoggedIn ? const Color(0xFFFFF0EC) : const Color(0xFFF0F1F5),
+                                color: isLoggedIn ? AppColors.surfaceAlt : const Color(0xFFF0F1F5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -643,7 +643,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                      colors: [AppColors.primary, AppColors.earth],
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -766,15 +766,15 @@ class _AccountScreenState extends State<AccountScreen> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFFFF0EC), Color(0xFFFFE3DB)],
+              colors: [AppColors.surfaceAlt, AppColors.surface],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFFFD1C5)),
+            border: Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFEE4D2D).withValues(alpha: 0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -787,12 +787,12 @@ class _AccountScreenState extends State<AccountScreen> {
                 height: 44,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                    colors: [AppColors.primary, AppColors.earth],
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFEE4D2D).withValues(alpha: 0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -819,7 +819,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: const BoxDecoration(
-                            color: Color(0xFFEE4D2D),
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.all(Radius.circular(4)),
                           ),
                           child: const Text(
@@ -847,7 +847,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEE4D2D),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -877,7 +877,7 @@ class _AccountScreenState extends State<AccountScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.confirmation_number_outlined, color: Color(0xFFEE4D2D)),
+                Icon(Icons.confirmation_number_outlined, color: AppColors.primary),
                 SizedBox(width: 8),
                 Text('Ví Voucher Của Tôi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
               ],
@@ -923,7 +923,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(v['code']!, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D))),
+                      Text(v['code']!, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
                       const SizedBox(height: 2),
                       Text(v['title']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       Text(v['desc']!, style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
@@ -1068,7 +1068,7 @@ class _AccountScreenState extends State<AccountScreen> {
             children: [
               Row(
                 children: const [
-                  Icon(Icons.assignment_outlined, color: Color(0xFFEE4D2D), size: 18),
+                  Icon(Icons.assignment_outlined, color: AppColors.primary, size: 18),
                   SizedBox(width: 6),
                   Text('Đơn Mua Của Tôi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
                 ],
@@ -1118,7 +1118,7 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(11),
-            decoration: const BoxDecoration(color: Color(0xFFFFF0EC), shape: BoxShape.circle),
+            decoration: const BoxDecoration(color: AppColors.surfaceAlt, shape: BoxShape.circle),
             child: Icon(icon, color: primaryColor, size: 22),
           ),
           const SizedBox(height: 6),
@@ -1175,7 +1175,7 @@ class _AccountScreenState extends State<AccountScreen> {
             children: [
               Row(
                 children: const [
-                  Icon(Icons.confirmation_number_outlined, color: Color(0xFFEE4D2D), size: 18),
+                  Icon(Icons.confirmation_number_outlined, color: AppColors.primary, size: 18),
                   SizedBox(width: 6),
                   Text('Ví Voucher & Ưu Đãi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E2022))),
                 ],
@@ -1844,8 +1844,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
               );
             },
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFEE4D2D), size: 18),
-            label: const Text('Đăng xuất tài khoản', style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.logout_rounded, color: AppColors.primary, size: 18),
+            label: const Text('Đăng xuất tài khoản', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,

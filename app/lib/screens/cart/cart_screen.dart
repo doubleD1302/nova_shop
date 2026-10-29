@@ -153,18 +153,18 @@ class _CartScreenState extends State<CartScreen> {
               height: 120,
               decoration: BoxDecoration(
                 gradient: const RadialGradient(
-                  colors: [Color(0xFFFFECE5), Color(0xFFFFF7F4)],
+                  colors: [AppColors.surfaceAlt, AppColors.surface],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.12),
+                    color: primaryColor.withValues(alpha: 0.12),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: const Icon(Icons.remove_shopping_cart_rounded, size: 54, color: Color(0xFFEE4D2D)),
+              child: const Icon(Icons.remove_shopping_cart_rounded, size: 54, color: AppColors.primary),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -181,12 +181,12 @@ class _CartScreenState extends State<CartScreen> {
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                  colors: [AppColors.primary, AppColors.earth],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.28),
+                    color: primaryColor.withValues(alpha: 0.28),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -236,10 +236,10 @@ class _CartScreenState extends State<CartScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0EC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.local_shipping_rounded, color: Color(0xFFEE4D2D), size: 22),
+            child: const Icon(Icons.local_shipping_rounded, color: AppColors.primary, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -276,8 +276,8 @@ class _CartScreenState extends State<CartScreen> {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 6,
-                    backgroundColor: const Color(0xFFF2F2F5),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFEE4D2D)),
+                    backgroundColor: AppColors.surfaceAlt,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                   ),
                 ),
               ],
@@ -353,7 +353,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const SizedBox(width: 6),
                 ] else ...[
-                  const Icon(Icons.storefront_rounded, size: 18, color: Color(0xFFEE4D2D)),
+                  const Icon(Icons.storefront_rounded, size: 18, color: AppColors.primary),
                   const SizedBox(width: 6),
                 ],
                 Expanded(
@@ -602,14 +602,14 @@ class _CartScreenState extends State<CartScreen> {
                   gradient: selectedItems.isEmpty
                       ? null
                       : const LinearGradient(
-                          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                          colors: [AppColors.primary, AppColors.earth],
                         ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: selectedItems.isEmpty
                       ? null
                       : [
                           BoxShadow(
-                            color: primaryColor.withOpacity(0.3),
+                            color: primaryColor.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),

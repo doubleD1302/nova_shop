@@ -200,15 +200,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(color: const Color(0xFFEEEEF0), height: 1),
+        child: Container(color: AppColors.border, height: 1),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF1E2022)),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textPrimary),
         onPressed: () => Navigator.maybePop(context),
       ),
       title: Row(
@@ -217,19 +217,35 @@ class _LoginScreenState extends State<LoginScreen> {
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF0EC),
+              color: AppColors.surfaceAlt,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border, width: 0.8),
             ),
             child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'ShopNova',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+          RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Nova',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Shop',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -237,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF555770), size: 22),
+          icon: const Icon(Icons.help_outline_rounded, color: AppColors.textSecondary, size: 22),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Trung tâm hỗ trợ ShopNova: 1900 1234 (Miễn phí 24/7)')),
@@ -252,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 32),
@@ -278,12 +294,12 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           const Text(
             'Chào mừng trở lại! 👋',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 4),
           const Text(
             'Đăng nhập tài khoản ShopNova để nhận ưu đãi và mua sắm không giới hạn',
-            style: TextStyle(color: Color(0xFF8F90A6), fontSize: 13, height: 1.4),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 12),
           // Backend Connection Indicator
@@ -344,8 +360,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFFEAEAEE),
+          color: AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 0.8),
         ),
         child: Row(
           children: [
@@ -353,8 +370,9 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                   boxShadow: const [
                     BoxShadow(color: Color(0x0C000000), blurRadius: 4, offset: Offset(0, 1))
                   ],
@@ -378,7 +396,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   child: const Center(
-                    child: Text('Đăng Ký', style: TextStyle(color: Color(0xFF555770), fontWeight: FontWeight.w700, fontSize: 15)),
+                    child: Text('Đăng Ký', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 15)),
                   ),
                 ),
               ),
@@ -398,9 +416,9 @@ class _LoginScreenState extends State<LoginScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEEEEF0)),
+            border: Border.all(color: AppColors.border),
             boxShadow: const [
               BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3))
             ],
@@ -408,18 +426,18 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Tên đăng nhập hoặc Số điện thoại', style: TextStyle(color: Color(0xFF555770), fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text('Tên đăng nhập hoặc Số điện thoại', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E2E6)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.person_outline_rounded, color: Color(0xFF8F90A6), size: 20),
+                    const Icon(Icons.person_outline_rounded, color: AppColors.textSecondary, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -448,7 +466,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Mật khẩu', style: TextStyle(color: Color(0xFF555770), fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('Mật khẩu', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
                   Text('Quên mật khẩu?', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -456,21 +474,22 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E2E6)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.lock_outline_rounded, color: Color(0xFF8F90A6), size: 20),
+                    const Icon(Icons.lock_outline_rounded, color: AppColors.textSecondary, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
+                        style: const TextStyle(color: AppColors.textPrimary),
                         decoration: const InputDecoration(
                           hintText: 'Nhập mật khẩu ShopNova',
-                          hintStyle: TextStyle(color: Color(0xFF8F90A6), fontSize: 13),
+                          hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           border: InputBorder.none,
                           isDense: true,
                         ),
@@ -484,7 +503,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       child: Icon(
                         _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: const Color(0xFF8F90A6), size: 20
+                        color: AppColors.textSecondary, size: 20
                       ),
                     ),
                   ],
@@ -508,14 +527,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('Ghi nhớ đăng nhập', style: TextStyle(color: Color(0xFF555770), fontSize: 12)),
+                      const Text('Ghi nhớ đăng nhập', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                     ],
                   ),
                   Row(
                     children: const [
-                      Icon(Icons.sms_outlined, color: Color(0xFF00BFA5), size: 16),
+                      Icon(Icons.sms_outlined, color: AppColors.primary, size: 16),
                       SizedBox(width: 4),
-                      Text('Đăng nhập OTP / Zalo', style: TextStyle(color: Color(0xFF00BFA5), fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('Đăng nhập OTP / Zalo', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   )
                 ],
@@ -525,12 +544,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                    colors: [AppColors.primary, AppColors.earth],
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -568,9 +587,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF7F7F8),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFEEEEF0)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -580,9 +599,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Container(
                           width: 38, height: 38,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEEEEF0)),
+                            border: Border.all(color: AppColors.border),
                             boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 4)],
                           ),
                           child: const Icon(Icons.fingerprint_rounded, color: AppColors.primary, size: 22),
@@ -591,8 +610,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: const [
-                            Text('Face ID / Vân tay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
-                            Text('Đăng nhập tức thì chỉ 1 chạm', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 11)),
+                            Text('Face ID / Vân tay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                            Text('Đăng nhập tức thì chỉ 1 chạm', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                           ],
                         )
                       ],
@@ -602,17 +621,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Đã kích hoạt đăng nhập nhanh bằng Sinh trắc học (Face ID / Vân tay)!'),
-                            backgroundColor: Color(0xFF00BFA5),
+                            backgroundColor: AppColors.primary,
                           ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFF0EC),
+                        backgroundColor: AppColors.surface,
                         foregroundColor: AppColors.primary,
                         elevation: 0,
                         minimumSize: const Size(0, 32),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: AppColors.border),
+                        ),
                       ),
                       child: const Text('Kích hoạt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     )

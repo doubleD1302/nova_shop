@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/product.dart';
 import '../../services/favorite_service.dart';
 import '../product_detail/product_detail_screen.dart';
+import '../../theme/app_colors.dart';
 
 /// Màn hình Danh Sách Sản Phẩm Yêu Thích (Kết nối trực tiếp Backend API)
 class FavoritesScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final FavoriteService _favoriteService = FavoriteService();
 
   List<Product> _favorites = [];
@@ -66,14 +67,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+          child: Container(color: AppColors.border, height: 1),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
@@ -119,8 +120,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             Container(
               width: 90,
               height: 90,
-              decoration: const BoxDecoration(color: Color(0xFFFFF0EC), shape: BoxShape.circle),
-              child: const Icon(Icons.favorite_border_rounded, size: 48, color: Color(0xFFEE4D2D)),
+              decoration: const BoxDecoration(color: AppColors.surfaceAlt, shape: BoxShape.circle),
+              child: const Icon(Icons.favorite_border_rounded, size: 48, color: AppColors.primary),
             ),
             const SizedBox(height: 18),
             const Text(
@@ -137,7 +138,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                  colors: [AppColors.primary, AppColors.earth],
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -219,7 +220,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           shape: BoxShape.circle,
                           boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 4)],
                         ),
-                        child: const Icon(Icons.favorite_rounded, color: Color(0xFFEE4D2D), size: 18),
+                        child: const Icon(Icons.favorite_rounded, color: AppColors.primary, size: 18),
                       ),
                     ),
                   ),

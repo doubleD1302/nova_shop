@@ -143,7 +143,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     required String emptySubtitle,
   }) {
     if (_isLoadingOrders) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     final filteredOrders = _orders.where((o) {
@@ -211,7 +211,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                colors: [AppColors.primary, AppColors.earth],
               ),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -277,7 +277,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         statusText = 'Đã hủy';
         break;
       default:
-        statusBgColor = const Color(0xFFFFF0EC);
+        statusBgColor = AppColors.surfaceAlt;
         statusTextColor = primaryColor;
         statusText = 'Chờ shop xác nhận';
     }

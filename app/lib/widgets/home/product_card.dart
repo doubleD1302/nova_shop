@@ -137,7 +137,7 @@ class _ProductCardState extends State<ProductCard> {
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                                  colors: [AppColors.primary, AppColors.earth],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -216,7 +216,7 @@ class _ProductCardState extends State<ProductCard> {
                               Text(
                                 '-${product.discount}%',
                                 style: const TextStyle(
-                                  color: Color(0xFFEE4D2D),
+                                  color: AppColors.primary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -224,7 +224,7 @@ class _ProductCardState extends State<ProductCard> {
                               const Text(
                                 'GIẢM',
                                 style: TextStyle(
-                                  color: Color(0xFFEE4D2D),
+                                  color: AppColors.primary,
                                   fontSize: 7.5,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -256,7 +256,7 @@ class _ProductCardState extends State<ProductCard> {
                           ),
                           child: Icon(
                             _isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: _isFavorite ? const Color(0xFFEE4D2D) : Colors.black45,
+                            color: _isFavorite ? AppColors.primary : Colors.black45,
                             size: 16,
                           ),
                         ),
@@ -381,7 +381,7 @@ class _ProductCardState extends State<ProductCard> {
                 value: progress.expectedTotalBytes != null
                     ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
                     : null,
-                color: const Color(0xFFEE4D2D),
+                color: AppColors.primary,
               ),
             ),
           ),
