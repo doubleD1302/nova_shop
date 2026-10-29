@@ -13,6 +13,7 @@ import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/models/product.dart';
 import 'package:shopnova/services/catalog_service.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
+import 'package:shopnova/theme/app_colors.dart';
 import '../search/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -106,10 +107,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final displayProducts = _getFilteredProducts();
 
     return Container(
-      color: const Color(0xFFF5F5F5),
+      color: AppColors.background,
       child: RefreshIndicator(
         onRefresh: _loadCatalogData,
-        color: const Color(0xFFEE4D2D),
+        color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -277,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.refresh, size: 18),
                         label: const Text('Tải lại sản phẩm', style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEE4D2D),
+                          backgroundColor: AppColors.primary,
                         ),
                       ),
                     ],
@@ -306,14 +307,19 @@ class _HomeScreenState extends State<HomeScreen> {
               const CommitmentStripWidget(),
 
               Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border, width: 1),
+                ),
                 alignment: Alignment.center,
                 child: TextButton(
                   onPressed: _loadCatalogData,
                   child: const Text(
                     'Xem thêm sản phẩm gợi ý >',
-                    style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.bold),
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

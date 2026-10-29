@@ -17,11 +17,21 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
         elevation: 0,
+        scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.2,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.border, width: 0.8),
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -29,13 +39,15 @@ class AppTheme {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.bottomNavInactive,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 6,
+        selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+        unselectedLabelStyle: TextStyle(fontSize: 11),
       ),
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: AppColors.textPrimary),
         bodyMedium: TextStyle(color: AppColors.textPrimary),
-        titleLarge: TextStyle(color: AppColors.textPrimary),
-        titleMedium: TextStyle(color: AppColors.textPrimary),
+        titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+        titleMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         titleSmall: TextStyle(color: AppColors.textPrimary),
       ),
       dividerColor: AppColors.divider,

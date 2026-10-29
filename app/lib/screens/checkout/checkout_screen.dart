@@ -8,6 +8,7 @@ import '../../services/order_service.dart';
 import '../account/addresses_screen.dart';
 import '../auth/login_screen.dart' as shopnova_auth;
 import '../orders/orders_screen.dart';
+import '../../theme/app_colors.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItemModel>? selectedItems;
@@ -19,7 +20,7 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
 
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -344,9 +345,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final totalAmount = (subtotal + shippingFee - shippingDiscount).clamp(0.0, double.infinity);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(

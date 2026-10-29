@@ -3,6 +3,7 @@ import '../../screens/cart/cart_screen.dart';
 import '../../screens/nova_ai/nova_ai_screen.dart';
 import '../../screens/search/search_screen.dart';
 import '../../services/cart_service.dart';
+import '../../theme/app_colors.dart';
 
 class ShopNovaAppBar extends StatelessWidget {
   const ShopNovaAppBar({super.key});
@@ -11,7 +12,7 @@ class ShopNovaAppBar extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -33,7 +34,7 @@ class ShopNovaAppBar extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: AppColors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -44,20 +45,21 @@ class ShopNovaAppBar extends StatelessWidget {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F7),
+                        color: AppColors.surfaceAlt,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: TextField(
                         controller: searchCtrl,
                         autofocus: true,
                         textInputAction: TextInputAction.search,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: 'Tìm kiếm sản phẩm, thương hiệu...',
-                          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13.5),
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFFEE4D2D), size: 20),
+                          hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
+                          prefixIcon: const Icon(Icons.search, color: AppColors.primary, size: 20),
                           suffixIcon: IconButton(
-                            icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                            icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
                             onPressed: () => searchCtrl.clear(),
                           ),
                           border: InputBorder.none,
@@ -79,64 +81,61 @@ class ShopNovaAppBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   TextButton(
-                    onPressed: () => Navigator.pop(ctx),
+                    onPressed: () {
+                      final q = searchCtrl.text.trim();
+                      if (q.isNotEmpty) {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: q)),
+                        );
+                      }
+                    },
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(40, 36),
+                      foregroundColor: AppColors.primary,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
-                    child: const Text('Hủy', style: TextStyle(color: Color(0xFF666666), fontWeight: FontWeight.bold)),
+                    child: const Text('Tìm'),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              const Row(
-                children: [
-                  Icon(Icons.local_fire_department, color: Color(0xFFEE4D2D), size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    'Từ khóa tìm kiếm phổ biến',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF222222)),
-                  ),
-                ],
+              const SizedBox(height: 14),
+              const Text(
+                'Tìm kiếm phổ biến',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   '⚡ Flash Sale',
-                  '📱 Tai nghe bluetooth',
-                  '👕 Áo thun cotton',
-                  '🔋 Sạc nhanh 65W',
+                  '👗 Thời trang nữ',
+                  '👔 Thời trang nam',
+                  '📱 Điện thoại',
+                  '💻 Laptop',
+                  '💄 Mỹ phẩm',
                   '👟 Giày sneaker',
-                  '🍳 Nồi chiên không dầu',
-                  '💻 Bàn phím cơ',
-                  '👗 Đầm nữ dạo phố',
-                ].map((tag) => InkWell(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    final cleanTag = tag.replaceAll(RegExp(r'^[^\w\s]+'), '').trim();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SearchScreen(initialQuery: cleanTag),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F7),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFEEEEEE)),
-                    ),
-                    child: Text(
-                      tag,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF444444), fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                )).toList(),
+                  '👜 Túi xách',
+                ].map((tag) {
+                  return ActionChip(
+                    backgroundColor: AppColors.surfaceAlt,
+                    side: const BorderSide(color: AppColors.border),
+                    label: Text(tag, style: const TextStyle(fontSize: 12, color: AppColors.textPrimary)),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      final q = tag.replaceFirst(RegExp(r'^[^\s]+\s+'), '');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: q)),
+                      );
+                    },
+                  );
+                }).toList(),
               ),
             ],
           ),
@@ -149,105 +148,132 @@ class ShopNovaAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border, width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x33EE4D2D),
+            color: Color(0x0A80513B),
             blurRadius: 8,
-            offset: Offset(0, 3),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 10, 10),
+          padding: const EdgeInsets.fromLTRB(14, 8, 12, 10),
           child: Row(
             children: [
-              // Logo
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                        ),
-                      ],
+              // Logo NovaShop chuẩn Terracotta
+              InkWell(
+                onTap: () {
+                  Navigator.popUntil(context, (r) => r.isFirst);
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
+                      ),
                     ),
-                    child: const Icon(Icons.shopping_bag, color: Color(0xFFEE4D2D), size: 20),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'ShopNova',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      letterSpacing: -0.4,
+                    const SizedBox(width: 7),
+                    RichText(
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Nova',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 19,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Shop',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 19,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
 
               // Capsule Search Field
               Expanded(
                 child: InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SearchScreen()),
-                    );
-                  },
+                  onTap: () => _showSearchModal(context),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+                      border: Border.all(color: AppColors.border),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: const Row(
                       children: [
-                        Icon(Icons.search, color: Color(0xFFEE4D2D), size: 19),
-                        SizedBox(width: 6),
+                        Icon(Icons.search, color: AppColors.primary, size: 19),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Tìm kiếm trên ShopNova...',
+                            'Tìm kiếm trên NovaShop...',
                             style: TextStyle(
-                              color: Color(0xFF888888),
+                              color: AppColors.textSecondary,
                               fontSize: 12.5,
-                              fontWeight: FontWeight.w400,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Icon(Icons.camera_alt_outlined, color: Color(0xFF999999), size: 18),
                       ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
+
+              // Nút Nova AI Copilot
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NovaAIScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceAlt,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
 
               // Cart Button with counter badge
               AnimatedBuilder(
@@ -262,39 +288,33 @@ class ShopNovaAppBar extends StatelessWidget {
                       );
                     },
                     borderRadius: BorderRadius.circular(20),
-                    child: Container(
+                    child: SizedBox(
                       width: 38,
                       height: 38,
-                      alignment: Alignment.center,
                       child: Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 24),
+                          const Icon(Icons.shopping_cart_outlined, color: AppColors.textPrimary, size: 24),
                           if (count > 0)
                             Positioned(
-                              top: -3,
-                              right: -4,
+                              top: 2,
+                              right: 1,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(10),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 3,
-                                    ),
-                                  ],
+                                  border: Border.all(color: Colors.white, width: 1.5),
                                 ),
-                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
                                 child: Center(
                                   child: Text(
                                     count > 99 ? '99+' : '$count',
                                     style: const TextStyle(
-                                      color: Color(0xFFEE4D2D),
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -306,40 +326,6 @@ class ShopNovaAppBar extends StatelessWidget {
                     ),
                   );
                 },
-              ),
-
-              // Nova AI Copilot Action Icon
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NovaAIScreen(isStandalone: true)),
-                  );
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFD54F),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),

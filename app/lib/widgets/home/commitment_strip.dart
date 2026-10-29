@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/website_data.dart';
+import '../../theme/app_colors.dart';
 
 class CommitmentStripWidget extends StatelessWidget {
   const CommitmentStripWidget({super.key});
@@ -9,17 +10,29 @@ class CommitmentStripWidget extends StatelessWidget {
     final items = WebsiteData.commitments;
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 0.8),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0680513B),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'TẠI SAO MUA HÀNG TẠI SHOPNOVA?',
+            'CAM KẾT TỪ SHOPNOVA',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF555555),
+              color: AppColors.textPrimary,
               letterSpacing: 0.5,
             ),
           ),
@@ -29,7 +42,7 @@ class CommitmentStripWidget extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 2.3,
+              childAspectRatio: 2.2,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -39,14 +52,15 @@ class CommitmentStripWidget extends StatelessWidget {
               return Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: c.backgroundColor,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border, width: 0.5),
                 ),
                 child: Row(
                   children: [
                     Text(
                       c.emoji,
-                      style: const TextStyle(fontSize: 24),
+                      style: const TextStyle(fontSize: 22),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -59,7 +73,7 @@ class CommitmentStripWidget extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF222222),
+                              color: AppColors.textPrimary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -69,9 +83,9 @@ class CommitmentStripWidget extends StatelessWidget {
                             c.desc,
                             style: const TextStyle(
                               fontSize: 10,
-                              color: Color(0xFF666666),
+                              color: AppColors.textSecondary,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],

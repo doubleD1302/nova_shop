@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
+import 'package:shopnova/theme/app_colors.dart';
 import '../../utils/product_image_resolver.dart';
 
 class FlashSaleItemCard extends StatelessWidget {
@@ -32,9 +33,9 @@ class FlashSaleItemCard extends StatelessWidget {
           width: 132,
           padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFEEEEEE), width: 0.8),
+            border: Border.all(color: AppColors.border, width: 0.8),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
@@ -57,12 +58,9 @@ class FlashSaleItemCard extends StatelessWidget {
                       Container(
                         width: double.infinity,
                         height: double.infinity,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFFFF0EC), Color(0xFFFFDDD2)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
                           child: Image.network(
@@ -73,12 +71,12 @@ class FlashSaleItemCard extends StatelessWidget {
                             loadingBuilder: (context, child, progress) {
                               if (progress == null) return child;
                               return Container(
-                                color: const Color(0xFFFFF0EC),
+                                color: AppColors.surfaceAlt,
                                 child: const Center(
                                   child: SizedBox(
                                     width: 20,
                                     height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEE4D2D)),
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                                   ),
                                 ),
                               );
@@ -103,7 +101,7 @@ class FlashSaleItemCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                                colors: [AppColors.flashSaleRed, AppColors.primary],
                               ),
                               borderRadius: BorderRadius.only(
                                 bottomRight: Radius.circular(6),
@@ -130,7 +128,7 @@ class FlashSaleItemCard extends StatelessWidget {
                 child: Text(
                   _formatPrice(item.price),
                   style: const TextStyle(
-                    color: Color(0xFFEE4D2D),
+                    color: AppColors.flashSaleRed,
                     fontWeight: FontWeight.w900,
                     fontSize: 14,
                     letterSpacing: -0.2,
@@ -148,8 +146,9 @@ class FlashSaleItemCard extends StatelessWidget {
                     width: double.infinity,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFE0D9),
+                      color: AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border, width: 0.5),
                     ),
                   ),
                   FractionallySizedBox(
@@ -158,7 +157,7 @@ class FlashSaleItemCard extends StatelessWidget {
                       height: 18,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFEE4D2D), Color(0xFFFF6633)],
+                          colors: [AppColors.flashSaleRed, AppColors.primary],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),

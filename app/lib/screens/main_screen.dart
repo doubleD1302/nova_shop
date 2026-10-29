@@ -6,6 +6,7 @@ import 'package:shopnova/widgets/common/shopnova_app_bar.dart';
 import 'package:shopnova/screens/account/account_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
 import 'package:shopnova/services/cart_service.dart';
+import 'package:shopnova/theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -38,13 +39,14 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Color(0x0A80513B),
               blurRadius: 10,
-              offset: const Offset(0, -3),
+              offset: Offset(0, -3),
             ),
           ],
         ),
@@ -52,23 +54,23 @@ class _MainScreenState extends State<MainScreen> {
           currentIndex: _currentTabIndex,
           onTap: (i) => setState(() => _currentTabIndex = i),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           elevation: 0,
-          selectedItemColor: const Color(0xFFEE4D2D),
-          unselectedItemColor: const Color(0xFF757575),
-          selectedFontSize: 10.5,
-          unselectedFontSize: 10.5,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textSecondary,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
+              activeIcon: Icon(Icons.home_rounded),
               label: 'Trang chủ',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.storefront_outlined),
-              activeIcon: Icon(Icons.storefront),
+              activeIcon: Icon(Icons.storefront_rounded),
               label: 'Gian hàng',
             ),
             BottomNavigationBarItem(
@@ -76,20 +78,20 @@ class _MainScreenState extends State<MainScreen> {
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFEE4D2D), Color(0xFFFF5722)],
+                    colors: [AppColors.primary, AppColors.earth],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFEE4D2D).withValues(alpha: 0.4),
+                      color: AppColors.primary.withValues(alpha: 0.35),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
               ),
               label: 'Nova AI',
             ),
@@ -109,7 +111,7 @@ class _MainScreenState extends State<MainScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEE4D2D),
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             constraints: const BoxConstraints(minWidth: 15, minHeight: 15),

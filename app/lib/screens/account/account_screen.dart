@@ -11,6 +11,7 @@ import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/cart_service.dart';
 import 'package:shopnova/screens/admin/admin_screen.dart';
 import 'package:shopnova/services/api_config.dart';
+import 'package:shopnova/theme/app_colors.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -20,7 +21,7 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   Map<String, dynamic>? _backendStats;
   bool _notificationEnabled = true;
   bool _twoFactorEnabled = false;
@@ -404,16 +405,16 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFEEEEF0), height: 1),
+          child: Container(color: AppColors.border, height: 1),
         ),
-        leadingWidth: 140,
+        leadingWidth: 150,
         leading: Padding(
           padding: const EdgeInsets.only(left: 14),
           child: Row(
@@ -421,19 +422,41 @@ class _AccountScreenState extends State<AccountScreen> {
               Container(
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EC),
+                  color: AppColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border, width: 0.8),
                 ),
-                child: const Icon(Icons.person_rounded, color: Color(0xFFEE4D2D), size: 18),
+                child: const Icon(Icons.person_rounded, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 8),
-              const Text('ShopNova', style: TextStyle(color: Color(0xFFEE4D2D), fontWeight: FontWeight.w800, fontSize: 16)),
+              RichText(
+                text: const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Nova',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Shop',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
         title: const Text(
           'Tài Khoản Của Tôi',
-          style: TextStyle(color: Color(0xFF1E2022), fontSize: 16, fontWeight: FontWeight.w700),
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
       ),

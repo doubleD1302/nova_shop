@@ -4,6 +4,7 @@ import 'package:shopnova/models/product.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/favorite_service.dart';
+import '../../theme/app_colors.dart';
 import '../../utils/product_image_resolver.dart';
 
 class ProductCard extends StatefulWidget {
@@ -72,18 +73,18 @@ class _ProductCardState extends State<ProductCard> {
           );
         },
         borderRadius: BorderRadius.circular(12),
-        splashColor: const Color(0xFFEE4D2D).withValues(alpha: 0.1),
-        highlightColor: const Color(0xFFEE4D2D).withValues(alpha: 0.05),
+        splashColor: AppColors.primary.withValues(alpha: 0.1),
+        highlightColor: AppColors.primary.withValues(alpha: 0.05),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEEEEF0), width: 0.8),
-            boxShadow: [
+            border: Border.all(color: AppColors.border, width: 0.8),
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Color(0x0880513B),
                 blurRadius: 8,
-                offset: const Offset(0, 3),
+                offset: Offset(0, 2),
               ),
             ],
           ),
@@ -281,8 +282,8 @@ class _ProductCardState extends State<ProductCard> {
                         style: const TextStyle(
                           fontSize: 12.5,
                           height: 1.25,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF222222),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
 
@@ -297,7 +298,7 @@ class _ProductCardState extends State<ProductCard> {
                               Text(
                                 _formatPrice(product.price),
                                 style: const TextStyle(
-                                  color: Color(0xFFEE4D2D),
+                                  color: AppColors.primary,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 14.5,
                                   letterSpacing: -0.2,
@@ -309,7 +310,7 @@ class _ProductCardState extends State<ProductCard> {
                             Text(
                               _formatPrice(product.originalPrice),
                               style: const TextStyle(
-                                color: Color(0xFF9E9E9E),
+                                color: AppColors.textSecondary,
                                 decoration: TextDecoration.lineThrough,
                                 fontSize: 10.5,
                               ),
@@ -321,21 +322,21 @@ class _ProductCardState extends State<ProductCard> {
                       // Rating & Sold & Location Line
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFFFFB800), size: 14),
+                          const Icon(Icons.star_rounded, color: AppColors.starYellow, size: 14),
                           const SizedBox(width: 2),
                           Text(
                             product.rating.toStringAsFixed(1),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF444444),
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             product.soldCount.isNotEmpty ? product.soldCount : 'Đã bán 0',
                             style: const TextStyle(
-                              color: Color(0xFF757575),
+                              color: AppColors.textSecondary,
                               fontSize: 10.5,
                             ),
                           ),
@@ -343,7 +344,7 @@ class _ProductCardState extends State<ProductCard> {
                           Text(
                             product.location.isNotEmpty ? product.location.replaceAll('TP. ', '') : 'HCM',
                             style: const TextStyle(
-                              color: Color(0xFF9E9E9E),
+                              color: AppColors.textSecondary,
                               fontSize: 10,
                             ),
                             maxLines: 1,

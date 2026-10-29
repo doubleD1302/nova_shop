@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/product.dart';
 import '../../models/shop.dart';
 import '../../services/shop_service.dart';
+import '../../theme/app_colors.dart';
 import '../../screens/product_detail/product_detail_screen.dart';
 import '../../screens/shop/shop_screen.dart';
 import '../../screens/shop/shop_detail_screen.dart';
@@ -116,8 +117,13 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
     }
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -128,14 +134,14 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.storefront, color: Color(0xFFEE4D2D), size: 20),
+                    Icon(Icons.storefront, color: AppColors.primary, size: 20),
                     SizedBox(width: 6),
                     Text(
                       'GIAN HÀNG NỔI BẬT',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF222222),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -154,7 +160,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                   ),
                   child: const Text(
                     'Xem tất cả >',
-                    style: TextStyle(color: Color(0xFFEE4D2D), fontSize: 13),
+                    style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -181,9 +187,9 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                 return Container(
                   width: 290,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFEEEEEE)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
@@ -260,7 +266,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFFD0011B),
+                                                    color: AppColors.primary,
                                                     borderRadius: BorderRadius.circular(2),
                                                   ),
                                                   child: const Text(
@@ -348,8 +354,9 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                   child: Container(
                                     margin: const EdgeInsets.symmetric(horizontal: 3),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFAFAFA),
+                                      color: AppColors.surfaceAlt,
                                       borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: AppColors.border, width: 0.5),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +365,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                           aspectRatio: 1,
                                           child: Container(
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFFFF0EC),
+                                              color: AppColors.surface,
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             clipBehavior: Clip.antiAlias,
@@ -385,7 +392,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                             p.name,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 10, height: 1.15),
+                                            style: const TextStyle(fontSize: 10, height: 1.15, color: AppColors.textPrimary),
                                           ),
                                         ),
                                         const Spacer(),
@@ -394,7 +401,7 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                           child: Text(
                                             _formatPrice(p.price),
                                             style: const TextStyle(
-                                              color: Color(0xFFEE4D2D),
+                                              color: AppColors.primary,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 11,
                                             ),

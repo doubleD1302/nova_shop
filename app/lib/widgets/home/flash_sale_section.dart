@@ -46,13 +46,13 @@ class _FlashSaleSectionState extends State<FlashSaleSection> {
       margin: const EdgeInsets.symmetric(horizontal: 2),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
       decoration: BoxDecoration(
-        color: const Color(0xFF222222),
+        color: AppColors.textPrimary,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         time,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.surface,
           fontSize: 11.5,
           fontWeight: FontWeight.w800,
         ),
@@ -67,26 +67,32 @@ class _FlashSaleSectionState extends State<FlashSaleSection> {
     final seconds = (_timeLeft.inSeconds % 60).toString().padLeft(2, '0');
 
     return Container(
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFECE8),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceAlt,
                   shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.border, width: 0.8),
                 ),
-                child: const Icon(Icons.local_fire_department, color: Color(0xFFEE4D2D), size: 18),
+                child: const Icon(Icons.local_fire_department, color: AppColors.flashSaleRed, size: 18),
               ),
               const SizedBox(width: 6),
               const Text(
                 'FLASH SALE',
                 style: TextStyle(
-                  color: Color(0xFFEE4D2D),
+                  color: AppColors.flashSaleRed,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
                   letterSpacing: 0.2,
@@ -94,9 +100,9 @@ class _FlashSaleSectionState extends State<FlashSaleSection> {
               ),
               const SizedBox(width: 8),
               _buildTimeBox(hours),
-              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF222222))),
+              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
               _buildTimeBox(minutes),
-              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF222222))),
+              const Text(':', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
               _buildTimeBox(seconds),
               const Spacer(),
               Text(

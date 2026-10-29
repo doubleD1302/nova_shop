@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/order_service.dart';
+import '../../theme/app_colors.dart';
 
 class OrdersScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -12,7 +13,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
 
   List<Map<String, dynamic>> _orders = [];
   bool _isLoadingOrders = false;
@@ -50,9 +51,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
@@ -64,7 +65,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 labelColor: primaryColor,
-                unselectedLabelColor: const Color(0xFF555770),
+                unselectedLabelColor: AppColors.textSecondary,
                 indicatorColor: primaryColor,
                 indicatorWeight: 2.5,
                 indicatorSize: TabBarIndicatorSize.label,
@@ -78,17 +79,21 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                   Tab(text: 'Đã hủy / Trả hàng'),
                 ],
               ),
-              Container(color: const Color(0xFFEEEEF0), height: 1),
+              Container(color: AppColors.border, height: 1),
             ],
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Đơn Mua Của Tôi',
-          style: TextStyle(color: Color(0xFF1E2022), fontSize: 17, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
         ),
         actions: [
           IconButton(

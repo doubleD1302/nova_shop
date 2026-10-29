@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/website_data.dart';
+import '../../theme/app_colors.dart';
 
 class QuickLinksSection extends StatelessWidget {
   final Function(String link)? onLinkTap;
@@ -11,8 +12,20 @@ class QuickLinksSection extends StatelessWidget {
     final items = WebsiteData.quickLinks;
 
     return Container(
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 0.8),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0680513B),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -39,20 +52,21 @@ class QuickLinksSection extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: item.backgroundColor,
+                    color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
+                    border: Border.all(color: AppColors.border, width: 0.5),
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
+                        color: Color(0x0680513B),
                         blurRadius: 6,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Center(
                     child: Text(
                       item.emoji,
-                      style: const TextStyle(fontSize: 24),
+                      style: const TextStyle(fontSize: 22),
                     ),
                   ),
                 ),
@@ -64,8 +78,8 @@ class QuickLinksSection extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
-                    height: 1.18,
+                    color: AppColors.textPrimary,
+                    height: 1.15,
                   ),
                 ),
               ],

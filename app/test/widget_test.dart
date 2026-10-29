@@ -6,8 +6,8 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const ShopNovaApp());
 
-    // Verify that the app bar title is displayed.
-    expect(find.text('ShopNova'), findsWidgets);
+    // Verify that the app bar brand logo is displayed.
+    expect(find.textContaining('Nova'), findsWidgets);
 
     // Verify bottom navigation is displayed.
     expect(find.text('Trang chủ'), findsOneWidget);

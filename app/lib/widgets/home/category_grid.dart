@@ -16,7 +16,7 @@ class CategoryGrid extends StatelessWidget {
       builder: (ctx) => Container(
         height: MediaQuery.of(context).size.height * 0.65,
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -31,16 +31,16 @@ class CategoryGrid extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF222222),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
-            const Divider(),
+            const Divider(color: AppColors.border),
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -75,20 +75,16 @@ class CategoryGrid extends StatelessWidget {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFF4F0), Color(0xFFFFEAE3)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: AppColors.surfaceAlt,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFFFDDD4), width: 0.8),
+                            border: Border.all(color: AppColors.border, width: 0.8),
                           ),
                           child: Icon(cat.icon, color: AppColors.primary, size: 26),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           cat.name,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -108,8 +104,13 @@ class CategoryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -132,7 +133,7 @@ class CategoryGrid extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF222222),
+                      color: AppColors.textPrimary,
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -185,20 +186,9 @@ class CategoryGrid extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFF5F2), Color(0xFFFFEBE4)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: AppColors.surfaceAlt,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFFDDD4), width: 0.8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFEE4D2D).withValues(alpha: 0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: AppColors.border, width: 0.8),
                       ),
                       child: Icon(category.icon, color: AppColors.primary, size: 24),
                     ),
@@ -207,8 +197,8 @@ class CategoryGrid extends StatelessWidget {
                       category.name,
                       style: const TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF333333),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 1,

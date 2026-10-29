@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shopnova/theme/app_colors.dart';
 
 class SuggestionTabBar extends StatelessWidget {
   final int selectedIndex;
@@ -20,18 +21,11 @@ class SuggestionTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border, width: 1),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -54,7 +48,7 @@ class SuggestionTabBar extends StatelessWidget {
                         Icon(
                           tab['icon'] as IconData,
                           size: 16,
-                          color: isSelected ? const Color(0xFFEE4D2D) : Colors.grey.shade600,
+                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -62,7 +56,7 @@ class SuggestionTabBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFF555555),
+                            color: isSelected ? AppColors.primary : AppColors.textSecondary,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -74,7 +68,7 @@ class SuggestionTabBar extends StatelessWidget {
                       height: 3,
                       width: isSelected ? 48 : 0,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEE4D2D),
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),

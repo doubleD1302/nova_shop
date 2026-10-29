@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/product.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/home/product_card.dart';
 import '../cart/cart_screen.dart';
 
@@ -254,13 +255,13 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F9),
+      backgroundColor: AppColors.background,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Color(0xFFEEEEF0))),
+            color: AppColors.surface,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
           child: SafeArea(
             child: Padding(
@@ -268,22 +269,22 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 18),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 18),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Expanded(
                     child: Container(
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F3F5),
+                        color: AppColors.surfaceAlt,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFEEEEF0)),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
                         children: [
                           const Padding(
                             padding: EdgeInsets.only(left: 10, right: 6),
-                            child: Icon(Icons.search_rounded, color: Color(0xFFEE4D2D), size: 20),
+                            child: Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
                           ),
                           Expanded(
                             child: TextField(
@@ -291,10 +292,10 @@ class _SearchScreenState extends State<SearchScreen> {
                               focusNode: _focusNode,
                               textInputAction: TextInputAction.search,
                               onSubmitted: _performSearch,
-                              style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E2022)),
+                              style: const TextStyle(fontSize: 13.5, color: AppColors.textPrimary),
                               decoration: InputDecoration(
                                 hintText: _categoryName != null ? 'Tìm trong $_categoryName...' : 'Tìm kiếm trên ShopNova...',
-                                hintStyle: const TextStyle(color: Color(0xFF8F90A6), fontSize: 13),
+                                hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                                 border: InputBorder.none,
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -309,7 +310,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               },
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 8),
-                                child: Icon(Icons.cancel_rounded, color: Color(0xFF8F90A6), size: 16),
+                                child: Icon(Icons.cancel_rounded, color: AppColors.textSecondary, size: 16),
                               ),
                             ),
                           InkWell(
@@ -320,7 +321,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFFEE4D2D), Color(0xFFFF5224)],
+                                  colors: [AppColors.primary, AppColors.earth],
                                 ),
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -343,7 +344,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         clipBehavior: Clip.none,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF1E2022), size: 22),
+                            icon: const Icon(Icons.shopping_bag_outlined, color: AppColors.textPrimary, size: 22),
                             onPressed: () {
                               Navigator.push(
                                 context,

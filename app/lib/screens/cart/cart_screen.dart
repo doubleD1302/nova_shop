@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/cart_item.dart';
 import '../../services/cart_service.dart';
+import '../../theme/app_colors.dart';
 import '../checkout/checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
@@ -11,7 +12,7 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final Color primaryColor = const Color(0xFFEE4D2D);
+  final Color primaryColor = AppColors.primary;
   final CartService _cartService = CartService();
 
   @override
@@ -36,17 +37,17 @@ class _CartScreenState extends State<CartScreen> {
         final allSelected = items.isNotEmpty && items.every((i) => i.selected);
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF6F7F9),
+          backgroundColor: AppColors.background,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.surface,
             elevation: 0,
             surfaceTintColor: Colors.transparent,
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(color: const Color(0xFFEEEEF0), height: 1),
+              child: Container(color: AppColors.border, height: 1),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E2022), size: 20),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
               onPressed: () => Navigator.maybePop(context),
             ),
             title: Row(
@@ -54,16 +55,17 @@ class _CartScreenState extends State<CartScreen> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF0EC),
+                    color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border, width: 0.8),
                   ),
-                  child: const Icon(Icons.shopping_bag_rounded, color: Color(0xFFEE4D2D), size: 20),
+                  child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Giỏ hàng (${items.length})',
                   style: const TextStyle(
-                    color: Color(0xFF1E2022),
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
                   ),
