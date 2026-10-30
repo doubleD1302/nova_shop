@@ -861,9 +861,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       // 2. Nội dung hội thoại & Control Panel
       body: Column(
         children: [
-          // Banner thông báo chưa có API kết nối
-          _buildNoApiAiBanner(),
-
           // Nova AI Status & Quick Control Header
           _buildAiStatusHeader(),
 
@@ -896,33 +893,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     );
   }
 
-  // Banner thông báo chưa có API kết nối Backend
-  Widget _buildNoApiAiBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF8E1),
-        border: Border(bottom: BorderSide(color: Color(0xFFFFECB3))),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.info_outline, size: 16, color: Color(0xFF856404)),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Chưa có API kết nối: Tính năng Trợ lý Nova AI đang ở chế độ giao diện mẫu do hệ thống Backend website thương mại chưa kết nối API Nova AI.',
-              style: TextStyle(
-                color: Color(0xFF856404),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // Nova AI Status Header
   Widget _buildAiStatusHeader() {
