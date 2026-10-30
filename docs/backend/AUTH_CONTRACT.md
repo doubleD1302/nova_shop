@@ -1,6 +1,6 @@
 # Hợp đồng API Xác thực Backend (Auth Contract - Backend)
 
-Tài liệu này định nghĩa giao diện API công khai của dịch vụ `shopnova-backend` cho phạm vi **BE-003A** (Đăng nhập, lấy thông tin tài khoản và nền tảng phân quyền buyer/seller).
+Tài liệu này định nghĩa giao diện API công khai của dịch vụ `shopnova-backend` cho phạm vi **BE-003A** (Đăng nhập, lấy thông tin tài khoản và nền tảng phân quyền buyer/seller) và **BE-003B** (Refresh Token Rotation 7 ngày, Quản lý phiên đăng nhập và Đổi mật khẩu).
 
 ## 1. Nguyên tắc chung
 
@@ -8,6 +8,12 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
 - **Định dạng dữ liệu**: `application/json; charset=utf-8`
 - **Thời hạn Access Token**: 15 phút (900 giây).
 - **Thuật toán JWT**: `HS256`, ký bởi `JWT_SECRET` (bắt buộc sinh từ ít nhất 32 byte ngẫu nhiên độc lập bằng crypto, mã hóa hex/base64).
+- **Cơ chế Refresh Token & Quản lý Phiên (BE-003B)**:
+  - Sinh chuỗi ngẫu nhiên cryptographically secure 40 bytes (hex 80 ký tự).
+  - Băm SHA-256 lưu trữ tại bảng `sessions` (`token_hash CHAR(64)`). Tuyệt đối không lưu plain text token vào database.
+  - Thời hạn Refresh Token: 7 ngày (`7 * 24 * 60 * 60 * 1000` ms).
+  - **Refresh Token Rotation**: Mỗi lần gọi `/api/v1/auth/refresh`, session cũ được đánh dấu thu hồi (`revoked_at = NOW()`) và một session mới với Refresh Token mới được sinh ra và trả về client.
+  - **Phát hiện tái sử dụng Token (Token Reuse Detection)**: Nếu một Refresh Token đã bị thu hồi (`revoked_at IS NOT NULL`) được gửi lên, hệ thống coi đây là hành vi xâm nhập và lập tức thu hồi toàn bộ phiên đăng nhập của người dùng đó (`revokeAllUserSessions`), buộc đăng nhập lại từ đầu.
 - **JWT Claims bắt buộc và Thẩm định chặt chẽ**:
   - `iss`: `shopnova-backend`
   - `aud`: `shopnova-clients`
@@ -25,7 +31,7 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
   - Bất kỳ phản hồi nào từ Data API trái với hợp đồng (thiếu trường, sai kiểu, `user.id` không khớp với ID yêu cầu) đều bị từ chối với HTTP 502 `DATA_API_BAD_RESPONSE`.
 - **Xử lý an toàn lỗi Upstream**:
   - Tuyệt đối không chuyển tiếp `json.message` từ Data API ra API công khai; mã 400 từ Data API được chuẩn hóa thành message tiếng Việt cố định `"Dữ liệu yêu cầu không hợp lệ."`.
-  - Phân biệt rõ lỗi xác thực dịch vụ nội bộ (Data API trả 401 `SERVICE_UNAUTHORIZED` -> Backend trả HTTP 502 `DATA_API_AUTH_FAILED`) với lỗi xác thực người dùng (HTTP 401 `INVALID_CREDENTIALS`).
+  - Phân biệt rõ lỗi xác thực dịch vụ nội bộ (Data API trả 401 `SERVICE_UNAUTHORIZED` -> Backend trả HTTP 502 `DATA_API_AUTH_FAILED`) với lỗi xác thực người dùng (HTTP 401 `INVALID_CREDENTIALS`, `SESSION_REVOKED`, `SESSION_EXPIRED`).
   - Lỗi database không sẵn sàng hoặc timeout từ Data API (HTTP 503 `DATABASE_UNAVAILABLE`) được ánh xạ thành HTTP 503 `DATA_API_UNAVAILABLE`.
   - Toàn bộ marker nhạy cảm (SQL, stack trace, parameters) của Data API tuyệt đối không được phép rò rỉ ra response hoặc log Backend.
 - **Xác thực trạng thái thời gian thực**:
@@ -62,6 +68,7 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "tokenType": "Bearer",
     "expiresIn": 900,
+    "refreshToken": "4a7f0e9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
     "user": {
       "id": "1",
       "username": "buyer_demo",
@@ -176,7 +183,156 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 2.3. Mã lỗi phân quyền tài nguyên (Role-based Authorization)
+### 2.3. Làm mới Access Token (Refresh Token Rotation - BE-003B)
+
+- **Endpoint**: `POST /api/v1/auth/refresh`
+- **Xác thực**: Không yêu cầu JWT (Xác thực qua Refresh Token).
+
+#### Request Body:
+```json
+{
+  "refreshToken": "4a7f0e9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b"
+}
+```
+
+#### Phản hồi thành công (HTTP 200 OK):
+Trả về Access Token mới (15 phút) kèm Refresh Token xoay vòng mới (7 ngày):
+```json
+{
+  "success": true,
+  "message": "Làm mới phiên đăng nhập thành công.",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 900,
+    "refreshToken": "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c",
+    "user": {
+      "id": "1",
+      "username": "buyer_demo",
+      "fullName": "Nguyen Van A",
+      "email": "buyer@example.com",
+      "phone": "0901234567",
+      "avatarUrl": null,
+      "role": "buyer",
+      "shopId": null
+    }
+  }
+}
+```
+
+#### Phản hồi thất bại:
+- **HTTP 400 Bad Request** (Thiếu hoặc refreshToken không đúng định dạng):
+  ```json
+  {
+    "success": false,
+    "message": "Refresh token không hợp lệ hoặc bị thiếu.",
+    "error": {
+      "code": "VALIDATION_ERROR"
+    }
+  }
+  ```
+- **HTTP 401 Unauthorized** (Phiên đã hết hạn hoặc không tồn tại):
+  ```json
+  {
+    "success": false,
+    "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+    "error": {
+      "code": "SESSION_EXPIRED"
+    }
+  }
+  ```
+- **HTTP 401 Unauthorized** (Phát hiện token đã bị thu hồi trước đó - Token reuse):
+  ```json
+  {
+    "success": false,
+    "message": "Phiên đăng nhập đã bị thu hồi hoặc phát hiện bất thường.",
+    "error": {
+      "code": "SESSION_REVOKED"
+    }
+  }
+  ```
+
+---
+
+### 2.4. Đăng xuất và thu hồi phiên (Logout - BE-003B)
+
+- **Endpoint**: `POST /api/v1/auth/logout`
+- **Xác thực**: Cho phép gửi `refreshToken` qua body, hoặc gửi Bearer token qua header `Authorization`.
+
+#### Request Body (tùy chọn):
+```json
+{
+  "refreshToken": "4a7f0e9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b"
+}
+```
+
+#### Phản hồi thành công (HTTP 200 OK):
+```json
+{
+  "success": true,
+  "message": "Đăng xuất thành công."
+}
+```
+
+---
+
+### 2.5. Đổi mật khẩu (Change Password - BE-003B)
+
+- **Endpoint**: `POST /api/v1/auth/change-password`
+- **Xác thực**: Bắt buộc Bearer JWT qua header `Authorization: Bearer <token>`.
+
+#### Request Headers:
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+```
+
+#### Request Body:
+```json
+{
+  "currentPassword": "OldPassword123!",
+  "newPassword": "NewSecurePassword456!"
+}
+```
+
+*Ghi chú*:
+- `currentPassword`: Mật khẩu hiện tại của người dùng.
+- `newPassword`: Mật khẩu mới, tối thiểu 6 ký tự, tối đa 72 bytes.
+- Khi đổi mật khẩu thành công, Data API hash mật khẩu mới với bcrypt cost 12 và tự động thu hồi toàn bộ phiên đăng nhập đang hoạt động của người dùng trong bảng `sessions` (`revoked_at = NOW()`).
+
+#### Phản hồi thành công (HTTP 200 OK):
+```json
+{
+  "success": true,
+  "message": "Đổi mật khẩu thành công. Toàn bộ phiên đăng nhập cũ đã được thu hồi."
+}
+```
+
+#### Phản hồi thất bại:
+- **HTTP 400 Bad Request** (Mật khẩu không đúng quy chuẩn):
+  ```json
+  {
+    "success": false,
+    "message": "Mật khẩu mới phải có ít nhất 6 ký tự.",
+    "error": {
+      "code": "VALIDATION_ERROR"
+    }
+  }
+  ```
+- **HTTP 401 Unauthorized** (Mật khẩu hiện tại không chính xác):
+  ```json
+  {
+    "success": false,
+    "message": "Mật khẩu hiện tại không chính xác.",
+    "error": {
+      "code": "INVALID_CREDENTIALS"
+    }
+  }
+  ```
+
+---
+
+### 2.6. Mã lỗi phân quyền tài nguyên (Role-based Authorization)
 
 Khi client truy cập vào các route nội bộ bảo vệ bởi middleware phân quyền:
 - **HTTP 403 Forbidden** (Không đủ quyền hạn):

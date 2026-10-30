@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { shopAvatar } from '../utils/image'
-import { apiCreateSellerShop, apiGetMe, apiGoogleLogin, apiLogin, apiRegister, apiUpdateProfile } from '../utils/api'
+import { apiChangePassword, apiCreateSellerShop, apiGetMe, apiGoogleLogin, apiLogin, apiLogout, apiRegister, apiUpdateProfile, REFRESH_TOKEN_KEY, refreshAccessToken } from '../utils/api'
 import {
   getFirebaseConfigError,
   isFirebaseConfigured,
@@ -75,10 +75,15 @@ export function AuthProvider({ children }) {
     let isMounted = true
 
     const restoreSession = async () => {
-      const token = sessionStorage.getItem(TOKEN_KEY)
+      let token = sessionStorage.getItem(TOKEN_KEY)
       if (!token) {
-        if (!isFirebaseConfigured() && isMounted) setIsInitializing(false)
-        return
+        const refreshed = await refreshAccessToken()
+        if (refreshed?.token) {
+          token = refreshed.token
+        } else {
+          if (!isFirebaseConfigured() && isMounted) setIsInitializing(false)
+          return
+        }
       }
 
       // Tạo version mới và AbortController cho lần restore này
@@ -110,10 +115,25 @@ export function AuthProvider({ children }) {
           }
         }
 
-        // Token hết hạn hoặc không hợp lệ (401 hoặc lỗi):
-        // Chỉ xóa token và đặt user null nếu version vẫn khớp và token chưa bị thay thế
-        if (authVersionRef.current === version && sessionStorage.getItem(TOKEN_KEY) === token) {
+        // Token hết hạn: Thử làm mới phiên ngầm trước khi xóa
+        const refreshed = await refreshAccessToken()
+        if (refreshed?.token && authVersionRef.current === version) {
+          const retryRes = await apiGetMe(refreshed.token, { signal: controller.signal })
+          if (retryRes.ok) {
+            const retryData = await retryRes.json().catch(() => null)
+            if (retryData?.success && retryData?.data?.user && isMounted) {
+              setUser(normalizeUser(retryData.data.user))
+              setAuthError('')
+              return
+            }
+          }
+        }
+
+        // Nếu refresh cũng không thành công: xóa phiên
+        if (authVersionRef.current === version) {
           sessionStorage.removeItem(TOKEN_KEY)
+          sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+          localStorage.removeItem(REFRESH_TOKEN_KEY)
           if (isMounted) {
             setUser(null)
             setAuthError('')
@@ -218,8 +238,12 @@ export function AuthProvider({ children }) {
         restoreAbortRef.current?.abort()
         authVersionRef.current += 1
 
-        const { token, user: apiUser } = data.data
+        const { token, refreshToken, user: apiUser } = data.data
         sessionStorage.setItem(TOKEN_KEY, token)
+        if (refreshToken) {
+          sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+          localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+        }
         sessionStorage.setItem(AUTH_PROVIDER_KEY, 'password')
         const normalized = normalizeUser(apiUser)
         setUser(normalized)
@@ -283,6 +307,10 @@ export function AuthProvider({ children }) {
       restoreAbortRef.current?.abort()
       authVersionRef.current += 1
       sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      if (data.data.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
       sessionStorage.setItem(AUTH_PROVIDER_KEY, 'password')
       const normalized = normalizeUser(data.data.user)
       setAuthError('')
@@ -334,6 +362,10 @@ export function AuthProvider({ children }) {
       }
 
       sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      if (data.data.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
       sessionStorage.setItem(AUTH_PROVIDER_KEY, 'google')
       const normalized = normalizeUser(data.data.user)
       setUser(normalized)
@@ -393,6 +425,10 @@ export function AuthProvider({ children }) {
       if (data?.data?.token) {
         sessionStorage.setItem(TOKEN_KEY, data.data.token)
       }
+      if (data?.data?.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
       const normalized = normalizeUser(data.data.user)
       setAuthError('')
       setUser(normalized)
@@ -408,7 +444,13 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     restoreAbortRef.current?.abort()
     authVersionRef.current += 1
+    const currentRefreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY)
+    if (currentRefreshToken) {
+      apiLogout(currentRefreshToken).catch(() => {})
+    }
     sessionStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
     sessionStorage.removeItem(AUTH_PROVIDER_KEY)
     setAuthError('')
     if (isFirebaseConfigured()) {
@@ -419,6 +461,32 @@ export function AuthProvider({ children }) {
       }
     }
     setUser(null)
+  }, [])
+
+  /**
+   * Đổi mật khẩu tài khoản và cập nhật token mới.
+   */
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    try {
+      const res = await apiChangePassword(currentPassword, newPassword)
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) {
+        return {
+          ok: false,
+          error: data?.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.',
+        }
+      }
+      if (data.data?.token) {
+        sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      }
+      if (data.data?.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
+      return { ok: true, message: data.message || 'Đổi mật khẩu thành công.' }
+    } catch {
+      return { ok: false, error: 'Lỗi kết nối khi đổi mật khẩu.' }
+    }
   }, [])
 
   const value = useMemo(
@@ -437,10 +505,11 @@ export function AuthProvider({ children }) {
       loginAs,
       register,
       openSellerShop,
+      changePassword,
       logout,
       updateProfile,
     }),
-    [user, isInitializing, authError, login, loginWithGoogle, loginAs, register, openSellerShop, logout, updateProfile],
+    [user, isInitializing, authError, login, loginWithGoogle, loginAs, register, openSellerShop, logout, updateProfile, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

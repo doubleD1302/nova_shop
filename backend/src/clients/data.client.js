@@ -184,10 +184,17 @@ export async function callDataApi(endpointPath, options = {}) {
   }
   if (status < 200 || status >= 300 || data.success !== true) {
     if (status === 401) {
+      if (data.error?.code === 'SERVICE_UNAUTHORIZED' || !data.error?.code) {
+        throw new DataApiClientError(
+          502,
+          'DATA_API_AUTH_FAILED',
+          'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+        )
+      }
       throw new DataApiClientError(
-        502,
-        'DATA_API_AUTH_FAILED',
-        'Lỗi xác thực khóa dịch vụ với dịch vụ dữ liệu nội bộ.',
+        401,
+        data.error.code,
+        typeof data.message === 'string' ? data.message : 'Xác thực không thành công.',
       )
     }
     const error = data.error && typeof data.error === 'object' ? data.error : {}
@@ -775,5 +782,47 @@ export async function syncCart(userId, items) {
   return await callDataApi("/internal/v1/cart/sync", {
     method: "POST",
     body: { userId, items },
+  })
+}
+
+/**
+ * Quản lý phiên đăng nhập (Sessions) và đổi mật khẩu qua Data API nội bộ.
+ */
+export async function createSession(userId, tokenHash, expiresAt) {
+  return await callDataApi('/internal/v1/auth/sessions', {
+    method: 'POST',
+    body: { userId: String(userId), tokenHash, expiresAt },
+  })
+}
+
+export async function refreshSession(tokenHash, newRefreshTokenHash, newExpiresAt) {
+  const result = await callDataApi('/internal/v1/auth/sessions/refresh', {
+    method: 'POST',
+    body: { tokenHash, newRefreshTokenHash, newExpiresAt },
+  })
+  if (!result?.user) {
+    throw new DataApiClientError(502, 'DATA_API_BAD_RESPONSE', 'Phản hồi làm mới phiên không hợp lệ.')
+  }
+  return validateAuthUserProfile(result.user)
+}
+
+export async function revokeSession(tokenHash) {
+  return await callDataApi('/internal/v1/auth/sessions/revoke', {
+    method: 'POST',
+    body: { tokenHash },
+  })
+}
+
+export async function revokeAllUserSessions(userId) {
+  return await callDataApi('/internal/v1/auth/sessions/revoke-all', {
+    method: 'POST',
+    body: { userId: String(userId) },
+  })
+}
+
+export async function changeUserPassword(userId, currentPassword, newPassword) {
+  return await callDataApi(`/internal/v1/users/${encodeURIComponent(userId)}/change-password`, {
+    method: 'POST',
+    body: { currentPassword, newPassword },
   })
 }

@@ -18,7 +18,7 @@ process.env.DOTENV_CONFIG_PATH = path.join(__dirname, 'non-existent-smoke.env')
 // Nạp ứng dụng sau khi đã thiết lập biến môi trường test cô lập
 const { default: app } = await import('../src/app.js')
 const { validateAuthUserProfile } = await import('../src/clients/data.client.js')
-const { requireRole } = await import('../src/middlewares/auth.middleware.js')
+const { requireRole, signAccessToken } = await import('../src/middlewares/auth.middleware.js')
 
 // Khởi chạy server trên cổng ngẫu nhiên khả dụng (port 0) để chạy kiểm thử
 const server = http.createServer(app)
@@ -164,6 +164,54 @@ async function runTests() {
       const data = await res.json()
       assert(res.status === 401, 'GET /api/v1/auth/me với token không hợp lệ trả HTTP 401')
       assert(data.error?.code === 'AUTH_INVALID', 'Mã lỗi là AUTH_INVALID khi token sai chữ ký/cú pháp')
+    }
+
+    // 6.3.1. Auth endpoints smoke: POST /api/v1/auth/refresh thiếu body trả 400 VALIDATION_ERROR
+    {
+      const res = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      assert(res.status === 400, 'POST /api/v1/auth/refresh thiếu refreshToken trả HTTP 400')
+      assert(data.error?.code === 'VALIDATION_ERROR', 'Mã lỗi là VALIDATION_ERROR khi thiếu refresh token')
+    }
+
+    // 6.3.2. Auth endpoints smoke: POST /api/v1/auth/refresh sai định dạng trả 401 AUTH_INVALID
+    {
+      const res = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: 'invalid!token' }),
+      })
+      const data = await res.json()
+      assert(res.status === 401, 'POST /api/v1/auth/refresh token sai định dạng trả HTTP 401')
+      assert(data.error?.code === 'AUTH_INVALID', 'Mã lỗi là AUTH_INVALID khi refresh token sai cú pháp')
+    }
+
+    // 6.3.3. Auth endpoints smoke: POST /api/v1/auth/logout trả 200 OK
+    {
+      const res = await fetch(`${baseUrl}/api/v1/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: 'a'.repeat(64) }),
+      })
+      const data = await res.json()
+      assert(res.status === 200, 'POST /api/v1/auth/logout trả HTTP 200')
+      assert(data.success === true, 'Đăng xuất có success === true')
+    }
+
+    // 6.3.4. Auth endpoints smoke: POST /api/v1/auth/change-password thiếu token trả 401 AUTH_REQUIRED
+    {
+      const res = await fetch(`${baseUrl}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: 'OldPassword123!', newPassword: 'NewPassword123!' }),
+      })
+      const data = await res.json()
+      assert(res.status === 401, 'POST /api/v1/auth/change-password thiếu token trả HTTP 401')
+      assert(data.error?.code === 'AUTH_REQUIRED', 'Mã lỗi là AUTH_REQUIRED khi đổi mật khẩu thiếu token')
     }
 
     // 6.4. Cart endpoints smoke: Yêu cầu giỏ hàng không có token trả 401 AUTH_REQUIRED

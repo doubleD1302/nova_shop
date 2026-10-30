@@ -8,19 +8,23 @@ import { formatNumber, formatVnd } from '../utils/format'
 import { vietnamProvinces } from '../data/locations'
 import Breadcrumb from '../components/ui/Breadcrumb'
 import AvatarPicker from '../components/ui/AvatarPicker'
-import { IconHeart, IconPackage, IconStore, IconUser } from '../components/ui/Icons'
+import { IconHeart, IconLock, IconPackage, IconStore, IconUser } from '../components/ui/Icons'
 import SmartImage from '../components/ui/SmartImage'
 import { isValidEmail, normalizeEmail } from '../utils/validation'
 
 const TABS = [
   { id: 'profile', label: 'Há»“ sÆ¡', icon: <IconUser className="h-4 w-4" /> },
   { id: 'address', label: 'Äá»‹a chá»‰ nháº­n hĂ ng', icon: <IconPackage className="h-4 w-4" /> },
+  { id: 'password', label: 'Đổi mật khẩu', icon: <IconLock className="h-4 w-4" /> },
   { id: 'shop', label: 'Gian hĂ ng cá»§a tĂ´i', icon: <IconStore className="h-4 w-4" /> },
 ]
 
 /** TRANG TĂ€I KHOáº¢N â€” há»“ sÆ¡, Ä‘á»‹a chá»‰, thĂ´ng tin gian hĂ ng (náº¿u lĂ  ngÆ°á»i bĂ¡n) */
 export default function AccountPage() {
-  const { user, avatar, updateProfile } = useAuth()
+  const { user, avatar, updateProfile, changePassword } = useAuth()
+  const [passwordDraft, setPasswordDraft] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [showPassword, setShowPassword] = useState({ current: false, next: false })
   const { getShop, loadShop, followedShopIds } = useCatalog()
   const { loadBuyerOrders, buyerOrdersSummary } = useOrders()
   const { pushToast } = useToast()
@@ -85,6 +89,39 @@ export default function AccountPage() {
     }
     setEmailError('')
     pushToast('ÄĂ£ cáº­p nháº­t há»“ sÆ¡.', 'success')
+  }
+
+  const savePassword = async (e) => {
+    e.preventDefault()
+    if (!passwordDraft.currentPassword) {
+      pushToast('Vui lòng nhập mật khẩu hiện tại.', 'error')
+      return
+    }
+    if (!passwordDraft.newPassword || passwordDraft.newPassword.length < 8) {
+      pushToast('Mật khẩu mới phải có ít nhất 8 ký tự.', 'error')
+      return
+    }
+    if (new TextEncoder().encode(passwordDraft.newPassword).length > 72) {
+      pushToast('Mật khẩu mới không được dài quá 72 byte.', 'error')
+      return
+    }
+    if (passwordDraft.newPassword !== passwordDraft.confirmPassword) {
+      pushToast('Mật khẩu nhập lại không khớp.', 'error')
+      return
+    }
+    if (passwordDraft.currentPassword === passwordDraft.newPassword) {
+      pushToast('Mật khẩu mới không được trùng với mật khẩu hiện tại.', 'error')
+      return
+    }
+    setPasswordSaving(true)
+    const result = await changePassword(passwordDraft.currentPassword, passwordDraft.newPassword)
+    setPasswordSaving(false)
+    if (!result.ok) {
+      pushToast(result.error || 'Không thể đổi mật khẩu.', 'error')
+      return
+    }
+    setPasswordDraft({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    pushToast(result.message || 'Đã đổi mật khẩu thành công.', 'success')
   }
 
   const saveAddress = async () => {
@@ -341,6 +378,83 @@ export default function AccountPage() {
                 </Link>
               </div>
             )
+          ) : tab === 'password' ? (
+            <div className="max-w-[480px]">
+              <h2 className="text-[15px] font-semibold text-ink">Đổi mật khẩu tài khoản</h2>
+              <p className="mt-1 text-[13px] text-muted">
+                Để bảo vệ tài khoản, không chia sẻ mật khẩu cho người khác. Sau khi đổi mật khẩu, toàn bộ phiên đăng nhập trên các thiết bị khác sẽ được tự động thu hồi.
+              </p>
+
+              <form onSubmit={savePassword} className="mt-5 space-y-4">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium text-ink-soft">
+                    Mật khẩu hiện tại <span className="text-brand">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword.current ? 'text' : 'password'}
+                      className={inputClass}
+                      placeholder="Nhập mật khẩu hiện tại..."
+                      value={passwordDraft.currentPassword}
+                      onChange={(e) => setPasswordDraft((d) => ({ ...d, currentPassword: e.target.value }))}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => ({ ...s, current: !s.current }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted hover:text-brand"
+                    >
+                      {showPassword.current ? 'Ẩn' : 'Hiện'}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium text-ink-soft">
+                    Mật khẩu mới (tối thiểu 8 ký tự) <span className="text-brand">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword.next ? 'text' : 'password'}
+                      className={inputClass}
+                      placeholder="Nhập mật khẩu mới..."
+                      value={passwordDraft.newPassword}
+                      onChange={(e) => setPasswordDraft((d) => ({ ...d, newPassword: e.target.value }))}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => ({ ...s, next: !s.next }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted hover:text-brand"
+                    >
+                      {showPassword.next ? 'Ẩn' : 'Hiện'}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium text-ink-soft">
+                    Xác nhận mật khẩu mới <span className="text-brand">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    className={inputClass}
+                    placeholder="Nhập lại mật khẩu mới..."
+                    value={passwordDraft.confirmPassword}
+                    onChange={(e) => setPasswordDraft((d) => ({ ...d, confirmPassword: e.target.value }))}
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={passwordSaving}
+                  className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
+                >
+                  {passwordSaving ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                </button>
+              </form>
+            </div>
           ) : null}
         </section>
       </div>
