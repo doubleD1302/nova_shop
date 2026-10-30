@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
-import '../../services/api_config.dart';
+import '../../config/api_config.dart';
 import '../../widgets/common/nova_logo.dart';
 import 'register_screen.dart';
 

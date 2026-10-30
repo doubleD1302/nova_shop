@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../services/api_config.dart';
+import '../../config/api_config.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/order_service.dart';

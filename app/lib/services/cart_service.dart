@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cart_item.dart';
 import 'api_client.dart';
-import 'api_config.dart';
+import '../config/api_config.dart';
 import 'auth_service.dart';
 
 /// Service xử lý toàn bộ thao tác giỏ hàng trên App Mobile

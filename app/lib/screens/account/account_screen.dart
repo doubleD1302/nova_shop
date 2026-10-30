@@ -10,7 +10,7 @@ import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/cart_service.dart';
 import 'package:shopnova/screens/admin/admin_screen.dart';
-import 'package:shopnova/services/api_config.dart';
+import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/theme/app_colors.dart';
 
 class AccountScreen extends StatefulWidget {

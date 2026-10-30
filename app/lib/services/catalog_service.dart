@@ -8,7 +8,7 @@ import '../models/flash_sale_item.dart';
 import '../data/website_data.dart';
 import '../utils/product_image_resolver.dart';
 import 'api_client.dart';
-import 'api_config.dart';
+import '../config/api_config.dart';
 
 /// Kết quả phân trang danh sách sản phẩm
 class ProductListResult {

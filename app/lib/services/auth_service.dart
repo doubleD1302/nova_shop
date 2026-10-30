@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import 'api_client.dart';
-import 'api_config.dart';
+import '../config/api_config.dart';
 
 /// Service xử lý xác thực tài khoản (Đăng nhập, Đăng ký, Hồ sơ cá nhân)
 class AuthService extends ChangeNotifier {
