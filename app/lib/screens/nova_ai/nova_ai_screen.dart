@@ -323,7 +323,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   'parts': [
                     {
                       'text':
-                          'Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Hãy tự tư duy sâu sắc, trả lời tự nhiên, nhiệt tình và cụ thể theo câu hỏi của khách hàng: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
+                          'Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Ngữ cảnh thói quen người dùng: $_activeContextText. Nhiệm vụ: Hãy tự tư duy sâu sắc, phân tích và gợi ý thông minh dựa trên thói quen của khách hàng theo câu hỏi: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
                     }
                   ]
                 }

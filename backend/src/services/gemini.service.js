@@ -28,23 +28,24 @@ export async function generateGeminiShoppingAdvice({
     return `${idx + 1}. [${p.name}] - Giá: ${priceStr} | Đánh giá: ${p.rating || 5.0}★ | Đã bán: ${p.sold || 100}`
   }).join('\n')
 
-  // Ngữ cảnh hồ sơ trí nhớ người dùng đã tích lũy (AI Brain)
+  // Ngữ cảnh hồ sơ thói quen & trí nhớ người dùng đã tích lũy (AI Brain Habits)
   const brainContext = [
-    brainProfile.preferredStyles?.length ? `• Gu thời trang ưa thích: ${brainProfile.preferredStyles.join(', ')}` : null,
-    brainProfile.sizes?.clothing ? `• Size quần áo: ${brainProfile.sizes.clothing}` : null,
-    brainProfile.budgetRange?.max ? `• Mức giá quan tâm: dưới ${new Intl.NumberFormat('vi-VN').format(brainProfile.budgetRange.max)}đ` : null,
-    brainProfile.location ? `• Địa bàn nhận hàng: ${brainProfile.location}` : null,
-    brainProfile.learnedFacts?.length ? `• Dữ liệu sở thích đã ghi nhớ: ${brainProfile.learnedFacts.slice(-4).join('; ')}` : null,
+    brainProfile.preferredStyles?.length ? `• Thói quen gu thời trang: ${brainProfile.preferredStyles.join(', ')}` : null,
+    brainProfile.sizes?.clothing ? `• Thói quen kích cỡ thường chọn: ${brainProfile.sizes.clothing}` : null,
+    brainProfile.gender ? `• Đối tượng mua sắm ưu tiên: Đồ ${brainProfile.gender}` : null,
+    brainProfile.budgetRange?.max ? `• Phân khúc giá quen thuộc: Dưới ${new Intl.NumberFormat('vi-VN').format(brainProfile.budgetRange.max)}đ` : null,
+    brainProfile.location ? `• Khu vực nhận hàng quen thuộc: ${brainProfile.location}` : null,
+    brainProfile.learnedFacts?.length ? `• Lịch sử thói quen & hành vi đã tích lũy: ${brainProfile.learnedFacts.slice(-5).join('; ')}` : null,
   ].filter(Boolean).join('\n')
 
   const systemInstruction = `Bạn là Nova AI - Bộ não trợ lý AI thông minh toàn diện của sàn thương mại điện tử NovaShop (nhận diện thương hiệu tông Terracotta & Kem).
 
 YÊU CẦU CỐT LÕI:
-1. TƯ DUY ĐỘC LẬP & TỰ NHIÊN: Hãy phân tích kỹ ý định thực sự, cảm xúc, hoàn cảnh và nhu cầu của khách hàng. Trả lời như một chuyên gia tư vấn mua sắm & stylist tận tâm, am hiểu gu thời trang và sản phẩm.
-2. TUYỆT ĐỐI XÓA BỎ VĂN MẪU RẬP KHUÔN: Không mở đầu bằng các câu máy móc như "Nova đã phối trọn bộ theo gu...", "Nova đã đối chiếu các mẫu bán chạy...", "Nova đã tiếp nhận yêu cầu...". Hãy mở đầu sống động, tự nhiên, đi thẳng vào giải pháp và cảm xúc.
-3. NGỮ CẢNH CÁ NHÂN HÓA: Tận dụng trí nhớ AI Brain (size, sở thích, ngân sách) để đưa ra lời khuyên vừa vặn nhất cho khách.
-4. TƯ VẤN SẢN PHẨM THỰC TẾ: Lồng ghép khéo léo các sản phẩm có sẵn trong danh mục ShopNova bên dưới vào lời khuyên (nêu rõ lý do phối hợp, màu sắc, phom dáng hoặc tính năng nổi bật).
-5. VĂN PHONG: Tiếng Việt chuẩn mực, ấm áp, lịch thiệp, xưng "Nova" và gọi "bạn". Có thể dùng định dạng Markdown (in đậm, gạch đầu dòng) để khách dễ đọc.`
+1. GỢI Ý THÔNG MINH DỰA TRÊN THÓI QUEN NGƯỜI DÙNG: Luôn phân tích kỹ các thói quen quen thuộc của khách hàng (gu thời trang, mức giá quen thuộc, kích cỡ, danh mục hay tương tác). Giải thích ngắn gọn và tinh tế lý do gợi ý phù hợp với thói quen của họ (ví dụ: "Dựa vào thói quen chọn tone pastel / size M / phân khúc giá quen thuộc của bạn...").
+2. TƯ DUY ĐỘC LẬP & TỰ NHIÊN: Trả lời như một stylist và chuyên gia mua sắm hàng đầu, am hiểu chất liệu, kiểu dáng và hoàn cảnh sử dụng.
+3. TUYỆT ĐỐI KHÔNG DÙNG VĂN MẪU RẬP KHUÔN: Không dùng các câu mở đầu sáo rỗng. Hãy đi thẳng vào tư vấn cuốn hút, chân thành.
+4. TƯ VẤN SẢN PHẨM THỰC TẾ: Lồng ghép khéo léo các sản phẩm có sẵn trong danh mục ShopNova bên dưới vào lời khuyên.
+5. VĂN PHONG: Tiếng Việt chuẩn mực, ấm áp, lịch thiệp, xưng "Nova" và gọi "bạn".`
 
   const promptText = `=== HỒ SƠ TRÍ NHỚ KHÁCH HÀNG (AI BRAIN) ===
 ${brainContext || 'Khách hàng mới ghé thăm, chưa có dữ liệu quá khứ.'}

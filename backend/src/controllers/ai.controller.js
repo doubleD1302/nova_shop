@@ -174,10 +174,8 @@ export async function chatWithAi(req, res, next) {
         catalogProducts = FALLBACK_PRODUCTS
       }
 
-      // Ưu tiên sản phẩm theo sở thích đã học trong Brain
-      if (brain.profile.preferredStyles.some((s) => s.toLowerCase().includes('pastel'))) {
-        catalogProducts.sort((a, b) => (a.name.toLowerCase().includes('pastel') ? -1 : 1))
-      }
+      // ÁP DỤNG THUẬT TOÁN XẾP HẠNG THÔNG MINH DỰA TRÊN THÓI QUEN NGƯỜI DÙNG (SMART ADAPTIVE RANKING)
+      catalogProducts = aiBrainService.rankProductsByUserHabits(userKey, catalogProducts)
 
       // Nhánh C: Gợi ý phối đồ (Outfit Combo)
       if (

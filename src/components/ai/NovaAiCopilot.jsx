@@ -139,8 +139,10 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         const p3 = 'hm8gxA9oQWNoLOhjTkg5A'
         const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || `${p1}${p2}${p3}`
 
+        const habitFacts = brainMemory.learnedFacts?.length ? brainMemory.learnedFacts.slice(-4).join('; ') : 'Khách hàng mới'
         const prompt = `Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop (giao diện nhận diện tông Terracotta & Kem).
-Nhiệm vụ: Hãy tự tư duy độc lập, sáng tạo, trả lời tự nhiên, thân thiện và cụ thể theo câu hỏi của khách hàng: "${text}".
+Hồ sơ thói quen của khách hàng đã ghi nhớ: ${habitFacts}
+Nhiệm vụ: Hãy tự tư duy độc lập, giải thích và gợi ý thông minh dựa trên thói quen của khách hàng theo câu hỏi: "${text}".
 Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".`
 
         const geminiRes = await fetch(
