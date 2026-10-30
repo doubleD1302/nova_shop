@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../services/api_config.dart';
+import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/order_service.dart';
 import '../cart/cart_screen.dart';
@@ -234,78 +238,137 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     });
     _scrollToBottom();
 
-    // Giả lập xử lý AI thông minh theo ngữ cảnh
-    await Future.delayed(const Duration(milliseconds: 1000));
+    _AiChatMessage? aiResponse;
 
-    final lower = query.toLowerCase();
-    _AiChatMessage aiResponse;
+    // 1. Thử gọi trực tiếp API Backend AI thông minh
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/v1/ai/chat');
+      final res = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': query,
+          'context': {
+            'role': AuthService().currentUser?.role ?? 'buyer',
+          },
+        }),
+      ).timeout(const Duration(milliseconds: 3500));
 
-    if (lower.contains('đơn hàng') || lower.contains('tra cứu') || lower.contains('vận chuyển') || lower.contains('khi nào')) {
-      // Truy xuất dữ liệu đơn hàng thực tế từ OrderService
-      final orders = await OrderService().fetchOrders();
-      if (orders.isNotEmpty) {
-        final latest = orders.first;
-        final code = latest['code'] ?? latest['id'] ?? 'ORD-NOVA-882';
-        final status = (latest['status'] ?? 'shipping').toString();
-        final total = latest['totalAmount'] ?? latest['total_amount'] ?? 389000;
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        final data = decoded['data'] as Map<String, dynamic>?;
+        if (data != null) {
+          final reply = data['reply'] as String? ?? 'Nova đã hiểu yêu cầu của bạn!';
+          final intentTitle = data['intentTitle'] as String? ?? 'Nova AI Đề Xuất';
+          final intentMatch = data['intentMatch'] as String? ?? 'Khớp 98%';
+          final orderInfo = data['orderInfo'] as Map<String, dynamic>?;
+          final budget = data['budget'] as Map<String, dynamic>?;
 
+          aiResponse = _AiChatMessage(
+            isUser: false,
+            text: reply,
+            intentTitle: intentTitle,
+            intentMatch: intentMatch,
+            orderData: orderInfo != null
+                ? {
+                    'code': orderInfo['code'] ?? 'ORD-NOVA-882',
+                    'status': orderInfo['status'] ?? 'shipping',
+                    'total': orderInfo['total'] ?? 389000,
+                    'shipper': orderInfo['shipper'] ?? 'Nguyễn Văn Minh (0912.888.xxx)',
+                    'location': orderInfo['location'] ?? 'Bưu cục Quận 1 - TP.HCM',
+                    'eta': orderInfo['eta'] ?? 'Dự kiến giao trước 17:30 hôm nay',
+                    'step': orderInfo['step'] ?? 3,
+                  }
+                : null,
+            budgetMax: budget != null ? _formatVND(budget['max'] ?? 500000) : null,
+            budgetSaved: budget != null && budget['saved'] != null ? 'Tiết kiệm ${_formatVND(budget['saved'])}' : null,
+            budgetPercent: 0.88,
+            comboPrice: budget != null ? _formatVND(budget['total'] ?? 389000) : null,
+            isOutfitCombo: data['intent'] == 'outfit_combo',
+          );
+        }
+      }
+    } catch (_) {
+      // Tiếp tục xuống fallback cục bộ nếu thiết bị đang offline
+    }
+
+    // 2. Fallback xử lý thông minh theo ngữ cảnh nếu chưa có phản hồi từ máy chủ
+    if (aiResponse == null) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      final lower = query.toLowerCase();
+
+      if (lower.contains('đơn hàng') || lower.contains('tra cứu') || lower.contains('vận chuyển') || lower.contains('khi nào')) {
+        // Truy xuất dữ liệu đơn hàng thực tế từ OrderService
+        final orders = await OrderService().fetchOrders();
+        if (orders.isNotEmpty) {
+          final latest = orders.first;
+          final code = latest['code'] ?? latest['id'] ?? 'ORD-NOVA-882';
+          final status = (latest['status'] ?? 'shipping').toString();
+          final total = latest['totalAmount'] ?? latest['total_amount'] ?? 389000;
+
+          aiResponse = _AiChatMessage(
+            isUser: false,
+            text: 'Nova đã liên kết thông tin thời gian thực với trung tâm kho vận GHN & Shopee Xpress:',
+            intentMatch: 'Khớp 99%',
+            intentTitle: 'Nova Tra Cứu Đơn Hàng #$code',
+            orderData: {
+              'code': code.toString(),
+              'status': status,
+              'total': total,
+              'shipper': 'Nguyễn Văn Minh (0912.888.xxx)',
+              'location': 'Đang trung chuyển qua Bưu cục Quận 1 - TP.HCM',
+              'eta': 'Dự kiến giao trước 17:30 hôm nay',
+              'step': 3,
+            },
+          );
+        } else {
+          aiResponse = _AiChatMessage(
+            isUser: false,
+            text: 'Hiện tại bạn chưa có đơn hàng đang chờ giao. Nova sẵn sàng gợi ý các chương trình Flash Sale và Combo Freeship cực hấp dẫn cho bạn!',
+            intentMatch: 'Hỗ trợ 100%',
+            intentTitle: 'Tình Trạng Mua Sắm',
+          );
+        }
+      } else if (lower.contains('tiệc') || lower.contains('500k')) {
         aiResponse = _AiChatMessage(
           isUser: false,
-          text: 'Nova đã liên kết thông tin thời gian thực với trung tâm kho vận GHN & Shopee Xpress:',
-          intentMatch: 'Khớp 99%',
-          intentTitle: 'Nova Tra Cứu Đơn Hàng #$code',
-          orderData: {
-            'code': code.toString(),
-            'status': status,
-            'total': total,
-            'shipper': 'Nguyễn Văn Minh (0912.888.xxx)',
-            'location': 'Đang trung chuyển qua Bưu cục Quận 1 - TP.HCM',
-            'eta': 'Dự kiến giao trước 17:30 hôm nay',
-            'step': 3,
-          },
+          text: 'Nova đã phối sẵn set đầm dự tiệc phong cách thanh lịch, đính ngọc sang trọng kèm clutch mini, tổng chi phí trọn gói chỉ 469.000đ (đã áp mã giảm 40k)!',
+          intentMatch: 'Khớp 97%',
+          intentTitle: 'Phối Đồ Đi Tiệc Tối',
+          budgetMax: '500.000đ',
+          budgetSaved: 'Tiết kiệm 85.000đ',
+          budgetPercent: 0.938,
+          comboPrice: '469.000đ',
+          isOutfitCombo: true,
+        );
+      } else if (lower.contains('tai nghe') || lower.contains('chống ồn')) {
+        aiResponse = _AiChatMessage(
+          isUser: false,
+          text: 'Nova đã đối chiếu 3 dòng tai nghe ANC bán chạy nhất trong phân khúc: Baseus Bowie M2+ vs Soundpeats Capsule3 Pro vs Sony CH-720N. Gợi ý bạn nên chọn mẫu hỗ trợ xuyên âm và pin trâu 30h đang giảm 25%!',
+          intentMatch: 'Khớp 96%',
+          intentTitle: 'So Sánh Công Nghệ AI',
         );
       } else {
         aiResponse = _AiChatMessage(
           isUser: false,
-          text: 'Hiện tại bạn chưa có đơn hàng đang chờ giao. Nova sẵn sàng gợi ý các chương trình Flash Sale và Combo Freeship cực hấp dẫn cho bạn!',
-          intentMatch: 'Hỗ trợ 100%',
-          intentTitle: 'Tình Trạng Mua Sắm',
+          text: 'Nova đã tiếp nhận yêu cầu: "$query". Nova đang liên tục cập nhật kho hàng giá sỉ và các mã Voucher độc quyền dành riêng cho bạn!',
+          intentMatch: 'Khớp 95%',
+          intentTitle: 'Nova AI Đề Xuất Cá Nhân Hóa',
         );
       }
-    } else if (lower.contains('tiệc') || lower.contains('500k')) {
-      aiResponse = _AiChatMessage(
-        isUser: false,
-        text: 'Nova đã phối sẵn set đầm dự tiệc phong cách thanh lịch, đính ngọc sang trọng kèm clutch mini, tổng chi phí trọn gói chỉ 469.000đ (đã áp mã giảm 40k)!',
-        intentMatch: 'Khớp 97%',
-        intentTitle: 'Phối Đồ Đi Tiệc Tối',
-        budgetMax: '500.000đ',
-        budgetSaved: 'Tiết kiệm 85.000đ',
-        budgetPercent: 0.938,
-        comboPrice: '469.000đ',
-        isOutfitCombo: true,
-      );
-    } else if (lower.contains('tai nghe') || lower.contains('chống ồn')) {
-      aiResponse = _AiChatMessage(
-        isUser: false,
-        text: 'Nova đã đối chiếu 3 dòng tai nghe ANC bán chạy nhất trong phân khúc: Baseus Bowie M2+ vs Soundpeats Capsule3 Pro vs Sony CH-720N. Gợi ý bạn nên chọn mẫu hỗ trợ xuyên âm và pin trâu 30h đang giảm 25%!',
-        intentMatch: 'Khớp 96%',
-        intentTitle: 'So Sánh Công Nghệ AI',
-      );
-    } else {
-      aiResponse = _AiChatMessage(
-        isUser: false,
-        text: 'Nova đã tiếp nhận yêu cầu: "$query". Nova đang liên tục cập nhật kho hàng giá sỉ và các mã Voucher độc quyền dành riêng cho bạn!',
-        intentMatch: 'Khớp 95%',
-        intentTitle: 'Nova AI Đề Xuất Cá Nhân Hóa',
-      );
     }
 
-    if (mounted) {
+
+    if (mounted && aiResponse != null) {
       setState(() {
         _isThinking = false;
-        _messages.add(aiResponse);
+        _messages.add(aiResponse!);
       });
       _scrollToBottom();
+    } else if (mounted) {
+      setState(() {
+        _isThinking = false;
+      });
     }
   }
 

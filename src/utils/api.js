@@ -347,3 +347,15 @@ export function apiGetShopViolations(shopId) {
 export function apiGetAdminEmailStatus() {
   return apiRequest('/admin/email-status')
 }
+
+export async function apiSendAiMessage(message, context = {}) {
+  const response = await apiRequest('/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, context }),
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData?.message || 'Không thể kết nối đến trợ lý AI')
+  }
+  return response.json()
+}

@@ -11,6 +11,7 @@ import shopsRouter from './routes/shops.routes.js'
 import uploadsRouter from './routes/uploads.routes.js'
 import { serveUploadedImage } from './controllers/uploads.controller.js'
 import adminRouter from './routes/admin.routes.js'
+import aiRouter from './routes/ai.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 
@@ -60,6 +61,7 @@ app.use('/api/v1', adminRouter)
 app.use('/api/v1/products', productsRouter)
 app.use('/api/v1/orders', ordersRouter)
 app.use('/api/v1/seller', sellerRouter)
+app.use('/api/v1/ai', aiRouter)
 
 // 5. Middleware xử lý khi client gọi route không tồn tại (404)
 app.use(notFoundHandler)

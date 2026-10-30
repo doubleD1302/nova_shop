@@ -4,6 +4,7 @@ import CategoryNav from './CategoryNav'
 import Footer from './Footer'
 import MainHeader from './MainHeader'
 import TopBar from './TopBar'
+import NovaAiCopilot from '../ai/NovaAiCopilot'
 
 /** Cuộn lên đầu trang mỗi khi đổi route */
 function ScrollToTop() {
@@ -27,6 +28,7 @@ export default function MainLayout() {
       <main className="container-shop flex-1 pb-6 pt-4">
         <Outlet />
       </main>
+      <NovaAiCopilot />
       <Footer />
     </div>
   )
