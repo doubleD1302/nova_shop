@@ -286,6 +286,15 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
             comboPrice: budget != null ? _formatVND(budget['total'] ?? 389000) : null,
             isOutfitCombo: data['intent'] == 'outfit_combo',
           );
+
+          // Cập nhật dải ngữ cảnh học tập từ AI Brain
+          final brain = data['brain'] as Map<String, dynamic>?;
+          if (brain != null) {
+            final facts = brain['learnedFacts'] as List<dynamic>?;
+            if (facts != null && facts.isNotEmpty) {
+              _activeContextText = '🧠 Nova AI đã học: ${facts.take(3).join(' • ')}';
+            }
+          }
         }
       }
     } catch (_) {

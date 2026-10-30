@@ -359,3 +359,27 @@ export async function apiSendAiMessage(message, context = {}) {
   }
   return response.json()
 }
+
+export async function apiGetAiBrainProfile() {
+  const response = await apiRequest('/ai/brain/profile')
+  if (!response.ok) return null
+  return response.json()
+}
+
+export async function apiSendAiBrainFeedback(feedbackData) {
+  const response = await apiRequest('/ai/brain/feedback', {
+    method: 'POST',
+    body: JSON.stringify(feedbackData),
+  })
+  if (!response.ok) return null
+  return response.json()
+}
+
+export async function apiResetAiBrain() {
+  const response = await apiRequest('/ai/brain/reset', {
+    method: 'DELETE',
+  })
+  if (!response.ok) return null
+  return response.json()
+}
+
