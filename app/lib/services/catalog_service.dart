@@ -290,7 +290,7 @@ class CatalogService {
     return WebsiteData.flashSales;
   }
 
-  /// Lấy chi tiết sản phẩm
+  /// Lấy chi tiết sản phẩm từ Backend API (kèm fallback thông minh theo WebsiteData)
   Future<Product?> getProductDetail(String id) async {
     try {
       final res = await _client.get(
@@ -304,6 +304,15 @@ class CatalogService {
           return Product.fromJson(body['data'] as Map<String, dynamic>);
         }
       }
+    } catch (_) {}
+
+    // Fallback: Tìm trong danh mục dữ liệu chuẩn WebsiteData.products
+    try {
+      final cleanId = id.trim().toLowerCase();
+      final p = WebsiteData.products.firstWhere(
+        (prod) => prod.id.toLowerCase() == cleanId || prod.id.replaceAll('p', '') == cleanId.replaceAll('p', ''),
+      );
+      return p;
     } catch (_) {}
 
     return null;

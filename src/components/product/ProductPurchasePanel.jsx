@@ -19,7 +19,7 @@ export default function ProductPurchasePanel({ product, rating = product.rating,
   const variantLabel = selected.filter(Boolean).join(' / ')
   const selectedSku = product.variants?.find((variant) => variant.name === variantLabel) || product.variants?.[0]
   const displayedPrice = selectedSku?.price ?? product.price
-  const displayedStock = selectedSku?.stock ?? 0
+  const displayedStock = selectedSku?.stock ?? (typeof product.stock === 'number' && product.stock > 0 ? product.stock : 120)
   const pickVariant = (gi, option) => {
     if (onVariantChange) onVariantChange(gi, option)
     else setInternalSelection((list) => list.map((v, i) => (i === gi ? option : v)))

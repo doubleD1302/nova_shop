@@ -24,6 +24,8 @@ class Product {
   final int soldPercent;
   final String categoryId;
   final String shopId;
+  final int stock;
+  final List<Map<String, dynamic>> variants;
 
   const Product({
     required this.id,
@@ -48,6 +50,8 @@ class Product {
     this.soldPercent = 50,
     this.categoryId = '',
     this.shopId = '',
+    this.stock = 120,
+    this.variants = const [],
   });
 
   /// Luôn trả về hình ảnh thật chuẩn mực sắc nét của sản phẩm
@@ -81,6 +85,8 @@ class Product {
     int? soldPercent,
     String? categoryId,
     String? shopId,
+    int? stock,
+    List<Map<String, dynamic>>? variants,
   }) {
     return Product(
       id: id ?? this.id,
@@ -105,6 +111,8 @@ class Product {
       soldPercent: soldPercent ?? this.soldPercent,
       categoryId: categoryId ?? this.categoryId,
       shopId: shopId ?? this.shopId,
+      stock: stock ?? this.stock,
+      variants: variants ?? this.variants,
     );
   }
 
@@ -114,7 +122,7 @@ class Product {
     final priceVal = (rawPrice is num) ? rawPrice.toDouble() : double.tryParse(rawPrice?.toString() ?? '0') ?? 0.0;
     final origVal = (rawOrig is num) ? rawOrig.toDouble() : double.tryParse(rawOrig?.toString() ?? '0') ?? priceVal;
 
-    final rawSold = json['soldCount'];
+    final rawSold = json['soldCount'] ?? json['sold'];
     String soldStr = '0';
     if (rawSold is num) {
       if (rawSold >= 1000) {
@@ -133,21 +141,39 @@ class Product {
     if (rawBadges is List) {
       badges = rawBadges.where((e) => e != null).map((e) => e.toString()).toList();
     } else {
-      if (json['isMall'] == true) badges.add('Mall');
-      if (json['freeShipping'] == true) badges.add('Freeship');
+      if (json['isMall'] == true || json['mall'] == true) badges.add('MALL');
+      if (json['freeShipping'] == true || json['freeship'] == true) badges.add('Freeship');
     }
 
-    final rawImages = json['images'];
+    final rawImages = json['images'] ?? json['gallery'];
     List<String> images = [];
     if (rawImages is List) {
-      images = rawImages.where((e) => e != null).map((e) => e.toString()).toList();
+      images = rawImages.where((e) => e != null).map((e) {
+        if (e is Map && e['url'] != null) return e['url'].toString();
+        return e.toString();
+      }).toList();
     }
 
     final rawSpecs = json['specs'];
     Map<String, dynamic> specs = {};
     if (rawSpecs is Map) {
       specs = Map<String, dynamic>.from(rawSpecs);
+    } else if (rawSpecs is List) {
+      for (final item in rawSpecs) {
+        if (item is List && item.length >= 2) {
+          specs[item[0].toString()] = item[1].toString();
+        }
+      }
     }
+
+    final rawVariants = json['variants'];
+    List<Map<String, dynamic>> variants = [];
+    if (rawVariants is List) {
+      variants = rawVariants.whereType<Map<String, dynamic>>().toList();
+    }
+
+    final rawStock = json['stock'];
+    final stockVal = (rawStock is num) ? rawStock.toInt() : (int.tryParse(rawStock?.toString() ?? '') ?? 120);
 
     final discount = (json['discount'] as num?)?.toInt() ?? 0;
     final rating = (json['rating'] as num?)?.toDouble() ?? 4.9;
@@ -207,6 +233,8 @@ class Product {
       soldPercent: (json['soldPercent'] as num?)?.toInt() ?? 50,
       categoryId: cId,
       shopId: sId,
+      stock: stockVal,
+      variants: variants,
     );
   }
 }

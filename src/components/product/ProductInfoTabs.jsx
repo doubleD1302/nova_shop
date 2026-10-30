@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatNumber } from '../../utils/format'
+import { getCategoryName } from '../../data/categories'
 
 const TABS = [
   { id: 'desc', label: 'Chi Tiết Sản Phẩm' },
@@ -11,18 +12,29 @@ const TABS = [
 export default function ProductInfoTabs({ product }) {
   const [tab, setTab] = useState('desc')
 
+  const categoryLabel = getCategoryName(product?.categoryId) || product?.categoryName || 'Sản phẩm tiêu chuẩn'
+  const shopLabel = product?.shopName || 'ShopNova Official Store'
+  const locationLabel = product?.location || 'TP. Hồ Chí Minh'
+  const stockCount = typeof product?.stock === 'number' ? product.stock : 120
+
+  const specEntries = Array.isArray(product?.specs)
+    ? product.specs
+    : Object.entries(product?.specs || {})
+
   return (
-    <section id="chi-tiet" className="mt-3 rounded-sm border border-line bg-white">
-      <div className="flex flex-wrap items-center gap-6 border-b border-line px-4">
-        <h2 className="py-3 text-[16px] font-bold text-ink">Chi Tiết Sản Phẩm</h2>
+    <section id="chi-tiet" className="mt-3 rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs overflow-hidden">
+      <div className="flex flex-wrap items-center gap-6 border-b border-[#E6D5C2] bg-[#F5E7D4] px-4">
+        <h2 className="py-3 text-[16px] font-bold text-[#49352D]">Chi Tiết Sản Phẩm</h2>
         <div className="flex flex-wrap gap-5">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`py-3 text-[13px] transition ${
-                tab === t.id ? 'border-b-2 border-brand font-medium text-brand' : 'text-ink-soft hover:text-brand'
+              className={`py-3 text-[13px] font-medium transition ${
+                tab === t.id
+                  ? 'border-b-2 border-[#BD6E49] text-[#BD6E49]'
+                  : 'text-[#8B7566] hover:text-[#BD6E49]'
               }`}
             >
               {t.label}
@@ -36,28 +48,39 @@ export default function ProductInfoTabs({ product }) {
           <div className="space-y-4">
             <div className="grid gap-x-8 gap-y-2 text-[13px] md:grid-cols-2">
               <div className="flex">
-                <span className="w-[130px] shrink-0 text-muted">Danh Mục</span>
-                <span className="text-ink-soft">{product.categoryId}</span>
+                <span className="w-[130px] shrink-0 text-[#8B7566]">Danh Mục</span>
+                <span className="font-medium text-[#49352D]">{categoryLabel}</span>
               </div>
               <div className="flex">
-                <span className="w-[130px] shrink-0 text-muted">Thương hiệu</span>
-                <span className="text-ink-soft">{product.shopName}</span>
+                <span className="w-[130px] shrink-0 text-[#8B7566]">Gian hàng</span>
+                <span className="font-medium text-[#49352D]">{shopLabel}</span>
               </div>
               <div className="flex">
-                <span className="w-[130px] shrink-0 text-muted">Kho hàng</span>
-                <span className="text-ink-soft">{formatNumber(product.stock)}</span>
+                <span className="w-[130px] shrink-0 text-[#8B7566]">Kho hàng</span>
+                <span className="font-medium text-[#49352D]">{formatNumber(stockCount)} sản phẩm có sẵn</span>
               </div>
               <div className="flex">
-                <span className="w-[130px] shrink-0 text-muted">Gửi từ</span>
-                <span className="text-ink-soft">{product.location}</span>
+                <span className="w-[130px] shrink-0 text-[#8B7566]">Gửi từ</span>
+                <span className="font-medium text-[#49352D]">{locationLabel}</span>
               </div>
             </div>
 
-            <div className="whitespace-pre-line text-[14px] leading-[22px] text-ink-soft">{product.description}</div>
+            <div className="whitespace-pre-line text-[14px] leading-[24px] text-[#49352D]">
+              {product?.description || 'Sản phẩm chính hãng ShopNova với chất lượng kiểm định nghiêm ngặt, đóng gói cẩn thận và hỗ trợ bảo hành chính hãng toàn quốc.'}
+            </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(product.tags || []).map((t) => (
-                <span key={t} className="rounded-full bg-page px-3 py-1 text-[12px] text-ink-soft">
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="rounded-full bg-[#F5E7D4] px-3 py-1 text-[12px] font-semibold text-[#BD6E49]">
+                #ChínhHãng100%
+              </span>
+              <span className="rounded-full bg-[#F5E7D4] px-3 py-1 text-[12px] font-semibold text-[#BD6E49]">
+                #FreeshipExtra
+              </span>
+              <span className="rounded-full bg-[#F5E7D4] px-3 py-1 text-[12px] font-semibold text-[#BD6E49]">
+                #ĐổiTrả15Ngày
+              </span>
+              {(product?.tags || []).map((t) => (
+                <span key={t} className="rounded-full bg-[#F5E7D4] px-3 py-1 text-[12px] text-[#8B7566]">
                   #{t}
                 </span>
               ))}
@@ -66,16 +89,24 @@ export default function ProductInfoTabs({ product }) {
         ) : null}
 
         {tab === 'specs' ? (
-          <table className="w-full max-w-[720px] border border-line text-[13px]">
-            <tbody>
-              {(product.specs || []).map(([k, v], i) => (
-                <tr key={k} className={i % 2 === 0 ? 'bg-page/60' : 'bg-white'}>
-                  <td className="w-[190px] border-r border-line px-3 py-2 text-muted">{k}</td>
-                  <td className="px-3 py-2 text-ink-soft">{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          specEntries.length > 0 ? (
+            <table className="w-full max-w-[720px] border border-[#E6D5C2] text-[13px] rounded-lg overflow-hidden">
+              <tbody>
+                {specEntries.map(([k, v], i) => (
+                  <tr key={k} className={i % 2 === 0 ? 'bg-[#FDF9F3]' : 'bg-[#FFFCF7]'}>
+                    <td className="w-[190px] border-r border-[#E6D5C2] px-3 py-2 font-medium text-[#8B7566]">{k}</td>
+                    <td className="px-3 py-2 text-[#49352D]">{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-[13px] text-[#8B7566]">
+              <p>• Xuất xứ: Việt Nam / Nhập khẩu chính ngạch</p>
+              <p className="mt-1">• Tiêu chuẩn chất lượng: Đạt chuẩn sàn thương mại điện tử NovaShop</p>
+              <p className="mt-1">• Hạn bảo hành: 12 tháng chính hãng</p>
+            </div>
+          )
         ) : null}
 
         {tab === 'ship' ? (

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   listProducts,
+  getProductDetail,
   listProductReviews,
   listEligibleReviewItems,
   createProductReview,
@@ -10,6 +11,7 @@ import { authenticate } from '../middlewares/auth.middleware.js'
 const router = Router()
 
 router.get('/', listProducts)
+router.get('/:productId', getProductDetail)
 router.get('/:productId/reviews', listProductReviews)
 router.get('/:productId/reviews/eligible', authenticate, listEligibleReviewItems)
 router.post('/:productId/reviews', authenticate, createProductReview)

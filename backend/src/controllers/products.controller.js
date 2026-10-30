@@ -37,6 +37,43 @@ export async function listProducts(req, res, next) {
   }
 }
 
+export async function getProductDetail(req, res, next) {
+  try {
+    const { productId } = req.params
+    let product = null
+    try {
+      product = await callDataApi(`/internal/v1/products/${encodeURIComponent(productId)}`)
+    } catch (_) {
+      try {
+        const queryRes = await callDataApi(`/internal/v1/products?ids=${encodeURIComponent(productId)}`)
+        if (Array.isArray(queryRes?.products) && queryRes.products.length > 0) {
+          product = queryRes.products[0]
+        }
+      } catch {}
+      if (!product) {
+        try {
+          const slugRes = await callDataApi(`/internal/v1/products?slug=${encodeURIComponent(productId)}`)
+          if (Array.isArray(slugRes?.products) && slugRes.products.length > 0) {
+            product = slugRes.products[0]
+          }
+        } catch {}
+      }
+    }
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy sản phẩm.',
+        error: { code: 'PRODUCT_NOT_FOUND' },
+      })
+    }
+
+    return res.status(200).json({ success: true, data: product })
+  } catch (err) {
+    return next(err)
+  }
+}
+
 export async function listProductReviews(req, res, next) {
   try {
     const result = await callDataApi(`/internal/v1/products/${encodeURIComponent(req.params.productId)}/reviews`)
