@@ -4,6 +4,7 @@ import '../../screens/nova_ai/nova_ai_screen.dart';
 import '../../screens/search/search_screen.dart';
 import '../../services/cart_service.dart';
 import '../../theme/app_colors.dart';
+import 'nova_logo.dart';
 
 class ShopNovaAppBar extends StatelessWidget {
   const ShopNovaAppBar({super.key});
@@ -167,52 +168,12 @@ class ShopNovaAppBar extends StatelessWidget {
           child: Row(
             children: [
               // Logo NovaShop chuẩn Terracotta
-              InkWell(
+              NovaLogo(
+                size: 32,
+                fontSize: 19,
                 onTap: () {
                   Navigator.popUntil(context, (r) => r.isFirst);
                 },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Nova',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 19,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Shop',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 19,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(width: 12),
 

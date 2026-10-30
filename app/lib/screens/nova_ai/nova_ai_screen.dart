@@ -6,6 +6,7 @@ import '../cart/cart_screen.dart';
 import '../orders/orders_screen.dart';
 import '../search/search_screen.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/common/nova_logo.dart';
 
 /// Screen Nova AI Copilot - Trợ lý mua sắm và theo dõi đơn hàng thông minh
 class NovaAIScreen extends StatefulWidget {
@@ -654,31 +655,10 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   ],
 
                   // Logo & Brand
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: colorPrimary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.shopping_bag, color: Colors.white, size: 18),
-                      ),
-                      if (!widget.isStandalone) ...[
-                        const SizedBox(width: 6),
-                        const Text(
-                          'ShopNova',
-                          style: TextStyle(
-                            color: colorPrimary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ],
-                    ],
+                  NovaLogo(
+                    size: 28,
+                    fontSize: 16,
+                    showText: !widget.isStandalone,
                   ),
                   const SizedBox(width: 10),
 

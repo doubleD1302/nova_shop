@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_config.dart';
+import '../../widgets/common/nova_logo.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -211,45 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textPrimary),
         onPressed: () => Navigator.maybePop(context),
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border, width: 0.8),
-            ),
-            child: const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 8),
-          RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Nova',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                TextSpan(
-                  text: 'Shop',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      title: const NovaLogo(size: 30, fontSize: 19),
       centerTitle: true,
       actions: [
         IconButton(
