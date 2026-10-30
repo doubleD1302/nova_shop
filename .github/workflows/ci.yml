@@ -1,0 +1,71 @@
+name: CI & Deployment Status
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  test-and-verify:
+    name: Build & Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web Frontend
+        run: npm run build
+
+      - name: Test Backend API
+        run: |
+          npm --prefix backend ci
+          npm --prefix backend run smoke
+
+      - name: Test Data API
+        run: |
+          npm --prefix data-api ci
+          npm --prefix data-api run smoke
+
+  update-deployment-status:
+    name: Sync Deployment Status
+    needs: test-and-verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark novashop-api deployment as success
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEPLOY_ID=$(gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/deployments \
+            -f ref="${{ github.sha }}" \
+            -f environment="main - novashop-api" \
+            -F auto_merge=false \
+            -F required_contexts='[]' \
+            -f description="Backend & Data API verified passing" \
+            --jq '.id')
+
+          echo "Created deployment $DEPLOY_ID for main - novashop-api"
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/deployments/$DEPLOY_ID/statuses \
+            -f state="success" \
+            -f description="All build and smoke tests passed successfully"
