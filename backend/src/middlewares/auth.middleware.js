@@ -206,13 +206,8 @@ export function requireRole(...allowedRoles) {
     }
 
     const userRole = req.user.role
-    // Admin kế thừa toàn bộ quyền của seller và buyer; Seller kế thừa toàn bộ quyền của buyer
-    let effectiveRoles = [userRole]
-    if (userRole === 'admin') {
-      effectiveRoles = ['admin', 'seller', 'buyer']
-    } else if (userRole === 'seller') {
-      effectiveRoles = ['seller', 'buyer']
-    }
+    // Seller kế thừa toàn bộ quyền của buyer (seller vẫn có quyền mua hàng)
+    const effectiveRoles = userRole === 'seller' ? ['seller', 'buyer'] : [userRole]
     const hasPermission = flattenedRoles.some((role) => effectiveRoles.includes(role))
 
     if (!hasPermission) {
