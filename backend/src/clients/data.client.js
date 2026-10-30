@@ -735,3 +735,45 @@ export async function getUserAuthProfile(userId) {
     'Dịch vụ dữ liệu nội bộ trả về mã trạng thái không hợp lệ.',
   )
 }
+
+/**
+ * Thao tác giỏ hàng qua Data API nội bộ.
+ */
+export async function fetchUserCart(userId) {
+  return await callDataApi(`/internal/v1/cart?userId=${encodeURIComponent(userId)}`)
+}
+
+export async function addCartItem(userId, data) {
+  return await callDataApi("/internal/v1/cart/items", {
+    method: "POST",
+    body: { ...data, userId },
+  })
+}
+
+export async function updateCartItem(userId, itemId, data) {
+  return await callDataApi(`/internal/v1/cart/items/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    body: { ...data, userId },
+  })
+}
+
+export async function removeCartItem(userId, itemId) {
+  return await callDataApi(`/internal/v1/cart/items/${encodeURIComponent(itemId)}`, {
+    method: "DELETE",
+    body: { userId },
+  })
+}
+
+export async function clearCart(userId, selectedOnly = false) {
+  return await callDataApi("/internal/v1/cart/items", {
+    method: "DELETE",
+    body: { userId, selectedOnly },
+  })
+}
+
+export async function syncCart(userId, items) {
+  return await callDataApi("/internal/v1/cart/sync", {
+    method: "POST",
+    body: { userId, items },
+  })
+}

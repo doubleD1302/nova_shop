@@ -304,6 +304,16 @@ export async function createOrder(req, res, next) {
           [voucher.id, orderId, userId, discountAmount],
         )
       }
+      // Tự động xóa các mặt hàng đã mua khỏi giỏ hàng của người dùng
+      const purchasedVariantIds = variants.map((v) => v.variant_id)
+      if (purchasedVariantIds.length > 0) {
+        const placeholders = purchasedVariantIds.map(() => "?").join(", ")
+        await query(
+          "DELETE FROM cart_items WHERE user_id = ? AND variant_id IN (" + placeholders + ")",
+          [userId, ...purchasedVariantIds],
+        )
+      }
+
       return {
         order: {
           id: orderId,

@@ -39,10 +39,13 @@
 | **Quản lý SP (Seller)** | `src/pages/seller/SellerProductsPage.jsx` | `DELETE /api/v1/seller/products/:id` | `seller` | Lưu trạng thái ẩn/lưu trữ vào MySQL; seller không thể tự duyệt/reactivate | **implemented** |
 | **Cài đặt Shop (Seller)** | `src/pages/seller/SellerShopPage.jsx` | `PUT /api/v1/seller/shop` | `seller` | Cập nhật shop hiện có trong MySQL | **implemented** |
 | **Thống kê (Seller)** | `src/pages/seller/SellerDashboardPage.jsx` | `GET /api/v1/seller/dashboard` | `seller` | Doanh thu, số đơn chờ xử lý, cảnh báo tồn kho, sản phẩm bán chạy | `planned` |
-| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `POST /api/v1/cart/items` | `buyer` | Thêm SKU vào giỏ: `{ variantId, qty }` | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | `planned` |
-| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` | Xóa sản phẩm khỏi giỏ hàng | `planned` |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx`<br>`src/pages/CartPage.jsx` | `GET /api/v1/cart` | `buyer` | Giỏ hàng hiện tại của user, gom nhóm theo từng shop | **implemented** |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `POST /api/v1/cart/items` | `buyer` | Thêm SKU vào giỏ: `{ variantId, qty }` | **implemented** |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `PATCH /api/v1/cart/items/:itemId` | `buyer` | Cập nhật số lượng (1-99) hoặc trạng thái chọn | **implemented** |
+| **Giỏ hàng (Cart)** | `src/pages/CartPage.jsx` | `DELETE /api/v1/cart/items/:itemId` | `buyer` | Xóa sản phẩm khỏi giỏ hàng | **implemented** |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx` | `DELETE /api/v1/cart/items` | `buyer` | Xóa toàn bộ giỏ hoặc các sản phẩm đã chọn (`?selected=true`) | **implemented** |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx` | `POST /api/v1/cart/sync` | `buyer` | Đồng bộ giỏ hàng từ guest local cart khi đăng nhập | **implemented** |
+| **Giỏ hàng (Cart)** | `src/context/CartContext.jsx` | `PATCH /api/v1/cart/selection` | `buyer` | Cập nhật chọn/bỏ chọn hàng loạt cho toàn giỏ hoặc shop | **implemented** |
 | **Đặt hàng (Buyer)** | `src/pages/CheckoutPage.jsx`<br>`src/context/OrderContext.jsx` | `POST /api/v1/orders` | `buyer` | Tạo đơn (Master Order + Shop Orders); backend tính lại giá, khóa/kiểm tra SKU và trừ kho trong transaction, hỗ trợ `Idempotency-Key` | **implemented** |
 | **Đơn hàng (Buyer)** | `src/pages/OrdersPage.jsx`<br>`src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders` | `buyer` | Danh sách đơn của tài khoản đã xác thực và lịch sử trạng thái từ DB | **implemented** |
 | **Đơn hàng (Buyer)** | `src/pages/OrderDetailPage.jsx` | `GET /api/v1/orders/:orderId` | `buyer` | Chi tiết được truy vấn qua danh sách đơn thuộc người mua đã xác thực | **implemented** |
@@ -315,5 +318,5 @@ MySQL 8.4 Server (Port 3306 - shopnova_dev)
   - **Database MySQL 8.4:** Database `shopnova_dev` hiện có 23 bảng. Schema/seed không tự chạy khi ứng dụng khởi động; `database/seed.sql` là fixture chỉ chạy thủ công. MySQL local dùng data directory trên ổ đĩa `C:\xampp\mysql\data`.
   - **Data API Nội bộ (`data-api/`):** Đang chạy tại Port 3001, cung cấp readiness/health và các endpoint nghiệp vụ MySQL cho auth, catalog, seller, orders và admin. Bộ smoke test gần nhất đạt 59/59.
   - **Backend HTTP Client (`backend/src/clients/data.client.js`):** Đã hoàn thành trong DB-003 / BE-002B2 (**implemented**), sử dụng built-in `fetch` gọi Data API `/internal/v1/health` và `/internal/v1/ready` với deadline cố định 5000ms bao phủ kết nối, headers, streaming body và parse JSON; giới hạn 1MiB; mapping lỗi an toàn thành 502/503/504 và hỗ trợ endpoint `GET /api/v1/ready`.
-  - **Endpoint nghiệp vụ:** Auth, catalog, seller product/shop, orders, admin moderation và Flash Sale đã được triển khai qua Backend/Data API tới MySQL. Cart và seller dashboard vẫn được ghi là `planned` trong bảng endpoint ở tài liệu này.
+  - **Endpoint nghiệp vụ:** Auth, catalog, seller product/shop, orders, admin moderation và Flash Sale đã được triển khai qua Backend/Data API tới MySQL. Giỏ hàng lưu trữ phía máy chủ (Server-side Cart BE-006) đã hoàn thành (**implemented**). Seller dashboard vẫn được ghi là `planned` trong bảng endpoint ở tài liệu này.
 - **An toàn dữ liệu:** Data API chỉ mở các endpoint nghiệp vụ cố định đã thiết kế; tuyệt đối không mở endpoint nhận câu lệnh SQL tùy ý. Backend tuyệt đối không kết nối trực tiếp MySQL hay import model từ Data API.

@@ -166,6 +166,23 @@ async function runTests() {
       assert(data.error?.code === 'AUTH_INVALID', 'Mã lỗi là AUTH_INVALID khi token sai chữ ký/cú pháp')
     }
 
+    // 6.4. Cart endpoints smoke: Yêu cầu giỏ hàng không có token trả 401 AUTH_REQUIRED
+    for (const item of [
+      { route: '/api/v1/cart', method: 'GET' },
+      { route: '/api/v1/cart/items', method: 'POST', body: { variantId: '1', qty: 1 } },
+      { route: '/api/v1/cart/items/1', method: 'PATCH', body: { qty: 2 } },
+      { route: '/api/v1/cart/items/1', method: 'DELETE' },
+    ]) {
+      const res = await fetch(`${baseUrl}${item.route}`, {
+        method: item.method,
+        headers: item.body ? { 'Content-Type': 'application/json' } : {},
+        body: item.body ? JSON.stringify(item.body) : undefined,
+      })
+      const data = await res.json()
+      assert(res.status === 401, `${item.method} ${item.route} thiếu token trả HTTP 401`)
+      assert(data.error?.code === 'AUTH_REQUIRED', `${item.method} ${item.route} có mã lỗi là AUTH_REQUIRED`)
+    }
+
     // -------------------------------------------------------------
     // 7. Kiểm tra xác thực cấu hình môi trường (src/config/env.js)
     // -------------------------------------------------------------

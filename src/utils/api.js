@@ -383,3 +383,57 @@ export async function apiResetAiBrain() {
   return response.json()
 }
 
+
+/**
+ * API Giỏ hàng lưu trữ phía máy chủ (Server-side Cart).
+ */
+export function apiGetCart(options = {}) {
+  return apiRequest("/cart", options)
+}
+
+export function apiAddToCart({ variantId, productId, qty = 1, selected = true, replaceQty }, options = {}) {
+  return apiRequest("/cart/items", {
+    method: "POST",
+    body: { variantId, productId, qty, selected, replaceQty },
+    ...options,
+  })
+}
+
+export function apiUpdateCartItem(itemId, { qty, selected }, options = {}) {
+  return apiRequest(`/cart/items/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    body: { qty, selected },
+    ...options,
+  })
+}
+
+export function apiRemoveCartItem(itemId, options = {}) {
+  return apiRequest(`/cart/items/${encodeURIComponent(itemId)}`, {
+    method: "DELETE",
+    ...options,
+  })
+}
+
+export function apiClearCart(options = {}) {
+  const query = options?.selectedOnly ? "?selected=true" : ""
+  return apiRequest(`/cart/items${query}`, {
+    method: "DELETE",
+    ...options,
+  })
+}
+
+export function apiSyncCart(items, options = {}) {
+  return apiRequest("/cart/sync", {
+    method: "POST",
+    body: { items },
+    ...options,
+  })
+}
+
+export function apiUpdateCartSelection(selected, shopId, options = {}) {
+  return apiRequest("/cart/selection", {
+    method: "PATCH",
+    body: { selected, shopId },
+    ...options,
+  })
+}
