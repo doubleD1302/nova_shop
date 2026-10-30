@@ -359,7 +359,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
             aiResponse = _AiChatMessage(
               isUser: false,
               text: text.trim(),
-              intentTitle: 'Tư Vấn Trực Tiếp Từ Gemini AI',
+              intentTitle: 'Trợ lý Nova',
               intentMatch: 'Khớp 99%',
             );
           }
