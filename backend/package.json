@@ -14,7 +14,9 @@
     "check:abort": "node scripts/test-abort-regression.mjs",
     "test:uploads": "node scripts/test-object-storage.mjs",
     "test:google-auth": "node scripts/test-google-auth.mjs",
-    "test:cart": "node scripts/test-cart-integration.mjs"
+    "test:cart": "node scripts/test-cart-integration.mjs",
+    "test:refresh-password": "node scripts/test-refresh-token-and-change-password.mjs",
+    "test:new-modules": "node scripts/test-post-sales-shipping-chat.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

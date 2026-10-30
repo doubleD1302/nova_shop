@@ -19,6 +19,46 @@ const isLoopbackApiUrl = (() => {
 // empty base URL, the host can route /api and /uploads to the deployed backend.
 export const API_BASE_URL = import.meta.env.PROD && isLoopbackApiUrl ? '' : configuredApiBaseUrl
 const TOKEN_KEY = 'novashop_token'
+export const REFRESH_TOKEN_KEY = 'novashop_refresh_token'
+
+let inflightRefreshPromise = null
+
+export async function refreshAccessToken() {
+  if (inflightRefreshPromise) return inflightRefreshPromise
+
+  inflightRefreshPromise = (async () => {
+    try {
+      const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY)
+      if (!refreshToken) return null
+
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success || !data?.data?.token) {
+        sessionStorage.removeItem(TOKEN_KEY)
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+        localStorage.removeItem(REFRESH_TOKEN_KEY)
+        return null
+      }
+
+      sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      if (data.data.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
+      return data.data
+    } catch {
+      return null
+    } finally {
+      inflightRefreshPromise = null
+    }
+  })()
+
+  return inflightRefreshPromise
+}
 const PUBLIC_GET_TTL_MS = 20_000
 const MAX_PUBLIC_GET_CACHE = 40
 const publicGetCache = new Map()
@@ -164,6 +204,32 @@ export async function apiGetMe(token, options = {}) {
       ...options.headers,
     },
     signal: options.signal,
+  })
+}
+
+export function apiRefreshToken(refreshToken) {
+  return fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  })
+}
+
+export function apiLogout(refreshToken) {
+  return fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ refreshToken }),
+  })
+}
+
+export function apiChangePassword(currentPassword, newPassword) {
+  return apiRequest('/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
   })
 }
 
@@ -434,6 +500,94 @@ export function apiUpdateCartSelection(selected, shopId, options = {}) {
   return apiRequest("/cart/selection", {
     method: "PATCH",
     body: { selected, shopId },
+    ...options,
+  })
+}
+
+/**
+ * 1. Vận chuyển (Shipping)
+ */
+export function apiCalculateShipping(payload, options = {}) {
+  return apiRequest('/shipping/calculate', {
+    method: 'POST',
+    body: payload,
+    ...options,
+  })
+}
+
+export function apiUpdateOrderTracking(shopOrderId, payload, options = {}) {
+  return apiRequest(`/seller/orders/${encodeURIComponent(shopOrderId)}/tracking`, {
+    method: 'PATCH',
+    body: payload,
+    ...options,
+  })
+}
+
+export function apiGetOrderTracking(orderId, options = {}) {
+  return apiRequest(`/orders/${encodeURIComponent(orderId)}/tracking`, options)
+}
+
+/**
+ * 2. Hậu mãi (Returns & Refunds)
+ */
+export function apiCreateOrderReturn(orderId, payload, options = {}) {
+  return apiRequest(`/orders/${encodeURIComponent(orderId)}/returns`, {
+    method: 'POST',
+    body: payload,
+    ...options,
+  })
+}
+
+export function apiGetOrderReturns(orderId, options = {}) {
+  return apiRequest(`/orders/${encodeURIComponent(orderId)}/returns`, options)
+}
+
+export function apiGetSellerReturns(options = {}) {
+  const { status, limit, offset, ...rest } = options
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  if (limit) params.set('limit', String(limit))
+  if (offset) params.set('offset', String(offset))
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return apiRequest(`/seller/returns${query}`, rest)
+}
+
+export function apiUpdateSellerReturnStatus(returnId, payload, options = {}) {
+  return apiRequest(`/seller/returns/${encodeURIComponent(returnId)}/status`, {
+    method: 'PATCH',
+    body: payload,
+    ...options,
+  })
+}
+
+/**
+ * 3. Giao tiếp (Chat)
+ */
+export function apiGetChatConversations(options = {}) {
+  return apiRequest('/chat/conversations', options)
+}
+
+export function apiStartChatConversation(shopId, options = {}) {
+  return apiRequest('/chat/conversations', {
+    method: 'POST',
+    body: { shopId },
+    ...options,
+  })
+}
+
+export function apiGetChatMessages(conversationId, options = {}) {
+  const { limit, offset, ...rest } = options
+  const params = new URLSearchParams()
+  if (limit) params.set('limit', String(limit))
+  if (offset) params.set('offset', String(offset))
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return apiRequest(`/chat/conversations/${encodeURIComponent(conversationId)}/messages${query}`, rest)
+}
+
+export function apiSendChatMessage(conversationId, payload, options = {}) {
+  return apiRequest(`/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    body: payload,
     ...options,
   })
 }
