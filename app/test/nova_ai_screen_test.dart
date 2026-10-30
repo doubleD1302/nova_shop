@@ -120,6 +120,10 @@ void main() {
     HttpOverrides.global = null;
   });
 
+  setUp(() {
+    NovaAIScreen.resetSession();
+  });
+
   testWidgets('NovaAIScreen renders all sections matching the HTML template', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -128,7 +132,7 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: NovaAIScreen(isStandalone: false),
+        home: NovaAIScreen(isStandalone: false, loadDemoIfEmpty: true),
       ),
     );
     await tester.pumpAndSettle();
@@ -163,5 +167,25 @@ void main() {
     // Verify Input Panel
     expect(find.text('Nova AI đang lắng nghe theo ngữ cảnh thời trang TP.HCM'), findsOneWidget);
     expect(find.text('Hỏi Nova về sản phẩm, phong cách, giá cả...'), findsOneWidget);
+  });
+
+  testWidgets('NovaAIScreen renders clean intelligent greeting by default without static mock data', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NovaAIScreen(isStandalone: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nova AI'), findsOneWidget);
+    expect(find.text('Trợ lý Nova'), findsOneWidget);
+    expect(find.textContaining('Trợ lý Nova AI ✨'), findsOneWidget);
+    // Ensure static mock prompt does NOT appear by default
+    expect(find.textContaining('Tìm giúp mình set đồ dạo phố mùa hè'), findsNothing);
   });
 }

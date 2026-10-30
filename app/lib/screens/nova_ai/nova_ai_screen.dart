@@ -16,12 +16,16 @@ import '../../widgets/common/nova_logo.dart';
 class NovaAIScreen extends StatefulWidget {
   final bool isStandalone;
   final String? initialQuery;
+  final bool loadDemoIfEmpty;
 
   const NovaAIScreen({
     super.key,
     this.isStandalone = false,
     this.initialQuery,
+    this.loadDemoIfEmpty = false,
   });
+
+  static void resetSession() => _NovaAIScreenState.resetSessionForTest();
 
   @override
   State<NovaAIScreen> createState() => _NovaAIScreenState();
@@ -112,8 +116,13 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     },
   ];
 
-  // List of chat dialogues
-  final List<_AiChatMessage> _messages = [];
+  // Shared session memory so user conversations are preserved across tab switches and app pauses
+  static final List<_AiChatMessage> _sessionMessages = [];
+  List<_AiChatMessage> get _messages => _sessionMessages;
+
+  static void resetSessionForTest() {
+    _sessionMessages.clear();
+  }
 
   final List<String> _quickPrompts = [
     '👗 Phối đồ đi tiệc < 500k',
@@ -127,28 +136,42 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    // Khởi tạo đoạn hội thoại mẫu đúng như giao diện HTML
-    _messages.add(
-      _AiChatMessage(
-        isUser: true,
-        text: 'Tìm giúp mình set đồ dạo phố mùa hè thoáng mát, tone pastel, ngân sách dưới 450.000đ giao hỏa tốc tại TP.HCM nha Nova!',
-        time: '14:24',
-      ),
-    );
 
-    _messages.add(
-      _AiChatMessage(
-        isUser: false,
-        text: 'Nova đã hiểu! Đã quét và chọn lọc từ 142 sản phẩm có sẵn kho TP.HCM, cam kết hỗ trợ giao Hỏa Tốc 2h và tự động ghép Voucher Freeship Xtra cho bạn.',
-        intentMatch: 'Khớp 98%',
-        intentTitle: 'Nova Phân Tích Ý Định',
-        budgetMax: '450.000đ',
-        budgetSaved: 'Tiết kiệm 61.000đ',
-        budgetPercent: 0.864,
-        comboPrice: '389.000đ',
-        isOutfitCombo: true,
-      ),
-    );
+    if (widget.loadDemoIfEmpty && _sessionMessages.isEmpty) {
+      // Dành cho chế độ kiểm thử mẫu
+      _sessionMessages.add(
+        _AiChatMessage(
+          isUser: true,
+          text: 'Tìm giúp mình set đồ dạo phố mùa hè thoáng mát, tone pastel, ngân sách dưới 450.000đ giao hỏa tốc tại TP.HCM nha Nova!',
+          time: '14:24',
+        ),
+      );
+
+      _sessionMessages.add(
+        _AiChatMessage(
+          isUser: false,
+          text: 'Nova đã hiểu! Đã quét và chọn lọc từ 142 sản phẩm có sẵn kho TP.HCM, cam kết hỗ trợ giao Hỏa Tốc 2h và tự động ghép Voucher Freeship Xtra cho bạn.',
+          intentMatch: 'Khớp 98%',
+          intentTitle: 'Nova Phân Tích Ý Định',
+          budgetMax: '450.000đ',
+          budgetSaved: 'Tiết kiệm 61.000đ',
+          budgetPercent: 0.864,
+          comboPrice: '389.000đ',
+          isOutfitCombo: true,
+          products: _outfitItems,
+        ),
+      );
+    } else if (_sessionMessages.isEmpty) {
+      // Khởi tạo phiên trợ lý Nova AI tự nhiên và chân thực
+      _sessionMessages.add(
+        _AiChatMessage(
+          isUser: false,
+          text: 'Xin chào! Mình là Trợ lý Nova AI ✨ – Trợ lý mua sắm thông minh của bạn. Mình đã sẵn sàng tư vấn phong cách, gợi ý sản phẩm theo gu và thói quen của bạn. Bạn muốn tìm kiếm hoặc cần gợi ý gì hôm nay?',
+          intentMatch: 'AI Brain 100%',
+          intentTitle: 'Trợ lý Nova',
+        ),
+      );
+    }
 
     if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -183,20 +206,29 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     return '${str.replaceAllMapped(reg, (Match m) => '${m[1]}.')}đ';
   }
 
-  // Thêm trọn bộ combo 3 món vào giỏ hàng
-  Future<void> _addComboToCart() async {
+  // Thêm trọn bộ combo vào giỏ hàng
+  Future<void> _addComboToCart([List<Map<String, dynamic>>? customItems]) async {
     if (_isAddingCombo) return;
     setState(() => _isAddingCombo = true);
 
+    final targetItems = (customItems != null && customItems.isNotEmpty)
+        ? customItems
+        : _outfitItems;
+
     final cart = CartService();
-    for (final item in _outfitItems) {
+    for (final item in targetItems) {
+      final priceNum = (item['price'] is num) ? (item['price'] as num).toDouble() : 150000.0;
+      final origPriceNum = (item['originalPrice'] is num)
+          ? (item['originalPrice'] as num).toDouble()
+          : (priceNum * 1.3);
+
       await cart.addToCart(
-        productId: item['id'],
-        productName: item['name'],
-        variantName: 'Màu Pastel - Size M',
-        price: (item['price'] as int).toDouble(),
-        originalPrice: (item['originalPrice'] as int).toDouble(),
-        imageUrl: item['imageUrl'] ?? '',
+        productId: item['id']?.toString() ?? 'p_${DateTime.now().millisecondsSinceEpoch}',
+        productName: item['name']?.toString() ?? 'Sản phẩm Nova AI',
+        variantName: 'Màu sắc & Size chuẩn',
+        price: priceNum,
+        originalPrice: origPriceNum,
+        imageUrl: item['imageUrl']?.toString() ?? '',
         qty: 1,
         shopName: item['mall'] == true ? 'ShopNova Mall' : 'Shop Thời Trang Sài Gòn',
         shopMall: item['mall'] == true,
@@ -263,12 +295,17 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           final intentMatch = data['intentMatch'] as String? ?? 'Khớp 98%';
           final orderInfo = data['orderInfo'] as Map<String, dynamic>?;
           final budget = data['budget'] as Map<String, dynamic>?;
+          final rawProducts = data['products'] as List<dynamic>?;
+          final dynamicProducts = rawProducts
+              ?.map((p) => p is Map ? Map<String, dynamic>.from(p) : <String, dynamic>{})
+              .toList();
 
           aiResponse = _AiChatMessage(
             isUser: false,
             text: reply,
             intentTitle: intentTitle,
             intentMatch: intentMatch,
+            products: dynamicProducts,
             orderData: orderInfo != null
                 ? {
                     'code': orderInfo['code'] ?? 'ORD-NOVA-882',
@@ -284,7 +321,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
             budgetSaved: budget != null && budget['saved'] != null ? 'Tiết kiệm ${_formatVND(budget['saved'])}' : null,
             budgetPercent: 0.88,
             comboPrice: budget != null ? _formatVND(budget['total'] ?? 389000) : null,
-            isOutfitCombo: data['intent'] == 'outfit_combo',
+            isOutfitCombo: data['intent'] == 'outfit_combo' || (dynamicProducts != null && dynamicProducts.isNotEmpty),
           );
 
           // Cập nhật dải ngữ cảnh học tập từ AI Brain
@@ -997,13 +1034,13 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
             children: [
               _buildHeaderCircleBtn(Icons.refresh, 'Làm mới phiên chat', () {
                 setState(() {
-                  _messages.clear();
-                  _messages.add(
+                  _sessionMessages.clear();
+                  _sessionMessages.add(
                     _AiChatMessage(
                       isUser: false,
-                      text: 'Xin chào! Nova AI đã sẵn sàng hỗ trợ bạn săn deal, phối đồ và theo dõi đơn hàng 24/7.',
-                      intentMatch: 'Sẵn sàng',
-                      intentTitle: 'Phiên Chat Mới',
+                      text: 'Xin chào! Mình là Trợ lý Nova AI ✨ – Trợ lý mua sắm thông minh của bạn. Mình đã sẵn sàng tư vấn phong cách, gợi ý sản phẩm theo gu và thói quen của bạn. Bạn muốn tìm kiếm hoặc cần gợi ý gì hôm nay?',
+                      intentMatch: 'AI Brain 100%',
+                      intentTitle: 'Trợ lý Nova',
                     ),
                   );
                 });
@@ -1326,40 +1363,52 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                 // 3. Co-ordinated Outfit Cards Stream (Nếu là tin nhắn gợi ý combo)
                 if (msg.isOutfitCombo == true) ...[
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.style, color: colorPrimary, size: 18),
-                            SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                'Set Đồ Phối Chuẩn Gu Mùa Hè',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                overflow: TextOverflow.ellipsis,
+                  Builder(
+                    builder: (context) {
+                      final items = (msg.products != null && msg.products!.isNotEmpty)
+                          ? msg.products!
+                          : _outfitItems;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Expanded(
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.style, color: colorPrimary, size: 18),
+                                    SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Gợi Ý Mua Sắm Chuẩn Gu Thói Quen',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text('${_outfitItems.length} món kết hợp', style: const TextStyle(color: colorSecondary, fontSize: 11)),
-                    ],
+                              const SizedBox(width: 6),
+                              Text('${items.length} món kết hợp', style: const TextStyle(color: colorSecondary, fontSize: 11)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Danh sách sản phẩm
+                          ...items.map((item) => _buildOutfitItemCard(item)),
+
+                          // Smart Action Buttons For Combo
+                          const SizedBox(height: 6),
+                          _buildComboActionButtons(items),
+
+                          // Floating AI Exclusive Micro Feature Cards (Grid 2-Col)
+                          const SizedBox(height: 10),
+                          _buildMicroFeaturesGrid(),
+                        ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 8),
-
-                  // Danh sách 3 sản phẩm
-                  ..._outfitItems.map((item) => _buildOutfitItemCard(item)),
-
-                  // Smart Action Buttons For Combo
-                  const SizedBox(height: 6),
-                  _buildComboActionButtons(),
-
-                  // Floating AI Exclusive Micro Feature Cards (Grid 2-Col)
-                  const SizedBox(height: 10),
-                  _buildMicroFeaturesGrid(),
                 ],
               ],
             ),
@@ -1469,6 +1518,15 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
   // Từng sản phẩm trong Combo
   Widget _buildOutfitItemCard(Map<String, dynamic> item) {
+    final badge = item['badge']?.toString() ?? (item['mall'] == true ? 'MALL' : '');
+    final tag = item['tag']?.toString() ?? 'Gợi ý';
+    final subTag = item['subTag']?.toString() ?? 'Freeship';
+    final name = item['name']?.toString() ?? 'Sản phẩm Nova AI';
+    final rating = item['rating']?.toString() ?? '4.9';
+    final sold = item['sold']?.toString() ?? '500+ đã bán';
+    final priceNum = (item['price'] is num) ? (item['price'] as num) : 150000;
+    final origPriceNum = (item['originalPrice'] is num) ? (item['originalPrice'] as num) : (priceNum * 1.3);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -1492,7 +1550,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   height: 86,
                   color: colorSurfaceContainerHigh,
                   child: Image.network(
-                    item['imageUrl'] ?? '',
+                    item['imageUrl']?.toString() ?? '',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => const Center(
                       child: Icon(Icons.image_outlined, color: colorSecondary, size: 30),
@@ -1500,7 +1558,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   ),
                 ),
               ),
-              if ((item['badge'] as String).isNotEmpty)
+              if (badge.isNotEmpty)
                 Positioned(
                   top: 4,
                   left: 4,
@@ -1511,7 +1569,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                       borderRadius: BorderRadius.circular(3),
                     ),
                     child: Text(
-                      item['badge'],
+                      badge,
                       style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w800, letterSpacing: 0.3),
                     ),
                   ),
@@ -1536,7 +1594,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        item['tag'],
+                        tag,
                         style: const TextStyle(color: colorOnPrimaryFixed, fontSize: 9.5, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -1546,11 +1604,11 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                     if (item['subTagIcon'] != null) const SizedBox(width: 2),
                     Flexible(
                       child: Text(
-                        item['subTag'],
+                        subTag,
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: (item['subTag'] as String).contains('Giảm') ? colorPrimary : colorTertiary,
+                          color: subTag.contains('Giảm') ? colorPrimary : colorTertiary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1561,7 +1619,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
                 // Tiêu đề
                 Text(
-                  item['name'],
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorOnSurface),
@@ -1573,9 +1631,9 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   children: [
                     const Icon(Icons.star, color: colorPrimary, size: 13),
                     const SizedBox(width: 3),
-                    Text(item['rating'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    Text(rating, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                     const SizedBox(width: 4),
-                    Text('(${item['sold']})', style: const TextStyle(color: colorSecondary, fontSize: 11)),
+                    Text('($sold)', style: const TextStyle(color: colorSecondary, fontSize: 11)),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -1590,13 +1648,13 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            _formatVND(item['price'] as int),
+                            _formatVND(priceNum),
                             style: const TextStyle(color: colorPrimary, fontWeight: FontWeight.w800, fontSize: 13.5),
                           ),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              _formatVND(item['originalPrice'] as int),
+                              _formatVND(origPriceNum),
                               style: const TextStyle(color: colorSecondary, fontSize: 10.5, decoration: TextDecoration.lineThrough),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1607,7 +1665,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                     InkWell(
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Nova đang tìm món tương đương để thay thế "${item['name']}"...')),
+                          SnackBar(content: Text('Nova đang tìm món tương đương để thay thế "$name"...')),
                         );
                       },
                       borderRadius: BorderRadius.circular(15),
@@ -1632,7 +1690,8 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
   }
 
   // Buttons Thao tác Combo
-  Widget _buildComboActionButtons() {
+  Widget _buildComboActionButtons([List<Map<String, dynamic>>? comboItems]) {
+    final count = comboItems?.length ?? 3;
     return Column(
       children: [
         // Main Button: Thêm trọn bộ combo
@@ -1640,7 +1699,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           width: double.infinity,
           height: 46,
           child: ElevatedButton(
-            onPressed: _addComboToCart,
+            onPressed: () => _addComboToCart(comboItems),
             style: ElevatedButton.styleFrom(
               backgroundColor: _comboAddedSuccess ? colorTertiaryContainer : colorPrimary,
               foregroundColor: Colors.white,
@@ -1657,7 +1716,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          _comboAddedSuccess ? 'Đã thêm 3 sản phẩm vào giỏ hàng!' : 'Thêm trọn bộ combo vào giỏ (-15%)',
+                          _comboAddedSuccess ? 'Đã thêm $count sản phẩm vào giỏ hàng!' : 'Thêm trọn bộ combo vào giỏ (-15%)',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -2069,6 +2128,7 @@ class _AiChatMessage {
   final String? comboPrice;
   final bool? isOutfitCombo;
   final Map<String, dynamic>? orderData;
+  final List<Map<String, dynamic>>? products;
 
   _AiChatMessage({
     required this.isUser,
@@ -2082,5 +2142,6 @@ class _AiChatMessage {
     this.comboPrice,
     this.isOutfitCombo,
     this.orderData,
+    this.products,
   });
 }
