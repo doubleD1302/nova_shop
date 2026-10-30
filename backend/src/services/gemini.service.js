@@ -37,7 +37,7 @@ export async function generateGeminiShoppingAdvice({
     brainProfile.learnedFacts?.length ? `• Dữ liệu sở thích đã ghi nhớ: ${brainProfile.learnedFacts.slice(-4).join('; ')}` : null,
   ].filter(Boolean).join('\n')
 
-  const systemInstruction = `Bạn là Nova AI Copilot - Bộ não trợ lý AI thông minh toàn diện của sàn thương mại điện tử NovaShop (nhận diện thương hiệu tông Terracotta & Kem).
+  const systemInstruction = `Bạn là Nova AI - Bộ não trợ lý AI thông minh toàn diện của sàn thương mại điện tử NovaShop (nhận diện thương hiệu tông Terracotta & Kem).
 
 YÊU CẦU CỐT LÕI:
 1. TƯ DUY ĐỘC LẬP & TỰ NHIÊN: Hãy phân tích kỹ ý định thực sự, cảm xúc, hoàn cảnh và nhu cầu của khách hàng. Trả lời như một chuyên gia tư vấn mua sắm & stylist tận tâm, am hiểu gu thời trang và sản phẩm.

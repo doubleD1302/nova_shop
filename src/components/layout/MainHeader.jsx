@@ -35,11 +35,11 @@ export default function MainHeader() {
 
         {/* Nhóm tài khoản & Giỏ hàng bên phải */}
         <div className="order-2 ml-auto flex shrink-0 items-center gap-2.5 sm:gap-4 lg:order-3 lg:ml-0">
-          {/* Nút Nova AI Copilot thông minh */}
+          {/* Nút Nova AI thông minh */}
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('open-nova-ai'))}
-            title="Trợ lý mua sắm Nova AI Copilot"
+            title="Trợ lý mua sắm Nova AI"
             className="flex items-center gap-1.5 rounded-full border border-[#E6D5C2] bg-[#F5E7D4] px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-[#80513B] shadow-2xs transition-all duration-200 hover:border-[#BD6E49] hover:bg-[#BD6E49] hover:text-white cursor-pointer"
           >
             <span className="text-sm">✨</span>

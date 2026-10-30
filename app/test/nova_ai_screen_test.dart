@@ -133,8 +133,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify AI Copilot Header
-    expect(find.text('Nova AI Copilot'), findsOneWidget);
+    // Verify AI Header
+    expect(find.text('Nova AI'), findsOneWidget);
     expect(find.text('Trực tuyến 24/7'), findsOneWidget);
     expect(find.text('• Mua sắm thông minh'), findsOneWidget);
 

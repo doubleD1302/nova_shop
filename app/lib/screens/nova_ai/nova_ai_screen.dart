@@ -12,7 +12,7 @@ import '../search/search_screen.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common/nova_logo.dart';
 
-/// Screen Nova AI Copilot - Trợ lý mua sắm và theo dõi đơn hàng thông minh
+/// Screen Nova AI - Trợ lý mua sắm và theo dõi đơn hàng thông minh
 class NovaAIScreen extends StatefulWidget {
   final bool isStandalone;
   final String? initialQuery;
@@ -240,7 +240,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
     _AiChatMessage? aiResponse;
 
-    // 1. Thử gọi API Backend AI Copilot (đã tích hợp Gemini + AI Brain)
+    // 1. Thử gọi API Backend Nova AI (đã tích hợp Gemini + AI Brain)
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/api/v1/ai/chat');
       final res = await http.post(
@@ -319,7 +319,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   'parts': [
                     {
                       'text':
-                          'Bạn là Nova AI Copilot - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Hãy tự tư duy sâu sắc, trả lời tự nhiên, nhiệt tình và cụ thể theo câu hỏi của khách hàng: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
+                          'Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Hãy tự tư duy sâu sắc, trả lời tự nhiên, nhiệt tình và cụ thể theo câu hỏi của khách hàng: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
                     }
                   ]
                 }
@@ -860,7 +860,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           // Banner thông báo chưa có API kết nối
           _buildNoApiAiBanner(),
 
-          // AI Copilot Status & Quick Control Header
+          // Nova AI Status & Quick Control Header
           _buildAiStatusHeader(),
 
           // Smart Quick Prompts Bar (Horizontal Scroll)
@@ -907,7 +907,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Chưa có API kết nối: Tính năng Trợ lý Nova AI đang ở chế độ giao diện mẫu do hệ thống Backend website thương mại chưa phát triển API AI Copilot.',
+              'Chưa có API kết nối: Tính năng Trợ lý Nova AI đang ở chế độ giao diện mẫu do hệ thống Backend website thương mại chưa kết nối API Nova AI.',
               style: TextStyle(
                 color: Color(0xFF856404),
                 fontSize: 11,
@@ -920,7 +920,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     );
   }
 
-  // AI Copilot Status Header
+  // Nova AI Status Header
   Widget _buildAiStatusHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -978,7 +978,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                         children: [
                           Flexible(
                             child: Text(
-                              'Nova AI Copilot',
+                              'Nova AI',
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: colorOnSurface),
                               overflow: TextOverflow.ellipsis,
                             ),

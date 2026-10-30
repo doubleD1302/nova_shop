@@ -20,7 +20,7 @@ const INITIAL_MESSAGES = [
   {
     id: 'm1',
     isUser: false,
-    text: 'Xin chào! Mình là Nova AI Copilot ✨ – Trợ lý mua sắm thông minh có bộ não tự học (AI Brain). Mình có thể ghi nhớ gu thẩm mỹ, kích cỡ, ngân sách quen thuộc và lịch sử tìm kiếm của bạn để ngày càng hiểu bạn hơn. Bạn cần mình tư vấn gì hôm nay?',
+    text: 'Xin chào! Mình là Nova AI ✨ – Trợ lý mua sắm thông minh có bộ não tự học (AI Brain). Mình có thể ghi nhớ gu thẩm mỹ, kích cỡ, ngân sách quen thuộc và lịch sử tìm kiếm của bạn để ngày càng hiểu bạn hơn. Bạn cần mình tư vấn gì hôm nay?',
     time: 'Vừa xong',
     intentMatch: 'AI Brain Kích Hoạt 100%',
     suggestions: QUICK_PROMPTS,
@@ -305,7 +305,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[15px] font-black text-[#49352D]">Nova AI Copilot</span>
+                  <span className="text-[15px] font-black text-[#49352D]">Nova AI</span>
                   <span className="rounded bg-[#BD6E49] px-1.5 py-0.2 text-[10px] font-bold text-white">AI BRAIN</span>
                 </div>
                 <p className="text-[11px] text-[#8B7566] flex items-center gap-1">

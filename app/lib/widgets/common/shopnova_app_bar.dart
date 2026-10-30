@@ -212,7 +212,7 @@ class ShopNovaAppBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
 
-              // Nút Nova AI Copilot
+              // Nút Nova AI
               InkWell(
                 onTap: () {
                   Navigator.push(
