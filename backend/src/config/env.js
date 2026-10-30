@@ -250,6 +250,7 @@ function parseAndValidateEnv() {
     smtpPass,
     smtpFrom,
     isSmtpConfigured: Boolean(smtpHost && smtpUser && smtpPass),
+    geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
   })
 }
 

@@ -1,5 +1,6 @@
 import { callDataApi } from '../clients/data.client.js'
 import { aiBrainService } from '../services/ai-brain.service.js'
+import { generateGeminiShoppingAdvice } from '../services/gemini.service.js'
 
 /**
  * Danh sách sản phẩm dự phòng phong phú từ Catalog khi Data API chưa kết nối MySQL
@@ -255,6 +256,24 @@ export async function chatWithAi(req, res, next) {
             '⭐ Lọc sản phẩm đánh giá trên 4.8 sao',
           ],
         }
+      }
+    }
+
+    // BƯỚC 2.5: GỌI GOOGLE GEMINI 3.8 FLASH ĐỂ SINH CÂU TRẢ LỜI NGÔN NGỮ TỰ NHIÊN
+    if (aiResult && aiResult.intent !== 'order_tracking') {
+      try {
+        const geminiReply = await generateGeminiShoppingAdvice({
+          query,
+          brainProfile: brain.profile,
+          catalogProducts: aiResult.products || [],
+          intent: aiResult.intent,
+        })
+        if (geminiReply) {
+          aiResult.reply = geminiReply
+          aiResult.poweredBy = 'Google Gemini 3.8 Flash'
+        }
+      } catch (err) {
+        // Fallback nhẹ nhàng nếu mạng hoặc quota Gemini gián đoạn
       }
     }
 
