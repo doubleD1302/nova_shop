@@ -135,9 +135,9 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
       const aiMessage = {
         id: 'ai_fallback_' + Date.now(),
         isUser: false,
-        text: `Nova đã ghi nhận: "${text}". Dưới đây là gợi ý nổi bật từ kho hàng được đánh giá 4.9 sao dành riêng cho bạn:`,
+        text: `Nova đang kiểm tra nhanh kho hàng cho "${text}". Hiện máy chủ AI đang kết nối lại, bạn có thể xem các mẫu nổi bật bên dưới hoặc nhắn lại cho Nova nhé!`,
         time: timeNow,
-        intentTitle: 'Nova AI Đề Xuất',
+        intentTitle: 'Tư Vấn Mua Sắm Nova AI',
         intentMatch: 'Khớp 95%',
         products: [
           {

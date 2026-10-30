@@ -240,7 +240,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
     _AiChatMessage? aiResponse;
 
-    // 1. Thử gọi trực tiếp API Backend AI thông minh
+    // 1. Thử gọi API Backend AI Copilot (đã tích hợp Gemini + AI Brain)
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/api/v1/ai/chat');
       final res = await http.post(
@@ -252,7 +252,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
             'role': AuthService().currentUser?.role ?? 'buyer',
           },
         }),
-      ).timeout(const Duration(milliseconds: 3500));
+      ).timeout(const Duration(milliseconds: 10000));
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -298,73 +298,82 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         }
       }
     } catch (_) {
-      // Tiếp tục xuống fallback cục bộ nếu thiết bị đang offline
+      // Tiếp tục xuống gọi trực tiếp Gemini nếu backend offline
     }
 
-    // 2. Fallback xử lý thông minh theo ngữ cảnh nếu chưa có phản hồi từ máy chủ
+    // 2. Nếu máy chủ chưa phản hồi, kiểm tra API key trực tiếp từ môi trường compile
     if (aiResponse == null) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      final lower = query.toLowerCase();
-
-      if (lower.contains('đơn hàng') || lower.contains('tra cứu') || lower.contains('vận chuyển') || lower.contains('khi nào')) {
-        // Truy xuất dữ liệu đơn hàng thực tế từ OrderService
-        final orders = await OrderService().fetchOrders();
-        if (orders.isNotEmpty) {
-          final latest = orders.first;
-          final code = latest['code'] ?? latest['id'] ?? 'ORD-NOVA-882';
-          final status = (latest['status'] ?? 'shipping').toString();
-          final total = latest['totalAmount'] ?? latest['total_amount'] ?? 389000;
-
-          aiResponse = _AiChatMessage(
-            isUser: false,
-            text: 'Nova đã liên kết thông tin thời gian thực với trung tâm kho vận GHN & Shopee Xpress:',
-            intentMatch: 'Khớp 99%',
-            intentTitle: 'Nova Tra Cứu Đơn Hàng #$code',
-            orderData: {
-              'code': code.toString(),
-              'status': status,
-              'total': total,
-              'shipper': 'Nguyễn Văn Minh (0912.888.xxx)',
-              'location': 'Đang trung chuyển qua Bưu cục Quận 1 - TP.HCM',
-              'eta': 'Dự kiến giao trước 17:30 hôm nay',
-              'step': 3,
-            },
+      try {
+        const geminiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+        if (geminiKey.isNotEmpty) {
+          final geminiUrl = Uri.parse(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$geminiKey',
           );
-        } else {
-          aiResponse = _AiChatMessage(
-            isUser: false,
-            text: 'Hiện tại bạn chưa có đơn hàng đang chờ giao. Nova sẵn sàng gợi ý các chương trình Flash Sale và Combo Freeship cực hấp dẫn cho bạn!',
-            intentMatch: 'Hỗ trợ 100%',
-            intentTitle: 'Tình Trạng Mua Sắm',
-          );
+          final gRes = await http.post(
+            geminiUrl,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'role': 'user',
+                  'parts': [
+                    {
+                      'text':
+                          'Bạn là Nova AI Copilot - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Hãy tự tư duy sâu sắc, trả lời tự nhiên, nhiệt tình và cụ thể theo câu hỏi của khách hàng: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
+                    }
+                  ]
+                }
+              ],
+            'generationConfig': {
+              'temperature': 0.75,
+              'maxOutputTokens': 400,
+            }
+          }),
+        ).timeout(const Duration(milliseconds: 9000));
+
+        if (gRes.statusCode == 200) {
+          final gDecoded = jsonDecode(gRes.body);
+          final candidates = gDecoded['candidates'] as List<dynamic>?;
+          String? text;
+          if (candidates != null && candidates.isNotEmpty) {
+            final firstCandidate = candidates.first;
+            if (firstCandidate is Map) {
+              final content = firstCandidate['content'];
+              if (content is Map) {
+                final parts = content['parts'];
+                if (parts is List && parts.isNotEmpty) {
+                  final firstPart = parts.first;
+                  if (firstPart is Map) {
+                    text = firstPart['text']?.toString();
+                  }
+                }
+              }
+            }
+          }
+
+          if (text != null && text.trim().isNotEmpty) {
+            aiResponse = _AiChatMessage(
+              isUser: false,
+              text: text.trim(),
+              intentTitle: 'Tư Vấn Trực Tiếp Từ Gemini AI',
+              intentMatch: 'Khớp 99%',
+            );
+          }
         }
-      } else if (lower.contains('tiệc') || lower.contains('500k')) {
-        aiResponse = _AiChatMessage(
-          isUser: false,
-          text: 'Nova đã phối sẵn set đầm dự tiệc phong cách thanh lịch, đính ngọc sang trọng kèm clutch mini, tổng chi phí trọn gói chỉ 469.000đ (đã áp mã giảm 40k)!',
-          intentMatch: 'Khớp 97%',
-          intentTitle: 'Phối Đồ Đi Tiệc Tối',
-          budgetMax: '500.000đ',
-          budgetSaved: 'Tiết kiệm 85.000đ',
-          budgetPercent: 0.938,
-          comboPrice: '469.000đ',
-          isOutfitCombo: true,
-        );
-      } else if (lower.contains('tai nghe') || lower.contains('chống ồn')) {
-        aiResponse = _AiChatMessage(
-          isUser: false,
-          text: 'Nova đã đối chiếu 3 dòng tai nghe ANC bán chạy nhất trong phân khúc: Baseus Bowie M2+ vs Soundpeats Capsule3 Pro vs Sony CH-720N. Gợi ý bạn nên chọn mẫu hỗ trợ xuyên âm và pin trâu 30h đang giảm 25%!',
-          intentMatch: 'Khớp 96%',
-          intentTitle: 'So Sánh Công Nghệ AI',
-        );
-      } else {
-        aiResponse = _AiChatMessage(
-          isUser: false,
-          text: 'Nova đã tiếp nhận yêu cầu: "$query". Nova đang liên tục cập nhật kho hàng giá sỉ và các mã Voucher độc quyền dành riêng cho bạn!',
-          intentMatch: 'Khớp 95%',
-          intentTitle: 'Nova AI Đề Xuất Cá Nhân Hóa',
-        );
       }
+      } catch (_) {
+        // Mạng ngoại tuyến hoàn toàn
+      }
+    }
+
+    // 3. Fallback chỉ kích hoạt khi mất toàn bộ kết nối mạng
+    if (aiResponse == null) {
+      aiResponse = _AiChatMessage(
+        isUser: false,
+        text: 'Nova đã lắng nghe câu hỏi "$query" của bạn. Kết nối mạng hiện đang chập chờn, bạn vui lòng kiểm tra lại đường truyền internet và thử lại nhé!',
+        intentTitle: 'Thông Báo Kết Nối',
+        intentMatch: '95%',
+      );
     }
 
 

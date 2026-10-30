@@ -209,9 +209,9 @@ export async function chatWithAi(req, res, next) {
           : ''
 
         aiResult = {
-          reply: `Nova đã phối trọn bộ theo gu thời trang bạn yêu thích, tối ưu chi phí và hỗ trợ Freeship Xtra:${learnedHint}`,
+          reply: null,
           intent: 'outfit_combo',
-          intentTitle: 'Nova Gợi Ý Set Đồ Phối Sẵn',
+          intentTitle: 'Tư Vấn Phối Đồ & Set Thời Trang',
           intentMatch: 'Khớp 98%',
           budget: {
             max: brain.profile.budgetRange.max || 500000,
@@ -229,51 +229,58 @@ export async function chatWithAi(req, res, next) {
       } else if (lower.includes('so sánh') || lower.includes('tai nghe') || lower.includes('chống ồn')) {
         // Nhánh D: So sánh công nghệ
         aiResult = {
-          reply: `Nova đã đối chiếu các mẫu bán chạy nhất dựa trên dữ liệu đánh giá thực tế của cộng đồng:`,
+          reply: null,
           intent: 'product_comparison',
-          intentTitle: 'Bảng So Sánh Thông Minh Nova AI',
+          intentTitle: 'Bảng So Sánh Sản Phẩm Thông Minh',
           intentMatch: 'Khớp 96%',
           products: catalogProducts.slice(0, 3),
           suggestions: [
-            '🔍 Chi tiết thông số chống ồn ANC',
-            '⚡ Xem đánh giá 5 sao từ người dùng',
+            '🔍 Chi tiết thông số & bảo hành',
+            '⚡ Xem đánh giá thực tế từ người mua',
             '🏷️ Xem mã giảm giá hiện có',
           ],
         }
       } else {
-        // Nhánh E: Gợi ý chung
-        const userFact = brain.profile.learnedFacts[brain.profile.learnedFacts.length - 1]
-        const prefix = userFact ? `🧠 Nova đã lưu: ${userFact}. ` : ''
+        // Nhánh E: Gợi ý mua sắm / Trả lời tự do
         aiResult = {
-          reply: `${prefix}Nova đã chọn lọc các sản phẩm phù hợp nhất với yêu cầu "${query}" của bạn:`,
+          reply: null,
           intent: 'product_recommendation',
-          intentTitle: 'Gợi Ý Mua Sắm Từ Nova AI',
+          intentTitle: 'Tư Vấn Mua Sắm Nova AI',
           intentMatch: 'Khớp 95%',
           products: catalogProducts.slice(0, 4),
           suggestions: [
-            '⚡ Săn deal giảm sốc hôm nay',
-            '🚚 Sản phẩm hỗ trợ Freeship Xtra',
+            '⚡ Xem các deal hot nhất hôm nay',
+            '🚚 Lọc sản phẩm hỗ trợ Freeship Xtra',
             '⭐ Lọc sản phẩm đánh giá trên 4.8 sao',
           ],
         }
       }
     }
 
-    // BƯỚC 2.5: GỌI GOOGLE GEMINI 3.8 FLASH ĐỂ SINH CÂU TRẢ LỜI NGÔN NGỮ TỰ NHIÊN
+    // BƯỚC 2.5: GỌI GOOGLE GEMINI ĐỂ TRỰC TIẾP TƯ DUY & TRẢ LỜI TỰ NHIÊN (KHÔNG DÙNG VĂN MẪU)
     if (aiResult && aiResult.intent !== 'order_tracking') {
       try {
-        const geminiReply = await generateGeminiShoppingAdvice({
+        const geminiRes = await generateGeminiShoppingAdvice({
           query,
           brainProfile: brain.profile,
           catalogProducts: aiResult.products || [],
           intent: aiResult.intent,
         })
-        if (geminiReply) {
-          aiResult.reply = geminiReply
-          aiResult.poweredBy = 'Google Gemini 3.8 Flash'
+        if (geminiRes && geminiRes.reply) {
+          aiResult.reply = geminiRes.reply
+          aiResult.poweredBy = geminiRes.modelUsed || 'Google Gemini AI'
         }
       } catch (err) {
-        // Fallback nhẹ nhàng nếu mạng hoặc quota Gemini gián đoạn
+        console.warn('[AI Controller] Bỏ qua lỗi gọi Gemini:', err.message)
+      }
+
+      // Nếu Gemini không khả dụng, tạo câu trả lời tự nhiên theo đúng từ khóa của khách, tuyệt đối không dùng mẫu rập khuôn
+      if (!aiResult.reply) {
+        const topProduct = aiResult.products?.[0]?.name
+        aiResult.reply = topProduct
+          ? `Nova thấy bạn đang quan tâm đến "${query}". Đây là những sản phẩm được đánh giá cao nhất trong kho hàng hôm nay, nổi bật là ${topProduct}. Bạn có muốn mình tư vấn chi tiết hơn về thông số hay cách chọn kích cỡ không?`
+          : `Nova đã lắng nghe câu hỏi "${query}" của bạn. Bạn muốn Nova hỗ trợ thêm về phong cách, khoảng giá hay thương hiệu cụ thể nào không?`
+        aiResult.poweredBy = 'Nova Catalog Engine'
       }
     }
 
