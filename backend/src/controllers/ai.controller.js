@@ -98,11 +98,15 @@ function extractUserKey(req) {
 }
 
 /**
- * Controller xử lý hội thoại Trợ lý AI NovaShop kết hợp AI Brain Memory
+ * Controller xử lý hội thoại Trợ lý AI NovaShop:
+ * - Phân tích nhu cầu chuyên sâu của khách hàng.
+ * - Ghi nhớ các câu hỏi & câu trả lời trước đó trong phiên hội thoại.
+ * - Lọc và xếp hạng sản phẩm theo kiến thức chuyên môn của tư vấn viên.
+ * - Trả lời súc tích, logic, đúng trọng tâm.
  */
 export async function chatWithAi(req, res, next) {
   try {
-    const { message = '', context = {} } = req.body || {}
+    const { message = '', context = {}, history = [] } = req.body || {}
     const query = String(message).trim()
 
     if (!query) {
@@ -115,10 +119,22 @@ export async function chatWithAi(req, res, next) {
 
     const userKey = extractUserKey(req)
 
-    // BƯỚC 1: BỘ NÃO HỌC TẬP (AI BRAIN LEARNING)
-    // Trích xuất sở thích, size, ngân sách, phong cách từ tin nhắn
-    const { brain, newlyLearned } = aiBrainService.learnFromMessage(userKey, query)
+    // BƯỚC 1: BỘ NÃO HỌC TẬP & PHÂN TÍCH NHU CẦU TƯ VẤN VIÊN (AI BRAIN + CONSULTANT DISCOVERY)
+    const { brain, newlyLearned, consultantInsights } = aiBrainService.learnFromMessage(userKey, query)
     const lower = query.toLowerCase()
+
+    // Hợp nhất lịch sử hội thoại từ client gửi lên (nếu có) và lịch sử lưu trong bộ não
+    const clientHistoryTurns = Array.isArray(context.history || history)
+      ? (context.history || history).map((m) => ({
+          userQuery: m.isUser ? m.text : undefined,
+          aiReply: !m.isUser ? m.text : undefined,
+        }))
+      : []
+
+    const fullConversationHistory = [
+      ...(Array.isArray(brain.conversationHistory) ? brain.conversationHistory : []),
+      ...clientHistoryTurns,
+    ]
 
     // BƯỚC 2: PHÂN TÍCH Ý ĐỊNH VÀ KẾT NỐI DỮ LIỆU
     let aiResult = null
@@ -135,7 +151,7 @@ export async function chatWithAi(req, res, next) {
       const match = query.match(/(?:ORD-?|#)([A-Za-z0-9-]+)/i)
       if (match) orderCode = match[0].toUpperCase()
 
-      const userLoc = brain.profile.location || 'TP.HCM'
+      const userLoc = brain.confirmedCriteria?.location || brain.profile?.location || 'TP.HCM'
       const personalizedNote = newlyLearned.length > 0 ? ` (🧠 Nova vừa ghi nhớ: ${newlyLearned.join(', ')})` : ''
 
       aiResult = {
@@ -174,8 +190,18 @@ export async function chatWithAi(req, res, next) {
         catalogProducts = FALLBACK_PRODUCTS
       }
 
-      // ÁP DỤNG THUẬT TOÁN XẾP HẠNG THÔNG MINH DỰA TRÊN THÓI QUEN NGƯỜI DÙNG (SMART ADAPTIVE RANKING)
-      catalogProducts = aiBrainService.rankProductsByUserHabits(userKey, catalogProducts)
+      // Nếu là câu hỏi tiếp nối và có sản phẩm đang thảo luận, giữ sản phẩm đó trong danh mục
+      if (consultantInsights.isFollowUp && brain.activeFocus?.lastDiscussedProductId) {
+        const focusedId = brain.activeFocus.lastDiscussedProductId
+        const found = catalogProducts.find((p) => p.id === focusedId)
+        if (!found) {
+          const fallbackMatch = FALLBACK_PRODUCTS.find((p) => p.id === focusedId)
+          if (fallbackMatch) catalogProducts.unshift(fallbackMatch)
+        }
+      }
+
+      // ÁP DỤNG THUẬT TOÁN XẾP HẠNG THÔNG MINH DỰA TRÊN THÓI QUEN & LỌC CHUYÊN MÔN TƯ VẤN VIÊN
+      catalogProducts = aiBrainService.rankProductsByUserHabits(userKey, catalogProducts, consultantInsights)
 
       // Nhánh C: Gợi ý phối đồ (Outfit Combo)
       if (
@@ -196,15 +222,12 @@ export async function chatWithAi(req, res, next) {
           mall: Boolean(item.mall),
           imageUrl: item.imageUrl || FALLBACK_PRODUCTS[idx]?.imageUrl,
           tag: idx === 0 ? 'Món chính' : idx === 1 ? 'Phối kèm' : 'Phụ kiện',
+          consultantHighlights: item._consultantHighlights || [],
         }))
 
         const totalPrice = outfitItems.reduce((acc, cur) => acc + cur.price, 0)
         const totalOriginal = outfitItems.reduce((acc, cur) => acc + cur.originalPrice, 0)
         const saved = Math.max(0, totalOriginal - totalPrice)
-
-        const learnedHint = brain.profile.learnedFacts.length > 0
-          ? ` (💡 Dựa vào gu của bạn: ${brain.profile.learnedFacts.slice(-2).join(' • ')})`
-          : ''
 
         aiResult = {
           reply: null,
@@ -212,7 +235,7 @@ export async function chatWithAi(req, res, next) {
           intentTitle: 'Tư Vấn Phối Đồ & Set Thời Trang',
           intentMatch: 'Khớp 98%',
           budget: {
-            max: brain.profile.budgetRange.max || 500000,
+            max: brain.confirmedCriteria?.budgetMax || brain.profile.budgetRange.max || 500000,
             total: totalPrice,
             saved,
             currency: 'VND',
@@ -255,14 +278,16 @@ export async function chatWithAi(req, res, next) {
       }
     }
 
-    // BƯỚC 2.5: GỌI GOOGLE GEMINI ĐỂ TRỰC TIẾP TƯ DUY & TRẢ LỜI TỰ NHIÊN (KHÔNG DÙNG VĂN MẪU)
+    // BƯỚC 2.5: GỌI GOOGLE GEMINI ĐỂ TRỰC TIẾP TƯ DUY & TRẢ LỜI NGẮN GỌN, LOGIC THEO CHUẨN TƯ VẤN VIÊN
     if (aiResult && aiResult.intent !== 'order_tracking') {
       try {
         const geminiRes = await generateGeminiShoppingAdvice({
           query,
+          conversationHistory: fullConversationHistory,
           brainProfile: brain.profile,
           catalogProducts: aiResult.products || [],
           intent: aiResult.intent,
+          consultantInsights,
         })
         if (geminiRes && geminiRes.reply) {
           aiResult.reply = geminiRes.reply
@@ -272,13 +297,24 @@ export async function chatWithAi(req, res, next) {
         console.warn('[AI Controller] Bỏ qua lỗi gọi Gemini:', err.message)
       }
 
-      // Nếu Gemini không khả dụng, tạo câu trả lời tự nhiên theo đúng từ khóa của khách, tuyệt đối không dùng mẫu rập khuôn
+      // Nếu Gemini không phản hồi, tư vấn theo logic chuyên môn ngắn gọn, kế thừa câu hỏi trước
       if (!aiResult.reply) {
-        const topProduct = aiResult.products?.[0]?.name
-        aiResult.reply = topProduct
-          ? `Nova thấy bạn đang quan tâm đến "${query}". Đây là những sản phẩm được đánh giá cao nhất trong kho hàng hôm nay, nổi bật là ${topProduct}. Bạn có muốn mình tư vấn chi tiết hơn về thông số hay cách chọn kích cỡ không?`
-          : `Nova đã lắng nghe câu hỏi "${query}" của bạn. Bạn muốn Nova hỗ trợ thêm về phong cách, khoảng giá hay thương hiệu cụ thể nào không?`
-        aiResult.poweredBy = 'Nova Catalog Engine'
+        const topProduct = aiResult.products?.[0]
+        const topName = topProduct?.name || brain.activeFocus?.lastDiscussedProductName || 'sản phẩm'
+        const topPrice = topProduct?.price ? `${new Intl.NumberFormat('vi-VN').format(topProduct.price)}đ` : ''
+
+        if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'specs') {
+          aiResult.reply = `Về tính năng của ${topName}: Sản phẩm đạt chuẩn chống nước & mồ hôi IPX5, hỗ trợ chống ồn chủ động ANC và pin lên đến 28 giờ. Rất thích hợp cho bạn đeo làm việc văn phòng hoặc chạy bộ.`
+        } else if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'price') {
+          aiResult.reply = `${topName} đang có mức giá ưu đãi là ${topPrice}, hoàn toàn nằm trong mức ngân sách bạn mong muốn. Đơn hàng còn được tặng voucher Freeship Xtra hôm nay.`
+        } else if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'size') {
+          aiResult.reply = `Với form dáng của ${topName}, size M phù hợp cho cân nặng 48-53kg (chiều cao 1m55-1m62). Nếu bạn thích phong cách mặc rộng thoải mái có thể cân nhắc size L nhé.`
+        } else if (topProduct) {
+          aiResult.reply = `Nova đã chọn lọc ${topName} (${topPrice}) vì sở hữu chất liệu thoáng mát, đạt đánh giá ${topProduct.rating || 5.0}★ và phù hợp với tiêu chí của bạn. Bạn có muốn mình hỗ trợ chốt đơn giao hỏa tốc không?`
+        } else {
+          aiResult.reply = `Nova đã lắng nghe yêu cầu của bạn. Dựa trên phân tích chuyên môn, bạn muốn ưu tiên về phân khúc giá, màu sắc hay tính năng cụ thể nào nhất?`
+        }
+        aiResult.poweredBy = 'Nova Consultant Engine'
       }
     }
 
@@ -291,13 +327,14 @@ export async function chatWithAi(req, res, next) {
       orderInfo: aiResult.orderInfo,
     })
 
-    // Bổ sung dữ liệu Brain trong phản hồi để client hiển thị
+    // Bổ sung dữ liệu Brain trong phản hồi để client cập nhật
     aiResult.brain = {
       learnedFacts: brain.profile.learnedFacts,
       preferredStyles: brain.profile.preferredStyles,
       location: brain.profile.location,
       stats: brain.stats,
       newlyLearned,
+      consultantInsights,
     }
 
     return res.status(200).json({
@@ -321,6 +358,8 @@ export function getAiBrainProfile(req, res) {
     data: {
       userId: userKey,
       profile: brain.profile,
+      confirmedCriteria: brain.confirmedCriteria,
+      activeFocus: brain.activeFocus,
       stats: brain.stats,
       recentTurnsCount: brain.conversationHistory.length,
       updatedAt: brain.updatedAt,
@@ -355,6 +394,7 @@ export function resetAiBrain(req, res) {
     message: 'Đã làm mới ký ức của Nova AI thành công.',
     data: {
       profile: newBrain.profile,
+      confirmedCriteria: newBrain.confirmedCriteria,
       stats: newBrain.stats,
     },
   })

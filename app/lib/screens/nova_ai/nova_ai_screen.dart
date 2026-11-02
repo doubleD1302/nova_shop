@@ -274,6 +274,11 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
     // 1. Thử gọi API Backend Nova AI (đã tích hợp Gemini + AI Brain)
     try {
+      final recentHistory = _messages.take(6).map((m) => {
+        'isUser': m.isUser,
+        'text': m.text,
+      }).toList();
+
       final uri = Uri.parse('${ApiConfig.baseUrl}/api/v1/ai/chat');
       final res = await http.post(
         uri,
@@ -282,7 +287,9 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           'message': query,
           'context': {
             'role': AuthService().currentUser?.role ?? 'buyer',
+            'history': recentHistory,
           },
+          'history': recentHistory,
         }),
       ).timeout(const Duration(milliseconds: 10000));
 
@@ -347,6 +354,21 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         const p3 = 'hm8gxA9oQWNoLOhjTkg5A';
         final geminiKey = envKey.isNotEmpty ? envKey : '$p1$p2$p3';
         if (geminiKey.isNotEmpty) {
+          final historyTurns = _messages.take(4).map((m) {
+            final shortT = m.text.length > 150 ? '${m.text.substring(0, 150)}...' : m.text;
+            return '• ${m.isUser ? 'Khách' : 'Tư vấn viên Nova'}: "$shortT"';
+          }).join('\n');
+
+          final prompt = 'Bạn là Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của sàn thương mại điện tử NovaShop (nhận diện thương hiệu phong cách Terracotta & Kem).\n'
+              'Hồ sơ thói quen khách hàng: $_activeContextText\n\n'
+              'LỊCH SỬ CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ:\n'
+              '${historyTurns.isNotEmpty ? historyTurns : 'Đây là câu hỏi đầu tiên.'}\n\n'
+              'YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG: "$query"\n\n'
+              'QUY TẮC TƯ VẤN BẮT BUỘC:\n'
+              '1. GHI NHỚ LỊCH SỬ TRAO ĐỔI: Nếu câu hỏi là câu hỏi tiếp nối (về giá, size, màu sắc, chống nước, so sánh...), hãy hiểu ngay khách đang nói về sản phẩm ở lượt trước. Kế thừa thông tin, tuyệt đối không hỏi lại những gì khách đã nêu.\n'
+              '2. TRẢ LỜI NGẮN GỌN & LOGIC: Đi thẳng vào trọng tâm điều khách muốn (khoảng 80 - 130 từ), súc tích, mạch lạc.\n'
+              '3. CHUYÊN MÔN TƯ VẤN VIÊN: Sử dụng kiến thức về chất liệu, thông số kỹ thuật, form dáng và tính ứng dụng thực tế. Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".';
+
           final geminiUrl = Uri.parse(
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$geminiKey',
           );
@@ -359,15 +381,14 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   'role': 'user',
                   'parts': [
                     {
-                      'text':
-                          'Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop. Ngữ cảnh thói quen người dùng: $_activeContextText. Nhiệm vụ: Hãy tự tư duy sâu sắc, phân tích và gợi ý thông minh dựa trên thói quen của khách hàng theo câu hỏi: "$query". Tuyệt đối không dùng văn mẫu rập khuôn.'
+                      'text': prompt,
                     }
                   ]
                 }
               ],
             'generationConfig': {
-              'temperature': 0.75,
-              'maxOutputTokens': 400,
+              'temperature': 0.7,
+              'maxOutputTokens': 350,
             }
           }),
         ).timeout(const Duration(milliseconds: 9000));

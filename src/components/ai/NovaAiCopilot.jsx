@@ -104,7 +104,11 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
     setIsLoading(true)
 
     try {
-      const response = await apiSendAiMessage(text, {})
+      const recentHistory = messages.slice(-6).map((m) => ({
+        isUser: m.isUser,
+        text: m.text,
+      }))
+      const response = await apiSendAiMessage(text, { history: recentHistory })
       const aiData = response?.data || {}
 
       if (aiData.brain) {
@@ -140,10 +144,20 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || `${p1}${p2}${p3}`
 
         const habitFacts = brainMemory.learnedFacts?.length ? brainMemory.learnedFacts.slice(-4).join('; ') : 'Khách hàng mới'
-        const prompt = `Bạn là Nova AI - Trợ lý mua sắm AI thông minh của sàn thương mại điện tử NovaShop (giao diện nhận diện tông Terracotta & Kem).
-Hồ sơ thói quen của khách hàng đã ghi nhớ: ${habitFacts}
-Nhiệm vụ: Hãy tự tư duy độc lập, giải thích và gợi ý thông minh dựa trên thói quen của khách hàng theo câu hỏi: "${text}".
-Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".`
+        const historyContext = messages.slice(-4).map((m) => `• ${m.isUser ? 'Khách' : 'Tư vấn viên Nova'}: "${m.text.slice(0, 160)}"`).join('\n')
+        const prompt = `Bạn là Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của sàn thương mại điện tử NovaShop (nhận diện thương hiệu phong cách Terracotta & Kem).
+
+Hồ sơ thói quen & tiêu chuẩn của khách hàng: ${habitFacts}
+
+LỊCH SỬ CÁC CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ:
+${historyContext || 'Đây là câu hỏi đầu tiên.'}
+
+YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG: "${text}"
+
+QUY TẮC TƯ VẤN BẮT BUỘC:
+1. GHI NHỚ LỊCH SỬ TRAO ĐỔI: Nếu câu hỏi là câu hỏi tiếp nối (về giá, size, màu sắc, chống nước, so sánh...), hãy hiểu ngay khách đang nói về sản phẩm ở lượt trước. Kế thừa thông tin, tuyệt đối không hỏi lại những gì khách đã nêu.
+2. TRẢ LỜI NGẮN GỌN & LOGIC: Đi thẳng vào trọng tâm điều khách muốn (khoảng 80 - 130 từ), súc tích, mạch lạc.
+3. CHUYÊN MÔN TƯ VẤN VIÊN: Sử dụng kiến thức về chất liệu, thông số kỹ thuật, form dáng và tính ứng dụng thực tế. Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".`
 
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { analyzeConsultantNeeds, CONSULTANT_KNOWLEDGE_BASE } from './consultant-knowledge.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BRAIN_DIR = path.resolve(__dirname, '../../data/ai-brains')
@@ -18,10 +19,11 @@ try {
 const brainCache = new Map()
 
 /**
- * THUẬT TOÁN HỌC TẬP VÀ GỢI Ý THÔNG MINH THEO THÓI QUEN NGƯỜI DÙNG (SMART ADAPTIVE RECOMMENDATION ALGORITHM)
- * 1. Persona Learning: Phong cách, danh mục, ngân sách, giới tính, kích cỡ, địa chỉ.
- * 2. Affinity Scoring: Trọng số sở thích theo thời gian (Decay Factor) dựa trên tương tác, tìm kiếm và thêm giỏ hàng.
- * 3. Personalized Ranking: Chấm điểm sản phẩm kết hợp giữa độ liên quan từ khóa (Relevance) và thói quen tích lũy (Affinity).
+ * THUẬT TOÁN HỌC TẬP VÀ GỢI Ý THÔNG MINH THEO THÓI QUEN NGƯỜI DÙNG KẾT HỢP KIẾN THỨC TƯ VẤN VIÊN
+ * 1. Persona & Habit Learning: Phong cách, danh mục, ngân sách, giới tính, kích cỡ, địa chỉ.
+ * 2. Multi-turn Working Memory: Nhớ câu hỏi và câu trả lời trước đó, không hỏi lại.
+ * 3. Consultant Needs Discovery: Phân tích use-case, ràng buộc, câu hỏi tiếp nối (follow-up).
+ * 4. Constraint-based Ranking: Lọc và xếp hạng sản phẩm logic dựa trên tiêu chuẩn chuyên gia bán hàng.
  */
 class AiBrainService {
   constructor() {
@@ -58,6 +60,26 @@ class AiBrainService {
             pricePreference: { avg: null, count: 0 },
           }
         }
+        if (!brainData.confirmedCriteria) {
+          brainData.confirmedCriteria = {
+            budgetMax: brainData.profile?.budgetRange?.max || null,
+            size: brainData.profile?.sizes?.clothing || null,
+            gender: brainData.profile?.gender || null,
+            location: brainData.profile?.location || null,
+            preferredStyle: null,
+          }
+        }
+        if (!brainData.activeFocus) {
+          brainData.activeFocus = {
+            lastDiscussedProductId: null,
+            lastDiscussedProductName: null,
+            lastDiscussedCategory: null,
+            lastIntent: null,
+          }
+        }
+        if (!Array.isArray(brainData.conversationHistory)) {
+          brainData.conversationHistory = []
+        }
         brainCache.set(key, brainData)
         return brainData
       } catch (e) {
@@ -79,6 +101,19 @@ class AiBrainService {
         sizes: {},
         gender: null,
         learnedFacts: [],
+      },
+      confirmedCriteria: {
+        budgetMax: null,
+        size: null,
+        gender: null,
+        location: null,
+        preferredStyle: null,
+      },
+      activeFocus: {
+        lastDiscussedProductId: null,
+        lastDiscussedProductName: null,
+        lastDiscussedCategory: null,
+        lastIntent: null,
       },
       affinity: {
         categories: {}, // e.g. { "Thời trang nữ": 5, "Điện tử": 2 }
@@ -109,7 +144,7 @@ class AiBrainService {
   }
 
   /**
-   * Thuật toán trích xuất và học hỏi thói quen từ tin nhắn
+   * Thuật toán trích xuất và học hỏi thói quen từ tin nhắn kết hợp phân tích chuyên môn tư vấn
    */
   learnFromMessage(userIdOrSession, messageText) {
     const brain = this.getBrain(userIdOrSession)
@@ -134,6 +169,7 @@ class AiBrainService {
           brain.profile.preferredStyles.push(s.label)
           learned.push(`Ưa chuộng: ${s.label}`)
         }
+        brain.confirmedCriteria.preferredStyle = s.label
         brain.affinity.tags[s.tag] = (brain.affinity.tags[s.tag] || 0) + 2
       }
     }
@@ -162,11 +198,13 @@ class AiBrainService {
     }
 
     // 3. Học đối tượng / giới tính (nam, nữ, bé)
-    if (text.includes('cho nam') || text.includes('bạn trai') || text.includes('nam')) {
+    if (text.includes('cho nam') || text.includes('bạn trai') || text.includes('đồ nam')) {
       brain.profile.gender = 'Nam'
+      brain.confirmedCriteria.gender = 'Nam'
       learned.push('Ưu tiên gợi ý đồ Nam')
-    } else if (text.includes('cho nữ') || text.includes('bạn gái') || text.includes('nữ')) {
+    } else if (text.includes('cho nữ') || text.includes('bạn gái') || text.includes('đồ nữ')) {
       brain.profile.gender = 'Nữ'
+      brain.confirmedCriteria.gender = 'Nữ'
       learned.push('Ưu tiên gợi ý đồ Nữ')
     }
 
@@ -175,6 +213,7 @@ class AiBrainService {
     if (sizeMatch) {
       const sizeVal = sizeMatch[1].toUpperCase()
       brain.profile.sizes.clothing = sizeVal
+      brain.confirmedCriteria.size = sizeVal
       learned.push(`Size thường mặc: ${sizeVal}`)
     }
 
@@ -184,6 +223,7 @@ class AiBrainService {
       const num = parseInt(budgetMatch[1], 10)
       const maxVal = num < 1000 ? num * 1000 : num
       brain.profile.budgetRange.max = maxVal
+      brain.confirmedCriteria.budgetMax = maxVal
 
       // Tính trung bình ngân sách tích lũy
       const pref = brain.affinity.pricePreference
@@ -197,12 +237,15 @@ class AiBrainService {
     // 6. Học địa điểm giao nhận
     if (text.includes('hà nội') || text.includes('hn')) {
       brain.profile.location = 'Hà Nội'
+      brain.confirmedCriteria.location = 'Hà Nội'
       learned.push('Khu vực nhận hàng: Hà Nội')
     } else if (text.includes('hồ chí minh') || text.includes('tp.hcm') || text.includes('sài gòn') || text.includes('tphcm')) {
       brain.profile.location = 'TP.HCM'
+      brain.confirmedCriteria.location = 'TP.HCM'
       learned.push('Khu vực nhận hàng: TP.HCM (Hỗ trợ Giao hỏa tốc 2h)')
     } else if (text.includes('đà nẵng')) {
       brain.profile.location = 'Đà Nẵng'
+      brain.confirmedCriteria.location = 'Đà Nẵng'
       learned.push('Khu vực nhận hàng: Đà Nẵng')
     }
 
@@ -218,6 +261,9 @@ class AiBrainService {
       brain.profile.learnedFacts = brain.profile.learnedFacts.slice(-15)
     }
 
+    // 8. Trích xuất nhu cầu chuyên môn của tư vấn viên
+    const consultantInsights = analyzeConsultantNeeds(text, brain)
+
     brain.stats.totalInteractions += 1
     brain.updatedAt = new Date().toISOString()
     this._persistBrain(userIdOrSession, brain)
@@ -225,35 +271,46 @@ class AiBrainService {
     return {
       brain,
       newlyLearned: learned,
+      consultantInsights,
     }
   }
 
   /**
-   * THUẬT TOÁN XẾP HẠNG THÔNG MINH (ADAPTIVE RANKING ALGORITHM)
-   * Tính điểm số thích ứng (Affinity Score) cho từng sản phẩm dựa trên thói quen người dùng:
-   * Score = BaseRelevance (40%) + CategoryAffinity (25%) + TagAffinity (20%) + BudgetFit (15%)
+   * THUẬT TOÁN XẾP HẠNG THÔNG MINH KẾT HỢP LỌC CHUYÊN MÔN TƯ VẤN VIÊN
+   * - Lọc triệt để sản phẩm vi phạm tiêu chí ngân sách hoặc giới tính đã xác nhận.
+   * - Thưởng điểm mạnh cho sản phẩm khớp hoàn cảnh sử dụng (Use case) và sản phẩm đang được thảo luận.
    */
-  rankProductsByUserHabits(userIdOrSession, products = []) {
+  rankProductsByUserHabits(userIdOrSession, products = [], consultantInsights = null) {
     if (!Array.isArray(products) || products.length === 0) {
       return []
     }
 
     const brain = this.getBrain(userIdOrSession)
-    const { profile, affinity } = brain
-    const maxBudget = profile.budgetRange?.max || affinity?.pricePreference?.avg || 1000000
+    const { profile, affinity, confirmedCriteria, activeFocus } = brain
+    const maxBudget = confirmedCriteria?.budgetMax || profile.budgetRange?.max || affinity?.pricePreference?.avg
 
     const scoredProducts = products.map((product) => {
       let score = 50 // Điểm cơ sở
+      const highlights = []
 
       const nameLower = (product.name || '').toLowerCase()
       const descLower = (product.description || '').toLowerCase()
       const price = Number(product.price) || 0
+
+      // 0. Nếu đây là câu hỏi tiếp nối và sản phẩm trùng với sản phẩm đang được thảo luận ở lượt trước
+      if (consultantInsights?.isFollowUp && activeFocus?.lastDiscussedProductId) {
+        if (product.id === activeFocus.lastDiscussedProductId || nameLower.includes((activeFocus.lastDiscussedProductName || '').toLowerCase())) {
+          score += 50
+          highlights.push('Sản phẩm đang trao đổi')
+        }
+      }
 
       // 1. Khớp phong cách & Tag ưa thích (+10 đến +30 điểm)
       if (affinity?.tags) {
         for (const [tag, weight] of Object.entries(affinity.tags)) {
           if (nameLower.includes(tag) || descLower.includes(tag)) {
             score += Math.min(30, weight * 5)
+            highlights.push(`Hợp gu: ${tag}`)
           }
         }
       }
@@ -267,65 +324,90 @@ class AiBrainService {
         }
       }
 
-      // 3. Khớp giới tính (+15 điểm nếu khớp, -15 nếu ngược)
-      if (profile.gender === 'Nữ') {
+      // 3. Khớp giới tính (+15 điểm nếu khớp, -30 nếu ngược)
+      const targetGender = confirmedCriteria?.gender || profile.gender
+      if (targetGender === 'Nữ') {
         if (nameLower.includes('nữ') || nameLower.includes('đầm') || nameLower.includes('váy') || nameLower.includes('croptop')) {
           score += 15
         } else if (nameLower.includes('nam') || nameLower.includes('cà vạt')) {
-          score -= 15
+          score -= 30 // Lọc gắt gao hơn theo chuẩn tư vấn viên
         }
-      } else if (profile.gender === 'Nam') {
+      } else if (targetGender === 'Nam') {
         if (nameLower.includes('nam') || nameLower.includes('sơ mi nam') || nameLower.includes('polo nam')) {
           score += 15
         } else if (nameLower.includes('nữ') || nameLower.includes('đầm')) {
-          score -= 15
+          score -= 30
         }
       }
 
-      // 4. Khớp tầm ngân sách quen thuộc (+25 điểm nếu nằm trong ngân sách)
+      // 4. Ràng buộc ngân sách chặt chẽ theo tư vấn viên (Constraint Satisfaction)
       if (maxBudget && price > 0) {
         if (price <= maxBudget) {
           score += 25
+          highlights.push('Trong khoảng ngân sách')
           // Nếu nằm trong khoảng 60% - 95% ngân sách -> Thưởng thêm 10 điểm (Mức tối ưu giá trị)
           if (price >= maxBudget * 0.6) {
             score += 10
           }
-        } else if (price > maxBudget * 1.3) {
-          // Vượt quá 30% ngân sách quen thuộc -> Giảm điểm
-          score -= 20
+        } else if (price > maxBudget * 1.1) {
+          // Vượt quá ngân sách đã yêu cầu -> Phạt nặng điểm để không gợi ý hàng đắt quá tầm khách
+          score -= 40
         }
       }
 
-      // 5. Thưởng chất lượng (Rating & Bán chạy)
+      // 5. Thưởng tính năng kỹ thuật / chất liệu chuyên môn
+      if (nameLower.includes('chống ồn') || nameLower.includes('anc')) {
+        highlights.push('Chống ồn ANC')
+      }
+      if (nameLower.includes('linen') || nameLower.includes('cotton 100%')) {
+        highlights.push('Chất liệu thoáng mát cao cấp')
+      }
+      if (product.mall) {
+        highlights.push('Chính hãng Shop Mall')
+        score += 5
+      }
       if (product.rating >= 4.8) score += 10
       if (product.sold > 200) score += 5
-      if (product.mall) score += 5
 
       return {
         ...product,
         _personalizedScore: score,
         _matchPercent: Math.min(99, Math.max(85, Math.round(score * 0.75))),
+        _consultantHighlights: highlights.slice(0, 2),
       }
     })
 
-    // Sắp xếp giảm dần theo điểm số cá nhân hóa
+    // Sắp xếp giảm dần theo điểm số cá nhân hóa & sàng lọc chuyên môn
     scoredProducts.sort((a, b) => b._personalizedScore - a._personalizedScore)
     return scoredProducts
   }
 
   /**
-   * Lưu lượt hội thoại vào Working Memory (ngắn hạn)
+   * Lưu lượt hội thoại vào Working Memory (ngắn hạn) đồng thời cập nhật activeFocus
    */
   recordConversationTurn(userIdOrSession, { userQuery, aiReply, intent, products = [], orderInfo = null }) {
     const brain = this.getBrain(userIdOrSession)
+    const topProduct = products && products.length > 0 ? products[0] : null
+
     brain.conversationHistory.push({
       timestamp: new Date().toISOString(),
       userQuery,
       aiReply,
       intent,
       lastProductIds: products.map((p) => p.id || p.productId),
+      topProductName: topProduct?.name || null,
       orderInfo: orderInfo ? { code: orderInfo.code, status: orderInfo.status } : null,
     })
+
+    // Cập nhật tâm điểm hội thoại (activeFocus) để nhận diện các câu hỏi kế tiếp
+    if (topProduct) {
+      brain.activeFocus = {
+        lastDiscussedProductId: topProduct.id || topProduct.productId,
+        lastDiscussedProductName: topProduct.name,
+        lastDiscussedCategory: topProduct.categoryName || null,
+        lastIntent: intent,
+      }
+    }
 
     // Giữ 10 lượt hội thoại gần nhất
     if (brain.conversationHistory.length > 10) {
@@ -334,6 +416,14 @@ class AiBrainService {
 
     brain.updatedAt = new Date().toISOString()
     this._persistBrain(userIdOrSession, brain)
+  }
+
+  /**
+   * Trích xuất danh sách lịch sử hội thoại gần nhất phục vụ Gemini Prompt
+   */
+  getRecentConversationTurns(userIdOrSession, limit = 4) {
+    const brain = this.getBrain(userIdOrSession)
+    return (brain.conversationHistory || []).slice(-limit)
   }
 
   /**

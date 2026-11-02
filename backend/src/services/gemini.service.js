@@ -1,4 +1,5 @@
 import { env } from '../config/env.js'
+import { CONSULTANT_KNOWLEDGE_BASE } from './consultant-knowledge.js'
 
 // Danh sách các mô hình Gemini hỗ trợ theo thứ tự ưu tiên tốc độ & độ sâu tư duy
 const GEMINI_MODELS = [
@@ -8,62 +9,94 @@ const GEMINI_MODELS = [
 ]
 
 /**
- * Gọi Google Gemini AI để trực tiếp tư duy và sinh câu trả lời tư vấn mua sắm thông minh,
- * tuyệt đối không dùng các mẫu câu soạn sẵn rập khuôn.
+ * Gọi Google Gemini AI đóng vai trò Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của NovaShop:
+ * - Phân tích nhu cầu khách hàng theo chiều sâu.
+ * - Ghi nhớ các câu hỏi & câu trả lời trước đó trong phiên để trả lời logic, không hỏi lại.
+ * - Trả lời súc tích, ngắn gọn, đúng trọng tâm điều khách hàng muốn.
+ * - Sàng lọc sản phẩm dựa trên cơ sở kiến thức chuyên môn (chất liệu, thông số, bảng size, màu sắc).
  */
 export async function generateGeminiShoppingAdvice({
   query,
+  conversationHistory = [],
   brainProfile = {},
   catalogProducts = [],
   intent = 'general',
+  consultantInsights = null,
 }) {
   const apiKey = env.geminiApiKey
   if (!apiKey) {
     return null
   }
 
-  // Ngữ cảnh danh mục sản phẩm thực tế từ kho NovaShop
-  const productContext = catalogProducts.slice(0, 6).map((p, idx) => {
+  // 1. Ngữ cảnh sản phẩm thực tế từ kho NovaShop
+  const productContext = (catalogProducts || []).slice(0, 5).map((p, idx) => {
     const priceStr = new Intl.NumberFormat('vi-VN').format(p.price) + 'đ'
-    return `${idx + 1}. [${p.name}] - Giá: ${priceStr} | Đánh giá: ${p.rating || 5.0}★ | Đã bán: ${p.sold || 100}`
+    const origStr = p.originalPrice ? ` (Gốc: ${new Intl.NumberFormat('vi-VN').format(p.originalPrice)}đ)` : ''
+    const badge = p.mall ? '[Shop Mall] ' : ''
+    return `${idx + 1}. ${badge}[${p.name}] - Giá: ${priceStr}${origStr} | Đánh giá: ${p.rating || 5.0}★ | Đã bán: ${p.sold || 100}`
   }).join('\n')
 
-  // Ngữ cảnh hồ sơ thói quen & trí nhớ người dùng đã tích lũy (AI Brain Habits)
+  // 2. Ngữ cảnh lịch sử hội thoại trước đó (ghi nhớ các câu hỏi & câu trả lời đã diễn ra)
+  const historyTurns = (conversationHistory || []).slice(-4).map((turn, idx) => {
+    const uText = turn.userQuery || (turn.isUser ? turn.text : '') || ''
+    const aText = turn.aiReply || (!turn.isUser ? turn.text : '') || ''
+    if (!uText && !aText) return null
+    const shortAnswer = aText.length > 200 ? `${aText.slice(0, 200)}...` : aText
+    return `• Lượt ${idx + 1}:
+  - Khách đã hỏi: "${uText}"
+  - Nova đã tư vấn: "${shortAnswer}"`
+  }).filter(Boolean).join('\n')
+
+  // 3. Ngữ cảnh hồ sơ thói quen & tiêu chí đã chốt từ AI Brain
   const brainContext = [
-    brainProfile.preferredStyles?.length ? `• Thói quen gu thời trang: ${brainProfile.preferredStyles.join(', ')}` : null,
-    brainProfile.sizes?.clothing ? `• Thói quen kích cỡ thường chọn: ${brainProfile.sizes.clothing}` : null,
-    brainProfile.gender ? `• Đối tượng mua sắm ưu tiên: Đồ ${brainProfile.gender}` : null,
-    brainProfile.budgetRange?.max ? `• Phân khúc giá quen thuộc: Dưới ${new Intl.NumberFormat('vi-VN').format(brainProfile.budgetRange.max)}đ` : null,
-    brainProfile.location ? `• Khu vực nhận hàng quen thuộc: ${brainProfile.location}` : null,
-    brainProfile.learnedFacts?.length ? `• Lịch sử thói quen & hành vi đã tích lũy: ${brainProfile.learnedFacts.slice(-5).join('; ')}` : null,
+    brainProfile.preferredStyles?.length ? `• Gu thời trang yêu thích: ${brainProfile.preferredStyles.join(', ')}` : null,
+    brainProfile.sizes?.clothing ? `• Size quần áo quen thuộc: ${brainProfile.sizes.clothing}` : null,
+    brainProfile.gender ? `• Đối tượng ưu tiên: ${brainProfile.gender}` : null,
+    brainProfile.budgetRange?.max ? `• Ngân sách trần đã biết: Dưới ${new Intl.NumberFormat('vi-VN').format(brainProfile.budgetRange.max)}đ` : null,
+    brainProfile.location ? `• Địa chỉ nhận hàng quen thuộc: ${brainProfile.location}` : null,
+    brainProfile.learnedFacts?.length ? `• Thói quen đã tích lũy: ${brainProfile.learnedFacts.slice(-4).join('; ')}` : null,
   ].filter(Boolean).join('\n')
 
-  const systemInstruction = `Bạn là Nova AI - Bộ não trợ lý AI thông minh toàn diện của sàn thương mại điện tử NovaShop (nhận diện thương hiệu tông Terracotta & Kem).
+  // 4. Kiến thức chuyên môn tư vấn viên trích xuất
+  const consultantNotes = []
+  if (consultantInsights?.useCase) {
+    consultantNotes.push(`• Mục đích sử dụng đã phân tích: ${consultantInsights.useCase}`)
+  }
+  if (consultantInsights?.isFollowUp) {
+    consultantNotes.push(`• Đây là câu hỏi tiếp nối liên quan đến: ${consultantInsights.followUpTopic || 'sản phẩm vừa trao đổi'}`)
+  }
 
-YÊU CẦU CỐT LÕI:
-1. GỢI Ý THÔNG MINH DỰA TRÊN THÓI QUEN NGƯỜI DÙNG: Luôn phân tích kỹ các thói quen quen thuộc của khách hàng (gu thời trang, mức giá quen thuộc, kích cỡ, danh mục hay tương tác). Giải thích ngắn gọn và tinh tế lý do gợi ý phù hợp với thói quen của họ (ví dụ: "Dựa vào thói quen chọn tone pastel / size M / phân khúc giá quen thuộc của bạn...").
-2. TƯ DUY ĐỘC LẬP & TỰ NHIÊN: Trả lời như một stylist và chuyên gia mua sắm hàng đầu, am hiểu chất liệu, kiểu dáng và hoàn cảnh sử dụng.
-3. TUYỆT ĐỐI KHÔNG DÙNG VĂN MẪU RẬP KHUÔN: Không dùng các câu mở đầu sáo rỗng. Hãy đi thẳng vào tư vấn cuốn hút, chân thành.
-4. TƯ VẤN SẢN PHẨM THỰC TẾ: Lồng ghép khéo léo các sản phẩm có sẵn trong danh mục ShopNova bên dưới vào lời khuyên.
-5. VĂN PHONG: Tiếng Việt chuẩn mực, ấm áp, lịch thiệp, xưng "Nova" và gọi "bạn".`
+  const systemInstruction = `Bạn là Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của sàn thương mại điện tử NovaShop (nhận diện thương hiệu phong cách ấm áp Terracotta & Kem).
 
-  const promptText = `=== HỒ SƠ TRÍ NHỚ KHÁCH HÀNG (AI BRAIN) ===
-${brainContext || 'Khách hàng mới ghé thăm, chưa có dữ liệu quá khứ.'}
+CÁC NGUYÊN TẮC BẮT BUỘC KHI TƯ VẤN:
+1. GHI NHỚ LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ: Đọc kỹ các lượt hỏi - đáp đã có ở trên. Nếu câu hỏi hiện tại là câu hỏi tiếp nối (ví dụ: "có màu đen không?", "giá bao nhiêu?", "có chống nước không?", "so với cái kia thì sao?"), hãy kế thừa ngay sản phẩm và thông tin ở lượt trước. TUYỆT ĐỐI KHÔNG bắt khách nhắc lại từ đầu và KHÔNG hỏi lại ngân sách/size/địa chỉ đã được khách cung cấp.
+2. TRẢ LỜI NGẮN GỌN, ĐÚNG TRỌNG TÂM & LOGIC: Không chào hỏi rườm rà. Đi thẳng vào câu trả lời giải quyết chính xác điều khách muốn ở câu hỏi đó. Dung lượng lý tưởng: 70 - 150 từ, cô đọng, sắc bén, lập luận chặt chẽ.
+3. CƠ SỞ KIẾN THỨC CHUYÊN MÔN TƯ VẤN VIÊN:
+   - Thời trang: Luôn am hiểu chất liệu (Linen thoáng mát, Cotton mềm thấm mồ hôi, Lụa sang trọng tôn dáng), cách phối màu (tone Terracotta & Kem, Pastel), bảng size theo vóc dáng.
+   - Điện tử: Luôn nắm rõ tính năng kỹ thuật (chuẩn chống ồn chủ động ANC, chống nước IPX, Bluetooth 5.3, thời lượng pin).
+4. KHÔNG DÙNG VĂN MẪU RẬP KHUÔN: Mỗi câu trả lời là một phân tích thực tế dành riêng cho khách hàng đó. Xưng "Nova" và gọi "bạn".`
 
-=== SẢN PHẨM CÓ SẴN TRONG KHO HÀNG NOVASHOP ===
+  const promptText = `=== LỊCH SỬ CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ ===
+${historyTurns || 'Đây là câu hỏi đầu tiên của phiên hội thoại.'}
+
+=== HỒ SƠ THÓI QUEN & TIÊU CHÍ KHÁCH HÀNG (AI BRAIN) ===
+${brainContext || 'Chưa ghi nhận tiêu chí trước đó.'}
+${consultantNotes.length ? `\n=== PHÂN TÍCH CHUYÊN MÔN TƯ VẤN VIÊN ===\n${consultantNotes.join('\n')}` : ''}
+
+=== SẢN PHẨM PHÙ HỢP CÓ SẴN TRONG KHO NOVASHOP ===
 ${productContext || 'Đang cập nhật kho hàng.'}
 
-=== CÂU HỎI / YÊU CẦU CỦA KHÁCH HÀNG ===
+=== YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG ===
 "${query}"
 
-Hãy suy nghĩ sâu sắc và viết câu trả lời tư vấn tốt nhất cho khách hàng ngay bây giờ:`
+Dựa trên lịch sử trao đổi và kiến thức chuyên môn, hãy tư duy logic và đưa ra câu trả lời ngắn gọn, chuẩn xác và đúng nhu cầu của khách ngay bây giờ:`
 
   // Thử lần lượt các model Gemini (bắt đầu từ flash-lite siêu nhanh)
   for (const model of GEMINI_MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
     try {
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 9500) // 9.5s timeout đảm bảo không bị ngắt quãng
+      const timer = setTimeout(() => controller.abort(), 9500) // 9.5s timeout đảm bảo phản hồi tức thì
 
       const response = await fetch(url, {
         method: 'POST',
@@ -76,9 +109,9 @@ Hãy suy nghĩ sâu sắc và viết câu trả lời tư vấn tốt nhất cho
             },
           ],
           generationConfig: {
-            temperature: 0.75,
-            topP: 0.95,
-            maxOutputTokens: 500,
+            temperature: 0.7,
+            topP: 0.9,
+            maxOutputTokens: 400,
           },
         }),
         signal: controller.signal,
