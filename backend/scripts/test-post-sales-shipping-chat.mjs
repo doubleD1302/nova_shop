@@ -91,7 +91,7 @@ async function runTests() {
   })
   assert(sameProvRes.status === 200, 'Tính phí vận chuyển cùng tỉnh thành công (status 200)')
   assert(sameProvRes.body?.success === true, 'Response có success === true')
-  assert(sameProvRes.body?.data?.isSameProvince === true, 'Được nhận diện là cùng tỉnh (isSameProvince = true)')
+  assert(sameProvRes.body?.data?.estimated === true, 'Phí được đánh dấu là ước tính')
   assert(Array.isArray(sameProvRes.body?.data?.options) && sameProvRes.body.data.options.length >= 3, 'Trả về danh sách các gói cước vận chuyển (options >= 3)')
 
   // 1.2 Tính phí khác tỉnh có freeship khi subtotal >= 1.000.000đ
@@ -105,9 +105,9 @@ async function runTests() {
     },
   })
   assert(interProvRes.status === 200, 'Tính phí vận chuyển liên tỉnh thành công (status 200)')
-  assert(interProvRes.body?.data?.isSameProvince === false, 'Được nhận diện là liên tỉnh (isSameProvince = false)')
-  const stdOption = interProvRes.body?.data?.options?.find((o) => o.id === 'standard')
-  assert(stdOption && stdOption.discount > 0, 'Gói cước tiêu chuẩn được áp dụng giảm giá freeship (discount > 0)')
+  assert(interProvRes.body?.data?.estimated === true, 'Báo phí ghi rõ chỉ là ước tính')
+  const stdOption = interProvRes.body?.data?.options?.find((o) => o.id === 'tietkiem')
+  assert(stdOption && stdOption.discount === stdOption.originalFee && stdOption.fee === 0, 'Gói tiết kiệm được miễn phí khi shop đạt ngưỡng')
 
   // 1.3 Seller cập nhật mã vận đơn thiếu token bị chặn 401
   const trackNoAuth = await request('/api/v1/seller/orders/1/tracking', {
