@@ -481,8 +481,8 @@ export async function updateUserProfile(req, res, next) {
       typeof address.detail !== 'string' ||
       !address.detail.trim() ||
       address.detail.trim().length > 255 ||
-      (address.district && (typeof address.district !== 'string' || address.district.trim().length > 120)) ||
-      (address.ward && (typeof address.ward !== 'string' || address.ward.trim().length > 120))
+      (address.district != null && (typeof address.district !== 'string' || address.district.trim().length > 120)) ||
+      (address.ward != null && (typeof address.ward !== 'string' || address.ward.trim().length > 120))
     )) {
       return res.status(400).json({
         success: false,
