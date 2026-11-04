@@ -41,3 +41,5 @@ Lỗi nghiệp vụ: `400 VALIDATION_ERROR`, `400 VOUCHER_INVALID`, `400 ORDER_A
 Server kiểm tra dữ liệu, giá, kho và voucher; tạo đơn, trừ kho, ghi nhận voucher trong transaction. Tổng tiền từ client không được dùng làm nguồn tính tiền. Dùng cùng khóa với cùng nội dung khi thử lại; nếu dùng cùng khóa cho nội dung khác, API trả `409 IDEMPOTENCY_CONFLICT`. Response thành công có `data.order` với `subtotal`, `shippingFee`, `discount`, `total` và thông tin đơn. Phương thức thanh toán hiện được chấp nhận là COD.
 
 Voucher được phân bổ theo tỷ lệ tiền hàng tích lũy giữa các shop, làm tròn xuống đến đồng. Phần giảm của mỗi shop không vượt tiền hàng của shop đó và tổng phần giảm luôn bằng mức giảm của đơn.
+
+Khi giao dịch bị deadlock hoặc hết thời gian chờ khóa, API trả `409 CHECKOUT_CONFLICT`. Giao dịch đã thất bại; client có thể thử lại với cùng `Idempotency-Key` và nội dung cũ, sau khi kiểm tra kết quả hiện tại.

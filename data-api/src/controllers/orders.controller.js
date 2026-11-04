@@ -360,6 +360,9 @@ export async function createOrder(req, res, next) {
     if (err.domainCode === 'INSUFFICIENT_STOCK') {
       return responseError(res, 409, err.domainCode, 'Số lượng đặt vượt quá tồn kho hiện tại.')
     }
+    if (err.code === 'ER_LOCK_DEADLOCK' || err.code === 'ER_LOCK_WAIT_TIMEOUT') {
+      return responseError(res, 409, 'CHECKOUT_CONFLICT', 'Đơn hàng đang xung đột với giao dịch khác. Vui lòng thử lại với cùng khóa yêu cầu.')
+    }
     return next(err)
   }
 }

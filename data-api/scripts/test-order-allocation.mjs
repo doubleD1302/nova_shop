@@ -8,7 +8,7 @@ process.env.DATA_API_KEY = 'checkout-test-only-key'
 const { sequelize, closeDatabase } = await import('../src/config/database.js')
 const { createOrder } = await import('../src/controllers/orders.controller.js')
 
-async function runOrder({ failStock = false } = {}) {
+async function runOrder({ failStock = false, lockError = null } = {}) {
   const commands = []
   const shopOrders = []
   const payments = []
@@ -16,6 +16,7 @@ async function runOrder({ failStock = false } = {}) {
     query({ sql }, values, callback) {
       try {
         commands.push(sql.trim())
+        if (lockError && sql.includes('FROM product_variants v')) return callback(Object.assign(new Error('test lock error'), { code: lockError }))
         let result = { insertId: 1, affectedRows: 1 }
         if (sql.includes('FROM orders WHERE')) result = []
         else if (sql.includes('FROM product_variants v')) {
@@ -60,6 +61,13 @@ try {
   assert.equal(failure.body.error.code, 'INSUFFICIENT_STOCK')
   assert.ok(failure.commands.includes('ROLLBACK'))
   assert.ok(!failure.commands.includes('COMMIT'))
+  for (const code of ['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']) {
+    const conflict = await runOrder({ lockError: code })
+    assert.equal(conflict.status, 409)
+    assert.equal(conflict.body.error.code, 'CHECKOUT_CONFLICT')
+    assert.ok(conflict.commands.includes('ROLLBACK'))
+    assert.ok(!conflict.commands.includes('COMMIT'))
+  }
   console.log('Tạo đơn và rollback: PASS với kết nối database giả lập.')
 } finally {
   await closeDatabase()
