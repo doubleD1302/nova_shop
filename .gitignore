@@ -128,3 +128,15 @@ mcp_config.json
 /AI_NOTES.md
 /AGENT_NOTES.md
 /PROMPTS.md
+
+# Local maintenance and browser utilities
+/scripts/tools/
+/scripts/capture-verification.mjs
+/scripts/crop-auth.mjs
+/scripts/verify-admin-counterfeit-ui.mjs
+/scripts/verify-admin-settings-ui.mjs
+/scripts/verify-logo.mjs
+/scripts/verify-seller-centre.mjs
+/scripts/verify-smtp-final.mjs
+/scripts/verify-step2-google-auth.mjs
+/scripts/verify-ui-open-shop.mjs
