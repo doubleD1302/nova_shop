@@ -229,10 +229,13 @@ export async function getConversationMessages(req, res, next) {
   try {
     const conversationId = req.params.id
     const { userId, role, limit = 50, offset = 0 } = req.query
+    const validPageNumber = (value) => (typeof value === 'string' || typeof value === 'number') && /^\d+$/.test(String(value)) && Number.isSafeInteger(Number(value))
 
     if (
       !/^[1-9]\d{0,19}$/.test(conversationId) ||
-      !/^[1-9]\d{0,19}$/.test(String(userId || ''))
+      !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
+      !validPageNumber(limit) || Number(limit) < 1 || Number(limit) > 100 ||
+      !validPageNumber(offset)
     ) {
       return res.status(400).json({
         success: false,

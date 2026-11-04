@@ -93,6 +93,7 @@ try {
   for (const [prefix, controller] of [['backend', backend], ['internal', data]]) {
     app.patch(`/${prefix}/cart/items/:itemId`, controller.updateCartItem)
     app.delete(`/${prefix}/cart/items`, controller.clearCart)
+    app.post(`/${prefix}/cart/sync`, controller.syncCart)
   }
   app.patch('/internal/seller/orders/:shopOrderId/tracking', dataShipping.updateOrderTracking)
   app.post('/internal/orders/:orderId/returns', dataReturns.createOrderReturn)
@@ -105,6 +106,8 @@ try {
       ['PATCH', '/internal/cart/items/7', { userId: '1', qty: -1 }],
       ['DELETE', '/backend/cart/items', { selectedOnly: 'true' }],
       ['DELETE', '/internal/cart/items', { userId: '1', selectedOnly: 'true' }],
+      ['POST', '/backend/cart/sync', { items: [{ variantId: '1', qty: true }] }],
+      ['POST', '/internal/cart/sync', { userId: '1', items: [{ variantId: '1', qty: 2, selected: 'false' }] }],
       ['PATCH', '/internal/seller/orders/3/tracking', { userId: '1', trackingCode: 'TRACK', autoAdvanceStatus: 'false' }],
       ['POST', '/internal/orders/2/returns', { userId: '1', shopOrderId: '3', reason: 'Hỏng', refundAmount: 0 }],
       ['POST', '/internal/orders', { ...order, items: [{ variantId: '1', qty: true }] }],

@@ -31,11 +31,11 @@ export function validateSellerProductInput({ body = {}, userId, productId = null
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const categorySlug = typeof body.categoryId === 'string' ? body.categoryId.trim() : ''
   const description = typeof body.description === 'string' ? body.description.trim() : ''
-  const price = Number(body.price)
+  const price = body.price
   const originalPrice = body.originalPrice === '' || body.originalPrice === null || body.originalPrice === undefined
     ? null
-    : Number(body.originalPrice)
-  const stock = Number(body.stock)
+    : body.originalPrice
+  const stock = body.stock
   const images = Array.isArray(body.images) ? body.images : []
   const status = body.status || 'draft'
   const uniqueImageRefs = images.map((image) => image?.sourcePageUrl || image?.url)

@@ -169,7 +169,15 @@ export async function clearCart(req, res, next) {
  */
 export async function syncCart(req, res, next) {
   try {
-    const items = Array.isArray(req.body?.items) ? req.body.items : []
+    const items = req.body?.items
+    if (!Array.isArray(items) || items.length > 100 || items.some((item) =>
+      !item || typeof item !== 'object' || Array.isArray(item) ||
+      (!item.variantId && !item.productId) ||
+      (item.variantId !== undefined && !/^[1-9]\d{0,19}$/.test(String(item.variantId))) ||
+      (item.productId !== undefined && (typeof item.productId !== 'string' && typeof item.productId !== 'number' || !String(item.productId).trim() || String(item.productId).length > 160)) ||
+      (item.qty !== undefined && !validQuantity(item.qty, 1)) || !validBoolean(item.selected))) {
+      return res.status(400).json({ success: false, message: 'Danh sách đồng bộ giỏ hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     const result = await callDataApi('/internal/v1/cart/sync', {
       method: 'POST',
       body: {
