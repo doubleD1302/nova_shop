@@ -78,7 +78,9 @@ CREATE TABLE shops (
   province VARCHAR(120) NOT NULL COMMENT 'Nơi gửi hàng',
   address_detail VARCHAR(255) NULL COMMENT 'Địa chỉ shop',
   is_mall BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Nhãn shop chính hãng do hệ thống quản lý',
-  status ENUM('active','suspended','closed') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái gian hàng',
+  status ENUM('active','suspended','closed','pending','rejected') NOT NULL DEFAULT 'pending' COMMENT 'Trạng thái gian hàng',
+  approval_version INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Phiên bản hồ sơ để kiểm duyệt',
+  rejection_reason VARCHAR(1000) NULL COMMENT 'Lý do từ chối gần nhất',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật, UTC',
   PRIMARY KEY (id),
@@ -88,6 +90,20 @@ CREATE TABLE shops (
   CONSTRAINT fk_shops_owner FOREIGN KEY (owner_id) REFERENCES users (id),
   CONSTRAINT ck_shops_mall CHECK (is_mall IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Gian hàng thuộc một seller';
+
+CREATE TABLE shop_approval_events (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  shop_id BIGINT UNSIGNED NOT NULL,
+  actor_id BIGINT UNSIGNED NOT NULL,
+  action ENUM('submitted','approved','rejected') NOT NULL,
+  profile_version INT UNSIGNED NOT NULL,
+  reason VARCHAR(1000) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_shop_approval_events_shop (shop_id, id),
+  CONSTRAINT fk_shop_approval_event_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
+  CONSTRAINT fk_shop_approval_event_actor FOREIGN KEY (actor_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Lịch sử duyệt gian hàng';
 
 -- Danh mục, có thể có danh mục con
 CREATE TABLE categories (

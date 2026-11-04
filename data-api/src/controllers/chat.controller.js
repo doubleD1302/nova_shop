@@ -123,7 +123,7 @@ export async function getOrCreateConversation(req, res, next) {
 
     // Kiểm tra gian hàng và người mua có tồn tại
     const [shopRows, userRows] = await Promise.all([
-      executeQuery(`SELECT id, name, logo_url, owner_id FROM shops WHERE id = ? LIMIT 1`, [shopId]),
+      executeQuery(`SELECT id, name, logo_url, owner_id FROM shops WHERE id = ? AND status = 'active' LIMIT 1`, [shopId]),
       executeQuery(`SELECT id, full_name, avatar_url FROM users WHERE id = ? LIMIT 1`, [buyerId]),
     ])
 

@@ -8,7 +8,7 @@ const imageUrlIsAllowed = (value) => value === null || value === undefined || va
 const shopSelect = `
   SELECT s.id, s.owner_id, s.slug, s.name, s.logo_url, s.banner_url, s.tagline,
          s.description, s.province, s.address_detail, s.is_mall, s.status,
-         s.suspension_reason, s.created_at,
+         s.suspension_reason, s.approval_version, s.rejection_reason, s.created_at,
          u.full_name AS owner_name,
          COALESCE(ps.product_count, 0) AS product_count,
          COALESCE(ps.total_sold, 0) AS total_sold,
@@ -59,6 +59,8 @@ function serializeShop(row) {
     address: row.address_detail || '',
     mall: Boolean(row.is_mall),
     status: row.status,
+    approvalVersion: Number(row.approval_version),
+    rejectionReason: row.rejection_reason || null,
     suspensionReason: row.suspension_reason || null,
     productCount: Number(row.product_count),
     totalSold: Number(row.total_sold),
@@ -114,7 +116,7 @@ export async function getShop(req, res, next) {
   try {
     const key = String(req.params.shopId || '')
     const rows = await executeQuery(
-      `${shopSelect} WHERE (s.id = ? OR s.slug = ?) LIMIT 1`,
+      `${shopSelect} WHERE (s.id = ? OR s.slug = ?) AND s.status = 'active' LIMIT 1`,
       [key, key],
     )
     if (!rows.length) {
@@ -124,6 +126,34 @@ export async function getShop(req, res, next) {
   } catch (err) {
     return next(err)
   }
+}
+
+export async function getSellerShop(req, res, next) {
+  try {
+    const userId = String(req.params.userId || '')
+    if (!/^[1-9]\d{0,19}$/.test(userId)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
+    const rows = await executeQuery(`${shopSelect} WHERE s.owner_id = ? LIMIT 1`, [userId])
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng.', error: { code: 'SHOP_NOT_FOUND' } })
+    return res.status(200).json({ success: true, data: { shop: serializeShop(rows[0]) } })
+  } catch (err) { return next(err) }
+}
+
+export async function resubmitSellerShop(req, res, next) {
+  try {
+    const userId = String(req.params.userId || '')
+    if (!/^[1-9]\d{0,19}$/.test(userId)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
+    const result = await executeTransaction(async (query) => {
+      const shops = await query('SELECT id, status, approval_version FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
+      if (!shops.length) return { error: 'SHOP_NOT_FOUND' }
+      if (shops[0].status !== 'rejected') return { error: 'SHOP_NOT_REJECTED' }
+      const version = Number(shops[0].approval_version) + 1
+      await query("UPDATE shops SET status = 'pending', rejection_reason = NULL, approval_version = ? WHERE id = ?", [version, shops[0].id])
+      await query("INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', ?)", [shops[0].id, userId, version])
+      return { shopId: String(shops[0].id), status: 'pending', approvalVersion: version }
+    })
+    if (result.error) return res.status(result.error === 'SHOP_NOT_FOUND' ? 404 : 409).json({ success: false, message: 'Không thể gửi lại hồ sơ.', error: { code: result.error } })
+    return res.status(200).json({ success: true, data: result })
+  } catch (err) { return next(err) }
 }
 
 export async function updateSellerShop(req, res, next) {
@@ -145,13 +175,13 @@ export async function updateSellerShop(req, res, next) {
 
     const shop = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT id FROM shops WHERE owner_id = ? AND status = 'active' FOR UPDATE`,
+        `SELECT id FROM shops WHERE owner_id = ? AND status IN ('pending', 'rejected', 'active') FOR UPDATE`,
         [userId],
       )
       if (!rows.length) return null
       await query(
         `UPDATE shops SET name = ?, tagline = ?, description = ?, province = ?, address_detail = ?,
-           logo_url = ?, banner_url = ? WHERE id = ? AND owner_id = ?`,
+           logo_url = ?, banner_url = ?, approval_version = approval_version + IF(status IN ('pending', 'rejected'), 1, 0) WHERE id = ? AND owner_id = ?`,
         [name, tagline || null, description || null, province, address || null,
           body.logoUrl || null, body.bannerUrl || null, rows[0].id, userId],
       )

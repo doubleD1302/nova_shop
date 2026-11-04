@@ -225,3 +225,27 @@ export async function updateAdminProductApproval(req, res, next) {
     return next(err)
   }
 }
+
+export async function updateAdminShopApproval(req, res, next) {
+  try {
+    const { id } = req.params
+    const { approvalStatus, approvalVersion, rejectionReason } = req.body || {}
+    if (!/^[1-9]\d{0,19}$/.test(id) || !['approved', 'rejected'].includes(approvalStatus) ||
+        !Number.isSafeInteger(approvalVersion) || approvalVersion < 1 || approvalVersion > 4294967295) {
+      return res.status(400).json({ success: false, message: 'Yêu cầu duyệt gian hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(id)}/approval`, {
+      method: 'PATCH', body: { approvalStatus, approvalVersion, rejectionReason, userId: req.user.id },
+    })
+    return res.status(200).json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
+export async function listAdminShopApprovalEvents(req, res, next) {
+  try {
+    const { id } = req.params
+    if (!/^[1-9]\d{0,19}$/.test(id)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
+    const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(id)}/approval-events?userId=${encodeURIComponent(req.user.id)}`)
+    return res.status(200).json({ success: true, data })
+  } catch (err) { return next(err) }
+}

@@ -13,9 +13,9 @@ INSERT INTO users (id, username, password_hash, full_name, email, role) VALUES
 INSERT INTO addresses (id, user_id, recipient_name, phone, province, ward, detail, is_default)
 VALUES (1, 1, 'Người mua mẫu', '0900000000', 'TP. Hồ Chí Minh', 'Phường mẫu', 'Địa chỉ minh họa', TRUE);
 
-INSERT INTO shops (id, owner_id, slug, name, tagline, description, province) VALUES
-  (1, 2, 'shop-mau-a', 'DEMO - Shop mẫu A', 'DỮ LIỆU DEMO', 'Gian hàng minh họa để thử nghiệm giao diện. Không phải người bán thật.', 'TP. Hồ Chí Minh'),
-  (2, 3, 'shop-mau-b', 'DEMO - Shop mẫu B', 'DỮ LIỆU DEMO', 'Gian hàng minh họa để thử nghiệm giao diện. Không phải người bán thật.', 'Hà Nội');
+INSERT INTO shops (id, owner_id, slug, name, tagline, description, province, status) VALUES
+  (1, 2, 'shop-mau-a', 'DEMO - Shop mẫu A', 'DỮ LIỆU DEMO', 'Gian hàng minh họa để thử nghiệm giao diện. Không phải người bán thật.', 'TP. Hồ Chí Minh', 'active'),
+  (2, 3, 'shop-mau-b', 'DEMO - Shop mẫu B', 'DỮ LIỆU DEMO', 'Gian hàng minh họa để thử nghiệm giao diện. Không phải người bán thật.', 'Hà Nội', 'active');
 
 INSERT INTO categories (id, slug, name, sort_order) VALUES
   (1, 'thoi-trang-nam', 'Thời trang nam', 1),

@@ -407,10 +407,11 @@ export async function registerUser(req, res, next) {
       if (role === 'seller') {
         const shopResult = await query(
           `INSERT INTO shops (owner_id, slug, name, tagline, province, status)
-           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
           [userId, shopSlug, body.shopName.trim(), shopTagline || null],
         )
         shopId = String(shopResult.insertId)
+        await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
       if (address) {
         await query(
@@ -641,18 +642,22 @@ export async function createSellerShop(req, res, next) {
       }
 
       // 2. Kiểm tra xem người dùng đã sở hữu gian hàng hay chưa (tránh tạo trùng lặp)
-      const existingShops = await query('SELECT id, name FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
+      const existingShops = await query('SELECT id, name, status FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
       let shopId
+      let shopStatus
       if (existingShops.length) {
         shopId = String(existingShops[0].id)
+        shopStatus = existingShops[0].status
       } else {
         const shopSlug = `${slugify(shopName)}-${crypto.randomBytes(4).toString('hex')}`
         const shop = await query(
           `INSERT INTO shops (owner_id, slug, name, province, status)
-           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
           [userId, shopSlug, shopName],
         )
         shopId = String(shop.insertId)
+        shopStatus = 'pending'
+        await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
 
       // 3. Phân quyền: Người dùng buyer được nâng cấp thành seller; Admin giữ nguyên quyền admin
@@ -662,6 +667,7 @@ export async function createSellerShop(req, res, next) {
       }
 
       return {
+        shopStatus,
         user: {
           id: String(users[0].id),
           username: users[0].username,
@@ -692,8 +698,8 @@ export async function createSellerShop(req, res, next) {
     }
     return res.status(200).json({
       success: true,
-      message: 'Đã mở gian hàng thành công.',
-      data: { user: result.user },
+      message: result.shopStatus === 'pending' ? 'Hồ sơ gian hàng đang chờ kiểm duyệt.' : 'Tài khoản đã có gian hàng.',
+      data: { user: result.user, shopStatus: result.shopStatus },
     })
   } catch (err) {
     return next(err)
