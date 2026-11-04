@@ -1,4 +1,6 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
+import { calculateShippingOptions } from '../utils/shipping.js'
+import { isValidAmount } from '../utils/money.js'
 
 // Bộ nhớ đệm dự phòng mốc tracking nếu bảng shipment_trackings chưa chạy migration
 const memoryShipmentTrackings = []
@@ -11,81 +13,25 @@ function isTableMissingError(err) {
 }
 
 /**
- * Tính phí vận chuyển động dựa trên tỉnh gửi, tỉnh nhận, khối lượng và giá trị đơn hàng
+ * Ước tính phí cho một shop. Checkout tính lại bằng dữ liệu sản phẩm trên server.
  */
 export async function calculateShippingFee(req, res, next) {
   try {
-    const { fromProvince, toProvince, weightGrams = 500, subtotal = 0, isMall = false } = req.body || {}
-
-    const origin = String(fromProvince || 'TP. Hồ Chí Minh').trim()
-    const destination = String(toProvince || 'TP. Hồ Chí Minh').trim()
-    const weight = Math.max(100, Math.min(Number(weightGrams) || 500, 100000))
-    const cartSubtotal = Math.max(0, Number(subtotal) || 0)
-
-    // Kiểm tra nội thành / cùng tỉnh
-    const isSameProvince = origin.toLowerCase() === destination.toLowerCase() ||
-      (origin.toLowerCase().includes('hồ chí minh') && destination.toLowerCase().includes('hồ chí minh')) ||
-      (origin.toLowerCase().includes('hà nội') && destination.toLowerCase().includes('hà nội'))
-
-    // Phụ phí theo cân nặng (vượt 2kg thì mỗi 1000g thêm 5.000đ)
-    const extraWeightKg = Math.max(0, Math.ceil((weight - 2000) / 1000))
-    const weightSurcharge = extraWeightKg * 5000
-
-    let standardFee = isSameProvince ? 16500 : 32000
-    let expressFee = isSameProvince ? 30000 : 48000
-    let savingsFee = isSameProvince ? 14000 : 24000
-
-    standardFee += weightSurcharge
-    expressFee += weightSurcharge * 1.5
-    savingsFee += weightSurcharge
-
-    // Giảm phí nếu đạt mốc miễn phí vận chuyển (>= 1.000.000đ hoặc shop Mall)
-    let discount = 0
-    if (cartSubtotal >= 1000000 || isMall) {
-      discount = Math.min(30000, standardFee)
+    const { subtotal = 0 } = req.body || {}
+    if (!isValidAmount(subtotal)) {
+      return res.status(400).json({ success: false, message: 'Giá trị đơn hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
-
-    const options = [
-      {
-        id: 'standard',
-        name: 'Giao hàng Tiêu chuẩn',
-        carrier: isSameProvince ? 'Giao Hàng Nhanh (GHN)' : 'Viettel Post',
-        originalFee: Math.round(standardFee),
-        discount: Math.round(discount),
-        fee: Math.max(0, Math.round(standardFee - discount)),
-        estimatedDays: isSameProvince ? '1 - 2 ngày' : '2 - 4 ngày',
-        isDefault: true,
-      },
-      {
-        id: 'express',
-        name: 'Giao hàng Hỏa tốc',
-        carrier: 'AhaMove / GrabExpress',
-        originalFee: Math.round(expressFee),
-        discount: Math.round(Math.min(discount, 15000)),
-        fee: Math.max(0, Math.round(expressFee - Math.min(discount, 15000))),
-        estimatedDays: isSameProvince ? 'Trong ngày (2 - 4 giờ)' : '1 - 2 ngày',
-        isDefault: false,
-      },
-      {
-        id: 'savings',
-        name: 'Giao hàng Tiết kiệm',
-        carrier: 'Giao Hàng Tiết Kiệm (GHTK)',
-        originalFee: Math.round(savingsFee),
-        discount: Math.round(discount),
-        fee: Math.max(0, Math.round(savingsFee - discount)),
-        estimatedDays: isSameProvince ? '2 - 3 ngày' : '3 - 5 ngày',
-        isDefault: false,
-      },
-    ]
+    const options = calculateShippingOptions({ subtotal }).map((option, index) => ({
+      ...option,
+      isDefault: index === 0,
+    }))
 
     return res.status(200).json({
       success: true,
       message: 'Tính phí vận chuyển thành công.',
       data: {
-        fromProvince: origin,
-        toProvince: destination,
-        weightGrams: weight,
-        isSameProvince,
+        estimated: true,
+        note: 'Phí cố định cho một shop; không tính theo địa chỉ hay cân nặng. Đơn hàng được tính lại từ dữ liệu trên server.',
         options,
       },
     })

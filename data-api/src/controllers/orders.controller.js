@@ -1,11 +1,8 @@
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
-
-const SHIPPING = Object.freeze({
-  tietkiem: { name: 'Tiết Kiệm', fee: 16500 },
-  nhanh: { name: 'Hoả Tốc ShopNova', fee: 32000 },
-  hoatoc: { name: 'Nhanh', fee: 22000 },
-})
+import { calculateShipping } from '../utils/shipping.js'
+import { evaluateVoucher } from '../utils/voucher.js'
+import { allocateDiscounts, isValidAmount } from '../utils/money.js'
 
 const responseError = (res, status, code, message) => res.status(status).json({
   success: false,
@@ -86,7 +83,7 @@ export async function createOrder(req, res, next) {
     order.address.detail.length > 255 ||
     order.note.length > 500 ||
     order.paymentMethod !== 'cod' ||
-    !SHIPPING[order.shippingMethod] ||
+    !calculateShipping(order.shippingMethod, { subtotal: 0 }) ||
     order.voucherCode.length > 32
   ) {
     return responseError(res, 400, 'VALIDATION_ERROR', 'Thông tin đặt hàng không hợp lệ.')
@@ -143,7 +140,11 @@ export async function createOrder(req, res, next) {
       const groups = new Map()
       let subtotal = 0
       for (const variant of variants) {
-        const lineTotal = Number(variant.price) * variant.qty
+        const price = Number(variant.price)
+        const lineTotal = price * variant.qty
+        if (!isValidAmount(price) || !isValidAmount(lineTotal) || !isValidAmount(subtotal + lineTotal)) {
+          return { error: 'ORDER_AMOUNT_INVALID' }
+        }
         subtotal += lineTotal
         const shopId = String(variant.shop_id)
         const group = groups.get(shopId) || {
@@ -159,38 +160,18 @@ export async function createOrder(req, res, next) {
         groups.set(shopId, group)
       }
 
-      const shipping = SHIPPING[order.shippingMethod]
+      const shipping = calculateShipping(order.shippingMethod, { subtotal: 0 })
       let shippingFee = 0
       for (const group of groups.values()) {
-        group.shippingFee = group.hasFreeShipping || group.subtotal >= 1000000 ? 0 : shipping.fee
+        group.shippingFee = calculateShipping(order.shippingMethod, group).fee
         shippingFee += group.shippingFee
       }
 
-      let voucher = null
-      let discountAmount = 0
-      if (order.voucherCode) {
-        const vouchers = await query(
-          `SELECT id, discount_amount, min_subtotal, usage_limit, per_user_limit, used_count
-           FROM vouchers
-           WHERE code = ? AND is_active = 1 AND starts_at <= UTC_TIMESTAMP(3) AND ends_at > UTC_TIMESTAMP(3)
-           FOR UPDATE`,
-          [order.voucherCode],
-        )
-        if (!vouchers.length) return { error: 'VOUCHER_INVALID' }
-        voucher = vouchers[0]
-        const usage = await query(
-          `SELECT COUNT(*) AS used FROM voucher_uses WHERE voucher_id = ? AND buyer_id = ? AND state = 'applied'`,
-          [voucher.id, userId],
-        )
-        if (
-          subtotal < Number(voucher.min_subtotal) ||
-          (voucher.usage_limit !== null && Number(voucher.used_count) >= Number(voucher.usage_limit)) ||
-          Number(usage[0].used) >= Number(voucher.per_user_limit)
-        ) {
-          return { error: 'VOUCHER_UNAVAILABLE' }
-        }
-        discountAmount = Math.min(Number(voucher.discount_amount), subtotal)
-        if (discountAmount === 0) voucher = null
+      const evaluated = await evaluateVoucher(query, { voucherCode: order.voucherCode, userId, subtotal, lock: true })
+      if (evaluated.error) return { error: evaluated.error }
+      const { voucher, discountAmount } = evaluated
+      if (!isValidAmount(discountAmount) || !isValidAmount(shippingFee) || !isValidAmount(subtotal + shippingFee - discountAmount)) {
+        return { error: 'ORDER_AMOUNT_INVALID' }
       }
 
       const orderCode = makeOrderCode()
@@ -220,14 +201,11 @@ export async function createOrder(req, res, next) {
         ],
       )
       const orderId = String(orderIdResult.insertId)
-      let allocatedDiscount = 0
       const groupList = [...groups.values()]
+      const shopDiscounts = allocateDiscounts(discountAmount, groupList.map((group) => group.subtotal))
       for (let index = 0; index < groupList.length; index += 1) {
         const group = groupList[index]
-        const groupDiscount = index === groupList.length - 1
-          ? discountAmount - allocatedDiscount
-          : subtotal ? Math.floor(discountAmount * group.subtotal / subtotal) : 0
-        allocatedDiscount += groupDiscount
+        const groupDiscount = shopDiscounts[index]
         const shopOrderResult = await query(
           `INSERT INTO shop_orders
             (order_id, shop_id, shop_name, status, subtotal, shipping_fee, discount_amount,
@@ -344,6 +322,7 @@ export async function createOrder(req, res, next) {
         IDEMPOTENCY_CONFLICT: [409, 'IDEMPOTENCY_CONFLICT', 'Yêu cầu đặt hàng đã được sử dụng với thông tin khác.'],
         PRODUCT_UNAVAILABLE: [409, 'PRODUCT_UNAVAILABLE', 'Một sản phẩm trong giỏ không còn được bán.'],
         INSUFFICIENT_STOCK: [409, 'INSUFFICIENT_STOCK', 'Số lượng đặt vượt quá tồn kho hiện tại.'],
+        ORDER_AMOUNT_INVALID: [400, 'ORDER_AMOUNT_INVALID', 'Giá trị đơn hàng vượt giới hạn cho phép.'],
         VOUCHER_INVALID: [400, 'VOUCHER_INVALID', 'Mã giảm giá không hợp lệ hoặc đã hết hạn.'],
         VOUCHER_UNAVAILABLE: [409, 'VOUCHER_UNAVAILABLE', 'Mã giảm giá không đủ điều kiện hoặc đã hết lượt sử dụng.'],
       }
@@ -363,7 +342,7 @@ export async function createOrder(req, res, next) {
           createdAt: serializeDate(result.order.created_at),
           status: 'pending',
           payment: order.paymentMethod,
-          shippingUnit: SHIPPING[order.shippingMethod].name,
+          shippingUnit: calculateShipping(order.shippingMethod, { subtotal: 0 }).name,
           address: {
             fullName: order.address.recipientName,
             phone: order.address.phone,
@@ -380,6 +359,9 @@ export async function createOrder(req, res, next) {
   } catch (err) {
     if (err.domainCode === 'INSUFFICIENT_STOCK') {
       return responseError(res, 409, err.domainCode, 'Số lượng đặt vượt quá tồn kho hiện tại.')
+    }
+    if (err.code === 'ER_LOCK_DEADLOCK' || err.code === 'ER_LOCK_WAIT_TIMEOUT') {
+      return responseError(res, 409, 'CHECKOUT_CONFLICT', 'Đơn hàng đang xung đột với giao dịch khác. Vui lòng thử lại với cùng khóa yêu cầu.')
     }
     return next(err)
   }

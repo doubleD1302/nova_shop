@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { previewCheckout } from '../controllers/checkout-preview.controller.js'
 import {
   cancelOrder,
   createOrder,
@@ -9,6 +10,7 @@ import { authenticate } from '../middlewares/auth.middleware.js'
 
 const router = Router()
 
+router.post('/preview', authenticate, previewCheckout)
 router.get('/', authenticate, listOrders)
 router.post('/', authenticate, createOrder)
 router.post('/:orderId/cancel', authenticate, cancelOrder)

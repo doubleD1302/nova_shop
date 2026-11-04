@@ -1,7 +1,7 @@
 import { callDataApi } from '../clients/data.client.js'
 
 /**
- * Tính toán phí vận chuyển động theo địa chỉ người gửi, người nhận, cân nặng và giá trị đơn hàng
+ * Ước tính phí vận chuyển cho một shop theo bảng phí hiện tại.
  */
 export async function calculateShippingFee(req, res, next) {
   try {
@@ -13,7 +13,7 @@ export async function calculateShippingFee(req, res, next) {
         fromProvince,
         toProvince,
         weightGrams: typeof weightGrams === 'number' ? weightGrams : undefined,
-        subtotal: typeof subtotal === 'number' ? subtotal : undefined,
+        subtotal,
         isMall: Boolean(isMall),
       },
     })
