@@ -495,7 +495,8 @@ export async function updateUserProfile(req, res, next) {
       fullName.length > 120 ||
       !validEmail(email) ||
       (phone && phone.length > 20) ||
-      (avatarUrl !== undefined && avatarUrl.length > 1024)
+      (body.avatarUrl !== undefined && body.avatarUrl !== null && typeof body.avatarUrl !== 'string') ||
+      (typeof avatarUrl === 'string' && avatarUrl.length > 1024)
     ) {
       return res.status(400).json({
         success: false,
@@ -505,16 +506,22 @@ export async function updateUserProfile(req, res, next) {
     }
 
     const user = await executeTransaction(async (query) => {
-      await query(
-        `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
-         WHERE id = ? AND status = 'active'`,
-        [fullName, email, phone || null, avatarUrl ?? null, userId],
-      )
       const users = await query(
-        `SELECT id FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
+        `SELECT id, avatar_url FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
         [userId],
       )
       if (!users.length) return null
+      const currentAvatar = users[0].avatar_url
+      const nextAvatar = avatarUrl === undefined ? currentAvatar : avatarUrl
+      const prefix = `/uploads/avatar-${userId}-`
+      const validNewAvatar = typeof nextAvatar === 'string' && nextAvatar.startsWith(prefix) &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(nextAvatar.slice(prefix.length))
+      if (nextAvatar !== null && nextAvatar !== currentAvatar && !validNewAvatar) return { error: 'INVALID_AVATAR_IMAGE' }
+      await query(
+        `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
+         WHERE id = ? AND status = 'active'`,
+        [fullName, email, phone || null, nextAvatar, userId],
+      )
       if (address !== undefined) {
         const addresses = await query(
           `SELECT id FROM addresses WHERE user_id = ? AND is_default = 1 AND deleted_at IS NULL FOR UPDATE`,
@@ -560,6 +567,9 @@ export async function updateUserProfile(req, res, next) {
         message: 'Không tìm thấy tài khoản.',
         error: { code: 'USER_NOT_FOUND' },
       })
+    }
+    if (user.error === 'INVALID_AVATAR_IMAGE') {
+      return res.status(400).json({ success: false, message: 'Đường dẫn ảnh đại diện không hợp lệ cho tài khoản này.', error: { code: user.error } })
     }
 
     return res.status(200).json({

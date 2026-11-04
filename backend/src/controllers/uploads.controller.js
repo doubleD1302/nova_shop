@@ -4,7 +4,7 @@ import path from 'node:path'
 import { env } from '../config/env.js'
 import { getUploadedImage, saveUploadedImage } from '../services/object-storage.js'
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const IMAGE_LIMITS = Object.freeze({ product: 5, shop: 5, review: 2, avatar: 1, legacy: 5 })
 const IMAGE_TYPES = Object.freeze({
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -27,16 +27,27 @@ function detectImage(buffer) {
 export async function uploadSellerImage(req, res, next) {
   try {
     const dataUrl = req.body?.dataUrl
-    const match = typeof dataUrl === 'string' && dataUrl.match(/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/)
+    // Client cũ chưa gửi purpose; giữ mức 5 MiB để không phá luồng upload hiện có.
+    const purpose = req.body?.purpose === undefined ? 'legacy' : req.body.purpose
+    if (typeof purpose !== 'string' || !Object.hasOwn(IMAGE_LIMITS, purpose) || purpose === 'legacy' && req.body?.purpose !== undefined) {
+      return res.status(400).json({ success: false, message: 'Mục đích tải ảnh không hợp lệ.', error: { code: 'INVALID_IMAGE_PURPOSE' } })
+    }
+    if ((purpose === 'product' || purpose === 'shop') && !['seller', 'admin'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền tải ảnh cho gian hàng.', error: { code: 'FORBIDDEN' } })
+    }
+    const match = typeof dataUrl === 'string' && dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/)
     if (!match) {
       return res.status(400).json({ success: false, message: 'Chỉ chấp nhận ảnh PNG, JPG hoặc WebP hợp lệ.', error: { code: 'INVALID_IMAGE' } })
     }
-    const bytes = Buffer.from(match[1], 'base64')
+    const bytes = Buffer.from(match[2], 'base64')
     const image = detectImage(bytes)
-    if (!image || bytes.length > MAX_IMAGE_BYTES) {
-      return res.status(400).json({ success: false, message: 'Ảnh phải là PNG, JPG hoặc WebP và không vượt quá 5 MB.', error: { code: 'INVALID_IMAGE' } })
+    if (!image || image.mime !== match[1] || bytes.toString('base64') !== match[2] || bytes.length > IMAGE_LIMITS[purpose] * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: `Ảnh phải là PNG, JPG hoặc WebP hợp lệ và không vượt quá ${IMAGE_LIMITS[purpose]} MiB.`, error: { code: 'INVALID_IMAGE' } })
     }
-    const filename = `${randomUUID()}${image.ext}`
+    // Legacy <= 1 MiB tiếp tục dùng được cho avatar của client cũ.
+    // Tên do server cấp gắn mục đích và chủ sở hữu, không nhận từ client.
+    const avatarImage = purpose === 'avatar' || (purpose === 'legacy' && bytes.length <= 1024 * 1024)
+    const filename = `${avatarImage ? `avatar-${req.user.id}-` : ''}${randomUUID()}${image.ext}`
     if (env.uploadStorage === 's3') {
       await saveUploadedImage(filename, bytes, image.mime)
     } else {
@@ -51,7 +62,7 @@ export async function uploadSellerImage(req, res, next) {
 
 export async function serveUploadedImage(req, res, next) {
   const filename = req.params.filename
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
+  if (!/^(?:avatar-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
     return res.status(404).end()
   }
 
