@@ -62,6 +62,14 @@ function serializeOrderItem(row, shopId, shopName) {
 export async function createOrder(req, res, next) {
   const { userId } = req.body || {}
   const idempotencyKey = req.headers['idempotency-key']
+  const body = req.body || {}
+  const address = body.address
+  if (!Array.isArray(body.items) || body.items.some((item) => !item || typeof item !== 'object' || typeof item.qty !== 'number') ||
+      !address || typeof address !== 'object' || Array.isArray(address) ||
+      ['fullName', 'phone', 'province', 'district', 'ward', 'detail'].some((field) => address[field] !== undefined && address[field] !== null && typeof address[field] !== 'string') ||
+      ['voucherCode', 'note'].some((field) => body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string')) {
+    return responseError(res, 400, 'VALIDATION_ERROR', 'Thông tin đặt hàng không hợp lệ.')
+  }
   const order = normalizeOrderRequest(req.body || {})
   if (
     !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||

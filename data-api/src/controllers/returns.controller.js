@@ -26,6 +26,7 @@ export async function createOrderReturn(req, res, next) {
       !/^[1-9]\d{0,19}$/.test(orderId) ||
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
       !/^[1-9]\d{0,19}$/.test(String(shopOrderId || '')) ||
+      (refundAmount !== undefined && (!Number.isSafeInteger(refundAmount) || refundAmount <= 0)) ||
       typeof reason !== 'string' ||
       !reason.trim()
     ) {

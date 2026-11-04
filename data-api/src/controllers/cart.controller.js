@@ -15,6 +15,9 @@ function isValidId(val) {
   return typeof val === 'string' && /^[1-9]\d{0,19}$/.test(val.trim())
 }
 
+const validQuantity = (value, min) => (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isInteger(Number(value)) && Number(value) >= min && Number(value) <= 99
+const validBoolean = (value) => value === undefined || typeof value === 'boolean'
+
 function serializeCartItem(row) {
   const isAvailable = Boolean(
     row.variant_id &&
@@ -235,7 +238,7 @@ export async function addItemToCart(req, res, next) {
     }
 
     const qty = Number(req.body?.qty)
-    if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+    if (!validQuantity(req.body?.qty, 1) || !validBoolean(req.body?.selected) || !validBoolean(replaceQty)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Số lượng phải là số nguyên từ 1 đến 99.')
     }
 
@@ -303,7 +306,7 @@ export async function updateCartItem(req, res, next) {
     const cleanUserId = String(userId || '').trim()
     const itemId = String(req.params.itemId || '').trim()
 
-    if (!isValidId(cleanUserId) || !itemId) {
+    if (!isValidId(cleanUserId) || !itemId || (qty !== undefined && !validQuantity(qty, 0)) || !validBoolean(selected)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 
@@ -390,6 +393,9 @@ export async function removeCartItem(req, res, next) {
  */
 export async function clearCart(req, res, next) {
   try {
+    if (!validBoolean(req.body?.selectedOnly) || (req.query.selected !== undefined && !['true', 'false'].includes(req.query.selected))) {
+      return responseError(res, 400, 'VALIDATION_ERROR', 'Bộ lọc giỏ hàng không hợp lệ.')
+    }
     const userId = String(req.body?.userId || req.query.userId || '').trim()
     const selectedOnly = req.body?.selectedOnly === true || req.query.selected === 'true'
 
@@ -491,7 +497,7 @@ export async function updateCartSelection(req, res, next) {
     const { userId, selected, shopId } = req.body || {}
     const cleanUserId = String(userId || '').trim()
 
-    if (!isValidId(cleanUserId) || selected === undefined) {
+    if (!isValidId(cleanUserId) || typeof selected !== 'boolean' || (shopId !== undefined && !isValidId(String(shopId)))) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 

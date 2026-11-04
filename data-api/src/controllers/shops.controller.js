@@ -167,6 +167,7 @@ export async function updateSellerShop(req, res, next) {
     const address = typeof body.address === 'string' ? body.address.trim() : ''
     if (
       !/^[1-9]\d{0,19}$/.test(userId) || !name || name.length > 160 ||
+      ['tagline', 'description', 'address'].some((field) => body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string') ||
       tagline.length > 255 || description.length > 5000 || !province || province.length > 120 ||
       address.length > 255 || !imageUrlIsAllowed(body.logoUrl) || !imageUrlIsAllowed(body.bannerUrl)
     ) {

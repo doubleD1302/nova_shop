@@ -52,6 +52,7 @@ export async function updateOrderTracking(req, res, next) {
       !/^[1-9]\d{0,19}$/.test(shopOrderId) ||
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
       typeof trackingCode !== 'string' ||
+      typeof autoAdvanceStatus !== 'boolean' ||
       !trackingCode.trim()
     ) {
       return res.status(400).json({

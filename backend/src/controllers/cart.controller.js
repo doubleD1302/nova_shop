@@ -1,5 +1,8 @@
 import { callDataApi } from '../clients/data.client.js'
 
+const validQuantity = (value, min) => (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isInteger(Number(value)) && Number(value) >= min && Number(value) <= 99
+const validBoolean = (value) => value === undefined || typeof value === 'boolean'
+
 /**
  * GET /api/v1/cart
  * Lấy danh sách sản phẩm và thông tin giỏ hàng của người dùng đang đăng nhập.
@@ -25,7 +28,7 @@ export async function addItemToCart(req, res, next) {
   try {
     const { variantId, productId, qty = 1, selected = true, replaceQty } = req.body || {}
     const parsedQty = Number(qty)
-    if (!Number.isInteger(parsedQty) || parsedQty < 1 || parsedQty > 99) {
+    if (!validQuantity(qty, 1) || !validBoolean(selected) || !validBoolean(replaceQty)) {
       return res.status(400).json({
         success: false,
         message: 'Số lượng phải là số nguyên từ 1 đến 99.',
@@ -72,8 +75,7 @@ export async function updateCartItem(req, res, next) {
 
     const { qty, selected } = req.body || {}
     if (qty !== undefined) {
-      const parsedQty = Number(qty)
-      if (!Number.isInteger(parsedQty) || parsedQty < 0 || parsedQty > 99) {
+      if (!validQuantity(qty, 0)) {
         return res.status(400).json({
           success: false,
           message: 'Số lượng phải là số nguyên từ 0 đến 99 (0 là xóa khỏi giỏ).',
@@ -81,6 +83,8 @@ export async function updateCartItem(req, res, next) {
         })
       }
     }
+
+    if (!validBoolean(selected)) return res.status(400).json({ success: false, message: 'Trạng thái chọn không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
 
     const result = await callDataApi(`/internal/v1/cart/items/${encodeURIComponent(itemId)}`, {
       method: 'PATCH',
@@ -137,6 +141,9 @@ export async function removeCartItem(req, res, next) {
  */
 export async function clearCart(req, res, next) {
   try {
+    if (!validBoolean(req.body?.selectedOnly) || (req.query.selected !== undefined && !['true', 'false'].includes(req.query.selected))) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc giỏ hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     const selectedOnly = req.query.selected === 'true' || req.body?.selectedOnly === true
     const result = await callDataApi('/internal/v1/cart/items', {
       method: 'DELETE',
@@ -188,7 +195,7 @@ export async function syncCart(req, res, next) {
 export async function updateCartSelection(req, res, next) {
   try {
     const { selected, shopId } = req.body || {}
-    if (selected === undefined) {
+    if (typeof selected !== 'boolean' || (shopId !== undefined && !/^[1-9]\d{0,19}$/.test(String(shopId)))) {
       return res.status(400).json({
         success: false,
         message: 'Trường selected là bắt buộc.',
