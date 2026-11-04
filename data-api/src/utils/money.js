@@ -5,7 +5,17 @@ export function isValidAmount(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= MAX_ORDER_AMOUNT
 }
 
-export function allocateDiscount(discount, shopSubtotal, subtotal) {
-  if (!subtotal) return 0
-  return Number((BigInt(discount) * BigInt(shopSubtotal)) / BigInt(subtotal))
+export function allocateDiscounts(discount, shopSubtotals) {
+  const subtotal = shopSubtotals.reduce((sum, amount) => sum + amount, 0)
+  if (!subtotal) return shopSubtotals.map(() => 0)
+
+  let accumulatedSubtotal = 0
+  let allocatedDiscount = 0
+  return shopSubtotals.map((amount) => {
+    accumulatedSubtotal += amount
+    const accumulatedDiscount = Number((BigInt(discount) * BigInt(accumulatedSubtotal)) / BigInt(subtotal))
+    const shopDiscount = accumulatedDiscount - allocatedDiscount
+    allocatedDiscount = accumulatedDiscount
+    return shopDiscount
+  })
 }

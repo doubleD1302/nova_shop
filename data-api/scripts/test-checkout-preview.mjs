@@ -30,6 +30,19 @@ const noVoucher = await calculateCheckoutPreview(makeQuery(), { ...input, vouche
 assert.equal(noVoucher.discountAmount, 0)
 assert.equal(noVoucher.total, 333000)
 
+const smallOrderQuery = async (sql, params) => {
+  if (sql.includes('FROM product_variants')) return params.map((id) => ({ variant_id: id, price: 1, stock_qty: 1, shop_id: id, free_shipping: 1, shop_name: `Shop ${id}` }))
+  if (sql.includes('FROM vouchers')) return [{ id: 7, discount_amount: 2, min_subtotal: 0, usage_limit: 10, per_user_limit: 1, used_count: 0 }]
+  if (sql.includes('FROM voucher_uses')) return [{ used: 0 }]
+  throw new Error('Truy vấn không mong đợi')
+}
+const smallOrder = await calculateCheckoutPreview(smallOrderQuery, {
+  ...input, items: ['1', '2', '3'].map((variantId) => ({ variantId, qty: 1 })),
+})
+assert.equal(smallOrder.subtotal, 3)
+assert.equal(smallOrder.discountAmount, 2)
+assert.equal(smallOrder.total, 1)
+
 for (const items of [[{ variantId: '1', qty: '2' }], [{ variantId: '1', qty: 1 }, { variantId: '1', qty: 1 }]]) {
   let status
   let response

@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { calculateShipping } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
-import { allocateDiscount, isValidAmount } from '../utils/money.js'
+import { allocateDiscounts, isValidAmount } from '../utils/money.js'
 
 const responseError = (res, status, code, message) => res.status(status).json({
   success: false,
@@ -201,14 +201,11 @@ export async function createOrder(req, res, next) {
         ],
       )
       const orderId = String(orderIdResult.insertId)
-      let allocatedDiscount = 0
       const groupList = [...groups.values()]
+      const shopDiscounts = allocateDiscounts(discountAmount, groupList.map((group) => group.subtotal))
       for (let index = 0; index < groupList.length; index += 1) {
         const group = groupList[index]
-        const groupDiscount = index === groupList.length - 1
-          ? discountAmount - allocatedDiscount
-          : allocateDiscount(discountAmount, group.subtotal, subtotal)
-        allocatedDiscount += groupDiscount
+        const groupDiscount = shopDiscounts[index]
         const shopOrderResult = await query(
           `INSERT INTO shop_orders
             (order_id, shop_id, shop_name, status, subtotal, shipping_fee, discount_amount,

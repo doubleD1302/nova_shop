@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { calculateShipping, calculateShippingOptions } from '../src/utils/shipping.js'
-import { allocateDiscount, isValidAmount, MAX_ORDER_AMOUNT } from '../src/utils/money.js'
+import { allocateDiscounts, isValidAmount, MAX_ORDER_AMOUNT } from '../src/utils/money.js'
 
 test('báo giá và tính phí cùng phương thức, đơn giá cho từng shop', () => {
   const group = { subtotal: 999999, hasFreeShipping: false }
@@ -19,7 +19,21 @@ test('giới hạn tiền khớp DECIMAL(15,0) và phân bổ không mất chín
   assert.equal(isValidAmount(-1), false)
   assert.equal(isValidAmount(0.5), false)
   assert.equal(isValidAmount('1'), false)
-  assert.equal(allocateDiscount(999999999999999, 999999999999998, 999999999999999), 999999999999998)
+  assert.deepEqual(allocateDiscounts(999999999999999, [999999999999998, 1]), [999999999999998, 1])
+})
+
+test('phân bổ voucher đủ tổng và không vượt tiền hàng của từng shop', () => {
+  for (const amounts of [[1, 1, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0], [0, 0, 0], [2, 3, 1, 0]]) {
+    const subtotal = amounts.reduce((sum, value) => sum + value, 0)
+    for (let discount = 0; discount <= subtotal; discount += 1) {
+      const allocated = allocateDiscounts(discount, amounts)
+      assert.equal(allocated.reduce((sum, value) => sum + value, 0), discount)
+      allocated.forEach((value, index) => {
+        assert.ok(Number.isInteger(value) && value >= 0 && value <= amounts[index])
+      })
+    }
+  }
+  assert.deepEqual(allocateDiscounts(2, [1, 1, 1]), [0, 1, 1])
 })
 
 test('miễn phí theo ngưỡng hoặc sản phẩm miễn phí ship của từng shop', () => {
