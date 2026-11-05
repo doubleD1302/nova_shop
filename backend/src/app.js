@@ -12,6 +12,7 @@ import uploadsRouter from './routes/uploads.routes.js'
 import { serveUploadedImage } from './controllers/uploads.controller.js'
 import adminRouter from './routes/admin.routes.js'
 import aiRouter from './routes/ai.routes.js'
+import vouchersRouter from './routes/vouchers.routes.js'
 import cartRouter from './routes/cart.routes.js'
 import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
@@ -66,6 +67,7 @@ app.use('/api/v1/products', productsRouter)
 app.use('/api/v1/orders', ordersRouter)
 app.use('/api/v1/seller', sellerRouter)
 app.use('/api/v1/ai', aiRouter)
+app.use('/api/v1/vouchers', vouchersRouter)
 app.use('/api/v1/cart', cartRouter)
 app.use('/api/v1', returnsRouter)
 app.use('/api/v1', shippingRouter)

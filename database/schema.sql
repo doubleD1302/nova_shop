@@ -236,6 +236,17 @@ CREATE TABLE vouchers (
   CONSTRAINT ck_vouchers_active CHECK (is_active IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Voucher toàn sàn giảm một số tiền VND cố định';
 
+-- Lưu voucher theo người dùng; không thay đổi lượt sử dụng checkout.
+CREATE TABLE voucher_wallet (
+  user_id BIGINT UNSIGNED NOT NULL,
+  voucher_id BIGINT UNSIGNED NOT NULL,
+  saved_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (user_id, voucher_id),
+  KEY ix_voucher_wallet_order (user_id, saved_at, voucher_id),
+  CONSTRAINT fk_voucher_wallet_user FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT fk_voucher_wallet_voucher FOREIGN KEY (voucher_id) REFERENCES vouchers (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- Đơn tổng: một lần checkout của người mua
 CREATE TABLE orders (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID đơn tổng',
