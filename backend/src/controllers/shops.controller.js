@@ -57,3 +57,12 @@ export async function resubmitSellerShop(req, res, next) {
     return res.status(200).json({ success: true, data })
   } catch (err) { return next(err) }
 }
+
+export async function getCategoryAttributes(req, res, next) {
+  try {
+    const slug = req.params.categorySlug
+    if (!/^[a-z0-9-]{1,160}$/.test(slug)) return res.status(400).json({ success: false, message: 'Danh mục không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const data = await callDataApi(`/internal/v1/categories/${encodeURIComponent(slug)}/attributes`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}

@@ -1,6 +1,6 @@
 # Thuộc tính theo ngành hàng — dự thảo
 
-Trạng thái: **draft, chưa thống nhất và chưa triển khai**. Cần người phụ trách sản phẩm và database duyệt dữ liệu, cách chuyển đổi và tác động trước khi làm migration, API hay validation. Tài liệu này không thay đổi hành vi hiện tại.
+Tài liệu thiết kế ban đầu. Phiên bản minh họa hiện đã được triển khai trong source cho một số danh mục; xem `CATEGORY_ATTRIBUTES.md`. Các lựa chọn bên dưới tiếp tục là định hướng cần thống nhất trước khi vận hành chính thức hoặc chuyển đổi dữ liệu cũ.
 
 ## Hiện trạng source
 
@@ -14,7 +14,7 @@ Trạng thái: **draft, chưa thống nhất và chưa triển khai**. Cần ng�
 1. Định nghĩa thuộc tính bằng mã ổn định, nhãn, kiểu (`text`, `number`, `boolean`, `single_choice`, `multi_choice`), đơn vị và quy tắc giới hạn; lựa chọn có mã ổn định và nhãn riêng. Quy định chính xác độ dài, khoảng số, đơn vị, chuẩn hóa và danh sách giá trị theo từng ngành hàng trước khi phát hành.
 2. Gắn định nghĩa với danh mục và phiên bản; cần quyết định danh mục cha có kế thừa xuống con hay không, cách xử lý trùng mã, thứ tự hiển thị, danh mục được phép bán và ai có quyền chỉnh cấu hình. Không đổi nghĩa mã đã phát hành; bổ sung phiên bản khi thay quy tắc.
 3. Phân biệt thông số sản phẩm với thuộc tính tạo SKU. Thông số có thể đề xuất lưu theo mã và phiên bản định nghĩa; SKU, giá, tồn kho và snapshot đơn tiếp tục có vòng đời riêng. Tên bảng, khóa và migration chỉ chốt sau khi database review; không mặc định JSON hiện tại đủ cho lọc/index.
-4. Đề xuất response tương lai trả mã, nhãn, kiểu, đơn vị và giá trị đã xác thực; phải giữ tương thích response `specs` `{ label, value }` cho client hiện có trong giai đoạn chuyển tiếp. API đọc định nghĩa, ghi sản phẩm và lỗi validation đều là **planned**; contract cụ thể cần thống nhất cùng web/app trước khi triển khai.
+4. Đề xuất response tương lai trả mã, nhãn, kiểu, đơn vị và giá trị đã xác thực; phải giữ tương thích response `specs` `{ label, value }` cho client hiện có trong giai đoạn chuyển tiếp. Phiên bản minh họa đã có API đọc định nghĩa và ghi/đọc thuộc tính riêng; contract chính thức cần tiếp tục thống nhất cùng web/app.
 
 ## Sản phẩm cũ và thay đổi danh mục
 

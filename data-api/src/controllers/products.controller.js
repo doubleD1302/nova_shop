@@ -1,3 +1,4 @@
+import { validateCategoryAttributes } from '../utils/category-attributes.js'
 import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
@@ -545,6 +546,8 @@ export async function saveSellerProduct(req, res, next) {
       return res.status(400).json({ success: false, message: 'Cần nhập đủ thông tin và đúng 4 ảnh khác nhau đã kiểm tra, thuộc ảnh tải lên hoặc có giấy phép Commons phù hợp.', error: { code: 'VALIDATION_ERROR' } })
     }
     const { name, categorySlug, description, price, originalPrice, stock, images, status } = validation.value
+    const categoryAttributes = body.categoryAttributes === undefined ? undefined : validateCategoryAttributes(categorySlug, body.categoryAttributes)
+    if (categoryAttributes === null) return res.status(400).json({ success: false, message: 'Thuộc tính ngành hàng không hợp lệ.', error: { code: 'INVALID_CATEGORY_ATTRIBUTES' } })
 
     const result = await executeTransaction(async (query) => {
       const shops = await query(`SELECT id, status, suspension_reason FROM shops WHERE owner_id = ? FOR UPDATE`, [userId])
@@ -560,8 +563,12 @@ export async function saveSellerProduct(req, res, next) {
       if (!categories.length) return { error: 'CATEGORY_NOT_FOUND' }
       let id = productId
       if (productId) {
-        const owned = await query(`SELECT id, status, approval_status, rejection_reason, reviewed_by, reviewed_at FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
+        const owned = await query(`SELECT id, category_id, status, approval_status, rejection_reason, reviewed_by, reviewed_at FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
         if (!owned.length) return { error: 'PRODUCT_NOT_FOUND' }
+        if (String(owned[0].category_id) !== String(categories[0].id) && categoryAttributes === undefined) {
+          const previous = await query('SELECT product_id FROM product_category_attributes WHERE product_id = ? FOR UPDATE', [productId])
+          if (previous.length) return { error: 'CATEGORY_ATTRIBUTES_CONFIRM_REQUIRED' }
+        }
         let nextApprovalStatus = owned[0].approval_status
         let nextRejectionReason = owned[0].rejection_reason
         let nextReviewedBy = owned[0].reviewed_by || null
@@ -620,6 +627,12 @@ export async function saveSellerProduct(req, res, next) {
         )
       }
 
+      if (categoryAttributes !== undefined) {
+        await query(`INSERT INTO product_category_attributes (product_id, category_id, definition_version, attribute_values)
+          VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE category_id = VALUES(category_id),
+          definition_version = VALUES(definition_version), attribute_values = VALUES(attribute_values)`,
+        [id, categories[0].id, categoryAttributes.version, JSON.stringify(categoryAttributes.values)])
+      }
       await query(`DELETE FROM product_images WHERE product_id = ?`, [id])
       for (let index = 0; index < images.length; index += 1) {
         const image = images[index]
@@ -642,6 +655,7 @@ export async function saveSellerProduct(req, res, next) {
       return { id: String(id) }
     })
     if (result.error) {
+      if (result.error === 'CATEGORY_ATTRIBUTES_CONFIRM_REQUIRED') return res.status(409).json({ success: false, message: 'Cần xác nhận thuộc tính khi đổi danh mục.', error: { code: result.error } })
       if (result.error === 'SHOP_SUSPENDED') {
         return res.status(403).json({
           success: false,
@@ -682,4 +696,35 @@ export async function archiveSellerProduct(req, res, next) {
   } catch (err) {
     return next(err)
   }
+}
+
+export async function getSellerCategoryAttributes(req, res, next) {
+  try {
+    const userId = req.query.userId
+    const productId = req.params.productId
+    if (typeof userId !== 'string' || !/^[1-9]\d{0,19}$/.test(userId) || !/^[1-9]\d{0,19}$/.test(productId)) {
+      return res.status(400).json({ success: false, message: 'Mã không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const rows = await executeQuery(`SELECT c.slug, a.definition_version, a.attribute_values
+      FROM products p JOIN shops s ON s.id = p.shop_id JOIN categories c ON c.id = p.category_id
+      LEFT JOIN product_category_attributes a ON a.product_id = p.id
+      WHERE p.id = ? AND s.owner_id = ? AND p.status <> 'archived'`, [productId, userId])
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.', error: { code: 'PRODUCT_NOT_FOUND' } })
+    return res.json({ success: true, data: { categoryId: rows[0].slug, version: Number(rows[0].definition_version || 1), values: parseJson(rows[0].attribute_values, {}) } })
+  } catch (err) { return next(err) }
+}
+
+export async function getPublicCategoryAttributes(req, res, next) {
+  try {
+    const productId = req.params.productId
+    if (!/^[1-9]\d{0,19}$/.test(productId)) return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const approved = await hasColumn('products', 'approval_status')
+    const rows = await executeQuery(`SELECT c.slug, a.definition_version, a.attribute_values
+      FROM products p JOIN shops s ON s.id = p.shop_id JOIN users owner ON owner.id = s.owner_id
+      JOIN categories c ON c.id = p.category_id LEFT JOIN product_category_attributes a ON a.product_id = p.id
+      WHERE p.id = ? AND p.status = 'active' AND s.status = 'active' AND owner.status = 'active' AND c.is_active = 1
+      ${approved ? "AND p.approval_status = 'approved'" : ''}`, [productId])
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.', error: { code: 'PRODUCT_NOT_FOUND' } })
+    return res.json({ success: true, data: { categoryId: rows[0].slug, version: Number(rows[0].definition_version || 1), values: parseJson(rows[0].attribute_values, {}) } })
+  } catch (err) { return next(err) }
 }

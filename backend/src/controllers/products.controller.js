@@ -146,3 +146,21 @@ export async function archiveSellerProduct(req, res, next) {
     return next(err)
   }
 }
+
+export async function getSellerCategoryAttributes(req, res, next) {
+  try {
+    const id = req.params.productId
+    if (!/^[1-9]\d{0,19}$/.test(id)) return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const data = await callDataApi(`/internal/v1/seller/products/${encodeURIComponent(id)}/category-attributes?userId=${encodeURIComponent(req.user.id)}`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
+export async function getPublicCategoryAttributes(req, res, next) {
+  try {
+    const id = req.params.productId
+    if (!/^[1-9]\d{0,19}$/.test(id)) return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const data = await callDataApi(`/internal/v1/products/${encodeURIComponent(id)}/category-attributes`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}

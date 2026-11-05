@@ -1,3 +1,4 @@
+import { getCategoryDefinitions } from '../utils/category-attributes.js'
 import { readPagination } from '../utils/pagination.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
@@ -196,4 +197,14 @@ export async function updateSellerShop(req, res, next) {
   } catch (err) {
     return next(err)
   }
+}
+
+export async function getCategoryAttributes(req, res, next) {
+  try {
+    const slug = req.params.categorySlug
+    if (!/^[a-z0-9-]{1,160}$/.test(slug)) return res.status(400).json({ success: false, message: 'Danh mục không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const rows = await executeQuery('SELECT id FROM categories WHERE slug = ? AND is_active = 1', [slug])
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy danh mục.', error: { code: 'CATEGORY_NOT_FOUND' } })
+    return res.json({ success: true, data: { categoryId: slug, ...getCategoryDefinitions(slug), example: true } })
+  } catch (err) { return next(err) }
 }
