@@ -64,6 +64,12 @@ try {
     assert.equal(saved.stock_qty, 10)
     assert.equal(Number(saved.price), 180000)
   }
+  for (const freeShipping of ['false', null, 1, []]) {
+    const result = await request('PUT', '/seller/products/1', { ...product, freeShipping }, seller)
+    assert.equal(result.status, 400, JSON.stringify(result))
+    const [[saved]] = await db.query('SELECT free_shipping FROM products WHERE id = 1')
+    assert.equal(saved.free_shipping, 0)
+  }
   console.log(`PASS MySQL ${version}: HTTP cart sync validates atomically, skips pending shop, rolls back failure; seller product invalid stock/price preserves data.`)
 } finally {
   if (backendServer) await new Promise((resolve) => backendServer.close(resolve))

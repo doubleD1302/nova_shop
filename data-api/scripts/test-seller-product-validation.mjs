@@ -46,6 +46,13 @@ assert.equal(validateSellerProductInput(productInput(uploadedImages, { stock: 0,
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { price: 120000, originalPrice: 150000, stock: 99 })).ok, true, 'accepts valid numeric fields')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { description: ' ' })).ok, false, 'rejects a missing description')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { status: 'archived' })).ok, false, 'rejects a seller supplied archive status')
+for (const freeShipping of [null, 'false', 0, 1, [], {}]) {
+  assert.equal(validateSellerProductInput(productInput(uploadedImages, { freeShipping })).ok, false, 'rejects nonboolean freeShipping')
+}
+for (const status of [null, false, '', 0]) {
+  assert.equal(validateSellerProductInput(productInput(uploadedImages, { status })).ok, false, 'rejects invalid status rather than defaulting')
+}
+assert.equal(validateSellerProductInput(productInput(uploadedImages, { freeShipping: false })).ok, true)
 assert.equal(resolveSellerProductStatus(null, 'active'), 'draft', 'new seller products cannot bypass admin approval')
 assert.equal(resolveSellerProductStatus('hidden', 'active'), 'hidden', 'hidden products cannot be reactivated by sellers')
 assert.equal(resolveSellerProductStatus('active', 'active'), 'active', 'approved products remain active when sellers edit details')

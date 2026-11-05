@@ -37,7 +37,7 @@ export function validateSellerProductInput({ body = {}, userId, productId = null
     : body.originalPrice
   const stock = body.stock
   const images = Array.isArray(body.images) ? body.images : []
-  const status = body.status || 'draft'
+  const status = body.status === undefined ? 'draft' : body.status
   const uniqueImageRefs = images.map((image) => image?.sourcePageUrl || image?.url)
 
   const invalidImages = images.length !== 4 ||
@@ -59,6 +59,7 @@ export function validateSellerProductInput({ body = {}, userId, productId = null
     !Number.isSafeInteger(price) || price < 1 || price > 999999999999999 ||
     (originalPrice !== null && (!Number.isSafeInteger(originalPrice) || originalPrice < price || originalPrice > 999999999999999)) ||
     !Number.isSafeInteger(stock) || stock < 0 || stock > 2147483647 ||
+    (body.freeShipping !== undefined && typeof body.freeShipping !== 'boolean') ||
     !['draft', 'active', 'hidden'].includes(status) || invalidImages
   ) {
     return { ok: false }
