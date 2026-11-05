@@ -20,6 +20,13 @@ try {
   await db.query('DROP TABLE product_category_attributes')
   await db.query(await readFile(path.join(root, 'database/migrations/2026-11-06-product-category-attributes.sql'), 'utf8'))
   await db.query(await readFile(path.join(root, 'database/seed.sql'), 'utf8'))
+  await db.query('ALTER TABLE product_images DROP COLUMN source_page_url, DROP COLUMN author, DROP COLUMN license_name, DROP COLUMN license_url')
+  await db.query("INSERT INTO product_images (product_id,url,alt_text,sort_order) VALUES (1,'/uploads/legacy.png','Ảnh cũ',0)")
+  const [[imageBefore]] = await db.query('SELECT id,product_id,url,alt_text,sort_order FROM product_images WHERE product_id=1')
+  await db.query(await readFile(path.join(root, 'database/migrations/2026-10-21-product-images-attribution.sql'), 'utf8'))
+  const [[imageAfter]] = await db.query('SELECT id,product_id,url,alt_text,sort_order FROM product_images WHERE product_id=1')
+  assert.deepEqual(imageAfter, imageBefore)
+
   Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: path.join(root, 'missing-category-test.env'), DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: name, DB_USER: process.env.CATEGORY_LEGACY_DB_USER || 'root', DB_PASSWORD: process.env.CATEGORY_LEGACY_DB_PASSWORD, DB_SSL_ENABLED: 'false', DATA_API_KEY: 'wallet-test-service-key', JWT_SECRET: 'wallet-test-jwt-secret-at-least-32-characters' })
   const dataApp = (await import(pathToFileURL(path.join(root, 'data-api/src/app.js')))).default
   ;({ closeDatabase } = await import(pathToFileURL(path.join(root, 'data-api/src/config/database.js'))))
