@@ -58,6 +58,10 @@ try {
     result = await call('PUT', '/auth/profile', { ...profile, address: bad }, token1)
     assert.equal(result.status, 400, JSON.stringify({ bad, result }))
   }
+  for (const phone of [false, 123, [], {}]) {
+    result = await call('PUT', '/auth/profile', { ...profile, phone }, token1)
+    assert.equal(result.status, 400, JSON.stringify(result))
+  }
   result = await call('PUT', '/auth/profile', profile, token1)
   assert.equal(result.status, 200)
   result = await call('GET', '/auth/me', undefined, token1)

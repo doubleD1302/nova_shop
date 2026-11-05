@@ -498,6 +498,7 @@ export async function updateUserProfile(req, res, next) {
       !fullName ||
       fullName.length > 120 ||
       !validEmail(email) ||
+      (body.phone != null && typeof body.phone !== 'string') ||
       (phone && phone.length > 20) ||
       (body.avatarUrl !== undefined && body.avatarUrl !== null && typeof body.avatarUrl !== 'string') ||
       (typeof avatarUrl === 'string' && avatarUrl.length > 1024)
