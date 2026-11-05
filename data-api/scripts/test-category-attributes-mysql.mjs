@@ -47,6 +47,8 @@ try {
   assert.equal((await get('1')).status, 200)
   assert.deepEqual((await get('1')).body.data.values, {})
   assert.equal((await get('1', '3')).status, 404)
+  assert.equal((await save({ ...product, categoryAttributes: { version: 1, values: {} } }, '1')).status, 403)
+  assert.equal((await save({ ...product, categoryAttributes: { version: 1, values: {} } }, '3')).status, 404)
   assert.equal((await save({ ...product, categoryAttributes: { version: 1, values: { brand: 'Mẫu', material: 'Cotton' } } })).status, 200)
   result = await get('1')
   assert.deepEqual(result.body.data.values, { brand: 'Mẫu', material: 'Cotton' })
@@ -77,4 +79,3 @@ try {
   await db.query(`DROP DATABASE IF EXISTS \`${name}\``)
   await db.end()
 }
-
