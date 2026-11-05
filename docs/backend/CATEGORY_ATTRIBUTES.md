@@ -10,3 +10,5 @@ Bộ định nghĩa phiên bản 1 là dữ liệu ví dụ của đồ án; cá
 Các giá trị được lưu riêng tại `product_category_attributes`; không tự thay đổi `products.specs`, SKU hoặc lịch sử đơn. Sản phẩm cũ chưa có bản ghi vẫn hoạt động và trả `values: {}`. Không tự suy đoán hay chuyển đổi dữ liệu cũ. Trước khi bật code trên môi trường hiện có phải chạy migration `database/migrations/2026-11-06-product-category-attributes.sql`; triển khai và rollback schema cần kế hoạch riêng, tránh xóa bảng khi đã có dữ liệu.
 
 Kiểm thử `node data-api/scripts/test-category-attributes-mysql.mjs` trên MySQL 8 cục bộ riêng với `CATEGORY_TEST=1`, `CATEGORY_DB_PORT`, `CATEGORY_DB_PASSWORD`; tùy chọn `CATEGORY_DB_USER`. Test tạo và xóa database test riêng, không dùng database ứng dụng. Frontend và runtime triển khai chưa nằm trong phạm vi này.
+
+Với schema cũ chưa có các cột kiểm duyệt sản phẩm và lý do khóa shop, luồng seller vẫn đọc/sửa sản phẩm đúng owner, tạo sản phẩm mới ở trạng thái draft, và trả `approvalStatus: null` thay vì tự khẳng định đã duyệt. Khả năng kiểm duyệt đầy đủ vẫn cần migration kiểm duyệt riêng; cần rà trạng thái và dữ liệu trước khi áp dụng.

@@ -269,13 +269,14 @@ export async function listProductReviews(req, res, next) {
     if (!/^[1-9]\d{0,19}$/.test(productId)) {
       return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_ID' } })
     }
+    const approved = await hasColumn('products', 'approval_status')
     const rows = await executeQuery(
       `SELECT r.id, r.product_id, r.rating, r.comment, r.created_at, r.seller_reply,
               u.id AS user_id, u.full_name, oi.variant_name, oi.variant_attributes
        FROM reviews r
        JOIN users u ON u.id = r.user_id AND u.status = 'active'
        JOIN order_items oi ON oi.id = r.order_item_id
-       JOIN products p ON p.id = r.product_id AND p.status = 'active' AND p.approval_status = 'approved'
+       JOIN products p ON p.id = r.product_id AND p.status = 'active' ${approved ? "AND p.approval_status = 'approved'" : ''}
        JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
        JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
        WHERE r.product_id = ? AND r.status = 'visible'
@@ -478,7 +479,7 @@ function mapSellerProduct(row, variants, images) {
     flash: Boolean(row.is_flash_sale),
     freeship: Boolean(row.free_shipping),
     status: row.status,
-    approvalStatus: row.approval_status || 'pending',
+    approvalStatus: row.approval_status || null,
     rejectionReason: row.rejection_reason || null,
     reviewedAt: row.reviewed_at ? asDateString(row.reviewed_at) : null,
     createdAt: asDateString(row.created_at),
@@ -503,6 +504,7 @@ export async function listSellerProducts(req, res, next) {
     if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     const { limit, offset } = page
     const productId = req.query.productId ? String(req.query.productId) : ''
+    const hasApproval = await hasColumn('products', 'approval_status')
     if (productId && !validId(productId)) {
       return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_ID' } })
     }
@@ -515,7 +517,7 @@ export async function listSellerProducts(req, res, next) {
     )
     const rows = await executeQuery(`
       SELECT p.id, p.shop_id, p.category_id, p.slug, p.name, p.description, p.specs, p.badges,
-             p.status, p.approval_status, p.rejection_reason, p.reviewed_at, p.is_featured, p.is_flash_sale, p.free_shipping, p.created_at,
+             p.status, ${hasApproval ? 'p.approval_status, p.rejection_reason, p.reviewed_at' : 'NULL AS approval_status, NULL AS rejection_reason, NULL AS reviewed_at'}, p.is_featured, p.is_flash_sale, p.free_shipping, p.created_at,
              s.name AS shop_name, s.slug AS shop_slug, s.province AS shop_province,
              s.logo_url AS shop_logo_url, s.banner_url AS shop_banner_url, s.tagline AS shop_tagline,
              c.name AS category_name, c.slug AS category_slug,
@@ -565,8 +567,11 @@ export async function saveSellerProduct(req, res, next) {
     const body = req.body || {}
     const userId = String(body.userId || '')
     const productId = req.params.productId ? String(req.params.productId) : null
+    const hasApproval = await hasColumn('products', 'approval_status')
+    const hasSuspensionReason = await hasColumn('shops', 'suspension_reason')
+    const reasonColumn = hasSuspensionReason ? 'suspension_reason' : 'NULL AS suspension_reason'
     // Kiểm tra trạng thái gian hàng: Shop bị tạm khóa không được phép đăng hoặc sửa sản phẩm
-    const ownedShops = await executeQuery(`SELECT id, status, suspension_reason FROM shops WHERE owner_id = ? LIMIT 1`, [userId])
+    const ownedShops = await executeQuery(`SELECT id, status, ${reasonColumn} FROM shops WHERE owner_id = ? LIMIT 1`, [userId])
     if (ownedShops.length && ownedShops[0].status === 'suspended') {
       return res.status(403).json({
         success: false,
@@ -584,7 +589,7 @@ export async function saveSellerProduct(req, res, next) {
     if (categoryAttributes === null) return res.status(400).json({ success: false, message: 'Thuộc tính ngành hàng không hợp lệ.', error: { code: 'INVALID_CATEGORY_ATTRIBUTES' } })
 
     const result = await executeTransaction(async (query) => {
-      const shops = await query(`SELECT id, status, suspension_reason FROM shops WHERE owner_id = ? FOR UPDATE`, [userId])
+      const shops = await query(`SELECT id, status, ${reasonColumn} FROM shops WHERE owner_id = ? FOR UPDATE`, [userId])
       if (!shops.length) return { error: 'SHOP_NOT_FOUND' }
       if (shops[0].status === 'suspended') {
         return {
@@ -597,7 +602,8 @@ export async function saveSellerProduct(req, res, next) {
       if (!categories.length) return { error: 'CATEGORY_NOT_FOUND' }
       let id = productId
       if (productId) {
-        const owned = await query(`SELECT id, category_id, status, approval_status, rejection_reason, reviewed_by, reviewed_at FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
+        const approvalColumns = hasApproval ? 'approval_status, rejection_reason, reviewed_by, reviewed_at' : 'NULL AS approval_status, NULL AS rejection_reason, NULL AS reviewed_by, NULL AS reviewed_at'
+        const owned = await query(`SELECT id, category_id, status, ${approvalColumns} FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
         if (!owned.length) return { error: 'PRODUCT_NOT_FOUND' }
         if (String(owned[0].category_id) !== String(categories[0].id) && categoryAttributes === undefined) {
           const previous = await query('SELECT product_id FROM product_category_attributes WHERE product_id = ? FOR UPDATE', [productId])
@@ -614,13 +620,18 @@ export async function saveSellerProduct(req, res, next) {
           nextReviewedAt = null
         }
         let nextStatus = resolveSellerProductStatus(owned[0].status, status)
-        if (nextApprovalStatus !== 'approved' && nextStatus === 'active') {
+        if (hasApproval && nextApprovalStatus !== 'approved' && nextStatus === 'active') {
           nextStatus = 'draft'
         }
-        await query(
-          `UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ?, approval_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND shop_id = ?`,
-          [categories[0].id, name, description || null, body.freeShipping ? 1 : 0, nextStatus, nextApprovalStatus, nextRejectionReason, nextReviewedBy, nextReviewedAt, productId, shops[0].id],
-        )
+        if (hasApproval) {
+          await query(
+            `UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ?, approval_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND shop_id = ?`,
+            [categories[0].id, name, description || null, body.freeShipping ? 1 : 0, nextStatus, nextApprovalStatus, nextRejectionReason, nextReviewedBy, nextReviewedAt, productId, shops[0].id],
+          )
+        } else {
+          await query(`UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ? WHERE id = ? AND shop_id = ?`,
+            [categories[0].id, name, description || null, body.freeShipping ? 1 : 0, nextStatus, productId, shops[0].id])
+        }
         const ownedVariants = await query(
           `SELECT id, stock_qty FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY id LIMIT 1 FOR UPDATE`,
           [productId],
@@ -649,8 +660,8 @@ export async function saveSellerProduct(req, res, next) {
         const slug = `${productSlug(name)}-${crypto.randomBytes(5).toString('hex')}`
         const initialStatus = status === 'hidden' ? 'hidden' : 'draft'
         const inserted = await query(
-          `INSERT INTO products (shop_id, category_id, slug, name, description, badges, status, approval_status, free_shipping)
-           VALUES (?, ?, ?, ?, ?, JSON_ARRAY(), ?, 'pending', ?)`,
+          `INSERT INTO products (shop_id, category_id, slug, name, description, badges, status, ${hasApproval ? 'approval_status, ' : ''}free_shipping)
+           VALUES (?, ?, ?, ?, ?, JSON_ARRAY(), ?, ${hasApproval ? "'pending', " : ''}?)`,
           [shops[0].id, categories[0].id, slug, name, description || null, initialStatus, body.freeShipping ? 1 : 0],
         )
         id = String(inserted.insertId)
