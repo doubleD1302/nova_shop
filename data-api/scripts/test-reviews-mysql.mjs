@@ -47,6 +47,11 @@ try {
   assert.equal((await call('POST', '/products/2/reviews', review, '1')).status, 403)
   assert.equal((await call('POST', '/products/1/reviews', { ...review, orderItemId: '3' }, '1')).status, 403)
   assert.equal((await call('POST', '/products/1/reviews', { ...review, rating: 6 }, '1')).status, 400)
+  for (const orderItemId of [['1'], {}, true, null, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal((await call('POST', '/products/1/reviews', { ...review, orderItemId }, '1')).status, 400)
+  }
+  const [[beforeReview]] = await db.query('SELECT COUNT(*) AS n FROM reviews')
+  assert.equal(beforeReview.n, 0)
   const eligible = await call('GET', '/products/1/reviews/eligible', undefined, '1')
   assert.equal(eligible.body.data.items.length, 2)
   const results = await Promise.all(Array.from({ length: 3 }, () => call('POST', '/products/1/reviews', review, '1')))

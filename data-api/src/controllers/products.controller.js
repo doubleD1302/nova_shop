@@ -287,6 +287,9 @@ export async function listEligibleReviewItems(req, res, next) {
     if (!/^[1-9]\d{0,19}$/.test(productId)) {
       return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_ID' } })
     }
+    if (typeof req.query.userId !== 'string' || !/^[1-9]\d{0,19}$/.test(req.query.userId)) {
+      return res.status(400).json({ success: false, message: 'Mã tài khoản không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     const rows = await executeQuery(
       `SELECT oi.id AS order_item_id, oi.product_id, oi.variant_name, oi.created_at
        FROM order_items oi
@@ -320,7 +323,9 @@ export async function createProductReview(req, res, next) {
     const message = typeof comment === 'string' ? comment.trim() : ''
     if (
       !/^[1-9]\d{0,19}$/.test(productId) ||
-      !/^[1-9]\d{0,19}$/.test(String(orderItemId || '')) ||
+      typeof userId !== 'string' || !/^[1-9]\d{0,19}$/.test(userId) ||
+      (typeof orderItemId !== 'string' && !(typeof orderItemId === 'number' && Number.isSafeInteger(orderItemId))) ||
+      !/^[1-9]\d{0,19}$/.test(String(orderItemId)) ||
       !Number.isInteger(rating) ||
       rating < 1 ||
       rating > 5 ||
