@@ -1,5 +1,8 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
 
+const validShopId = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value))
+const validAttachments = (value) => value == null || (Array.isArray(value) && value.length <= 10 && Buffer.byteLength(JSON.stringify(value), 'utf8') <= 65535)
+
 // Bộ nhớ đệm dự phòng nếu bảng chat chưa chạy migration
 const memoryConversations = []
 const memoryMessages = []
@@ -112,7 +115,7 @@ export async function getOrCreateConversation(req, res, next) {
 
     if (
       !/^[1-9]\d{0,19}$/.test(String(buyerId || '')) ||
-      !/^[1-9]\d{0,19}$/.test(String(shopId || ''))
+      !validShopId(shopId)
     ) {
       return res.status(400).json({
         success: false,
@@ -361,8 +364,8 @@ export async function sendConversationMessage(req, res, next) {
       !/^[1-9]\d{0,19}$/.test(conversationId) ||
       !/^[1-9]\d{0,19}$/.test(String(senderId || '')) ||
       !['buyer', 'seller'].includes(senderRole) ||
-      typeof message !== 'string' ||
-      !message.trim()
+      typeof message !== 'string' || !message.trim() || message.trim().length > 4000 ||
+      !validAttachments(attachments)
     ) {
       return res.status(400).json({
         success: false,
@@ -371,8 +374,8 @@ export async function sendConversationMessage(req, res, next) {
       })
     }
 
-    const cleanMsg = message.trim().slice(0, 4000)
-    const cleanAttachments = Array.isArray(attachments) ? JSON.stringify(attachments.slice(0, 10)) : null
+    const cleanMsg = message.trim()
+    const cleanAttachments = Array.isArray(attachments) ? JSON.stringify(attachments) : null
 
     try {
       const result = await executeTransaction(async (query) => {

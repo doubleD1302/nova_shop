@@ -1,5 +1,8 @@
 import { callDataApi } from '../clients/data.client.js'
 
+const validShopId = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value))
+const validAttachments = (value) => value == null || (Array.isArray(value) && value.length <= 10 && Buffer.byteLength(JSON.stringify(value), 'utf8') <= 65535)
+
 /**
  * Lấy danh sách các cuộc trò chuyện của người dùng hiện tại
  */
@@ -23,7 +26,7 @@ export async function getOrCreateConversation(req, res, next) {
   try {
     const { shopId } = req.body || {}
 
-    if (!/^[1-9]\d{0,19}$/.test(String(shopId || ''))) {
+    if (!validShopId(shopId)) {
       return res.status(400).json({
         success: false,
         message: 'Mã gian hàng không hợp lệ.',
@@ -83,7 +86,7 @@ export async function sendConversationMessage(req, res, next) {
     const conversationId = req.params.id
     const { message, attachments } = req.body || {}
 
-    if (typeof message !== 'string' || !message.trim()) {
+    if (typeof message !== 'string' || !message.trim() || message.trim().length > 4000 || !validAttachments(attachments)) {
       return res.status(400).json({
         success: false,
         message: 'Nội dung tin nhắn không được để trống.',

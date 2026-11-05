@@ -13,6 +13,8 @@ const backendReturns = await import(pathToFileURL(path.join(root, 'backend/src/c
 const dataReturns = await import('../src/controllers/returns.controller.js')
 const dataShops = await import('../src/controllers/shops.controller.js')
 const dataOrders = await import('../src/controllers/orders.controller.js')
+const backendChat = await import(pathToFileURL(path.join(root, 'backend/src/controllers/chat.controller.js')))
+const dataChat = await import('../src/controllers/chat.controller.js')
 const { sequelize, closeDatabase } = await import('../src/config/database.js')
 const queries = []
 const conn = {
@@ -111,6 +113,16 @@ try {
     }
     for (const sellerNote of [false, {}, 'x'.repeat(501)]) {
       assert.equal((await invoke(controller.updateSellerReturnStatus, { userId: '1', status: 'approved', sellerNote }, {}, { returnId: '1' })).status, 400)
+    }
+  }
+  for (const controller of [backendChat, dataChat]) {
+    for (const shopId of [['1'], true, Number.MAX_SAFE_INTEGER + 1]) {
+      assert.equal((await invoke(controller.getOrCreateConversation, { buyerId: '1', shopId })).status, 400)
+    }
+    for (const invalid of [{ message: 'x'.repeat(4001) }, { attachments: {} }, { attachments: Array(11).fill('x') }, { attachments: ['é'.repeat(32768)] }]) {
+      const before = queries.length
+      assert.equal((await invoke(controller.sendConversationMessage, { senderId: '1', senderRole: 'buyer', message: 'Hello', ...invalid }, {}, { id: '1' })).status, 400)
+      assert.equal(queries.length, before)
     }
   }
   for (const field of ['tagline', 'description', 'address']) {
