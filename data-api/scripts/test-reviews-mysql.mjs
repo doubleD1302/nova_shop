@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdtemp, readdir, unlink, rmdir } from 'node:fs/promises'
+import os from 'node:os'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import mysql from 'mysql2/promise'
@@ -8,6 +10,8 @@ if (process.env.REVIEW_TEST !== '1' || !process.env.REVIEW_DB_PASSWORD) throw ne
 const port = Number(process.env.REVIEW_DB_PORT)
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Cổng MySQL test không hợp lệ.')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const sharp = createRequire(path.join(root, 'backend/package.json'))('sharp')
+const uploadDir = await mkdtemp(path.join(os.tmpdir(), 'shopnova-review-test-'))
 const name = `shopnova_test_review_${Date.now()}`
 const db = await mysql.createConnection({ host: '127.0.0.1', port, user: process.env.REVIEW_DB_USER || 'root', password: process.env.REVIEW_DB_PASSWORD, multipleStatements: true })
 let dataServer, backendServer, closeDatabase
@@ -18,7 +22,7 @@ try {
   await db.query(`CREATE DATABASE \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; USE \`${name}\``)
   await db.query(await readFile(path.join(root, 'database/schema.sql'), 'utf8'))
   await db.query(await readFile(path.join(root, 'database/seed.sql'), 'utf8'))
-  Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: path.join(root, 'missing-review-test.env'), DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: name, DB_USER: process.env.REVIEW_DB_USER || 'root', DB_PASSWORD: process.env.REVIEW_DB_PASSWORD, DB_SSL_ENABLED: 'false', DATA_API_KEY: 'wallet-test-service-key', JWT_SECRET: 'wallet-test-jwt-secret-at-least-32-characters' })
+  Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: path.join(root, 'missing-review-test.env'), DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: name, DB_USER: process.env.REVIEW_DB_USER || 'root', DB_PASSWORD: process.env.REVIEW_DB_PASSWORD, DB_SSL_ENABLED: 'false', DATA_API_KEY: 'wallet-test-service-key', JWT_SECRET: 'wallet-test-jwt-secret-at-least-32-characters', UPLOAD_STORAGE: 'local', UPLOAD_DIR: uploadDir })
   const dataApp = (await import(pathToFileURL(path.join(root, 'data-api/src/app.js')))).default
   ;({ closeDatabase } = await import(pathToFileURL(path.join(root, 'data-api/src/config/database.js'))))
   dataServer = await listen(dataApp)
@@ -41,9 +45,21 @@ try {
     VALUES (1,1,1,1,1,'product','product','M',JSON_OBJECT(),'SKU1',100,1,100),
            (2,1,1,1,2,'product','product','L',JSON_OBJECT(),'SKU2',100,1,100),
            (3,2,1,1,1,'product','product','M',JSON_OBJECT(),'SKU1',100,1,100)`)
-  const review = { orderItemId: '1', rating: 5, comment: 'Tốt' }
+  await db.query("ALTER TABLE products ADD COLUMN approval_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending'; UPDATE products SET status='active', approval_status='approved' WHERE id=1")
+  const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#aabbcc' } }).png().toBuffer()
+  const dataUrl = `data:image/png;base64,${png.toString('base64')}`
+  const uploaded = await call('POST', '/uploads/images', { purpose: 'review', dataUrl }, '1')
+  const other = await call('POST', '/uploads/images', { purpose: 'review', dataUrl }, '2')
+  assert.equal(uploaded.status, 201)
+  assert.match(uploaded.body.data.url, /^\/uploads\/review-1-/)
+  assert.equal(other.status, 201)
+  const imageUrl = uploaded.body.data.url
+  const review = { orderItemId: '1', rating: 5, comment: 'Tốt', images: [imageUrl] }
+  for (const images of [[other.body.data.url], [imageUrl, imageUrl], ['/uploads/review-1-00000000-0000-0000-0000-000000000000.png'], Array(6).fill(imageUrl), 'not-array']) {
+    assert.equal((await call('POST', '/products/1/reviews', { ...review, images }, '1')).status, 400)
+  }
   assert.equal((await call('POST', '/products/1/reviews', review)).status, 401)
-  assert.equal((await call('POST', '/products/1/reviews', review, '2')).status, 403)
+  assert.equal((await call('POST', '/products/1/reviews', { ...review, images: [] }, '2')).status, 403)
   assert.equal((await call('POST', '/products/2/reviews', review, '1')).status, 403)
   assert.equal((await call('POST', '/products/1/reviews', { ...review, orderItemId: '3' }, '1')).status, 403)
   assert.equal((await call('POST', '/products/1/reviews', { ...review, rating: 6 }, '1')).status, 400)
@@ -58,7 +74,17 @@ try {
   assert.deepEqual(results.map((r) => r.status).sort(), [201, 409, 409])
   const [[count]] = await db.query('SELECT COUNT(*) AS n FROM reviews WHERE order_item_id = 1')
   assert.equal(count.n, 1)
+  const [[imageCount]] = await db.query('SELECT COUNT(*) AS n FROM review_images')
+  assert.equal(imageCount.n, 1)
+  const listed = await call('GET', '/products/1/reviews')
+  assert.deepEqual(listed.body.data.reviews[0].images, [imageUrl])
+  assert.equal((await fetch(`http://127.0.0.1:${backendServer.address().port}${imageUrl}`)).status, 200)
   assert.equal((await call('POST', '/products/1/reviews', review, '1')).status, 409)
+  await db.query("CREATE TRIGGER reject_review_image_test BEFORE INSERT ON review_images FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced rollback'")
+  assert.equal((await call('POST', '/products/1/reviews', { ...review, orderItemId: '2' }, '1')).status, 502)
+  const [[rolledBack]] = await db.query('SELECT COUNT(*) AS n FROM reviews WHERE order_item_id = 2')
+  assert.equal(rolledBack.n, 0)
+  await db.query('DROP TRIGGER reject_review_image_test')
   assert.equal((await call('POST', '/products/1/reviews', { ...review, orderItemId: '2' }, '1')).status, 201)
   console.log('PASS MySQL', version, ': review quyền mua, delivered, sản phẩm, input, gửi trùng đồng thời.')
 } finally {
@@ -67,4 +93,6 @@ try {
   if (closeDatabase) await closeDatabase()
   await db.query(`DROP DATABASE IF EXISTS \`${name}\``)
   await db.end()
+  for (const name of await readdir(uploadDir)) await unlink(path.join(uploadDir, name))
+  await rmdir(uploadDir)
 }

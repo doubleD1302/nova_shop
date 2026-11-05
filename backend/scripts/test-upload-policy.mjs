@@ -5,6 +5,11 @@ import sharp from 'sharp'
 const store = new Map()
 const storage = http.createServer(async (req, res) => {
   const key = new URL(req.url, 'http://127.0.0.1').pathname
+  if (req.method === 'HEAD') {
+    const body = store.get(key)
+    if (!body) return res.writeHead(404).end()
+    return res.writeHead(200, { 'Content-Length': body.length, 'Content-Type': 'image/png' }).end()
+  }
   if (req.method === 'GET') {
     const body = store.get(key)
     if (!body) return res.writeHead(404).end()
@@ -19,6 +24,9 @@ await new Promise((resolve) => storage.listen(0, '127.0.0.1', resolve))
 const dataApi = http.createServer((req, res) => {
   const id = req.url?.match(/^\/internal\/v1\/users\/(\d+)\/auth-profile$/)?.[1]
   res.setHeader('content-type', 'application/json')
+  if (req.method === 'POST' && req.url === '/internal/v1/products/1/reviews') {
+    return res.writeHead(201).end(JSON.stringify({ success: true, data: { review: { id: '1' } } }))
+  }
   if (!id) return res.writeHead(404).end('{}')
   const role = id === '2' ? 'seller' : 'buyer'
   res.end(JSON.stringify({ success: true, data: { user: { id, username: 'test', fullName: 'Test', email: null, phone: null, avatarUrl: null, role, status: 'active', shopId: role === 'seller' ? '1' : null, address: null } } }))
@@ -33,7 +41,7 @@ Object.assign(process.env, {
 })
 const { default: app } = await import('../src/app.js')
 const { signAccessToken } = await import('../src/middlewares/auth.middleware.js')
-const { closeObjectStorage } = await import('../src/services/object-storage.js')
+const { closeObjectStorage, headUploadedImage } = await import('../src/services/object-storage.js')
 const server = http.createServer(app)
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/api/v1/uploads/images`
@@ -59,13 +67,26 @@ try {
     assert.equal(downloaded.status, 200)
     assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes)
   }
+  const reviewImage = await upload({ purpose: 'review', dataUrl: dataUrl('image/png', png) })
+  assert.equal(reviewImage.status, 201)
+  assert.match(reviewImage.json.data.url, /^\/uploads\/review-1-/)
+  const metadata = await headUploadedImage(reviewImage.json.data.url.slice('/uploads/'.length))
+  assert.equal(metadata.size, png.length)
+  assert.equal((await fetch(`http://127.0.0.1:${server.address().port}${reviewImage.json.data.url}`)).status, 200)
+  const reviewUrl = `http://127.0.0.1:${server.address().port}/api/v1/products/1/reviews`
+  async function submitReview(images) {
+    return fetch(reviewUrl, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.buyer}` }, body: JSON.stringify({ orderItemId: '1', rating: 5, comment: 'Tốt', images }) })
+  }
+  assert.equal((await submitReview([reviewImage.json.data.url])).status, 201)
+  assert.equal((await submitReview(['/uploads/review-1-00000000-0000-0000-0000-000000000000.png'])).status, 400)
+
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/jpeg', png) })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', png.subarray(0, 20)) })).status, 400)
   const tooWide = await sharp({ create: { width: 4097, height: 1, channels: 3, background: '#fff' } }).png().toBuffer()
   const tooManyPixels = await sharp({ create: { width: 4001, height: 4000, channels: 3, background: '#fff' } }).png().toBuffer()
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', tooWide) })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', tooManyPixels) })).status, 400)
-  assert.equal(store.size, 3)
+  assert.equal(store.size, 4)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: 'data:image/png;base64,' })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', Buffer.from('<html>')) })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=' })).status, 400)

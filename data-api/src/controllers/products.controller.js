@@ -260,6 +260,10 @@ export async function listProductReviews(req, res, next) {
        ORDER BY r.created_at DESC, r.id DESC`,
       [productId],
     )
+    const imageRows = rows.length ? await executeQuery(
+      `SELECT ri.review_id, ri.url FROM review_images ri JOIN reviews r ON r.id = ri.review_id
+       WHERE r.product_id = ? AND r.status = 'visible' ORDER BY ri.review_id, ri.sort_order`, [productId],
+    ) : []
     const reviews = rows.map((row) => ({
       id: String(row.id),
       productId: String(row.product_id),
@@ -270,6 +274,7 @@ export async function listProductReviews(req, res, next) {
       variant: row.variant_name,
       variantAttributes: parseJson(row.variant_attributes, {}),
       sellerReply: row.seller_reply || null,
+      images: imageRows.filter((image) => String(image.review_id) === String(row.id)).map((image) => image.url),
       createdAt: asDateString(row.created_at),
     }))
     const ratingCount = reviews.length
@@ -320,13 +325,16 @@ export async function listEligibleReviewItems(req, res, next) {
 export async function createProductReview(req, res, next) {
   try {
     const { productId } = req.params
-    const { userId, orderItemId, rating, comment } = req.body || {}
+    const { userId, orderItemId, rating, comment, images = [] } = req.body || {}
     const message = typeof comment === 'string' ? comment.trim() : ''
     if (
       !/^[1-9]\d{0,19}$/.test(productId) ||
       typeof userId !== 'string' || !/^[1-9]\d{0,19}$/.test(userId) ||
       (typeof orderItemId !== 'string' && !(typeof orderItemId === 'number' && Number.isSafeInteger(orderItemId))) ||
       !/^[1-9]\d{0,19}$/.test(String(orderItemId)) ||
+      !Array.isArray(images) || images.length > 5 || new Set(images).size !== images.length ||
+      images.some((url) => typeof url !== 'string' || !url.startsWith(`/uploads/review-${userId}-`) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(url.slice(`/uploads/review-${userId}-`.length))) ||
       !Number.isInteger(rating) ||
       rating < 1 ||
       rating > 5 ||
@@ -354,6 +362,9 @@ export async function createProductReview(req, res, next) {
          VALUES (?, ?, ?, ?, ?, 'visible')`,
         [orderItemId, userId, productId, rating, message],
       )
+      for (let index = 0; index < images.length; index += 1) {
+        await query('INSERT INTO review_images (review_id, url, sort_order) VALUES (?, ?, ?)', [result.insertId, images[index], index])
+      }
       const rows = await query(
         `SELECT r.id, r.product_id, r.rating, r.comment, r.created_at, u.id AS user_id, u.full_name, oi.variant_name
          FROM reviews r
@@ -381,6 +392,7 @@ export async function createProductReview(req, res, next) {
           user: review.full_name,
           rating: Number(review.rating),
           comment: review.comment,
+          images,
           variant: review.variant_name,
           createdAt: asDateString(review.created_at),
         },

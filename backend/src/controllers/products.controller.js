@@ -1,3 +1,7 @@
+import path from 'node:path'
+import { stat } from 'node:fs/promises'
+import { env } from '../config/env.js'
+import { headUploadedImage } from '../services/object-storage.js'
 import { callDataApi } from '../clients/data.client.js'
 
 export async function listProducts(req, res, next) {
@@ -96,9 +100,31 @@ export async function listEligibleReviewItems(req, res, next) {
 
 export async function createProductReview(req, res, next) {
   try {
+    const images = req.body?.images === undefined ? [] : req.body.images
+    const prefix = `/uploads/review-${req.user.id}-`
+    const filenamePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i
+    if (!Array.isArray(images) || images.length > 5 || new Set(images).size !== images.length || images.some((url) =>
+      typeof url !== 'string' || !url.startsWith(prefix) || !filenamePattern.test(url.slice(prefix.length)))) {
+      return res.status(400).json({ success: false, message: 'Ảnh đánh giá không hợp lệ.', error: { code: 'INVALID_REVIEW_IMAGES' } })
+    }
+    for (const url of images) {
+      const filename = url.slice('/uploads/'.length)
+      try {
+        const file = env.uploadStorage === 's3' ? await headUploadedImage(filename) : await stat(path.join(env.uploadDir, filename))
+        const size = env.uploadStorage === 's3' ? file.size : file.isFile() ? file.size : 0
+        if (!Number.isSafeInteger(size) || size < 1 || size > 2 * 1024 * 1024) {
+          return res.status(400).json({ success: false, message: 'Ảnh đánh giá không hợp lệ.', error: { code: 'INVALID_REVIEW_IMAGES' } })
+        }
+      } catch (err) {
+        if (err?.code === 'ENOENT' || err?.name === 'NotFound' || err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
+          return res.status(400).json({ success: false, message: 'Không tìm thấy ảnh đánh giá.', error: { code: 'INVALID_REVIEW_IMAGES' } })
+        }
+        return res.status(503).json({ success: false, message: 'Không thể kiểm tra ảnh đánh giá.', error: { code: 'IMAGE_STORAGE_UNAVAILABLE' } })
+      }
+    }
     const result = await callDataApi(`/internal/v1/products/${encodeURIComponent(req.params.productId)}/reviews`, {
       method: 'POST',
-      body: { ...req.body, userId: req.user.id },
+      body: { ...req.body, images, userId: req.user.id },
     })
     return res.status(201).json({ success: true, data: result })
   } catch (err) {

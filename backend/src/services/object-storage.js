@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { env } from '../config/env.js'
 
 const client = env.uploadStorage === 's3'
@@ -35,6 +35,12 @@ export async function getUploadedImage(filename) {
     body: Buffer.from(await result.Body.transformToByteArray()),
     contentType: result.ContentType,
   }
+}
+
+export async function headUploadedImage(filename) {
+  if (!client) throw new Error('Object storage is not enabled.')
+  const result = await client.send(new HeadObjectCommand({ Bucket: env.s3Bucket, Key: filename }))
+  return { size: result.ContentLength, contentType: result.ContentType }
 }
 
 export function closeObjectStorage() {

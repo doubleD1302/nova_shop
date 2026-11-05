@@ -58,7 +58,8 @@ export async function uploadSellerImage(req, res, next) {
     // Legacy <= 1 MiB tiếp tục dùng được cho avatar của client cũ.
     // Tên do server cấp gắn mục đích và chủ sở hữu, không nhận từ client.
     const avatarImage = purpose === 'avatar' || (purpose === 'legacy' && bytes.length <= 1024 * 1024)
-    const filename = `${avatarImage ? `avatar-${req.user.id}-` : ''}${randomUUID()}${image.ext}`
+    const prefix = purpose === 'review' ? `review-${req.user.id}-` : avatarImage ? `avatar-${req.user.id}-` : ''
+    const filename = `${prefix}${randomUUID()}${image.ext}`
     if (env.uploadStorage === 's3') {
       await saveUploadedImage(filename, bytes, image.mime)
     } else {
@@ -73,7 +74,7 @@ export async function uploadSellerImage(req, res, next) {
 
 export async function serveUploadedImage(req, res, next) {
   const filename = req.params.filename
-  if (!/^(?:avatar-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
+  if (!/^(?:(?:avatar|review)-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
     return res.status(404).end()
   }
 
