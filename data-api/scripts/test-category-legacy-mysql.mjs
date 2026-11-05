@@ -41,6 +41,15 @@ try {
     const response = await fetch(base + route, { method, headers: { 'content-type': 'application/json', ...(user ? { authorization: `Bearer ${token(user)}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
     return { status: response.status, body: await response.json() }
   }
+  await db.query("UPDATE shops SET slug='1foo' WHERE id=2")
+  assert.equal((await call('GET', '/shops')).status, 200)
+  const namedShop = await call('GET', '/shops/1foo')
+  assert.equal(namedShop.status, 200, JSON.stringify(namedShop))
+  assert.equal(namedShop.body.data.shop.id, '2')
+  assert.equal((await call('GET', '/shops/1')).body.data.shop.id, '1')
+  assert.equal((await call('GET', '/shops?mall=invalid')).status, 400)
+  assert.equal((await call('GET', '/seller/shop', undefined, '2')).status, 200)
+  assert.equal((await call('PUT', '/seller/shop', { name: 'Shop mẫu', province: 'Hà Nội' }, '2')).status, 200)
   let result = await call('GET', '/categories/thoi-trang-nam/attributes')
   assert.equal(result.status, 200, JSON.stringify(result))
   assert.equal(result.body.data.version, 1)

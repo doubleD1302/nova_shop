@@ -10,7 +10,7 @@ const imageUrlIsAllowed = (value) => value === null || value === undefined || va
 const shopSelect = `
   SELECT s.id, s.owner_id, s.slug, s.name, s.logo_url, s.banner_url, s.tagline,
          s.description, s.province, s.address_detail, s.is_mall, s.status,
-         s.suspension_reason, s.approval_version, s.rejection_reason, s.created_at,
+         __SUSPENSION_REASON__, s.approval_version, s.rejection_reason, s.created_at,
          u.full_name AS owner_name,
          COALESCE(ps.product_count, 0) AS product_count,
          COALESCE(ps.total_sold, 0) AS total_sold,
@@ -45,6 +45,11 @@ const shopSelect = `
     SELECT shop_id, COUNT(*) AS followers FROM shop_follows GROUP BY shop_id
   ) fs ON fs.shop_id = s.id
 `
+
+async function getShopSelect() {
+  const columns = await executeQuery("SELECT 1 FROM information_schema.columns WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'suspension_reason' LIMIT 1")
+  return shopSelect.replace('__SUSPENSION_REASON__', columns.length ? 's.suspension_reason' : 'NULL AS suspension_reason')
+}
 
 function serializeShop(row) {
   return {
@@ -97,14 +102,19 @@ export async function listShops(req, res, next) {
     const page = readPagination(req.query, { defaultLimit: 24 })
     if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     const { limit, offset } = page
+    if ((req.query.q !== undefined && (typeof req.query.q !== 'string' || req.query.q.length > 120)) ||
+        ['mall', 'featured'].some((key) => req.query[key] !== undefined && !['0', '1', 'true', 'false'].includes(req.query[key]))) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc shop không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     const where = ["s.status = 'active'"]
     const params = []
     const query = String(req.query.q || '').trim().slice(0, 120)
     if (query) { where.push('(s.name LIKE ? OR s.tagline LIKE ?)'); params.push(`%${query}%`, `%${query}%`) }
-    if (req.query.mall === '1' || req.query.featured === '1') where.push('s.is_mall = 1')
+    if (['1', 'true'].includes(req.query.mall) || ['1', 'true'].includes(req.query.featured)) where.push('s.is_mall = 1')
     const whereSql = where.join(' AND ')
+    const select = await getShopSelect()
     const [rows, countRows] = await Promise.all([
-      executeQuery(`${shopSelect} WHERE ${whereSql} ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?`, [...params, limit, offset]),
+      executeQuery(`${select} WHERE ${whereSql} ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?`, [...params, limit, offset]),
       executeQuery(`SELECT COUNT(*) AS total FROM shops s WHERE ${whereSql}`, params),
     ])
     return res.status(200).json({ success: true, data: { shops: rows.map(serializeShop), total: Number(countRows[0]?.total || 0), limit, offset } })
@@ -115,10 +125,13 @@ export async function listShops(req, res, next) {
 
 export async function getShop(req, res, next) {
   try {
-    const key = String(req.params.shopId || '')
+    const key = req.params.shopId
+    if (!/^[a-z0-9-]{1,160}$/.test(key)) return res.status(400).json({ success: false, message: 'Mã gian hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const select = await getShopSelect()
+    const match = /^[1-9]\d{0,19}$/.test(key) ? 's.id = ?' : 's.slug = ?'
     const rows = await executeQuery(
-      `${shopSelect} WHERE (s.id = ? OR s.slug = ?) AND s.status = 'active' LIMIT 1`,
-      [key, key],
+      `${select} WHERE ${match} AND s.status = 'active' LIMIT 1`,
+      [key],
     )
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng.', error: { code: 'SHOP_NOT_FOUND' } })
@@ -133,7 +146,8 @@ export async function getSellerShop(req, res, next) {
   try {
     const userId = String(req.params.userId || '')
     if (!/^[1-9]\d{0,19}$/.test(userId)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
-    const rows = await executeQuery(`${shopSelect} WHERE s.owner_id = ? LIMIT 1`, [userId])
+    const select = await getShopSelect()
+    const rows = await executeQuery(`${select} WHERE s.owner_id = ? LIMIT 1`, [userId])
     if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng.', error: { code: 'SHOP_NOT_FOUND' } })
     return res.status(200).json({ success: true, data: { shop: serializeShop(rows[0]) } })
   } catch (err) { return next(err) }
@@ -175,6 +189,7 @@ export async function updateSellerShop(req, res, next) {
       return res.status(400).json({ success: false, message: 'Thông tin gian hàng chưa hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
 
+    const select = await getShopSelect()
     const shop = await executeTransaction(async (query) => {
       const rows = await query(
         `SELECT id FROM shops WHERE owner_id = ? AND status IN ('pending', 'rejected', 'active') FOR UPDATE`,
@@ -187,7 +202,7 @@ export async function updateSellerShop(req, res, next) {
         [name, tagline || null, description || null, province, address || null,
           body.logoUrl || null, body.bannerUrl || null, rows[0].id, userId],
       )
-      const updated = await query(`${shopSelect} WHERE s.id = ? AND s.owner_id = ? LIMIT 1`, [rows[0].id, userId])
+      const updated = await query(`${select} WHERE s.id = ? AND s.owner_id = ? LIMIT 1`, [rows[0].id, userId])
       return updated[0] || null
     })
     if (!shop) {
