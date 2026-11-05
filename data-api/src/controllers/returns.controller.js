@@ -74,6 +74,14 @@ export async function createOrderReturn(req, res, next) {
     // 2. Thử lưu vào bảng order_returns
     try {
       const result = await executeTransaction(async (query) => {
+        // Khóa đơn con trước khi kiểm tra để hai yêu cầu đồng thời không cùng tạo mới.
+        const locked = await query(
+          `SELECT so.status, o.buyer_id FROM shop_orders so JOIN orders o ON o.id = so.order_id
+           WHERE so.id = ? AND o.id = ? FOR UPDATE`,
+          [shopOrderId, orderId],
+        )
+        if (!locked.length || String(locked[0].buyer_id) !== String(userId)) return { error: 'ORDER_NOT_FOUND' }
+        if (locked[0].status !== 'delivered') return { error: 'INVALID_ORDER_STATUS' }
         // Kiểm tra xem đã có yêu cầu trả hàng đang xử lý chưa
         const existing = await query(
           `SELECT id, status FROM order_returns WHERE shop_order_id = ? AND status IN ('requested', 'approved') LIMIT 1`,
@@ -99,6 +107,8 @@ export async function createOrderReturn(req, res, next) {
         return { id: insertRes.insertId || insertRes }
       })
 
+      if (result.error === 'ORDER_NOT_FOUND') return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng.', error: { code: result.error } })
+      if (result.error === 'INVALID_ORDER_STATUS') return res.status(400).json({ success: false, message: 'Đơn hàng chưa giao thành công.', error: { code: result.error } })
       if (result.error === 'RETURN_ALREADY_REQUESTED') {
         return res.status(409).json({
           success: false,
@@ -282,6 +292,11 @@ export async function listSellerReturns(req, res, next) {
   }
 }
 
+function canUpdateReturnStatus(current, next) {
+  return (current === 'requested' && ['approved', 'rejected'].includes(next)) ||
+    (current === 'approved' && next === 'completed')
+}
+
 /**
  * Seller cập nhật trạng thái yêu cầu trả hàng (approved, rejected, completed)
  */
@@ -332,7 +347,7 @@ export async function updateSellerReturnStatus(req, res, next) {
         if (!rows.length) return { error: 'RETURN_NOT_FOUND' }
         const currentReturn = rows[0]
 
-        if (currentReturn.status !== 'requested' && status !== 'completed') {
+        if (!canUpdateReturnStatus(currentReturn.status, status)) {
           return { error: 'INVALID_TRANSITION' }
         }
 
@@ -385,6 +400,9 @@ export async function updateSellerReturnStatus(req, res, next) {
         })
       }
 
+      if (!canUpdateReturnStatus(target.status, status)) {
+        return res.status(400).json({ success: false, message: 'Chuyển trạng thái trả hàng không hợp lệ.', error: { code: 'INVALID_TRANSITION' } })
+      }
       target.status = status
       target.sellerNote = cleanNote
       target.updatedAt = new Date().toISOString()
