@@ -33,6 +33,29 @@ export async function listProducts(req, res, next) {
     const page = readPagination(req.query, { defaultLimit: 100 })
     if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     const { limit, offset } = page
+    const fields = ['categoryId', 'shopId', 'q', 'location', 'slug', 'ids']
+    const limits = { categoryId: 160, shopId: 160, q: 120, location: 120, slug: 180, ids: 1050 }
+    const flags = ['flash', 'mall', 'freeship', 'fullImages']
+    const numeric = ['minPrice', 'maxPrice', 'minRating', 'minDiscount']
+    const sorts = ['popular', 'newest', 'price-asc', 'price-desc', 'price_asc', 'price_desc', 'rating', 'discount']
+    const invalidNumber = (key) => {
+      if (req.query[key] === undefined) return false
+      const value = req.query[key]
+      if (typeof value !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) return true
+      const parsed = Number(value)
+      if (!Number.isFinite(parsed)) return true
+      if (key === 'minRating') return parsed < 0 || parsed > 5
+      if (key === 'minDiscount') return parsed < 0 || parsed > 100
+      return !Number.isSafeInteger(parsed) || parsed > 999999999999999
+    }
+    if (fields.some((key) => req.query[key] !== undefined && (typeof req.query[key] !== 'string' || req.query[key].length > limits[key])) ||
+        flags.some((key) => req.query[key] !== undefined && !['0', '1', 'true', 'false'].includes(req.query[key])) ||
+        numeric.some(invalidNumber) ||
+        (req.query.minPrice !== undefined && req.query.maxPrice !== undefined && Number(req.query.minPrice) > Number(req.query.maxPrice)) ||
+        (req.query.sort !== undefined && !sorts.includes(req.query.sort)) ||
+        (req.query.ids && (req.query.ids.split(',').length > 50 || req.query.ids.split(',').some((id) => !/^[1-9]\d{0,19}$/.test(id))))) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     const hasApprovalStatusColumn = await hasColumn('products', 'approval_status')
     const where = [
       "p.status = 'active'",
@@ -62,13 +85,11 @@ export async function listProducts(req, res, next) {
     }
     const minPrice = Number(req.query.minPrice)
     const maxPrice = Number(req.query.maxPrice)
-    if (req.query.minPrice !== undefined && Number.isFinite(minPrice) && minPrice >= 0) {
-      where.push('EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1 AND pv.price >= ?)')
-      params.push(minPrice)
-    }
-    if (req.query.maxPrice !== undefined && Number.isFinite(maxPrice) && maxPrice >= 0) {
-      where.push('EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1 AND pv.price <= ?)')
-      params.push(maxPrice)
+    if (req.query.minPrice !== undefined || req.query.maxPrice !== undefined) {
+      const conditions = ['pv.product_id = p.id', 'pv.is_active = 1']
+      if (req.query.minPrice !== undefined) { conditions.push('pv.price >= ?'); params.push(minPrice) }
+      if (req.query.maxPrice !== undefined) { conditions.push('pv.price <= ?'); params.push(maxPrice) }
+      where.push(`EXISTS (SELECT 1 FROM product_variants pv WHERE ${conditions.join(' AND ')})`)
     }
     const minRating = Number(req.query.minRating)
     if (req.query.minRating !== undefined && Number.isFinite(minRating) && minRating > 0 && minRating <= 5) {
@@ -78,7 +99,7 @@ export async function listProducts(req, res, next) {
       params.push(minRating)
     }
     const minDiscount = Number(req.query.minDiscount)
-    if (req.query.minDiscount !== undefined && Number.isFinite(minDiscount) && minDiscount > 0 && minDiscount < 100) {
+    if (req.query.minDiscount !== undefined && Number.isFinite(minDiscount) && minDiscount > 0 && minDiscount <= 100) {
       where.push(`EXISTS (SELECT 1 FROM product_variants vd WHERE vd.product_id = p.id AND vd.is_active = 1
         AND vd.original_price > vd.price AND (100 * (vd.original_price - vd.price) / vd.original_price) >= ?)`)
       params.push(minDiscount)
@@ -93,6 +114,7 @@ export async function listProducts(req, res, next) {
     if (req.query.fullImages === '1' || req.query.slug) {
       // Không ép buộc 4 ảnh; nhiều sản phẩm demo/dev đang thiếu ảnh, điều này làm catalog rỗng trên màn hình chính.
     }
+    const sortKey = ({ price_asc: 'price-asc', price_desc: 'price-desc' })[req.query.sort] || req.query.sort || 'newest'
     const sortSql = ({
       popular: `(SELECT COALESCE(SUM(oi_sort.qty), 0) FROM order_items oi_sort
         JOIN shop_orders so_sort ON so_sort.id = oi_sort.shop_order_id
@@ -104,7 +126,7 @@ export async function listProducts(req, res, next) {
         JOIN users u_sort ON u_sort.id = r_sort.user_id AND u_sort.status = 'active'
         WHERE r_sort.product_id = p.id AND r_sort.status = 'visible') DESC, p.id DESC`,
       discount: '(SELECT MAX(100 * (vd.original_price - vd.price) / vd.original_price) FROM product_variants vd WHERE vd.product_id = p.id AND vd.is_active = 1 AND vd.original_price > vd.price) DESC, p.id DESC',
-    })[String(req.query.sort || 'newest')] || 'p.created_at DESC, p.id DESC'
+    })[sortKey]
     const whereSql = where.join('\n        AND ')
     const totalRows = await executeQuery(`
       SELECT COUNT(*) AS total

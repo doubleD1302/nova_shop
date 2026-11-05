@@ -13,3 +13,5 @@ Chạy `node data-api/scripts/test-cart-validation.mjs` từ thư mục gốc đ
 `node data-api/scripts/test-cart-sync-mysql.mjs` dùng MySQL 8 cục bộ riêng theo các biến `AVATAR_MYSQL_TEST=1`, `AVATAR_DB_PORT`, `AVATAR_DB_PASSWORD`, tùy chọn `AVATAR_DB_USER`; test tạo và xóa database riêng, không dùng DB dùng chung. `node data-api/scripts/test-chat-report-validation.mjs` kiểm tra HTTP Data API với DB giả lập. Chạy `node data-api/scripts/test-seller-product-validation.mjs` cho quy tắc sản phẩm seller.
 
 Phân trang danh sách sản phẩm, shop, đơn và yêu cầu trả hàng: `limit` là số nguyên 1–100, `offset` là số nguyên không âm an toàn; input sai trả `400 VALIDATION_ERROR`. Riêng danh sách đơn buyer cho phép `limit=0` để chỉ lấy tổng kết. Không truyền trường sẽ dùng giá trị mặc định.
+
+Bộ lọc catalog kiểm tra độ dài, kiểu, giá nguyên không âm, khoảng giá hợp lệ, rating/discount, cờ, danh sách ID và sort; sai trả 400. Hai đầu khoảng giá phải cùng thỏa trên một SKU hoạt động. Hỗ trợ `price-asc`/`price-desc` và hai tên tương ứng `price_asc`/`price_desc` của app.
