@@ -1,6 +1,6 @@
 # Thiết kế hồ sơ nhận tiền seller
 
-Trạng thái: **thiết kế dự kiến, chưa triển khai**. ShopNova chọn mô hình COD, đối soát qua sàn và chi trả qua đối tác. Không tạo API, migration hay thu thập thông tin ngân hàng/KYC trong giai đoạn này. Tham khảo cách Shopee ghi nhận số dư và trả về tài khoản liên kết tại [điều khoản Shopee](https://help.shopee.vn/portal/4/article/77243) và [hướng dẫn rút tiền](https://help.shopee.vn/portal/4/article/79510); các chính sách và con số bên dưới là lựa chọn riêng của ShopNova, không mô tả hệ thống nội bộ Shopee.
+Trạng thái: **thiết kế dự kiến, chưa triển khai**. ShopNova chọn mô hình COD, đối soát qua sàn và chi trả qua đối tác. Chức năng chi trả thật vẫn chưa được triển khai và không thu thập thông tin ngân hàng/KYC. Source có luồng ví dụ tách biệt `DEMO_SELLER_PAYOUT.md`, không kết nối số liệu đơn hàng hay chuyển tiền. Tham khảo cách Shopee ghi nhận số dư và trả về tài khoản liên kết tại [điều khoản Shopee](https://help.shopee.vn/portal/4/article/77243) và [hướng dẫn rút tiền](https://help.shopee.vn/portal/4/article/79510); các chính sách và con số bên dưới là lựa chọn riêng của ShopNova, không mô tả hệ thống nội bộ Shopee.
 
 ## Hiện trạng
 

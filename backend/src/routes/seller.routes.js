@@ -1,3 +1,4 @@
+import { getDemoPayout, setupDemoPayout, createDemoWithdrawal } from '../controllers/demo-payout.controller.js'
 import { Router } from 'express'
 import { listSellerOrders, updateSellerOrderStatus } from '../controllers/orders.controller.js'
 import { archiveSellerProduct, listSellerProducts, saveSellerProduct, getSellerCategoryAttributes } from '../controllers/products.controller.js'
@@ -7,6 +8,9 @@ import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
 router.use(authenticate, requireRole('seller', 'admin'))
+router.get('/demo-payout', getDemoPayout)
+router.post('/demo-payout/setup', setupDemoPayout)
+router.post('/demo-payout/withdrawals', createDemoWithdrawal)
 router.get('/shop', getSellerShop)
 router.put('/shop', updateSellerShop)
 router.post('/shop/resubmit', resubmitSellerShop)

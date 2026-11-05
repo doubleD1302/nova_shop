@@ -7,6 +7,7 @@ import ordersRouter from './routes/orders.routes.js'
 import shopsRouter from './routes/shops.routes.js'
 import adminRouter from './routes/admin.routes.js'
 import vouchersRouter from './routes/vouchers.routes.js'
+import demoPayoutRouter from './routes/demo-payout.routes.js'
 import cartRouter from './routes/cart.routes.js'
 import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
@@ -36,6 +37,7 @@ app.use(
   shopsRouter,
   adminRouter,
   vouchersRouter,
+  demoPayoutRouter,
   cartRouter,
   returnsRouter,
   shippingRouter,
