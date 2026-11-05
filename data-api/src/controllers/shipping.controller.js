@@ -51,9 +51,9 @@ export async function updateOrderTracking(req, res, next) {
     if (
       !/^[1-9]\d{0,19}$/.test(shopOrderId) ||
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
-      typeof trackingCode !== 'string' ||
-      typeof autoAdvanceStatus !== 'boolean' ||
-      !trackingCode.trim()
+      typeof trackingCode !== 'string' || !trackingCode.trim() || trackingCode.trim().toUpperCase().length > 100 ||
+      typeof carrier !== 'string' || !carrier.trim() || carrier.trim().length > 60 ||
+      typeof autoAdvanceStatus !== 'boolean'
     ) {
       return res.status(400).json({
         success: false,
@@ -62,8 +62,8 @@ export async function updateOrderTracking(req, res, next) {
       })
     }
 
-    const cleanCode = trackingCode.trim().toUpperCase().slice(0, 100)
-    const cleanCarrier = String(carrier || 'Giao Hàng Nhanh (GHN)').trim().slice(0, 60)
+    const cleanCode = trackingCode.trim().toUpperCase()
+    const cleanCarrier = carrier.trim()
 
     const result = await executeTransaction(async (query) => {
       const rows = await query(

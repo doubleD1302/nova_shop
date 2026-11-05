@@ -90,6 +90,13 @@ try {
       assert.equal((await invoke(controller.updateOrderTracking, { userId: '1', trackingCode: 'TRACK', autoAdvanceStatus: value })).status, 400)
     }
   }
+  for (const controller of [backendShipping, dataShipping]) {
+    for (const bad of [{ trackingCode: 'x'.repeat(101) }, { trackingCode: 'ß'.repeat(51) }, { trackingCode: 'T', carrier: false }, { trackingCode: 'T', carrier: [] }, { trackingCode: 'T', carrier: '' }, { trackingCode: 'T', carrier: 'x'.repeat(61) }]) {
+      const before = queries.length
+      assert.equal((await invoke(controller.updateOrderTracking, { userId: '1', ...bad })).status, 400)
+      assert.equal(queries.length, before)
+    }
+  }
   for (const value of [null, 0, -1, 0.5, '100', true, {}, Number.MAX_SAFE_INTEGER + 1]) {
     for (const controller of [backendReturns, dataReturns]) {
       assert.equal((await invoke(controller.createOrderReturn, { userId: '1', shopOrderId: '3', reason: 'Hỏng', refundAmount: value })).status, 400)
