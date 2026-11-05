@@ -26,9 +26,9 @@ const conn = {
 sequelize.connectionManager.getConnection = async () => conn
 sequelize.connectionManager.releaseConnection = async () => {}
 
-async function invoke(controller, body, query = {}) {
+async function invoke(controller, body, query = {}, params = { itemId: '7', orderId: '2', shopOrderId: '3' }) {
   let status, result
-  const req = { body, query, params: { itemId: '7', orderId: '2', shopOrderId: '3' }, headers: { 'idempotency-key': 'validation-test-0001' }, user: { id: '1' } }
+  const req = { body, query, params, headers: { 'idempotency-key': 'validation-test-0001' }, user: { id: '1' } }
   const res = { status(code) { status = code; return this }, json(value) { result = value; return this } }
   await controller(req, res, (error) => { throw error })
   return { status, result }
@@ -65,6 +65,15 @@ try {
     }
     for (const body of [{ qty: null }, { qty: true }, { qty: 1, selected: 'false' }, { qty: 1, replaceQty: 'false' }]) {
       assert.equal((await invoke(controller.addItemToCart, { userId: '1', ...body })).status, 400)
+    }
+  }
+  for (const controller of [backend, data]) {
+    for (const itemId of ['0', '-1', 'abc', '1.5', '1'.repeat(21)]) {
+      const before = queries.length
+      for (const fn of [controller.updateCartItem, controller.removeCartItem]) {
+        assert.equal((await invoke(fn, { userId: '1', qty: 1 }, {}, { itemId })).status, 400)
+      }
+      assert.equal(queries.length, before)
     }
   }
   let start = queries.length

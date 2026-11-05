@@ -69,7 +69,7 @@ export async function addItemToCart(req, res, next) {
 export async function updateCartItem(req, res, next) {
   try {
     const itemId = String(req.params.itemId || '').trim()
-    if (!itemId) {
+    if (!validReferenceId(itemId)) {
       return res.status(400).json({
         success: false,
         message: 'Mã dòng sản phẩm không hợp lệ.',
@@ -116,7 +116,7 @@ export async function updateCartItem(req, res, next) {
 export async function removeCartItem(req, res, next) {
   try {
     const itemId = String(req.params.itemId || '').trim()
-    if (!itemId) {
+    if (!validReferenceId(itemId)) {
       return res.status(400).json({
         success: false,
         message: 'Mã dòng sản phẩm không hợp lệ.',

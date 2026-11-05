@@ -310,7 +310,7 @@ export async function updateCartItem(req, res, next) {
     const cleanUserId = String(userId || '').trim()
     const itemId = String(req.params.itemId || '').trim()
 
-    if (!isValidId(cleanUserId) || !itemId || (qty !== undefined && !validQuantity(qty, 0)) || !validBoolean(selected)) {
+    if (!isValidId(cleanUserId) || !isValidId(itemId) || (qty !== undefined && !validQuantity(qty, 0)) || !validBoolean(selected)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 
@@ -371,7 +371,7 @@ export async function removeCartItem(req, res, next) {
     const userId = String(req.body?.userId || req.query.userId || '').trim()
     const itemId = String(req.params.itemId || '').trim()
 
-    if (!isValidId(userId) || !itemId) {
+    if (!isValidId(userId) || !isValidId(itemId)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'userId hoặc itemId không hợp lệ.')
     }
 
