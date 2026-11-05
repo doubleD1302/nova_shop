@@ -494,25 +494,27 @@ export async function updateUserProfile(req, res, next) {
       })
     }
 
+    const invalidEmail = body.email !== undefined && !validEmail(email)
     if (
-      !fullName ||
-      fullName.length > 120 ||
-      !validEmail(email) ||
+      !/^[1-9]\d{0,19}$/.test(userId) ||
+      !['fullName', 'email', 'phone', 'avatarUrl', 'address'].some((key) => body[key] !== undefined) ||
+      (body.fullName !== undefined && (!fullName || fullName.length > 120)) ||
+      invalidEmail ||
       (body.phone != null && typeof body.phone !== 'string') ||
-      (phone && phone.length > 20) ||
+      (phone && !/^[+()\d .-]{8,20}$/.test(phone)) ||
       (body.avatarUrl !== undefined && body.avatarUrl !== null && typeof body.avatarUrl !== 'string') ||
       (typeof avatarUrl === 'string' && avatarUrl.length > 1024)
     ) {
       return res.status(400).json({
         success: false,
-        message: !validEmail(email) ? 'Vui lòng nhập email hợp lệ.' : 'Thông tin hồ sơ không hợp lệ.',
-        error: { code: !validEmail(email) ? 'INVALID_EMAIL' : 'VALIDATION_ERROR' },
+        message: invalidEmail ? 'Vui lòng nhập email hợp lệ.' : 'Thông tin hồ sơ không hợp lệ.',
+        error: { code: invalidEmail ? 'INVALID_EMAIL' : 'VALIDATION_ERROR' },
       })
     }
 
     const user = await executeTransaction(async (query) => {
       const users = await query(
-        `SELECT id, avatar_url FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
+        `SELECT id, full_name, email, phone, avatar_url FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
         [userId],
       )
       if (!users.length) return null
@@ -525,7 +527,9 @@ export async function updateUserProfile(req, res, next) {
       await query(
         `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
          WHERE id = ? AND status = 'active'`,
-        [fullName, email, phone || null, nextAvatar, userId],
+        [body.fullName === undefined ? users[0].full_name : fullName,
+          body.email === undefined ? users[0].email : email,
+          body.phone === undefined ? users[0].phone : phone || null, nextAvatar, userId],
       )
       if (address !== undefined) {
         const addresses = await query(

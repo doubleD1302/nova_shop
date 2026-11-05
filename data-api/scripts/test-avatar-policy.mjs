@@ -8,7 +8,7 @@ let writes = 0
 const conn = {
   query({ sql }, values, callback) {
     let rows = []
-    if (sql.includes('SELECT id, avatar_url FROM users')) rows = [{ id: '1', avatar_url: existingAvatar }]
+    if (sql.includes('SELECT id, full_name, email, phone, avatar_url FROM users')) rows = [{ id: '1', full_name: 'Test', email: 'test@example.test', phone: null, avatar_url: existingAvatar }]
     else if (sql.includes('UPDATE users SET full_name')) { writes += 1; existingAvatar = values[3]; rows = { affectedRows: 1 } }
     else if (sql.includes('SELECT u.id, u.username')) rows = [{ id: '1', username: 'test', full_name: 'Test', email: 'test@example.test', phone: null, avatar_url: existingAvatar, role: 'buyer', status: 'active', shop_id: null, recipient_name: null }]
     callback(null, rows)
