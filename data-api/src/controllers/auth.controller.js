@@ -365,7 +365,8 @@ export async function registerUser(req, res, next) {
         }
       : null
     const invalidAddress = rawAddress !== undefined && rawAddress !== null && (
-      !address || !address.fullName || address.fullName.length > 120 || !address.phone || address.phone.length > 20 ||
+      !address || ['district', 'ward'].some((field) => rawAddress[field] != null && typeof rawAddress[field] !== 'string') ||
+      !address.fullName || address.fullName.length > 120 || !address.phone || address.phone.length > 20 ||
       !address.province || address.province.length > 120 || address.district.length > 120 || address.ward.length > 120 ||
       !address.detail || address.detail.length > 255
     )
@@ -376,6 +377,8 @@ export async function registerUser(req, res, next) {
       fullName.length > 120 ||
       !validEmail(email) ||
       invalidAddress ||
+      (body.phone != null && typeof body.phone !== 'string') ||
+      (body.shopTagline != null && typeof body.shopTagline !== 'string') ||
       (phone && phone.length > 20) ||
       (phone && !/^[+()\d .-]{8,20}$/.test(phone)) ||
       shopTagline.length > 255 ||

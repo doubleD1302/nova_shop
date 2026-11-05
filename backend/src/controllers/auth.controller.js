@@ -204,7 +204,7 @@ export async function register(req, res, next) {
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
-  const role = body.role || 'buyer'
+  const role = body.role === undefined ? 'buyer' : body.role
 
   if (!/^[a-z0-9_]{3,50}$/.test(username) || !fullName || fullName.length > 120) {
     return res.status(400).json({
@@ -218,6 +218,8 @@ export async function register(req, res, next) {
   }
   if (
     typeof body.password !== 'string' || body.password.length < 8 || Buffer.byteLength(body.password, 'utf8') > 72 ||
+    (body.phone != null && typeof body.phone !== 'string') ||
+    (body.shopTagline != null && typeof body.shopTagline !== 'string') ||
     (phone && (!/^[+()\d .-]{8,20}$/.test(phone))) || !['buyer', 'seller'].includes(role) ||
     (role === 'seller' && (typeof body.shopName !== 'string' || !body.shopName.trim() || body.shopName.trim().length > 160)) ||
     (typeof body.shopTagline === 'string' && body.shopTagline.trim().length > 255)
