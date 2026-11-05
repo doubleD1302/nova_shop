@@ -11,3 +11,5 @@ API tin nhắn kiểm tra `limit` từ 1 đến 100 và `offset` không âm trư
 Chạy `node data-api/scripts/test-cart-validation.mjs` từ thư mục gốc để kiểm tra các giá trị sai và các trường hợp xóa hợp lệ. Test có HTTP trên ứng dụng kiểm tra với controller Backend/Data API và database giả lập; không thay thế kiểm thử trên database thật. Bộ kiểm tra này chưa bao phủ toàn bộ các endpoint hoặc mọi trường đầu vào.
 
 `node data-api/scripts/test-cart-sync-mysql.mjs` dùng MySQL 8 cục bộ riêng theo các biến `AVATAR_MYSQL_TEST=1`, `AVATAR_DB_PORT`, `AVATAR_DB_PASSWORD`, tùy chọn `AVATAR_DB_USER`; test tạo và xóa database riêng, không dùng DB dùng chung. `node data-api/scripts/test-chat-report-validation.mjs` kiểm tra HTTP Data API với DB giả lập. Chạy `node data-api/scripts/test-seller-product-validation.mjs` cho quy tắc sản phẩm seller.
+
+Phân trang danh sách sản phẩm, shop, đơn và yêu cầu trả hàng: `limit` là số nguyên 1–100, `offset` là số nguyên không âm an toàn; input sai trả `400 VALIDATION_ERROR`. Riêng danh sách đơn buyer cho phép `limit=0` để chỉ lấy tổng kết. Không truyền trường sẽ dùng giá trị mặc định.

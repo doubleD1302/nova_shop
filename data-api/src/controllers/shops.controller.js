@@ -1,3 +1,4 @@
+import { readPagination } from '../utils/pagination.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
 const imageUrlIsAllowed = (value) => value === null || value === undefined || value === '' || (
@@ -92,10 +93,9 @@ export async function listCategories(req, res, next) {
 
 export async function listShops(req, res, next) {
   try {
-    const limitValue = Number(req.query.limit)
-    const offsetValue = Number(req.query.offset)
-    const limit = Number.isInteger(limitValue) && limitValue >= 1 && limitValue <= 100 ? limitValue : 24
-    const offset = Number.isInteger(offsetValue) && offsetValue >= 0 ? offsetValue : 0
+    const page = readPagination(req.query, { defaultLimit: 24 })
+    if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const { limit, offset } = page
     const where = ["s.status = 'active'"]
     const params = []
     const query = String(req.query.q || '').trim().slice(0, 120)

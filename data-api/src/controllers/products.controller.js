@@ -1,3 +1,4 @@
+import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import {
@@ -28,10 +29,9 @@ async function hasColumn(tableName, columnName) {
 
 export async function listProducts(req, res, next) {
   try {
-    const requestedLimit = Number(req.query.limit)
-    const requestedOffset = Number(req.query.offset)
-    const limit = Number.isInteger(requestedLimit) && requestedLimit >= 1 && requestedLimit <= 100 ? requestedLimit : 100
-    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const page = readPagination(req.query, { defaultLimit: 100 })
+    if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const { limit, offset } = page
     const hasApprovalStatusColumn = await hasColumn('products', 'approval_status')
     const where = [
       "p.status = 'active'",
@@ -464,10 +464,9 @@ export async function listSellerProducts(req, res, next) {
     if (!validId(userId)) {
       return res.status(400).json({ success: false, message: 'Tài khoản không hợp lệ.', error: { code: 'INVALID_USER_ID' } })
     }
-    const requestedLimit = Number(req.query.limit)
-    const requestedOffset = Number(req.query.offset)
-    const limit = Number.isInteger(requestedLimit) && requestedLimit >= 1 && requestedLimit <= 100 ? requestedLimit : 50
-    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const page = readPagination(req.query)
+    if (!page) return res.status(400).json({ success: false, message: 'Phân trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const { limit, offset } = page
     const productId = req.query.productId ? String(req.query.productId) : ''
     if (productId && !validId(productId)) {
       return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_ID' } })

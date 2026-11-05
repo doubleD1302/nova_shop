@@ -1,3 +1,4 @@
+import { readPagination } from '../utils/pagination.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
 // Bộ nhớ đệm dự phòng trong trường hợp DBA chưa chạy migration bảng order_returns
@@ -227,7 +228,13 @@ export async function listOrderReturns(req, res, next) {
 export async function listSellerReturns(req, res, next) {
   try {
     const userId = req.query.userId
-    const { status, limit = 50, offset = 0 } = req.query
+    const { status } = req.query
+    const page = readPagination(req.query)
+    if (!/^[1-9]\d{0,19}$/.test(String(userId || '')) || !page ||
+        (status !== undefined && status !== '' && !['requested', 'approved', 'rejected', 'completed', 'cancelled'].includes(status))) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const { limit, offset } = page
 
     // Lấy shopId của seller
     const ownedShops = await executeQuery(

@@ -1,3 +1,4 @@
+import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { calculateShipping } from '../utils/shipping.js'
@@ -460,10 +461,9 @@ export async function listOrders(req, res, next) {
     if (!/^[1-9]\d{0,19}$/.test(String(userId || ''))) {
       return responseError(res, 400, 'INVALID_USER_ID', 'Mã tài khoản không hợp lệ.')
     }
-    const requestedLimit = Number(req.query.limit)
-    const requestedOffset = Number(req.query.offset)
-    const limit = Number.isInteger(requestedLimit) && requestedLimit >= 0 && requestedLimit <= 100 ? requestedLimit : 50
-    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const page = readPagination(req.query, { minLimit: 0 })
+    if (!page) return responseError(res, 400, 'VALIDATION_ERROR', 'Phân trang không hợp lệ.')
+    const { limit, offset } = page
     const orderId = req.query.orderId ? String(req.query.orderId) : ''
     if (orderId && !/^[1-9]\d{0,19}$/.test(orderId)) return responseError(res, 400, 'INVALID_ORDER_ID', 'Mã đơn hàng không hợp lệ.')
     const summaryRows = await executeQuery(
@@ -624,10 +624,9 @@ export async function listSellerOrders(req, res, next) {
     if (!/^[1-9]\d{0,19}$/.test(String(userId || ''))) {
       return responseError(res, 400, 'INVALID_USER_ID', 'Mã tài khoản không hợp lệ.')
     }
-    const requestedLimit = Number(req.query.limit)
-    const requestedOffset = Number(req.query.offset)
-    const limit = Number.isInteger(requestedLimit) && requestedLimit >= 1 && requestedLimit <= 100 ? requestedLimit : 50
-    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    const page = readPagination(req.query, { minLimit: 1 })
+    if (!page) return responseError(res, 400, 'VALIDATION_ERROR', 'Phân trang không hợp lệ.')
+    const { limit, offset } = page
     const summaryRows = await executeQuery(
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(so.status = 'pending'), 0) AS pending,
