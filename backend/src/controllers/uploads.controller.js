@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import sharp from 'sharp'
 import { env } from '../config/env.js'
 import { getUploadedImage, saveUploadedImage } from '../services/object-storage.js'
 
@@ -43,6 +44,16 @@ export async function uploadSellerImage(req, res, next) {
     const image = detectImage(bytes)
     if (!image || image.mime !== match[1] || bytes.toString('base64') !== match[2] || bytes.length > IMAGE_LIMITS[purpose] * 1024 * 1024) {
       return res.status(400).json({ success: false, message: `Ảnh phải là PNG, JPG hoặc WebP hợp lệ và không vượt quá ${IMAGE_LIMITS[purpose]} MiB.`, error: { code: 'INVALID_IMAGE' } })
+    }
+    try {
+      const decoder = sharp(bytes, { failOn: 'warning', limitInputPixels: 16_000_000, animated: true })
+      const metadata = await decoder.metadata()
+      if (!metadata.width || !metadata.height || metadata.width > 4096 || metadata.height > 4096 || (metadata.pages || 1) !== 1) {
+        throw new Error('Kích thước hoặc số khung hình không hợp lệ')
+      }
+      await decoder.raw().toBuffer()
+    } catch {
+      return res.status(400).json({ success: false, message: 'Ảnh không thể giải mã hoặc vượt quá giới hạn kích thước.', error: { code: 'INVALID_IMAGE' } })
     }
     // Legacy <= 1 MiB tiếp tục dùng được cho avatar của client cũ.
     // Tên do server cấp gắn mục đích và chủ sở hữu, không nhận từ client.

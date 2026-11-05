@@ -49,7 +49,7 @@ try {
     })
     return { status: response.status, ...await response.json() }
   }
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64')
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWNYffb96rPvGSAUAEJCCZ0WY1CJAAAAAElFTkSuQmCC', 'base64')
   const dataUrl = (bytes) => `data:image/png;base64,${bytes.toString('base64')}`
   const small = await call('POST', '/uploads/images', { dataUrl: dataUrl(png) })
   assert.equal(small.status, 201)

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
+import sharp from 'sharp'
 
 const store = new Map()
 const storage = http.createServer(async (req, res) => {
@@ -37,11 +38,12 @@ const server = http.createServer(app)
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}/api/v1/uploads/images`
 const tokens = { buyer: signAccessToken({ id: '1', role: 'buyer' }), seller: signAccessToken({ id: '2', role: 'seller' }) }
-const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
-const jpeg = Buffer.from([0xff, 0xd8, 0xff])
-const webp = Buffer.from('RIFFxxxxWEBP')
+const source = { create: { width: 2, height: 2, channels: 3, background: '#abcdef' } }
+const png = await sharp(source).png().toBuffer()
+const jpeg = await sharp(source).jpeg().toBuffer()
+const webp = await sharp(source).webp().toBuffer()
 const dataUrl = (mime, bytes) => `data:${mime};base64,${bytes.toString('base64')}`
-const sizedPng = (length) => { const bytes = Buffer.alloc(length); png.copy(bytes); return bytes }
+const sizedPng = (length) => Buffer.concat([png, Buffer.alloc(length - png.length)])
 async function upload(body, role = 'buyer') {
   const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(role ? { authorization: `Bearer ${tokens[role]}` } : {}) }, body: JSON.stringify(body) })
   return { status: response.status, json: await response.json() }
@@ -58,6 +60,12 @@ try {
     assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), bytes)
   }
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/jpeg', png) })).status, 400)
+  assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', png.subarray(0, 20)) })).status, 400)
+  const tooWide = await sharp({ create: { width: 4097, height: 1, channels: 3, background: '#fff' } }).png().toBuffer()
+  const tooManyPixels = await sharp({ create: { width: 4001, height: 4000, channels: 3, background: '#fff' } }).png().toBuffer()
+  assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', tooWide) })).status, 400)
+  assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', tooManyPixels) })).status, 400)
+  assert.equal(store.size, 3)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: 'data:image/png;base64,' })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: dataUrl('image/png', Buffer.from('<html>')) })).status, 400)
   assert.equal((await upload({ purpose: 'avatar', dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=' })).status, 400)
@@ -73,7 +81,7 @@ try {
   const legacy = await upload({ dataUrl: dataUrl('image/png', png) })
   assert.equal(legacy.status, 201)
   assert.match(legacy.json.data.url, /^\/uploads\/avatar-1-/)
-  console.log('Upload HTTP policy PASS: auth, roles, types, signatures, MIME, purpose and size boundaries; mocked Data API and S3.')
+  console.log('Upload HTTP policy PASS: auth, roles, decode, dimensions, types, MIME, purpose and size boundaries; mocked Data API and S3.')
 } finally {
   closeObjectStorage()
   await Promise.all([new Promise((resolve) => server.close(resolve)), new Promise((resolve) => dataApi.close(resolve)), new Promise((resolve) => storage.close(resolve))])
