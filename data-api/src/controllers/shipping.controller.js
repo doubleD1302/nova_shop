@@ -4,7 +4,6 @@ import { isValidAmount } from '../utils/money.js'
 
 // Bộ nhớ đệm dự phòng mốc tracking nếu bảng shipment_trackings chưa chạy migration
 const memoryShipmentTrackings = []
-let memoryTrackingIdCounter = 1
 
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
@@ -102,6 +101,11 @@ export async function updateOrderTracking(req, res, next) {
         )
       }
 
+      await query(
+        `INSERT INTO shipment_trackings (shop_order_id, tracking_code, carrier, status, location, description)
+         VALUES (?, ?, ?, 'manifest_created', 'Kho người bán', 'Đã tạo mã vận đơn và sẵn sàng bàn giao cho bưu tá')`,
+        [shopOrderId, cleanCode, cleanCarrier],
+      )
       return {
         id: String(shopOrderId),
         trackingCode: cleanCode,
@@ -122,27 +126,6 @@ export async function updateOrderTracking(req, res, next) {
         success: false,
         message: 'Không thể cập nhật mã vận đơn cho đơn hàng đã hoàn tất hoặc đã hủy.',
         error: { code: 'INVALID_STATUS_FOR_TRACKING' },
-      })
-    }
-
-    // Thử thêm mốc vận chuyển khởi đầu vào shipment_trackings
-    try {
-      await executeQuery(
-        `INSERT INTO shipment_trackings (shop_order_id, tracking_code, carrier, status, location, description)
-         VALUES (?, ?, ?, 'manifest_created', 'Kho người bán', 'Đã tạo mã vận đơn và sẵn sàng bàn giao cho bưu tá')`,
-        [shopOrderId, cleanCode, cleanCarrier],
-      )
-    } catch (err) {
-      if (!isTableMissingError(err)) throw err
-      memoryShipmentTrackings.push({
-        id: String(memoryTrackingIdCounter++),
-        shopOrderId: String(shopOrderId),
-        trackingCode: cleanCode,
-        carrier: cleanCarrier,
-        status: 'manifest_created',
-        location: 'Kho người bán',
-        description: 'Đã tạo mã vận đơn và sẵn sàng bàn giao cho bưu tá',
-        eventTime: new Date().toISOString(),
       })
     }
 
