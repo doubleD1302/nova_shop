@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { callDataApi } from '../clients/data.client.js'
 import { aiBrainService } from '../services/ai-brain.service.js'
 import { generateGeminiShoppingAdvice } from '../services/gemini.service.js'
@@ -87,14 +88,7 @@ const FALLBACK_PRODUCTS = [
 ]
 
 function extractUserKey(req) {
-  return (
-    req.user?.id ||
-    req.user?.username ||
-    req.body?.context?.userId ||
-    req.body?.context?.sessionId ||
-    req.headers['x-session-id'] ||
-    'guest_user'
-  )
+  return req.user?.id ? `account_${req.user.id}` : `guest_ephemeral_${randomUUID().replace(/-/g, '')}`
 }
 
 /**
@@ -105,9 +99,17 @@ function extractUserKey(req) {
  * - Trả lời súc tích, logic, đúng trọng tâm.
  */
 export async function chatWithAi(req, res, next) {
+  let guestKey = null
   try {
     const { message = '', context = {}, history = [] } = req.body || {}
-    const query = String(message).trim()
+    const validHistory = (value) => Array.isArray(value) && value.length <= 20 && value.every((turn) =>
+      turn && typeof turn === 'object' && !Array.isArray(turn) && typeof turn.isUser === 'boolean' &&
+      typeof turn.text === 'string' && turn.text.length <= 4000)
+    if (typeof message !== 'string' || message.trim().length > 4000 || !context || typeof context !== 'object' ||
+        Array.isArray(context) || !validHistory(history) || (context.history !== undefined && !validHistory(context.history))) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu hội thoại không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const query = message.trim()
 
     if (!query) {
       return res.status(400).json({
@@ -118,6 +120,7 @@ export async function chatWithAi(req, res, next) {
     }
 
     const userKey = extractUserKey(req)
+    if (!req.user) guestKey = userKey
 
     // BƯỚC 1: BỘ NÃO HỌC TẬP & PHÂN TÍCH NHU CẦU TƯ VẤN VIÊN (AI BRAIN + CONSULTANT DISCOVERY)
     const { brain, newlyLearned, consultantInsights } = aiBrainService.learnFromMessage(userKey, query)
@@ -155,11 +158,12 @@ export async function chatWithAi(req, res, next) {
       const personalizedNote = newlyLearned.length > 0 ? ` (🧠 Nova vừa ghi nhớ: ${newlyLearned.join(', ')})` : ''
 
       aiResult = {
-        reply: `Nova đã kết nối hệ thống kho vận cho đơn hàng ${orderCode}. Đơn hàng đang được bưu tá ưu tiên giao tại khu vực ${userLoc}!${personalizedNote}`,
+        reply: `Đây là thông tin minh họa cho đơn hàng ${orderCode}, chưa được tra cứu từ hệ thống vận chuyển.${personalizedNote}`,
         intent: 'order_tracking',
         intentTitle: `Tra Cứu Đơn Hàng ${orderCode}`,
         intentMatch: 'Khớp 99%',
         orderInfo: {
+          isExample: true,
           code: orderCode,
           status: 'shipping',
           statusText: 'Đang vận chuyển hỏa tốc',
@@ -304,13 +308,13 @@ export async function chatWithAi(req, res, next) {
         const topPrice = topProduct?.price ? `${new Intl.NumberFormat('vi-VN').format(topProduct.price)}đ` : ''
 
         if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'specs') {
-          aiResult.reply = `Về tính năng của ${topName}: Sản phẩm đạt chuẩn chống nước & mồ hôi IPX5, hỗ trợ chống ồn chủ động ANC và pin lên đến 28 giờ. Rất thích hợp cho bạn đeo làm việc văn phòng hoặc chạy bộ.`
+          aiResult.reply = `Bạn có thể xem thông số của ${topName} trên trang chi tiết sản phẩm. Mình chưa có đủ dữ liệu để xác nhận các tính năng cụ thể.`
         } else if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'price') {
-          aiResult.reply = `${topName} đang có mức giá ưu đãi là ${topPrice}, hoàn toàn nằm trong mức ngân sách bạn mong muốn. Đơn hàng còn được tặng voucher Freeship Xtra hôm nay.`
+          aiResult.reply = `Giá tham khảo của ${topName} là ${topPrice}. Bạn hãy kiểm tra lại giá và voucher tại bước thanh toán.`
         } else if (consultantInsights.isFollowUp && consultantInsights.followUpTopic === 'size') {
-          aiResult.reply = `Với form dáng của ${topName}, size M phù hợp cho cân nặng 48-53kg (chiều cao 1m55-1m62). Nếu bạn thích phong cách mặc rộng thoải mái có thể cân nhắc size L nhé.`
+          aiResult.reply = `Bạn hãy xem bảng kích cỡ của ${topName} hoặc hỏi shop để chọn size phù hợp.`
         } else if (topProduct) {
-          aiResult.reply = `Nova đã chọn lọc ${topName} (${topPrice}) vì sở hữu chất liệu thoáng mát, đạt đánh giá ${topProduct.rating || 5.0}★ và phù hợp với tiêu chí của bạn. Bạn có muốn mình hỗ trợ chốt đơn giao hỏa tốc không?`
+          aiResult.reply = `Nova gợi ý ${topName} (${topPrice}). Bạn có thể xem thông tin chi tiết và đánh giá trước khi quyết định.`
         } else {
           aiResult.reply = `Nova đã lắng nghe yêu cầu của bạn. Dựa trên phân tích chuyên môn, bạn muốn ưu tiên về phân khúc giá, màu sắc hay tính năng cụ thể nào nhất?`
         }
@@ -343,6 +347,8 @@ export async function chatWithAi(req, res, next) {
     })
   } catch (err) {
     return next(err)
+  } finally {
+    if (guestKey) aiBrainService.forgetEphemeral(guestKey)
   }
 }
 
@@ -374,6 +380,10 @@ export function getAiBrainProfile(req, res) {
 export function recordAiBrainFeedback(req, res) {
   const userKey = extractUserKey(req)
   const { action = 'like', query = '', productId = null, helpful = true } = req.body || {}
+  if (!['like', 'dislike', 'add_to_cart'].includes(action) || typeof query !== 'string' || query.length > 4000 ||
+      (productId !== null && (typeof productId !== 'string' || productId.length > 160)) || typeof helpful !== 'boolean') {
+    return res.status(400).json({ success: false, message: 'Phản hồi không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+  }
   const stats = aiBrainService.recordFeedback(userKey, { action, query, productId, helpful })
   return res.status(200).json({
     success: true,

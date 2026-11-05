@@ -158,7 +158,7 @@ assert(
 )
 
 // TEST 5: Dọn dẹp session test
-aiBrainService.resetBrain(testSessionId)
+aiBrainService.removeBrain(testSessionId)
 console.log('\n=== TỔNG KẾT KẾT QUẢ KIỂM THỬ THUẬT TOÁN AI ===')
 console.log(`Số bài kiểm tra vượt qua (PASS): ${passedTests}/${totalTests}`)
 

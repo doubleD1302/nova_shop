@@ -135,6 +135,7 @@ class AiBrainService {
   }
 
   _persistBrain(key, brain) {
+    if (this._sanitizeKey(key).startsWith('guest_ephemeral_')) return
     try {
       const filePath = this._getBrainFilePath(key)
       fs.writeFileSync(filePath, JSON.stringify(brain, null, 2), 'utf8')
@@ -473,7 +474,12 @@ class AiBrainService {
   /**
    * Xóa hoặc đặt lại ký ức bộ não của người dùng
    */
-  resetBrain(userIdOrSession) {
+  forgetEphemeral(userIdOrSession) {
+    const key = this._sanitizeKey(userIdOrSession)
+    if (key.startsWith('guest_ephemeral_')) brainCache.delete(key)
+  }
+
+  removeBrain(userIdOrSession) {
     const key = this._sanitizeKey(userIdOrSession)
     brainCache.delete(key)
     const filePath = this._getBrainFilePath(key)
@@ -482,6 +488,10 @@ class AiBrainService {
         fs.unlinkSync(filePath)
       } catch {}
     }
+  }
+
+  resetBrain(userIdOrSession) {
+    this.removeBrain(userIdOrSession)
     return this.getBrain(userIdOrSession)
   }
 }
