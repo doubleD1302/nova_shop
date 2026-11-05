@@ -27,8 +27,9 @@ export async function createOrderReturn(req, res, next) {
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
       !/^[1-9]\d{0,19}$/.test(String(shopOrderId || '')) ||
       (refundAmount !== undefined && (!Number.isSafeInteger(refundAmount) || refundAmount <= 0)) ||
-      typeof reason !== 'string' ||
-      !reason.trim()
+      typeof reason !== 'string' || !reason.trim() || reason.trim().length > 255 ||
+      (detail != null && (typeof detail !== 'string' || detail.trim().length > 2000)) ||
+      (images != null && (!Array.isArray(images) || images.length > 5 || images.some((image) => typeof image !== 'string' || !image.trim() || image.length > 1024)))
     ) {
       return res.status(400).json({
         success: false,
@@ -37,9 +38,9 @@ export async function createOrderReturn(req, res, next) {
       })
     }
 
-    const cleanReason = reason.trim().slice(0, 255)
-    const cleanDetail = typeof detail === 'string' ? detail.trim().slice(0, 2000) : null
-    const cleanImages = Array.isArray(images) ? JSON.stringify(images.slice(0, 5)) : null
+    const cleanReason = reason.trim()
+    const cleanDetail = typeof detail === 'string' ? detail.trim() : null
+    const cleanImages = Array.isArray(images) ? JSON.stringify(images) : null
 
     // 1. Kiểm tra quyền sở hữu đơn hàng và trạng thái đơn hàng trong DB
     const rows = await executeQuery(
@@ -308,7 +309,8 @@ export async function updateSellerReturnStatus(req, res, next) {
     if (
       !/^[1-9]\d{0,19}$/.test(returnId) ||
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
-      !['approved', 'rejected', 'completed'].includes(status)
+      !['approved', 'rejected', 'completed'].includes(status) ||
+      (sellerNote != null && (typeof sellerNote !== 'string' || sellerNote.trim().length > 500))
     ) {
       return res.status(400).json({
         success: false,
@@ -317,7 +319,7 @@ export async function updateSellerReturnStatus(req, res, next) {
       })
     }
 
-    const cleanNote = typeof sellerNote === 'string' ? sellerNote.trim().slice(0, 500) : null
+    const cleanNote = typeof sellerNote === 'string' ? sellerNote.trim() : null
 
     // Kiểm tra quyền seller sở hữu shop
     const ownedShops = await executeQuery(
@@ -362,7 +364,7 @@ export async function updateSellerReturnStatus(req, res, next) {
         await query(
           `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
            VALUES (?, 'delivered', 'delivered', ?, ?)`,
-          [currentReturn.shop_order_id, userId, `Người bán ${status === 'approved' ? 'chấp nhận' : (status === 'rejected' ? 'từ chối' : 'hoàn tất')} trả hàng: ${cleanNote || ''}`],
+          [currentReturn.shop_order_id, userId, `Người bán ${status === 'approved' ? 'chấp nhận' : (status === 'rejected' ? 'từ chối' : 'hoàn tất')} trả hàng: ${cleanNote || ''}`.slice(0, 500)],
         )
 
         return { success: true }

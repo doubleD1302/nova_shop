@@ -102,6 +102,17 @@ try {
       assert.equal((await invoke(controller.createOrderReturn, { userId: '1', shopOrderId: '3', reason: 'Hỏng', refundAmount: value })).status, 400)
     }
   }
+  for (const controller of [backendReturns, dataReturns]) {
+    const base = { userId: '1', shopOrderId: '3', reason: 'Hỏng' }
+    for (const invalid of [{ reason: 'x'.repeat(256) }, { detail: false }, { images: {} }, { images: [false] }, { images: Array(6).fill('/uploads/a.jpg') }]) {
+      const before = queries.length
+      assert.equal((await invoke(controller.createOrderReturn, { ...base, ...invalid })).status, 400)
+      assert.equal(queries.length, before)
+    }
+    for (const sellerNote of [false, {}, 'x'.repeat(501)]) {
+      assert.equal((await invoke(controller.updateSellerReturnStatus, { userId: '1', status: 'approved', sellerNote }, {}, { returnId: '1' })).status, 400)
+    }
+  }
   for (const field of ['tagline', 'description', 'address']) {
     assert.equal((await invoke(dataShops.updateSellerShop, { userId: '1', name: 'Shop', province: 'Hà Nội', [field]: {} })).status, 400)
   }

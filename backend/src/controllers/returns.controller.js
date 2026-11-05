@@ -12,8 +12,9 @@ export async function createOrderReturn(req, res, next) {
       !/^[1-9]\d{0,19}$/.test(orderId) ||
       !/^[1-9]\d{0,19}$/.test(String(shopOrderId || '')) ||
       (refundAmount !== undefined && (!Number.isSafeInteger(refundAmount) || refundAmount <= 0)) ||
-      typeof reason !== 'string' ||
-      !reason.trim()
+      typeof reason !== 'string' || !reason.trim() || reason.trim().length > 255 ||
+      (detail != null && (typeof detail !== 'string' || detail.trim().length > 2000)) ||
+      (images != null && (!Array.isArray(images) || images.length > 5 || images.some((image) => typeof image !== 'string' || !image.trim() || image.length > 1024)))
     ) {
       return res.status(400).json({
         success: false,
@@ -85,7 +86,8 @@ export async function updateSellerReturnStatus(req, res, next) {
     const returnId = req.params.returnId
     const { status, sellerNote } = req.body || {}
 
-    if (!['approved', 'rejected', 'completed'].includes(status)) {
+    if (!['approved', 'rejected', 'completed'].includes(status) ||
+        (sellerNote != null && (typeof sellerNote !== 'string' || sellerNote.trim().length > 500))) {
       return res.status(400).json({
         success: false,
         message: 'Trạng thái xử lý không hợp lệ. Chỉ chấp nhận approved, rejected hoặc completed.',

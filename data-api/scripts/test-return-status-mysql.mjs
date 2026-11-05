@@ -45,10 +45,17 @@ try {
   await db.query(`INSERT INTO order_returns (id,order_id,shop_order_id,buyer_id,shop_id,reason,refund_amount,status)
     VALUES (1,1,1,1,1,'hỏng',100,'requested'), (2,1,1,1,1,'hỏng',100,'requested')`)
   const change = (id, status, user = '2') => call('PATCH', `/seller/returns/${id}/status`, { status }, user)
+  for (const extra of [{ reason: 'x'.repeat(256) }, { detail: {} }, { detail: 'x'.repeat(2001) }, { images: {} }, { images: [false] }, { images: Array(6).fill('/uploads/a.jpg') }]) {
+    assert.equal((await call('POST', '/orders/1/returns', { shopOrderId: '1', reason: 'Hỏng', ...extra }, '1')).status, 400)
+  }
+  for (const sellerNote of [{}, false, 'x'.repeat(501)]) {
+    assert.equal((await call('PATCH', '/seller/returns/1/status', { status: 'approved', sellerNote }, '2')).status, 400)
+  }
+
   assert.equal((await change('1', 'approved', '1')).status, 403)
   assert.equal((await change('1', 'approved', '3')).status, 404)
   assert.equal((await change('1', 'completed')).body.error.code, 'INVALID_TRANSITION')
-  assert.equal((await change('1', 'approved')).status, 200)
+  assert.equal((await call('PATCH', '/seller/returns/1/status', { status: 'approved', sellerNote: 'x'.repeat(500) }, '2')).status, 200)
   assert.equal((await change('1', 'rejected')).body.error.code, 'INVALID_TRANSITION')
   const concurrent = await Promise.all([change('1', 'completed'), change('1', 'completed')])
   assert.deepEqual(concurrent.map((r) => r.status).sort(), [200, 400])
