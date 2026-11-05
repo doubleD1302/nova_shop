@@ -43,39 +43,25 @@ export async function listProducts(req, res, next) {
 
 export async function getProductDetail(req, res, next) {
   try {
-    const { productId } = req.params
-    let product = null
-    try {
-      product = await callDataApi(`/internal/v1/products/${encodeURIComponent(productId)}`)
-    } catch (_) {
-      try {
-        const queryRes = await callDataApi(`/internal/v1/products?ids=${encodeURIComponent(productId)}`)
-        if (Array.isArray(queryRes?.products) && queryRes.products.length > 0) {
-          product = queryRes.products[0]
-        }
-      } catch {}
-      if (!product) {
-        try {
-          const slugRes = await callDataApi(`/internal/v1/products?slug=${encodeURIComponent(productId)}`)
-          if (Array.isArray(slugRes?.products) && slugRes.products.length > 0) {
-            product = slugRes.products[0]
-          }
-        } catch {}
-      }
+    const key = req.params.productId
+    if (!/^[a-z0-9-]{1,180}$/.test(key)) {
+      return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy sản phẩm.',
-        error: { code: 'PRODUCT_NOT_FOUND' },
-      })
+    const isId = /^[1-9]\d{0,19}$/.test(key)
+    const params = new URLSearchParams({ [isId ? 'ids' : 'slug']: key, limit: '1', fullImages: '1' })
+    const result = await callDataApi(`/internal/v1/products?${params}`)
+    if (!Array.isArray(result?.products)) {
+      return res.status(502).json({ success: false, message: 'Dữ liệu sản phẩm không hợp lệ.', error: { code: 'PRODUCT_RESULT_INVALID' } })
     }
-
+    if (result.products.length === 0) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.', error: { code: 'PRODUCT_NOT_FOUND' } })
+    }
+    const product = result.products[0]
+    if (result.products.length !== 1 || (isId ? String(product?.id) !== key : product?.slug !== key)) {
+      return res.status(502).json({ success: false, message: 'Dữ liệu sản phẩm không khớp.', error: { code: 'PRODUCT_RESULT_INVALID' } })
+    }
     return res.status(200).json({ success: true, data: product })
-  } catch (err) {
-    return next(err)
-  }
+  } catch (err) { return next(err) }
 }
 
 export async function listProductReviews(req, res, next) {

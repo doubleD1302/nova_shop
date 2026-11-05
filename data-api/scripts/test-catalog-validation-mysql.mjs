@@ -33,6 +33,7 @@ try {
     return { status: response.status, body: await response.json() }
   }
   await db.query("ALTER TABLE products ADD COLUMN approval_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending'; UPDATE products SET status='active', approval_status='approved' WHERE id=1; UPDATE product_variants SET price=CASE id WHEN 1 THEN 50 ELSE 100 END, original_price=NULL, stock_qty=10 WHERE id IN (1,2)")
+  await db.query("INSERT INTO product_images (product_id,url,sort_order) VALUES (1,'/uploads/a.jpg',0),(1,'/uploads/b.jpg',1)")
   for (const query of ['minPrice=abc', 'maxPrice=-1', 'minPrice=1.5', 'minPrice=100&maxPrice=50', 'minRating=6', 'minDiscount=101', 'sort=constructor', 'ids=1,nope', 'flash=maybe', 'offset=9007199254740992']) {
     const result = await call('GET', `/products?${query}`)
     assert.equal(result.status, 400, `${query}: ${JSON.stringify(result)}`)
@@ -44,6 +45,12 @@ try {
   assert.equal(result.status, 200, JSON.stringify(result))
   assert.equal(result.body.data.products[0].id, '1')
   assert.equal((await call('GET', '/products?minPrice=0&maxPrice=100&sort=price_desc')).status, 200)
+  const detail = await call('GET', '/products/1')
+  assert.equal(detail.body.data.id, '1')
+  assert.equal(detail.body.data.images.length, 2)
+  assert.equal((await call('GET', '/products?fullImages=true')).body.data.products[0].images.length, 2)
+  assert.equal((await call('GET', '/products/demo-ao-thun-mau')).body.data.id, '1')
+  assert.equal((await call('GET', '/products/99999')).status, 404)
   console.log('PASS MySQL', version, ': bộ lọc catalog, giới hạn, sort và khoảng giá theo cùng SKU.')
 } finally {
   if (backendServer) await new Promise((resolve) => backendServer.close(resolve))

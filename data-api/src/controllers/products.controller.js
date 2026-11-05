@@ -111,9 +111,7 @@ export async function listProducts(req, res, next) {
       where.push(`p.id IN (${ids.map(() => '?').join(',')})`)
       params.push(...ids)
     }
-    if (req.query.fullImages === '1' || req.query.slug) {
-      // Không ép buộc 4 ảnh; nhiều sản phẩm demo/dev đang thiếu ảnh, điều này làm catalog rỗng trên màn hình chính.
-    }
+    const fullImages = ['1', 'true'].includes(req.query.fullImages) || Boolean(req.query.slug)
     const sortKey = ({ price_asc: 'price-asc', price_desc: 'price-desc' })[req.query.sort] || req.query.sort || 'newest'
     const sortSql = ({
       popular: `(SELECT COALESCE(SUM(oi_sort.qty), 0) FROM order_items oi_sort
@@ -193,7 +191,7 @@ export async function listProducts(req, res, next) {
       executeQuery(
         `SELECT product_id, url, alt_text, sort_order, source_page_url, author, license_name, license_url FROM product_images
          WHERE product_id IN (${placeholders})
-         ${req.query.fullImages === '1' || req.query.slug ? '' : 'AND sort_order = (SELECT MIN(first_image.sort_order) FROM product_images first_image WHERE first_image.product_id = product_images.product_id)'}
+         ${fullImages ? '' : 'AND sort_order = (SELECT MIN(first_image.sort_order) FROM product_images first_image WHERE first_image.product_id = product_images.product_id)'}
          ORDER BY product_id, sort_order`,
         ids,
       ),
