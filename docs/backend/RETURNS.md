@@ -4,4 +4,4 @@ Buyer chỉ tạo yêu cầu cho đơn con của mình đã giao. Với bảng `
 
 Seller thuộc shop xử lý theo đường đi: `requested` → `approved` → `completed`, hoặc `requested` → `rejected`. Những chuyển trạng thái khác trả 400 `INVALID_TRANSITION`. `completed` chỉ là trạng thái yêu cầu, không chứng minh đã hoàn tiền qua đối tác. Backend yêu cầu quyền seller/admin; Data API kiểm tra owner.
 
-Khi chưa có bảng `order_returns`, code cũ dùng bộ nhớ tiến trình làm dự phòng. Dữ liệu này không bền vững và không chia sẻ giữa các tiến trình; cần áp dụng migration `2026-10-30-returns-shipping-and-chat.sql` trước vận hành để lưu thật. Trường hợp dự phòng không được coi là lưu dữ liệu đảm bảo hoặc kiểm chứng cạnh tranh nhiều tiến trình.
+Khi thiếu bảng `order_returns`, API trả 503 `DATA_STORAGE_UNAVAILABLE`; không báo đã lưu vào bộ nhớ tạm. Cần áp dụng migration `2026-10-30-returns-shipping-and-chat.sql` trước vận hành. Dữ liệu từng nằm trong bộ nhớ của tiến trình cũ không tự được chuyển sang database.

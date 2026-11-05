@@ -2,9 +2,6 @@ import { executeQuery, executeTransaction } from '../config/database.js'
 import { calculateShippingOptions } from '../utils/shipping.js'
 import { isValidAmount } from '../utils/money.js'
 
-// Bộ nhớ đệm dự phòng mốc tracking nếu bảng shipment_trackings chưa chạy migration
-const memoryShipmentTrackings = []
-
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
          err?.code === 'ER_NO_SUCH_TABLE' ||
@@ -135,6 +132,7 @@ export async function updateOrderTracking(req, res, next) {
       data: result,
     })
   } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
     return next(err)
   }
 }
@@ -185,15 +183,8 @@ export async function getOrderTracking(req, res, next) {
           time: t.event_time,
         }))
       } catch (err) {
-        if (!isTableMissingError(err)) throw err
-        timeline = memoryShipmentTrackings
-          .filter((t) => String(t.shopOrderId) === String(item.shop_order_id))
-          .map((t) => ({
-            status: t.status,
-            location: t.location,
-            description: t.description,
-            time: t.eventTime,
-          }))
+        if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+        throw err
       }
 
       // Nếu chưa có mốc chi tiết trong bảng tracking, tạo timeline tự động dựa trên trạng thái đơn hàng

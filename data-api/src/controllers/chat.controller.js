@@ -3,11 +3,6 @@ import { executeQuery, executeTransaction } from '../config/database.js'
 const validShopId = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value))
 const validAttachments = (value) => value == null || (Array.isArray(value) && value.length <= 10 && Buffer.byteLength(JSON.stringify(value), 'utf8') <= 65535)
 
-// Bộ nhớ đệm dự phòng nếu bảng chat chưa chạy migration
-const memoryConversations = []
-const memoryMessages = []
-let memoryConvIdCounter = 1
-let memoryMsgIdCounter = 1
 
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
@@ -84,22 +79,8 @@ export async function listConversations(req, res, next) {
         })),
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      let filtered = []
-      if (role === 'seller' && shopId) {
-        filtered = memoryConversations.filter((c) => String(c.shopId) === String(shopId))
-      } else {
-        filtered = memoryConversations.filter((c) => String(c.buyerId) === String(userId))
-      }
-
-      return res.status(200).json({
-        success: true,
-        data: filtered.map((c) => ({
-          ...c,
-          unreadCount: role === 'seller' ? c.sellerUnreadCount : c.buyerUnreadCount,
-        })),
-      })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -194,31 +175,8 @@ export async function getOrCreateConversation(req, res, next) {
         },
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      let conv = memoryConversations.find(
-        (c) => String(c.buyerId) === String(buyerId) && String(c.shopId) === String(shopId),
-      )
-      if (!conv) {
-        conv = {
-          id: String(memoryConvIdCounter++),
-          buyerId: String(buyerId),
-          shopId: String(shopId),
-          buyerName: user.full_name,
-          buyerAvatar: user.avatar_url,
-          shopName: shop.name,
-          shopLogo: shop.logo_url,
-          lastMessage: null,
-          lastMessageAt: null,
-          buyerUnreadCount: 0,
-          sellerUnreadCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        memoryConversations.push(conv)
-      }
-
-      return res.status(200).json({ success: true, data: conv })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -321,31 +279,8 @@ export async function getConversationMessages(req, res, next) {
         },
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      const conv = memoryConversations.find((c) => String(c.id) === String(conversationId))
-      if (!conv) {
-        return res.status(404).json({
-          success: false,
-          message: 'Không tìm thấy cuộc trò chuyện.',
-          error: { code: 'CONVERSATION_NOT_FOUND' },
-        })
-      }
-
-      const msgs = memoryMessages.filter((m) => String(m.conversationId) === String(conversationId))
-      msgs.forEach((m) => {
-        if (String(m.senderId) !== String(userId)) m.isRead = true
-      })
-      if (role === 'seller') conv.sellerUnreadCount = 0
-      else conv.buyerUnreadCount = 0
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          conversationId: String(conversationId),
-          messages: msgs,
-        },
-      })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -457,39 +392,8 @@ export async function sendConversationMessage(req, res, next) {
         data: result,
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      const conv = memoryConversations.find((c) => String(c.id) === String(conversationId))
-      if (!conv) {
-        return res.status(404).json({
-          success: false,
-          message: 'Không tìm thấy cuộc trò chuyện.',
-          error: { code: 'CONVERSATION_NOT_FOUND' },
-        })
-      }
-
-      const newMsg = {
-        id: String(memoryMsgIdCounter++),
-        conversationId: String(conversationId),
-        senderId: String(senderId),
-        senderRole,
-        message: cleanMsg,
-        attachments: cleanAttachments ? JSON.parse(cleanAttachments) : [],
-        isRead: false,
-        createdAt: new Date().toISOString(),
-      }
-      memoryMessages.push(newMsg)
-
-      conv.lastMessage = cleanMsg.slice(0, 500)
-      conv.lastMessageAt = newMsg.createdAt
-      if (senderRole === 'buyer') conv.sellerUnreadCount += 1
-      else conv.buyerUnreadCount += 1
-
-      return res.status(201).json({
-        success: true,
-        message: 'Gửi tin nhắn thành công.',
-        data: newMsg,
-      })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)

@@ -199,7 +199,7 @@ export async function callDataApi(endpointPath, options = {}) {
     }
     const error = data.error && typeof data.error === 'object' ? data.error : {}
     throw new DataApiClientError(
-      status >= 400 && status < 500 ? status : 502,
+      status === 503 && error.code === 'DATA_STORAGE_UNAVAILABLE' ? 503 : status >= 400 && status < 500 ? status : 502,
       typeof error.code === 'string' ? error.code : 'DATA_API_BAD_RESPONSE',
       typeof data.message === 'string' ? data.message : 'Dịch vụ dữ liệu nội bộ trả về lỗi.',
     )

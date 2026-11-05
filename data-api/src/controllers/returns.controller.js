@@ -1,10 +1,6 @@
 import { readPagination } from '../utils/pagination.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
-// Bộ nhớ đệm dự phòng trong trường hợp DBA chưa chạy migration bảng order_returns
-const memoryReturns = []
-let memoryReturnIdCounter = 1
-
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
          err?.code === 'ER_NO_SUCH_TABLE' ||
@@ -132,42 +128,8 @@ export async function createOrderReturn(req, res, next) {
         },
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      // Fallback lưu tạm bộ nhớ nếu bảng order_returns chưa chạy migration
-      const existingMem = memoryReturns.find(
-        (r) => String(r.shopOrderId) === String(shopOrderId) && ['requested', 'approved'].includes(r.status),
-      )
-      if (existingMem) {
-        return res.status(409).json({
-          success: false,
-          message: 'Đơn hàng này đã có một yêu cầu trả hàng đang được xử lý.',
-          error: { code: 'RETURN_ALREADY_REQUESTED' },
-        })
-      }
-
-      const newReturn = {
-        id: String(memoryReturnIdCounter++),
-        orderId: String(orderId),
-        shopOrderId: String(shopOrderId),
-        buyerId: String(userId),
-        shopId: String(shopOrder.shop_id),
-        reason: cleanReason,
-        detail: cleanDetail,
-        images: cleanImages ? JSON.parse(cleanImages) : [],
-        refundAmount: finalRefundAmount,
-        status: 'requested',
-        sellerNote: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      memoryReturns.push(newReturn)
-
-      return res.status(201).json({
-        success: true,
-        message: 'Gửi yêu cầu trả hàng / hoàn tiền thành công.',
-        data: newReturn,
-      })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -210,12 +172,8 @@ export async function listOrderReturns(req, res, next) {
         })),
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      const filtered = memoryReturns.filter(
-        (r) => String(r.orderId) === String(orderId) && String(r.buyerId) === String(userId),
-      )
-      return res.status(200).json({ success: true, data: filtered })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -289,11 +247,8 @@ export async function listSellerReturns(req, res, next) {
         })),
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      let filtered = memoryReturns.filter((r) => String(r.shopId) === String(shopId))
-      if (status) filtered = filtered.filter((r) => r.status === status)
-      return res.status(200).json({ success: true, data: filtered })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)
@@ -398,29 +353,8 @@ export async function updateSellerReturnStatus(req, res, next) {
         data: { id: String(returnId), status, sellerNote: cleanNote },
       })
     } catch (err) {
-      if (!isTableMissingError(err)) throw err
-
-      const target = memoryReturns.find((r) => String(r.id) === String(returnId) && String(r.shopId) === String(shopId))
-      if (!target) {
-        return res.status(404).json({
-          success: false,
-          message: 'Không tìm thấy yêu cầu trả hàng.',
-          error: { code: 'RETURN_NOT_FOUND' },
-        })
-      }
-
-      if (!canUpdateReturnStatus(target.status, status)) {
-        return res.status(400).json({ success: false, message: 'Chuyển trạng thái trả hàng không hợp lệ.', error: { code: 'INVALID_TRANSITION' } })
-      }
-      target.status = status
-      target.sellerNote = cleanNote
-      target.updatedAt = new Date().toISOString()
-
-      return res.status(200).json({
-        success: true,
-        message: 'Cập nhật trạng thái trả hàng thành công.',
-        data: { id: String(returnId), status, sellerNote: cleanNote },
-      })
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
     }
   } catch (err) {
     return next(err)

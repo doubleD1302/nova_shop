@@ -70,14 +70,10 @@ try {
   const [[createdCount]] = await db.query('SELECT COUNT(*) AS n FROM order_returns WHERE shop_order_id = 1')
   assert.equal(createdCount.n, 1)
   await db.query('DROP TABLE order_returns')
-  const created = await call('POST', '/orders/1/returns', { shopOrderId: '1', reason: 'Hỏng' }, '1')
-  assert.equal(created.status, 201, JSON.stringify(created))
-  const fallbackId = created.body.data.id
-  assert.equal((await change(fallbackId, 'completed')).body.error.code, 'INVALID_TRANSITION')
-  assert.equal((await change(fallbackId, 'approved')).status, 200)
-  assert.equal((await change(fallbackId, 'completed')).status, 200)
-  assert.equal((await change(fallbackId, 'completed')).body.error.code, 'INVALID_TRANSITION')
-  console.log('PASS MySQL', version, ': return owner, chuyển trạng thái và xử lý đồng thời; kiểm tra fallback bộ nhớ.')
+  const missing = await call('POST', '/orders/1/returns', { shopOrderId: '1', reason: 'Hỏng' }, '1')
+  assert.equal(missing.status, 503, JSON.stringify(missing))
+  assert.equal(missing.body.error.code, 'DATA_STORAGE_UNAVAILABLE')
+  console.log('PASS MySQL', version, ': return owner, chuyển trạng thái và xử lý đồng thời; thiếu bảng trả lỗi 503, không lưu tạm.')
 } finally {
   if (backendServer) await new Promise((resolve) => backendServer.close(resolve))
   if (dataServer) await new Promise((resolve) => dataServer.close(resolve))
