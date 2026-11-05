@@ -17,6 +17,10 @@ function isValidId(val) {
 
 const validQuantity = (value, min) => (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isInteger(Number(value)) && Number(value) >= min && Number(value) <= 99
 const validBoolean = (value) => value === undefined || typeof value === 'boolean'
+const validReferenceId = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value).trim())
+const validProductRef = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && Boolean(String(value).trim()) && String(value).length <= 160
+const validItemRefs = (item) => (item.variantId !== undefined || item.productId !== undefined) &&
+  (item.variantId === undefined || validReferenceId(item.variantId)) && (item.productId === undefined || validProductRef(item.productId))
 
 function serializeCartItem(row) {
   const isAvailable = Boolean(
@@ -238,7 +242,7 @@ export async function addItemToCart(req, res, next) {
     }
 
     const qty = Number(req.body?.qty)
-    if (!validQuantity(req.body?.qty, 1) || !validBoolean(req.body?.selected) || !validBoolean(replaceQty)) {
+    if (!validItemRefs({ variantId, productId }) || !validQuantity(req.body?.qty, 1) || !validBoolean(req.body?.selected) || !validBoolean(replaceQty)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Số lượng phải là số nguyên từ 1 đến 99.')
     }
 
@@ -435,9 +439,7 @@ export async function syncCart(req, res, next) {
 
     if (!Array.isArray(items) || items.length > 100 || items.some((item) =>
       !item || typeof item !== 'object' || Array.isArray(item) ||
-      (!item.variantId && !item.productId) ||
-      (item.variantId !== undefined && !isValidId(String(item.variantId))) ||
-      (item.productId !== undefined && (typeof item.productId !== 'string' && typeof item.productId !== 'number' || !String(item.productId).trim() || String(item.productId).length > 160)) ||
+      !validItemRefs(item) ||
       (item.qty !== undefined && !validQuantity(item.qty, 1)) || !validBoolean(item.selected))) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Danh sách đồng bộ giỏ hàng không hợp lệ.')
     }
@@ -504,7 +506,7 @@ export async function updateCartSelection(req, res, next) {
     const { userId, selected, shopId } = req.body || {}
     const cleanUserId = String(userId || '').trim()
 
-    if (!isValidId(cleanUserId) || typeof selected !== 'boolean' || (shopId !== undefined && !isValidId(String(shopId)))) {
+    if (!isValidId(cleanUserId) || typeof selected !== 'boolean' || (shopId !== undefined && !validReferenceId(shopId))) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 

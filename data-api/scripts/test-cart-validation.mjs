@@ -46,7 +46,7 @@ try {
       assert.equal((await invoke(controller.updateCartSelection, { userId: '1', selected })).status, 400)
       assert.equal((await invoke(controller.updateCartItem, { userId: '1', selected })).status, 400)
     }
-    for (const shopId of ['', null, 0, {}, []]) {
+    for (const shopId of ['', null, 0, {}, [], ['1'], Number.MAX_SAFE_INTEGER + 1]) {
       assert.equal((await invoke(controller.updateCartSelection, { userId: '1', selected: true, shopId })).status, 400)
     }
     for (const selectedOnly of ['true', 1, null, {}]) {
@@ -56,6 +56,12 @@ try {
     }
     for (const selected of ['yes', '', ['true', 'false']]) {
       assert.equal((await invoke(controller.clearCart, { userId: '1' }, { selected })).status, 400)
+    }
+    for (const variantId of [null, ['1'], {}, true, Number.MAX_SAFE_INTEGER + 1]) {
+      const before = queries.length
+      assert.equal((await invoke(controller.addItemToCart, { userId: '1', variantId, qty: 1 })).status, 400)
+      assert.equal((await invoke(controller.syncCart, { userId: '1', items: [{ variantId, qty: 1 }] })).status, 400)
+      assert.equal(queries.length, before)
     }
     for (const body of [{ qty: null }, { qty: true }, { qty: 1, selected: 'false' }, { qty: 1, replaceQty: 'false' }]) {
       assert.equal((await invoke(controller.addItemToCart, { userId: '1', ...body })).status, 400)
@@ -84,7 +90,7 @@ try {
     assert.equal((await invoke(dataShops.updateSellerShop, { userId: '1', name: 'Shop', province: 'Hà Nội', [field]: {} })).status, 400)
   }
   const order = { userId: '1', items: [{ variantId: '1', qty: 1 }], address: { fullName: 'Tên', phone: '123', province: 'Hà Nội', detail: 'Nhà' }, paymentMethod: 'cod', shippingMethod: 'nhanh' }
-  for (const bad of [{ ...order, items: [{ variantId: '1', qty: true }] }, { ...order, address: { ...order.address, fullName: {} } }, { ...order, note: {} }, { ...order, voucherCode: [] }]) {
+  for (const bad of [{ ...order, items: [{ variantId: '1', qty: true }] }, { ...order, items: [{ variantId: ['1'], qty: 1 }] }, { ...order, items: [{ variantId: Number.MAX_SAFE_INTEGER + 1, qty: 1 }] }, { ...order, address: { ...order.address, fullName: {} } }, { ...order, note: {} }, { ...order, voucherCode: [] }]) {
     assert.equal((await invoke(dataOrders.createOrder, bad)).status, 400)
   }
   const app = express()

@@ -64,7 +64,8 @@ export async function createOrder(req, res, next) {
   const idempotencyKey = req.headers['idempotency-key']
   const body = req.body || {}
   const address = body.address
-  if (!Array.isArray(body.items) || body.items.some((item) => !item || typeof item !== 'object' || typeof item.qty !== 'number') ||
+  if (!Array.isArray(body.items) || body.items.some((item) => !item || typeof item !== 'object' || Array.isArray(item) ||
+        (typeof item.variantId !== 'string' && !(typeof item.variantId === 'number' && Number.isSafeInteger(item.variantId))) || typeof item.qty !== 'number') ||
       !address || typeof address !== 'object' || Array.isArray(address) ||
       ['fullName', 'phone', 'province', 'district', 'ward', 'detail'].some((field) => address[field] !== undefined && address[field] !== null && typeof address[field] !== 'string') ||
       ['voucherCode', 'note'].some((field) => body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string')) {
