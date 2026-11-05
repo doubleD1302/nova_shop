@@ -12,7 +12,7 @@ import {
   revokeAllSessions,
   changePassword,
 } from '../controllers/auth.controller.js'
-import { updateSellerShop } from '../controllers/shops.controller.js'
+import { getSellerShop, resubmitSellerShop, updateSellerShop } from '../controllers/shops.controller.js'
 
 const router = Router()
 
@@ -32,6 +32,8 @@ router.get('/users/:userId/auth-profile', getUserAuthProfile)
 router.put('/users/:userId/profile', updateUserProfile)
 router.post('/users/:userId/change-password', changePassword)
 router.post('/users/:userId/seller-shop', createSellerShop)
+router.get('/users/:userId/seller-shop', getSellerShop)
+router.post('/users/:userId/seller-shop/resubmit', resubmitSellerShop)
 router.put('/users/:userId/seller-shop', (req, res, next) => {
   req.body = { ...(req.body || {}), userId: req.params.userId }
   return updateSellerShop(req, res, next)

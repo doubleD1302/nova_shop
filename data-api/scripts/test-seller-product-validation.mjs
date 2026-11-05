@@ -33,6 +33,17 @@ assert.equal(validateSellerProductInput(productInput(uploadedImages.slice(0, 3))
 assert.equal(validateSellerProductInput(productInput([...uploadedImages.slice(0, 3), uploadedImages[0]])).ok, false, 'rejects duplicate image references')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { price: 0 })).ok, false, 'rejects a zero price')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { stock: -1 })).ok, false, 'rejects negative stock')
+for (const stock of [null, '', ' ', '0', false, true, [], {}, undefined]) {
+  assert.equal(validateSellerProductInput(productInput(uploadedImages, { stock })).ok, false, 'rejects nonnumeric stock rather than resetting inventory')
+}
+for (const price of [true, false, null, '', '120000', [], {}, undefined]) {
+  assert.equal(validateSellerProductInput(productInput(uploadedImages, { price })).ok, false, 'rejects a nonnumeric price')
+}
+for (const originalPrice of [true, false, '150000', [], {}]) {
+  assert.equal(validateSellerProductInput(productInput(uploadedImages, { originalPrice })).ok, false, 'rejects a nonnumeric original price')
+}
+assert.equal(validateSellerProductInput(productInput(uploadedImages, { stock: 0, price: 1, originalPrice: null })).ok, true, 'accepts zero inventory, numeric price and omitted original price')
+assert.equal(validateSellerProductInput(productInput(uploadedImages, { price: 120000, originalPrice: 150000, stock: 99 })).ok, true, 'accepts valid numeric fields')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { description: ' ' })).ok, false, 'rejects a missing description')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { status: 'archived' })).ok, false, 'rejects a seller supplied archive status')
 assert.equal(resolveSellerProductStatus(null, 'active'), 'draft', 'new seller products cannot bypass admin approval')
@@ -51,4 +62,4 @@ assert.equal(validateSellerProductInput(productInput(commonsImages)).ok, true, '
 assert.equal(validateSellerProductInput(productInput(commonsImages.map((image) => ({ ...image, licenseName: 'CC BY-NC 4.0' })))).ok, false, 'rejects non-commercial Commons licenses')
 assert.equal(validateSellerProductInput(productInput(commonsImages.map((image) => ({ ...image, url: image.url.replace('upload.wikimedia.org', 'example.test') })))).ok, false, 'rejects image URLs outside the Wikimedia upload host')
 
-console.log('Seller product validation checks passed (10 cases).')
+console.log('Seller product validation checks passed, including numeric field type boundaries.')

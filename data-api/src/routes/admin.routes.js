@@ -14,6 +14,8 @@ import {
   updateAdminReportStatus,
   updateAdminReviewStatus,
   updateAdminShopStatus,
+  updateAdminShopApproval,
+  listAdminShopApprovalEvents,
   updateAdminUserStatus,
   updateViolationEmailStatus,
   getShopViolations,
@@ -28,6 +30,8 @@ router.get('/admin/users', listAdminUsers)
 router.patch('/admin/users/:userId/status', updateAdminUserStatus)
 router.get('/admin/shops', listAdminShops)
 router.patch('/admin/shops/:shopId/status', updateAdminShopStatus)
+router.patch('/admin/shops/:shopId/approval', updateAdminShopApproval)
+router.get('/admin/shops/:shopId/approval-events', listAdminShopApprovalEvents)
 router.get('/admin/shops/:shopId/violations', getShopViolations)
 router.get('/admin/products', listAdminProducts)
 router.patch('/admin/products/:productId/status', updateAdminProductStatus)

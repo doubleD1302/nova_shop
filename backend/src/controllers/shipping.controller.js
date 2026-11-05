@@ -36,7 +36,7 @@ export async function updateOrderTracking(req, res, next) {
     const shopOrderId = req.params.shopOrderId
     const { trackingCode, carrier, autoAdvanceStatus } = req.body || {}
 
-    if (typeof trackingCode !== 'string' || !trackingCode.trim()) {
+    if (typeof trackingCode !== 'string' || !trackingCode.trim() || (autoAdvanceStatus !== undefined && typeof autoAdvanceStatus !== 'boolean')) {
       return res.status(400).json({
         success: false,
         message: 'Mã vận đơn là bắt buộc.',

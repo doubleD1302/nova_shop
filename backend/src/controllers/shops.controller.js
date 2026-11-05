@@ -43,3 +43,17 @@ export async function updateSellerShop(req, res, next) {
     return next(err)
   }
 }
+
+export async function getSellerShop(req, res, next) {
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop`)
+    return res.status(200).json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
+export async function resubmitSellerShop(req, res, next) {
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/resubmit`, { method: 'POST' })
+    return res.status(200).json({ success: true, data })
+  } catch (err) { return next(err) }
+}

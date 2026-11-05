@@ -15,6 +15,9 @@ function isValidId(val) {
   return typeof val === 'string' && /^[1-9]\d{0,19}$/.test(val.trim())
 }
 
+const validQuantity = (value, min) => (typeof value === 'number' || typeof value === 'string' && value.trim() !== '') && Number.isInteger(Number(value)) && Number(value) >= min && Number(value) <= 99
+const validBoolean = (value) => value === undefined || typeof value === 'boolean'
+
 function serializeCartItem(row) {
   const isAvailable = Boolean(
     row.variant_id &&
@@ -186,12 +189,12 @@ export async function getCart(req, res, next) {
 /**
  * Tìm kiếm và xác thực biến thể sản phẩm (SKU) khả dụng.
  */
-async function resolveVariant(variantId, productId) {
+async function resolveVariant(variantId, productId, query = executeQuery) {
   const cleanVariantId = String(variantId || '').trim()
   const cleanProductId = String(productId || '').trim()
 
   if (isValidId(cleanVariantId)) {
-    const rows = await executeQuery(
+    const rows = await query(
       `SELECT pv.id, pv.product_id, pv.price, pv.stock_qty, pv.is_active,
               p.status AS product_status, s.status AS shop_status
        FROM product_variants pv
@@ -205,7 +208,7 @@ async function resolveVariant(variantId, productId) {
 
   if (cleanProductId) {
     const isId = isValidId(cleanProductId)
-    const rows = await executeQuery(
+    const rows = await query(
       `SELECT pv.id, pv.product_id, pv.price, pv.stock_qty, pv.is_active,
               p.status AS product_status, s.status AS shop_status
        FROM product_variants pv
@@ -235,7 +238,7 @@ export async function addItemToCart(req, res, next) {
     }
 
     const qty = Number(req.body?.qty)
-    if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+    if (!validQuantity(req.body?.qty, 1) || !validBoolean(req.body?.selected) || !validBoolean(replaceQty)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Số lượng phải là số nguyên từ 1 đến 99.')
     }
 
@@ -303,7 +306,7 @@ export async function updateCartItem(req, res, next) {
     const cleanUserId = String(userId || '').trim()
     const itemId = String(req.params.itemId || '').trim()
 
-    if (!isValidId(cleanUserId) || !itemId) {
+    if (!isValidId(cleanUserId) || !itemId || (qty !== undefined && !validQuantity(qty, 0)) || !validBoolean(selected)) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 
@@ -390,6 +393,9 @@ export async function removeCartItem(req, res, next) {
  */
 export async function clearCart(req, res, next) {
   try {
+    if (!validBoolean(req.body?.selectedOnly) || (req.query.selected !== undefined && !['true', 'false'].includes(req.query.selected))) {
+      return responseError(res, 400, 'VALIDATION_ERROR', 'Bộ lọc giỏ hàng không hợp lệ.')
+    }
     const userId = String(req.body?.userId || req.query.userId || '').trim()
     const selectedOnly = req.body?.selectedOnly === true || req.query.selected === 'true'
 
@@ -427,7 +433,16 @@ export async function syncCart(req, res, next) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'userId không hợp lệ.')
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length > 100 || items.some((item) =>
+      !item || typeof item !== 'object' || Array.isArray(item) ||
+      (!item.variantId && !item.productId) ||
+      (item.variantId !== undefined && !isValidId(String(item.variantId))) ||
+      (item.productId !== undefined && (typeof item.productId !== 'string' && typeof item.productId !== 'number' || !String(item.productId).trim() || String(item.productId).length > 160)) ||
+      (item.qty !== undefined && !validQuantity(item.qty, 1)) || !validBoolean(item.selected))) {
+      return responseError(res, 400, 'VALIDATION_ERROR', 'Danh sách đồng bộ giỏ hàng không hợp lệ.')
+    }
+
+    if (items.length === 0) {
       const cartData = await fetchUserCartData(cleanUserId)
       return res.status(200).json({
         success: true,
@@ -436,40 +451,38 @@ export async function syncCart(req, res, next) {
       })
     }
 
-    // Duyệt qua từng sản phẩm để hợp nhất
-    for (const item of items) {
-      try {
-        const variant = await resolveVariant(item.variantId, item.productId)
-        if (!variant || variant.is_active !== 1 || Number(variant.stock_qty) < 1) {
+    // Hợp nhất cả danh sách trong một transaction để lỗi không lưu một phần.
+    await executeTransaction(async (query) => {
+      for (const item of items) {
+        const variant = await resolveVariant(item.variantId, item.productId, query)
+        if (!variant || variant.is_active !== 1 || variant.product_status !== 'active' || variant.shop_status !== 'active' || Number(variant.stock_qty) < 1) {
           continue
         }
 
         const targetVariantId = String(variant.id)
-        const qty = Number(item.qty)
-        const validQty = Number.isInteger(qty) && qty >= 1 ? Math.min(qty, Number(variant.stock_qty), 99) : 1
+        const qty = item.qty === undefined ? 1 : Number(item.qty)
+        const validQty = Math.min(qty, Number(variant.stock_qty), 99)
         const selected = item.selected !== undefined ? (Boolean(item.selected) ? 1 : 0) : 1
 
-        const existing = await executeQuery(
-          'SELECT id, qty FROM cart_items WHERE user_id = ? AND variant_id = ? LIMIT 1',
+        const existing = await query(
+          'SELECT id, qty FROM cart_items WHERE user_id = ? AND variant_id = ? LIMIT 1 FOR UPDATE',
           [cleanUserId, targetVariantId],
         )
 
         if (existing.length > 0) {
           const mergedQty = Math.min(Number(existing[0].qty) + validQty, Number(variant.stock_qty), 99)
-          await executeQuery(
+          await query(
             'UPDATE cart_items SET qty = ?, selected = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ?',
             [mergedQty, selected, existing[0].id],
           )
         } else {
-          await executeQuery(
+          await query(
             'INSERT INTO cart_items (user_id, variant_id, qty, selected) VALUES (?, ?, ?, ?)',
             [cleanUserId, targetVariantId, validQty, selected],
           )
         }
-      } catch (err) {
-        console.error('[CartSync] Bỏ qua item lỗi khi đồng bộ:', item, err?.message)
       }
-    }
+    })
 
     const cartData = await fetchUserCartData(cleanUserId)
     return res.status(200).json({
@@ -491,7 +504,7 @@ export async function updateCartSelection(req, res, next) {
     const { userId, selected, shopId } = req.body || {}
     const cleanUserId = String(userId || '').trim()
 
-    if (!isValidId(cleanUserId) || selected === undefined) {
+    if (!isValidId(cleanUserId) || typeof selected !== 'boolean' || (shopId !== undefined && !isValidId(String(shopId)))) {
       return responseError(res, 400, 'VALIDATION_ERROR', 'Dữ liệu yêu cầu không hợp lệ.')
     }
 

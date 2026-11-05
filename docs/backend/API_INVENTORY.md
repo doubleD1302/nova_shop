@@ -1,5 +1,7 @@
 # ShopNova - Danh Mục & Kế Hoạch API Backend (API Inventory)
 
+Luồng chờ duyệt, API hồ sơ seller, duyệt/từ chối và lịch sử gian hàng: xem [SHOP_APPROVAL.md](./SHOP_APPROVAL.md). Shop mới chờ Admin duyệt trước khi hoạt động.
+
 > **Tài liệu phối hợp kỹ thuật giữa Backend, Frontend Web, Mobile App và Data API / Database**
 > *Mã tác vụ: DB-001-R1 / BE-002A*
 > *Trạng thái tài liệu: Bản nháp kỹ thuật (Draft) — Đã đồng bộ với schema thực tế `database/schema.sql`*

@@ -407,10 +407,11 @@ export async function registerUser(req, res, next) {
       if (role === 'seller') {
         const shopResult = await query(
           `INSERT INTO shops (owner_id, slug, name, tagline, province, status)
-           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
           [userId, shopSlug, body.shopName.trim(), shopTagline || null],
         )
         shopId = String(shopResult.insertId)
+        await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
       if (address) {
         await query(
@@ -480,8 +481,8 @@ export async function updateUserProfile(req, res, next) {
       typeof address.detail !== 'string' ||
       !address.detail.trim() ||
       address.detail.trim().length > 255 ||
-      (address.district && (typeof address.district !== 'string' || address.district.trim().length > 120)) ||
-      (address.ward && (typeof address.ward !== 'string' || address.ward.trim().length > 120))
+      (address.district != null && (typeof address.district !== 'string' || address.district.trim().length > 120)) ||
+      (address.ward != null && (typeof address.ward !== 'string' || address.ward.trim().length > 120))
     )) {
       return res.status(400).json({
         success: false,
@@ -495,7 +496,8 @@ export async function updateUserProfile(req, res, next) {
       fullName.length > 120 ||
       !validEmail(email) ||
       (phone && phone.length > 20) ||
-      (avatarUrl !== undefined && avatarUrl.length > 1024)
+      (body.avatarUrl !== undefined && body.avatarUrl !== null && typeof body.avatarUrl !== 'string') ||
+      (typeof avatarUrl === 'string' && avatarUrl.length > 1024)
     ) {
       return res.status(400).json({
         success: false,
@@ -505,16 +507,22 @@ export async function updateUserProfile(req, res, next) {
     }
 
     const user = await executeTransaction(async (query) => {
-      await query(
-        `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
-         WHERE id = ? AND status = 'active'`,
-        [fullName, email, phone || null, avatarUrl ?? null, userId],
-      )
       const users = await query(
-        `SELECT id FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
+        `SELECT id, avatar_url FROM users WHERE id = ? AND status = 'active' FOR UPDATE`,
         [userId],
       )
       if (!users.length) return null
+      const currentAvatar = users[0].avatar_url
+      const nextAvatar = avatarUrl === undefined ? currentAvatar : avatarUrl
+      const prefix = `/uploads/avatar-${userId}-`
+      const validNewAvatar = typeof nextAvatar === 'string' && nextAvatar.startsWith(prefix) &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(nextAvatar.slice(prefix.length))
+      if (nextAvatar !== null && nextAvatar !== currentAvatar && !validNewAvatar) return { error: 'INVALID_AVATAR_IMAGE' }
+      await query(
+        `UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_url = ?
+         WHERE id = ? AND status = 'active'`,
+        [fullName, email, phone || null, nextAvatar, userId],
+      )
       if (address !== undefined) {
         const addresses = await query(
           `SELECT id FROM addresses WHERE user_id = ? AND is_default = 1 AND deleted_at IS NULL FOR UPDATE`,
@@ -560,6 +568,9 @@ export async function updateUserProfile(req, res, next) {
         message: 'Không tìm thấy tài khoản.',
         error: { code: 'USER_NOT_FOUND' },
       })
+    }
+    if (user.error === 'INVALID_AVATAR_IMAGE') {
+      return res.status(400).json({ success: false, message: 'Đường dẫn ảnh đại diện không hợp lệ cho tài khoản này.', error: { code: user.error } })
     }
 
     return res.status(200).json({
@@ -631,18 +642,22 @@ export async function createSellerShop(req, res, next) {
       }
 
       // 2. Kiểm tra xem người dùng đã sở hữu gian hàng hay chưa (tránh tạo trùng lặp)
-      const existingShops = await query('SELECT id, name FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
+      const existingShops = await query('SELECT id, name, status FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
       let shopId
+      let shopStatus
       if (existingShops.length) {
         shopId = String(existingShops[0].id)
+        shopStatus = existingShops[0].status
       } else {
         const shopSlug = `${slugify(shopName)}-${crypto.randomBytes(4).toString('hex')}`
         const shop = await query(
           `INSERT INTO shops (owner_id, slug, name, province, status)
-           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'active')`,
+           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
           [userId, shopSlug, shopName],
         )
         shopId = String(shop.insertId)
+        shopStatus = 'pending'
+        await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
 
       // 3. Phân quyền: Người dùng buyer được nâng cấp thành seller; Admin giữ nguyên quyền admin
@@ -652,6 +667,7 @@ export async function createSellerShop(req, res, next) {
       }
 
       return {
+        shopStatus,
         user: {
           id: String(users[0].id),
           username: users[0].username,
@@ -682,8 +698,8 @@ export async function createSellerShop(req, res, next) {
     }
     return res.status(200).json({
       success: true,
-      message: 'Đã mở gian hàng thành công.',
-      data: { user: result.user },
+      message: result.shopStatus === 'pending' ? 'Hồ sơ gian hàng đang chờ kiểm duyệt.' : 'Tài khoản đã có gian hàng.',
+      data: { user: result.user, shopStatus: result.shopStatus },
     })
   } catch (err) {
     return next(err)

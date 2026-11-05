@@ -1,5 +1,7 @@
 # ShopNova Data API
 
+Kiểm tra địa chỉ mặc định qua Backend → Data API → MySQL: chạy từ root `node data-api/scripts/test-address-mysql.mjs` với MySQL 8 cục bộ riêng, `ADDRESS_MYSQL_TEST=1`, `ADDRESS_DB_PORT`, `ADDRESS_DB_PASSWORD` và tùy chọn `ADDRESS_DB_USER` (mặc định root). Script tạo rồi xóa database thử nghiệm riêng; không dùng database chung. Địa chỉ được lưu qua cập nhật hồ sơ; việc tự lưu khi đặt hàng chưa được quy định.
+
 Dịch vụ Data API nội bộ phụ trách truy vấn và thao tác cơ sở dữ liệu MySQL của sàn thương mại điện tử ShopNova.
 
 ---

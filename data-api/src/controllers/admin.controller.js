@@ -137,7 +137,7 @@ export async function updateAdminUserStatus(req, res, next) {
 export async function listAdminShops(req, res, next) {
   try {
     const rows = await executeQuery(`
-      SELECT s.id, s.owner_id, s.slug, s.name, s.tagline, s.province, s.status,
+      SELECT s.id, s.owner_id, s.slug, s.name, s.tagline, s.description, s.logo_url, s.banner_url, s.address_detail, s.province, s.status, s.approval_version, s.rejection_reason,
              s.suspension_reason, s.suspended_by, s.suspended_at, s.created_at,
              u.username, u.full_name, u.email AS owner_email, u.phone AS owner_phone,
              suspended_admin.username AS suspended_by_username,
@@ -156,6 +156,8 @@ export async function listAdminShops(req, res, next) {
       ownerName: row.full_name, ownerEmail: row.owner_email || null, ownerPhone: row.owner_phone || null,
       slug: row.slug, name: row.name, tagline: row.tagline || '',
       location: row.province, status: row.status,
+      description: row.description || '', logoUrl: row.logo_url, bannerUrl: row.banner_url,
+      address: row.address_detail || '', approvalVersion: Number(row.approval_version), rejectionReason: row.rejection_reason || null,
       suspensionReason: row.suspension_reason || null,
       suspendedBy: row.suspended_by ? String(row.suspended_by) : null,
       suspendedByUsername: row.suspended_by_username || null,
@@ -188,6 +190,7 @@ export async function updateAdminShopStatus(req, res, next) {
     const result = await executeTransaction(async (query) => {
       const rows = await query(`SELECT id, status FROM shops WHERE id = ? FOR UPDATE`, [shopId])
       if (!rows.length) return { error: 'SHOP_NOT_FOUND' }
+      if (['pending', 'rejected'].includes(rows[0].status)) return { error: 'SHOP_REQUIRES_APPROVAL' }
 
       if (status === 'active') {
         await query(
@@ -206,7 +209,7 @@ export async function updateAdminShopStatus(req, res, next) {
     })
 
     if (result.error) {
-      return res.status(result.error === 'SHOP_NOT_FOUND' ? 404 : 400).json({
+      return res.status(result.error === 'SHOP_NOT_FOUND' ? 404 : 409).json({
         success: false,
         message: result.error === 'SHOP_NOT_FOUND' ? 'Không tìm thấy gian hàng.' : 'Lỗi cập nhật gian hàng.',
         error: { code: result.error }
@@ -214,6 +217,54 @@ export async function updateAdminShopStatus(req, res, next) {
     }
 
     return res.status(200).json({ success: true, data: result })
+  } catch (err) { return next(err) }
+}
+
+export async function updateAdminShopApproval(req, res, next) {
+  try {
+    const shopId = String(req.params.shopId || '')
+    const userId = String(req.body?.userId || '')
+    const { approvalStatus, approvalVersion } = req.body || {}
+    const reason = typeof req.body?.rejectionReason === 'string' ? req.body.rejectionReason.trim() : ''
+    if (!validId(shopId) || !validId(userId) || !['approved', 'rejected'].includes(approvalStatus) ||
+        !Number.isSafeInteger(approvalVersion) || approvalVersion < 1 || approvalVersion > 4294967295 ||
+        (approvalStatus === 'rejected' && (reason.length < 3 || reason.length > 1000))) {
+      return res.status(400).json({ success: false, message: 'Yêu cầu duyệt gian hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const result = await executeTransaction(async (query) => {
+      const admins = await query("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active' FOR UPDATE", [userId])
+      if (!admins.length) return { error: 'ADMIN_REQUIRED' }
+      const shops = await query('SELECT id, status, approval_version FROM shops WHERE id = ? FOR UPDATE', [shopId])
+      if (!shops.length) return { error: 'SHOP_NOT_FOUND' }
+      if (shops[0].status !== 'pending' || Number(shops[0].approval_version) !== approvalVersion) return { error: 'SHOP_APPROVAL_CONFLICT' }
+      const status = approvalStatus === 'approved' ? 'active' : 'rejected'
+      await query('UPDATE shops SET status = ?, rejection_reason = ? WHERE id = ?', [status, status === 'rejected' ? reason : null, shopId])
+      await query('INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version, reason) VALUES (?, ?, ?, ?, ?)',
+        [shopId, userId, approvalStatus, approvalVersion, status === 'rejected' ? reason : null])
+      return { shopId, status, approvalVersion }
+    })
+    if (result.error) {
+      const status = result.error === 'SHOP_NOT_FOUND' ? 404 : result.error === 'ADMIN_REQUIRED' ? 403 : 409
+      return res.status(status).json({ success: false, message: 'Không thể duyệt gian hàng.', error: { code: result.error } })
+    }
+    return res.status(200).json({ success: true, data: result })
+  } catch (err) { return next(err) }
+}
+
+export async function listAdminShopApprovalEvents(req, res, next) {
+  try {
+    const shopId = String(req.params.shopId || '')
+    const userId = String(req.query.userId || '')
+    if (!validId(shopId) || !validId(userId)) return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
+    const admins = await executeQuery("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active'", [userId])
+    if (!admins.length) return res.status(403).json({ success: false, error: { code: 'ADMIN_REQUIRED' } })
+    const shops = await executeQuery('SELECT id FROM shops WHERE id = ?', [shopId])
+    if (!shops.length) return res.status(404).json({ success: false, error: { code: 'SHOP_NOT_FOUND' } })
+    const rows = await executeQuery('SELECT id, actor_id, action, profile_version, reason, created_at FROM shop_approval_events WHERE shop_id = ? ORDER BY id DESC LIMIT 200', [shopId])
+    return res.status(200).json({ success: true, data: { events: rows.map((row) => ({
+      id: String(row.id), actorId: String(row.actor_id), action: row.action, profileVersion: Number(row.profile_version),
+      reason: row.reason || null, createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    })) } })
   } catch (err) { return next(err) }
 }
 
@@ -542,6 +593,8 @@ export async function updateAdminReportStatus(req, res, next) {
 
           // 6. Quy tắc: Vi phạm lần 2 trở lên -> Khóa shop vi phạm
           if (actionTaken === 'shop_suspended') {
+            // Không chuyển shop chưa duyệt sang suspended vì có thể mở khóa thành active.
+            if (['pending', 'rejected'].includes(shop.status)) return { error: 'SHOP_REQUIRES_APPROVAL' }
             const lockReason = `Khóa gian hàng do tái phạm vi phạm chính sách hàng giả / vi phạm bản quyền (Lần ${violationNumber}) theo hồ sơ báo cáo #${reportId}.`
             await query(
               `UPDATE shops
@@ -649,7 +702,9 @@ export async function createReport(req, res, next) {
     const details = typeof req.body?.details === 'string' ? req.body.details.trim() : ''
     const evidenceUrl = typeof req.body?.evidenceUrl === 'string' && req.body.evidenceUrl.trim().length > 0 ? req.body.evidenceUrl.trim() : null
 
-    if (!validId(userId) || !validId(targetId) || !['shop', 'product', 'user', 'review'].includes(targetType) || reason.length < 3 || reason.length > 2000) {
+    if (!validId(userId) || !validId(targetId) || !['shop', 'product', 'user', 'review'].includes(targetType) || reason.length < 3 || reason.length > 2000 ||
+        (req.body?.details != null && typeof req.body.details !== 'string') || Buffer.byteLength(details, 'utf8') > 65535 ||
+        (req.body?.evidenceUrl != null && typeof req.body.evidenceUrl !== 'string') || (evidenceUrl && evidenceUrl.length > 1024)) {
       return res.status(400).json({ success: false, message: 'Loại đối tượng, mã đối tượng hoặc nội dung báo cáo không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
 

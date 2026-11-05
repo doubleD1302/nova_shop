@@ -287,13 +287,14 @@ export async function createSellerShop(req, res, next) {
     const refreshToken = await createSessionForUser(result.user.id)
     return res.status(200).json({
       success: true,
-      message: 'Đã mở gian hàng thành công.',
+      message: result.shopStatus === 'pending' ? 'Hồ sơ gian hàng đang chờ kiểm duyệt.' : 'Tài khoản đã có gian hàng.',
       data: {
         token: signAccessToken(result.user),
         ...(refreshToken ? { refreshToken } : {}),
         tokenType: 'Bearer',
         expiresIn: ACCESS_TOKEN_EXPIRES_IN,
         user: sanitizePublicUser(result.user),
+        shopStatus: result.shopStatus,
       },
     })
   } catch (err) {
