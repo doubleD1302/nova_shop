@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
-import { isValidAmount } from '../utils/money.js'
+import { isValidAmount, isValidGatewayAmount } from '../utils/money.js'
 import { readPagination } from '../utils/pagination.js'
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
@@ -17,9 +17,7 @@ export async function reservePayment(req, res, next) {
       const orders = await query('SELECT id, buyer_id, payment_method, total_amount FROM orders WHERE id = ? FOR UPDATE', [orderId])
       if (!orders.length || String(orders[0].buyer_id) !== String(userId)) return { error: 'ORDER_NOT_FOUND' }
       const order = orders[0]
-      if (!methods.includes(order.payment_method) || !isValidAmount(Number(order.total_amount)) || Number(order.total_amount) < 1000 ||
-          (order.payment_method === 'momo' && Number(order.total_amount) > 50000000) ||
-          (order.payment_method === 'vnpay' && Number(order.total_amount) > 9999999999)) {
+      if (!isValidGatewayAmount(order.payment_method, Number(order.total_amount))) {
         return { error: 'PAYMENT_UNAVAILABLE' }
       }
       const shops = await query('SELECT id, status FROM shop_orders WHERE order_id = ? FOR UPDATE', [orderId])

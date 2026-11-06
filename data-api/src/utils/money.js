@@ -5,6 +5,14 @@ export function isValidAmount(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= MAX_ORDER_AMOUNT
 }
 
+// Dùng cùng giới hạn khi đặt đơn và khi khởi tạo thanh toán.
+export function isValidGatewayAmount(method, amount) {
+  if (!isValidAmount(amount) || amount < 1000) return false
+  if (method === 'momo') return amount <= 50000000
+  if (method === 'vnpay') return amount <= 9999999999
+  return false
+}
+
 export function allocateDiscounts(discount, shopSubtotals) {
   const subtotal = shopSubtotals.reduce((sum, amount) => sum + amount, 0)
   if (!subtotal) return shopSubtotals.map(() => 0)

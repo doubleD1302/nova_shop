@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { calculateShipping, estimateItemWeight } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
-import { allocateDiscounts, isValidAmount } from '../utils/money.js'
+import { allocateDiscounts, isValidAmount, isValidGatewayAmount } from '../utils/money.js'
 import { getWeatherRisk } from '../services/weather.js'
 
 const responseError = (res, status, code, message) => res.status(status).json({
@@ -199,10 +199,7 @@ export async function createOrder(req, res, next) {
         return { error: 'ORDER_AMOUNT_INVALID' }
       }
       const totalAmount = subtotal + shippingFee - discountAmount
-      if (order.paymentMethod === 'momo' && (totalAmount < 1000 || totalAmount > 50000000)) {
-        return { error: 'ORDER_AMOUNT_INVALID' }
-      }
-      if (order.paymentMethod === 'vnpay' && totalAmount > 9999999999) {
+      if (order.paymentMethod !== 'cod' && !isValidGatewayAmount(order.paymentMethod, totalAmount)) {
         return { error: 'ORDER_AMOUNT_INVALID' }
       }
 
@@ -370,7 +367,7 @@ export async function createOrder(req, res, next) {
         IDEMPOTENCY_CONFLICT: [409, 'IDEMPOTENCY_CONFLICT', 'Yêu cầu đặt hàng đã được sử dụng với thông tin khác.'],
         PRODUCT_UNAVAILABLE: [409, 'PRODUCT_UNAVAILABLE', 'Một sản phẩm trong giỏ không còn được bán.'],
         INSUFFICIENT_STOCK: [409, 'INSUFFICIENT_STOCK', 'Số lượng đặt vượt quá tồn kho hiện tại.'],
-        ORDER_AMOUNT_INVALID: [400, 'ORDER_AMOUNT_INVALID', 'Giá trị đơn hàng vượt giới hạn cho phép.'],
+        ORDER_AMOUNT_INVALID: [400, 'ORDER_AMOUNT_INVALID', 'Giá trị đơn hàng không phù hợp với giới hạn cho phép.'],
         VOUCHER_INVALID: [400, 'VOUCHER_INVALID', 'Mã giảm giá không hợp lệ hoặc đã hết hạn.'],
         VOUCHER_UNAVAILABLE: [409, 'VOUCHER_UNAVAILABLE', 'Mã giảm giá không đủ điều kiện hoặc đã hết lượt sử dụng.'],
       }

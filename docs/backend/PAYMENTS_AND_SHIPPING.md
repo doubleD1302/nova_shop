@@ -27,6 +27,8 @@ Các biến môi trường mẫu nằm trong `backend/.env.example`. `VNPAY_PAYM
 do đối tác cung cấp; production yêu cầu HTTPS. Bí mật chỉ đặt trong môi trường Backend.
 MoMo yêu cầu thời gian chờ tối thiểu 30 giây cho API khởi tạo; timeout của ứng dụng gọi API này cần lớn hơn 35 giây.
 
+Giá trị đơn thanh toán online phải từ 1.000 VND; tối đa 50.000.000 VND với MoMo và 9.999.999.999 VND với VNPay. Giới hạn được kiểm tra khi đặt đơn và tạo phiên.
+
 ## Cước vận chuyển
 
 Data API tính cước cho từng shop từ tỉnh gửi của shop, tỉnh nhận của đơn, khối lượng ước tính theo danh mục,
