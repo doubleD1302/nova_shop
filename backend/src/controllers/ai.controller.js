@@ -2,22 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { callDataApi } from '../clients/data.client.js'
 import { aiBrainService } from '../services/ai-brain.service.js'
 import { generateGeminiShoppingAdvice } from '../services/gemini.service.js'
+import { findCatalogProducts } from '../services/ai-catalog.service.js'
 
 function extractUserKey(req) {
   return req.user?.id ? `account_${req.user.id}` : `guest_ephemeral_${randomUUID().replace(/-/g, '')}`
-}
-
-// Lọc theo từ khóa trong dữ liệu danh mục; không tự thêm sản phẩm mẫu.
-function findRelevantProducts(query, products) {
-  const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase()
-  const stopWords = new Set(['toi', 'minh', 'ban', 'tim', 'giup', 'cho', 'mot', 'nhung', 'cua', 'san', 'pham', 'gia', 'duoi', 'tren', 'voi', 'nao', 'mua', 'shopnova', 'nova', 'can', 'muon', 'bao', 'nhieu', 'dong', 'khong', 'the', 'loai', 'duoc', 'co', 'hay', 'nhe'])
-  const words = [...new Set(normalize(query).match(/[a-z0-9]+/g) || [])]
-    .filter((word) => word.length >= 2 && !/^\d/.test(word) && !stopWords.has(word))
-  if (!words.length) return []
-  return products.map((product) => {
-    const text = normalize([product.name, product.categoryName, product.shopName].join(' '))
-    return { product, score: words.filter((word) => text.includes(word)).length }
-  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).map((item) => item.product)
 }
 
 export async function chatWithAi(req, res, next) {
@@ -39,8 +27,8 @@ export async function chatWithAi(req, res, next) {
     const { brain, newlyLearned, consultantInsights } = aiBrainService.learnFromMessage(userKey, query)
     const lower = query.toLowerCase()
     const sellerQuestion = ['shop của tôi', 'cửa hàng của tôi', 'gian hàng của tôi', 'sản phẩm của tôi', 'sản phẩm shop', 'đơn hàng shop', 'đơn hàng của shop'].some((text) => lower.includes(text))
-    const adminQuestion = ['thống kê sàn', 'tổng quan sàn', 'toàn sàn', 'quản trị sàn', 'danh sách khách hàng', 'danh sách người dùng', 'danh sách tài khoản', 'danh sách shop', 'danh sách gian hàng', 'danh sách sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((text) => lower.includes(text))
-    const isOrderQuestion = ['đơn hàng', 'tra cứu', 'vận chuyển', 'giao hàng'].some((text) => lower.includes(text))
+    const adminQuestion = ['tra cứu tài khoản', 'tra cứu khách hàng', 'tra cứu người dùng', 'thống kê sàn', 'tổng quan sàn', 'toàn sàn', 'quản trị sàn', 'danh sách khách hàng', 'danh sách người dùng', 'danh sách tài khoản', 'danh sách shop', 'danh sách gian hàng', 'danh sách sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((text) => lower.includes(text))
+    const isOrderQuestion = ['đơn hàng', 'đơn của tôi', 'mã đơn', 'vận đơn'].some((text) => lower.includes(text))
     const privilegedQuestion = sellerQuestion || adminQuestion
     let aiResult
 
@@ -51,24 +39,38 @@ export async function chatWithAi(req, res, next) {
         return res.status(req.user ? 403 : 401).json({ success: false, message: 'Bạn không có quyền xem dữ liệu này.', error: { code: req.user ? 'FORBIDDEN' : 'AUTH_REQUIRED' } })
       }
       let businessContext
+      const idMatch = query.match(/(?:#|mã\s*(?:số)?\s*)([1-9]\d{0,19})/i)
+      const emailMatch = lower.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)
+      const phoneMatch = query.match(/\b0\d{8,10}\b/)
+      const selectRecords = (records, idField = 'id') => {
+        const matching = records.filter((record) => {
+          if (idMatch && String(record[idField]) !== idMatch[1]) return false
+          if (emailMatch && String(record.email || record.ownerEmail || '').toLowerCase() !== emailMatch[0]) return false
+          if (phoneMatch && String(record.phone || record.ownerPhone || record.recipientPhone || '') !== phoneMatch[0]) return false
+          return true
+        })
+        return matching.slice(0, 20)
+      }
+      const includeEmail = lower.includes('email') || lower.includes('liên hệ')
+      const includePhone = lower.includes('điện thoại') || lower.includes('liên hệ')
       if (adminQuestion && ['khách hàng', 'người dùng', 'tài khoản'].some((term) => lower.includes(term))) {
         const result = await callDataApi('/internal/v1/admin/users')
         if (!Array.isArray(result?.users)) throw new Error('Invalid admin users')
-        businessContext = { note: 'Tối đa 20 tài khoản gần đây', users: result.users.slice(0, 20).map((user) => ({ id: user.id, username: user.username, fullName: user.fullName, email: user.email, phone: user.phone, role: user.role, status: user.status })) }
+        businessContext = { note: 'Tra cứu trong tối đa 500 tài khoản gần đây; mỗi lượt tối đa 20 kết quả', users: selectRecords(result.users).map((user) => ({ id: user.id, username: user.username, fullName: user.fullName, ...(includeEmail ? { email: user.email } : {}), ...(includePhone ? { phone: user.phone } : {}), role: user.role, status: user.status })) }
       } else if (adminQuestion && lower.includes('đơn hàng')) {
         const result = await callDataApi('/internal/v1/admin/orders')
         if (!Array.isArray(result?.orders)) throw new Error('Invalid admin orders')
-        businessContext = { note: 'Tối đa 20 đơn shop gần đây', orders: result.orders.slice(0, 20).map((order) => ({ orderId: order.orderId, code: order.code, recipientName: order.recipientName, recipientPhone: order.recipientPhone, shopName: order.shopName, total: order.total, status: order.status })) }
+        businessContext = { note: 'Tra cứu trong tối đa 200 đơn shop gần đây; mỗi lượt tối đa 20 kết quả', orders: selectRecords(result.orders, 'orderId').map((order) => ({ orderId: order.orderId, code: order.code, recipientName: order.recipientName, ...(includePhone ? { recipientPhone: order.recipientPhone } : {}), shopName: order.shopName, total: order.total, status: order.status })) }
       } else if (adminQuestion && ['danh sách shop', 'danh sách gian hàng', 'sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((term) => lower.includes(term))) {
         let resource
         let fields
         if (lower.includes('sản phẩm')) { resource = 'products'; fields = ['id', 'name', 'shopName', 'price', 'stock', 'status', 'approvalStatus'] }
         else if (lower.includes('báo cáo')) { resource = 'reports'; fields = ['id', 'targetType', 'targetName', 'shopName', 'reason', 'details', 'status'] }
         else if (lower.includes('đánh giá')) { resource = 'reviews'; fields = ['id', 'productName', 'shopName', 'username', 'rating', 'comment', 'status'] }
-        else { resource = 'shops'; fields = ['id', 'name', 'ownerName', 'ownerEmail', 'ownerPhone', 'status', 'productCount'] }
+        else { resource = 'shops'; fields = ['id', 'name', 'ownerName', ...(includeEmail ? ['ownerEmail'] : []), ...(includePhone ? ['ownerPhone'] : []), 'status', 'productCount'] }
         const result = await callDataApi(`/internal/v1/admin/${resource}`)
         if (!Array.isArray(result?.[resource])) throw new Error('Invalid admin resource')
-        businessContext = { note: 'Tối đa 20 bản ghi gần đây', [resource]: result[resource].slice(0, 20).map((item) => Object.fromEntries(fields.filter((key) => item[key] !== undefined).map((key) => [key, item[key]]))) }
+        businessContext = { note: 'Tra cứu trong tối đa 500 bản ghi gần đây; mỗi lượt tối đa 20 kết quả', [resource]: selectRecords(result[resource]).map((item) => Object.fromEntries(fields.filter((key) => item[key] !== undefined).map((key) => [key, item[key]]))) }
       } else if (adminQuestion) {
         const result = await callDataApi('/internal/v1/admin/stats')
         if (!result?.stats || !result?.orderStatusCounts) throw new Error('Invalid admin stats')
@@ -84,9 +86,16 @@ export async function chatWithAi(req, res, next) {
         if (!Array.isArray(result?.products)) throw new Error('Invalid seller products')
         businessContext = { total: result.total, products: result.products.slice(0, 20).map((product) => ({ id: product.id, name: product.name, price: product.price, stock: product.stock, status: product.status, approvalStatus: product.approvalStatus })) }
       }
-      const response = await generateGeminiShoppingAdvice({ query, businessContext })
-      if (!response?.reply) return res.status(503).json({ success: false, message: 'Nova AI tạm thời không khả dụng. Bạn hãy thử lại sau.', error: { code: 'AI_UNAVAILABLE' } })
-      aiResult = { reply: response.reply, intent: 'business_info', intentTitle: adminQuestion ? 'Tổng quan ShopNova' : 'Gian hàng của bạn', poweredBy: response.modelUsed, products: [] }
+      const selectedRecords = adminQuestion && (idMatch || emailMatch || phoneMatch)
+        ? Object.values(businessContext).find(Array.isArray)
+        : null
+      if (selectedRecords && selectedRecords.length === 0) {
+        aiResult = { reply: 'Không tìm thấy bản ghi phù hợp trong phạm vi dữ liệu đã truy vấn. Vui lòng kiểm tra mã hoặc tìm trong trang quản trị.', intent: 'business_info', intentTitle: 'Tra cứu quản trị', products: [] }
+      } else {
+        const response = await generateGeminiShoppingAdvice({ query, businessContext })
+        if (!response?.reply) return res.status(503).json({ success: false, message: 'Nova AI tạm thời không khả dụng. Bạn hãy thử lại sau.', error: { code: 'AI_UNAVAILABLE' } })
+        aiResult = { reply: response.reply, intent: 'business_info', intentTitle: adminQuestion ? 'Tổng quan ShopNova' : 'Gian hàng của bạn', poweredBy: response.modelUsed, products: [] }
+      }
     } else if (isOrderQuestion) {
       if (!req.user) {
         aiResult = { reply: 'Bạn hãy đăng nhập và mở mục Đơn hàng để xem trạng thái đơn của mình.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [] }
@@ -97,16 +106,10 @@ export async function chatWithAi(req, res, next) {
         aiResult = { reply: orders ? `Các đơn gần đây của bạn: ${orders}. Bạn có thể xem chi tiết trong mục Đơn hàng.` : 'Bạn chưa có đơn hàng để hiển thị.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [] }
       }
     } else {
-      let products = []
-      let catalogAvailable = true
-      try {
-        // Chỉ tìm trong tối đa 100 sản phẩm công khai do Data API trả về.
-        const result = await callDataApi('/internal/v1/products?limit=100')
-        if (Array.isArray(result?.products)) products = findRelevantProducts(query, result.products)
-        else catalogAvailable = false
-      } catch {
-        catalogAvailable = false
-      }
+      const catalog = await findCatalogProducts(query)
+      const products = catalog.products
+      const catalogAvailable = catalog.available
+      if (catalogAvailable === false) return res.status(503).json({ success: false, message: 'Chưa thể lấy dữ liệu sản phẩm ShopNova. Bạn hãy thử lại sau.', error: { code: 'DATA_API_UNAVAILABLE' } })
       const ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 5)
       const recentHistory = (context.history || history).map((turn) => ({
         userQuery: turn.isUser ? turn.text : undefined,
@@ -117,6 +120,7 @@ export async function chatWithAi(req, res, next) {
         conversationHistory: [...(brain.conversationHistory || []), ...recentHistory],
         brainProfile: brain.profile,
         catalogProducts: ranked,
+        catalogPartial: catalog.partial,
         consultantInsights,
       })
       if (!response?.reply) {
@@ -128,6 +132,7 @@ export async function chatWithAi(req, res, next) {
         intentTitle: 'Tư vấn mua sắm ShopNova',
         poweredBy: response.modelUsed,
         catalogAvailable,
+        catalogPartial: catalog.partial,
         products: ranked.map((product) => ({
           id: product.id, name: product.name, price: product.price,
           originalPrice: product.originalPrice, rating: product.rating, sold: product.sold,

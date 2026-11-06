@@ -15,6 +15,7 @@ export async function generateGeminiShoppingAdvice({
   conversationHistory = [],
   brainProfile = {},
   catalogProducts = [],
+  catalogPartial = false,
   intent = 'general',
   consultantInsights = null,
   businessContext = null,
@@ -88,6 +89,7 @@ ${consultantNotes.length ? `\n=== PHÂN TÍCH CHUYÊN MÔN TƯ VẤN VIÊN ===\n
 ${businessContext ? JSON.stringify(businessContext) : 'Không có dữ liệu nghiệp vụ riêng.'}
 
 === SẢN PHẨM PHÙ HỢP CÓ SẴN TRONG KHO NOVASHOP ===
+${catalogPartial ? 'Dữ liệu tìm kiếm chưa đầy đủ, không khẳng định toàn bộ danh mục.' : 'Kết quả chỉ thuộc các trang đã truy vấn, không khẳng định toàn bộ danh mục.'}
 ${productContext.length ? JSON.stringify(productContext) : 'Không có dữ liệu sản phẩm phù hợp.'}
 
 === YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG ===
@@ -108,7 +110,8 @@ Dựa trên lịch sử trao đổi và kiến thức chuyên môn, hãy tư duy
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: `${systemInstruction}\n\n${promptText}` }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents: [{ role: 'user', parts: [{ text: promptText }] }],
             generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 400 },
           }),
           redirect: 'error',

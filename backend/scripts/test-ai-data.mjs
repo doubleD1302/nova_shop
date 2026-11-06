@@ -8,6 +8,7 @@ const ids = { buyer: baseId + '1', seller: baseId + '2', admin: baseId + '3', ot
 const brainDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data/ai-brains')
 const brainFiles = Object.values(ids).map(id => path.join(brainDir, `account_${id}.json`))
 for (const file of brainFiles) assert.equal(fs.existsSync(file), false)
+let failCatalog = false
 const dataApi = http.createServer((req, res) => {
   res.setHeader('content-type', 'application/json')
   const auth = req.url.match(/^\/internal\/v1\/users\/(\d+)\/auth-profile$/)
@@ -21,12 +22,13 @@ const dataApi = http.createServer((req, res) => {
     return res.end(JSON.stringify({success:true,data:{orders:[{code:`ORDER-${id}`,status:'shipping'}]}}))
   }
   if (req.url.startsWith('/internal/v1/seller/orders?')) return res.end(JSON.stringify({success:true,data:{summary:{total:1},orders:[]}}))
-  if (req.url === '/internal/v1/admin/users') return res.end(JSON.stringify({success:true,data:{users:[{id:'9',username:'sample',fullName:'Test User',email:'test@example.invalid',phone:'000',role:'buyer',status:'active'}]}}))
+  if (req.url === '/internal/v1/admin/users') return res.end(JSON.stringify({success:true,data:{users:Array.from({length:25}, (_, i) => ({id:String(i + 1),username:`sample${i + 1}`,fullName:`Test User ${i + 1}`,email:'test@example.invalid',phone:'000',role:'buyer',status:'active'}))}}))
   if (req.url.startsWith('/internal/v1/seller/products')) {
     const id = new URL(req.url,'http://localhost').searchParams.get('userId')
     return res.end(JSON.stringify({success:true,data:{total:1,products:[{id, name:`Sản phẩm shop ${id}`, price:100, stock:2,status:'active',approvalStatus:'approved', sensitive:'PRIVATE_SHOULD_NOT_SEND'}]}}))
   }
   if (req.url === '/internal/v1/admin/stats') return res.end(JSON.stringify({success:true,data:{stats:{totalShops:4,totalProducts:5,totalOrders:6,totalCustomers:7,totalRevenue:8},orderStatusCounts:{pending:1},recentOrders:[{recipientName:'PRIVATE_SHOULD_NOT_SEND'}]}}))
+  if (req.url.startsWith('/internal/v1/products') && failCatalog) return res.writeHead(503).end(JSON.stringify({success:false}))
   if (req.url.startsWith('/internal/v1/products')) return res.end(JSON.stringify({ success: true, data: { products: [
     { id: '1', name: 'Tai nghe kiểm thử', price: 199000, categoryName: 'Điện tử', stock: 2, images: [] },
     { id: '2', name: 'Áo kiểm thử', price: 99000, categoryName: 'Thời trang', stock: 1, images: [] },
@@ -57,7 +59,10 @@ try {
   assert.equal(result.status,200)
   assert.equal(result.body.data.products.length,1)
   assert.equal(result.body.data.products[0].id,'1')
+  const shippingProduct = await call('Tìm tai nghe giao hàng')
+  assert.equal(shippingProduct.body.data.intent, 'product_recommendation')
   assert.ok(providerRequest.url.includes('/models/gemini-3.1-flash-lite:generateContent'))
+  assert.ok(providerRequest.body.systemInstruction?.parts?.[0]?.text.includes('ShopNova'))
   assert.ok(JSON.stringify(providerRequest.body).includes('Tai nghe kiểm thử'))
   assert.ok(!JSON.stringify(providerRequest.body).includes('Áo kiểm thử'))
   const order=await call('Đơn hàng của tôi')
@@ -78,7 +83,22 @@ try {
   assert.ok(!myOrders.body.data.reply.includes(`ORDER-${ids.other}`))
   assert.equal((await call('Đơn hàng shop của tôi', ids.seller)).status,200)
   assert.equal((await call('Danh sách khách hàng', ids.admin)).status,200)
+  assert.ok(!JSON.stringify(providerRequest.body).includes('test@example.invalid'))
+  assert.equal((await call('Tra cứu tài khoản mã 25 và email', ids.admin)).status,200)
   assert.ok(JSON.stringify(providerRequest.body).includes('test@example.invalid'))
+  assert.ok(!providerRequest.body.contents[0].parts[0].text.includes('\"phone\"'))
+  assert.ok(JSON.stringify(providerRequest.body).includes('sample25'))
+  assert.ok(!JSON.stringify(providerRequest.body).includes('sample24'))
+  const beforeMissing = providerRequest
+  const missing = await call('Tra cứu tài khoản mã 999', ids.admin)
+  assert.equal(missing.status, 200)
+  assert.ok(missing.body.data.reply.includes('Không tìm thấy'))
+  assert.equal(providerRequest, beforeMissing)
+  failCatalog=true
+  const unavailableCatalog=await call('Tìm tai nghe')
+  assert.equal(unavailableCatalog.status,503)
+  assert.equal(unavailableCatalog.body.error.code,'DATA_API_UNAVAILABLE')
+  failCatalog=false
   failProvider=true
   const unavailable=await call('Tìm tai nghe')
   assert.equal(unavailable.status,503)
