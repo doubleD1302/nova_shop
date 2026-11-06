@@ -1,5 +1,5 @@
 export const validUploadedImage = (value) =>
-  typeof value === 'string' && value.length <= 1024 && /^\/uploads\/[A-Za-z0-9._-]+$/.test(value)
+  typeof value === 'string' && value.length <= 1024 && /^\/uploads\/(?:(?:product|avatar)-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(value)
 
 export function validCommonsImage(image) {
   if (!image || typeof image !== 'object') return false

@@ -599,6 +599,18 @@ export async function saveSellerProduct(req, res, next) {
       const categories = await query(`SELECT id FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1`, [categorySlug])
       if (!categories.length) return { error: 'CATEGORY_NOT_FOUND' }
       let id = productId
+      let existingUrls = new Set()
+      if (productId) {
+        const ownedForImages = await query(`SELECT id FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
+        if (!ownedForImages.length) return { error: 'PRODUCT_NOT_FOUND' }
+        const existingImages = await query('SELECT url FROM product_images WHERE product_id = ? FOR UPDATE', [productId])
+        existingUrls = new Set(existingImages.map((image) => image.url))
+      }
+      const allowedImagePrefixes = [`/uploads/product-${userId}-`, `/uploads/avatar-${userId}-`]
+      if (images.some((image) => validUploadedImage(image.url) && !existingUrls.has(image.url) &&
+          !allowedImagePrefixes.some((prefix) => image.url.startsWith(prefix)))) {
+        return { error: 'INVALID_PRODUCT_IMAGE' }
+      }
       if (productId) {
         const approvalColumns = hasApproval ? 'approval_status, rejection_reason, reviewed_by, reviewed_at' : 'NULL AS approval_status, NULL AS rejection_reason, NULL AS reviewed_by, NULL AS reviewed_at'
         const owned = await query(`SELECT id, category_id, status, ${approvalColumns} FROM products WHERE id = ? AND shop_id = ? AND status <> 'archived' FOR UPDATE`, [productId, shops[0].id])
@@ -698,6 +710,7 @@ export async function saveSellerProduct(req, res, next) {
       return { id: String(id) }
     })
     if (result.error) {
+      if (result.error === 'INVALID_PRODUCT_IMAGE') return res.status(400).json({ success: false, message: 'Ảnh sản phẩm không thuộc tài khoản này.', error: { code: result.error } })
       if (result.error === 'CATEGORY_ATTRIBUTES_CONFIRM_REQUIRED') return res.status(409).json({ success: false, message: 'Cần xác nhận thuộc tính khi đổi danh mục.', error: { code: result.error } })
       if (result.error === 'SHOP_SUSPENDED') {
         return res.status(403).json({

@@ -134,10 +134,30 @@ export async function listSellerProducts(req, res, next) {
 export async function saveSellerProduct(req, res, next) {
   try {
     const productId = req.params.productId
-    const path = productId
+    const images = Array.isArray(req.body?.images) ? req.body.images : []
+    for (const image of images) {
+      if (typeof image?.url !== 'string' || !image.url.startsWith('/uploads/')) continue
+      const filename = image.url.slice('/uploads/'.length)
+      if (!/^(?:(?:product|avatar)-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
+        return res.status(400).json({ success: false, message: 'Ảnh sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_IMAGE' } })
+      }
+      try {
+        const file = env.uploadStorage === 's3' ? await headUploadedImage(filename) : await stat(path.join(env.uploadDir, filename))
+        const size = env.uploadStorage === 's3' ? file.size : file.isFile() ? file.size : 0
+        if (!Number.isSafeInteger(size) || size < 1 || size > 5 * 1024 * 1024) {
+          return res.status(400).json({ success: false, message: 'Ảnh sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_IMAGE' } })
+        }
+      } catch (err) {
+        if (err?.code === 'ENOENT' || err?.name === 'NotFound' || err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
+          return res.status(400).json({ success: false, message: 'Không tìm thấy ảnh sản phẩm.', error: { code: 'INVALID_PRODUCT_IMAGE' } })
+        }
+        return res.status(503).json({ success: false, message: 'Không thể kiểm tra ảnh sản phẩm.', error: { code: 'IMAGE_STORAGE_UNAVAILABLE' } })
+      }
+    }
+    const apiPath = productId
       ? `/internal/v1/seller/products/${encodeURIComponent(productId)}`
       : '/internal/v1/seller/products'
-    const data = await callDataApi(path, {
+    const data = await callDataApi(apiPath, {
       method: productId ? 'PUT' : 'POST',
       body: { ...(req.body || {}), userId: req.user.id },
     })

@@ -95,6 +95,13 @@ try {
   assert.equal((await upload({ purpose: '__proto__', dataUrl: dataUrl('image/png', png) })).status, 400)
   assert.equal((await upload({ purpose: 'product', dataUrl: dataUrl('image/png', png) })).status, 403)
   assert.equal((await upload({ purpose: 'shop', dataUrl: dataUrl('image/png', png) }, 'seller')).status, 201)
+  const productImage = await upload({ purpose: 'product', dataUrl: dataUrl('image/png', png) }, 'seller')
+  assert.equal(productImage.status, 201)
+  assert.match(productImage.json.data.url, /^\/uploads\/product-2-/)
+  assert.equal((await fetch(`http://127.0.0.1:${server.address().port}${productImage.json.data.url}`)).status, 200)
+  const badProduct = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/seller/products`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.seller}` }, body: JSON.stringify({ images: [{ url: '/uploads/product-2-00000000-0000-4000-8000-000000000000.png' }] }) })
+  assert.equal(badProduct.status, 400)
+  assert.equal((await badProduct.json()).error.code, 'INVALID_PRODUCT_IMAGE')
   for (const [purpose, limit, role] of [['avatar', 1, 'buyer'], ['review', 2, 'buyer'], ['product', 5, 'seller']]) {
     assert.equal((await upload({ purpose, dataUrl: dataUrl('image/png', sizedPng(limit * 1024 * 1024)) }, role)).status, 201)
     assert.equal((await upload({ purpose, dataUrl: dataUrl('image/png', sizedPng(limit * 1024 * 1024 + 1)) }, role)).status, 400)

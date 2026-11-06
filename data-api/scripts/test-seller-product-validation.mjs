@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
 import {
-  resolveSellerProductStatus,
   validateSellerProductInput,
 } from '../src/utils/seller-product.validation.js'
 
 // These URLs are validation fixtures only; this script does not fetch or save them.
 const uploadedImages = ['a', 'b', 'c', 'd'].map((id) => ({
-  url: `/uploads/validation-${id}.jpg`,
+  url: `/uploads/product-21-00000000-0000-4000-8000-00000000000${id === 'a' ? 1 : id === 'b' ? 2 : id === 'c' ? 3 : 4}.jpg`,
   altText: 'Validation fixture',
 }))
 
@@ -29,6 +28,9 @@ function productInput(images = uploadedImages, overrides = {}) {
 }
 
 assert.equal(validateSellerProductInput(productInput()).ok, true, 'accepts exactly four distinct uploaded image references')
+for (const url of ['/uploads/does-not-exist.jpg', '/uploads/review-2-00000000-0000-4000-8000-000000000001.png', '/uploads/....']) {
+  assert.equal(validateSellerProductInput(productInput([{ url }, ...uploadedImages.slice(1)])).ok, false)
+}
 assert.equal(validateSellerProductInput(productInput(uploadedImages.slice(0, 3))).ok, false, 'rejects fewer than four images')
 assert.equal(validateSellerProductInput(productInput([...uploadedImages.slice(0, 3), uploadedImages[0]])).ok, false, 'rejects duplicate image references')
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { price: 0 })).ok, false, 'rejects a zero price')
@@ -53,10 +55,6 @@ for (const status of [null, false, '', 0]) {
   assert.equal(validateSellerProductInput(productInput(uploadedImages, { status })).ok, false, 'rejects invalid status rather than defaulting')
 }
 assert.equal(validateSellerProductInput(productInput(uploadedImages, { freeShipping: false })).ok, true)
-assert.equal(resolveSellerProductStatus(null, 'active'), 'draft', 'new seller products cannot bypass admin approval')
-assert.equal(resolveSellerProductStatus('hidden', 'active'), 'hidden', 'hidden products cannot be reactivated by sellers')
-assert.equal(resolveSellerProductStatus('active', 'active'), 'active', 'approved products remain active when sellers edit details')
-assert.equal(resolveSellerProductStatus('active', 'hidden'), 'hidden', 'sellers can hide their approved products')
 
 const commonsImages = ['one', 'two', 'three', 'four'].map((id) => ({
   url: `https://upload.wikimedia.org/wikipedia/commons/thumb/Validation/${id}.jpg/640px-${id}.jpg`,

@@ -11,3 +11,9 @@ Với `purpose=review`, server cấp URL có gắn ID user, giới hạn 2 MiB. 
 Kiểm tra bằng `node scripts/test-upload-policy.mjs` trong `backend/` và `node scripts/test-avatar-policy.mjs` trong `data-api/`. Hai bài dùng mock cho dịch vụ phụ thuộc, không chứng minh MySQL hoặc object storage triển khai thật.
 
 Kiểm tra tích hợp bằng `node data-api/scripts/test-avatar-mysql.mjs` từ root trên MySQL 8 cục bộ riêng. Cần đặt `AVATAR_MYSQL_TEST=1`, `AVATAR_DB_PORT`, `AVATAR_DB_PASSWORD`, tùy chọn `AVATAR_DB_USER` (mặc định `root`). Bài kiểm tra tự tạo rồi xóa database tên `shopnova_test_avatar_<timestamp>` và thư mục ảnh tạm; không dùng `.env` ứng dụng. Bài này chạy Backend → HTTP Data API → MySQL và phục vụ ảnh local; bài object storage dùng server S3 giả lập riêng.
+
+## Ảnh sản phẩm và tương thích client
+
+Ảnh sản phẩm mới cần upload với `purpose: "product"`; URL có dạng `/uploads/product-<userId>-<uuid>.<đuôi>`. Backend kiểm tra object tồn tại, là file và không quá 5 MiB trước khi lưu sản phẩm; Data API kiểm tra URL mới thuộc user đang sửa. Ảnh UUID cũ không mang owner chỉ được giữ lại trên đúng sản phẩm đã có ảnh đó; không được dùng cho sản phẩm khác. URL avatar do cùng seller tải theo client cũ vẫn được chấp nhận trong giai đoạn tương thích. Không tự xóa ảnh mồ côi.
+
+Web seller hiện gửi upload không có `purpose`: ảnh quá 1 MiB nhận URL cũ không mang owner và sẽ không được dùng làm ảnh mới của sản phẩm. Web cần gửi `purpose: "product"` trong task frontend riêng; chưa sửa frontend trong thay đổi Backend này. Ảnh cũ bị mất object sẽ cần tải lại trước khi lưu sản phẩm. Kiểm tra object chỉ phản ánh thời điểm lưu; object có thể bị xóa về sau.
