@@ -65,6 +65,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   // Tabs controller for Detail / Specs / Shipping
   late final TabController _tabController;
+  Map<String, dynamic> _categoryAttributes = {};
 
   @override
   void initState() {
@@ -168,7 +169,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   Future<void> _loadProduct(String id) async {
     setState(() => _isLoading = _product == null);
     final p = await _catalogService.getProductDetail(id);
-    if (mounted && p != null) {
+    final attrRes = await _catalogService.getProductCategoryAttributes(id);
+    if (mounted && attrRes != null && attrRes['values'] is Map) {
+      setState(() {
+        _categoryAttributes = Map<String, dynamic>.from(attrRes['values'] as Map);
+      });
+    }
+    if (mounted && p != null) {
       setState(() {
         _product = p;
         _isLoading = false;
@@ -1205,10 +1212,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   ),
                 ],
               ),
-              // Tab 2: Thông số
+              // Tab 2: Thông số & Thuộc tính ngành hàng
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_categoryAttributes.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFC8E6C9)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified_rounded, color: Color(0xFF2E7D32), size: 14),
+                          SizedBox(width: 6),
+                          Text('Thuộc tính ngành hàng xác thực API', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    ..._categoryAttributes.entries.map((e) {
+                      return _buildDetailRow(_formatAttributeLabel(e.key), '${e.value}');
+                    }),
+                    const SizedBox(height: 8),
+                  ],
                   if (specs.isNotEmpty)
                     ...specs.entries.map((e) => Container(
                           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
@@ -1231,7 +1261,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                             ],
                           ),
                         ))
-                  else ...[
+                  else if (_categoryAttributes.isEmpty) ...[
                     _buildDetailRow('Thương hiệu', p?.shopName ?? 'ShopNova'),
                     _buildDetailRow('Xuất xứ', 'Chính hãng Việt Nam / Nhập khẩu'),
                     _buildDetailRow('Bảo hành', '12 tháng chính hãng'),
@@ -1253,6 +1283,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ],
       ),
     );
+  }
+
+  String _formatAttributeLabel(String key) {
+    switch (key) {
+      case 'brand': return 'Thương hiệu';
+      case 'material': return 'Chất liệu';
+      case 'color': return 'Màu sắc';
+      case 'style': return 'Phong cách';
+      case 'country_of_origin': return 'Xuất xứ';
+      case 'origin': return 'Nguồn gốc';
+      case 'warranty_period': return 'Bảo hành';
+      case 'model': return 'Model';
+      case 'expiry_date': return 'Hạn sử dụng';
+      case 'weight': return 'Trọng lượng';
+      default:
+        return key.replaceAll('_', ' ').split(' ').map((w) => w.isNotEmpty ? (w[0].toUpperCase() + w.substring(1)) : '').join(' ');
+    }
   }
 
   Widget _buildDetailRow(String label, String value) {

@@ -314,6 +314,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  // 8. Hủy đơn hàng từ phía Admin
+  Future<void> _adminCancelOrder(String orderId) async {
+    final res = await _client.patch(
+      '/api/v1/orders/' + orderId + '/cancel',
+      body: {'reason': 'Quản trị viên sàn hủy đơn do vi phạm quy chế.'},
+    );
+    if (!mounted) return;
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã hủy đơn hàng thành công!'), backgroundColor: Colors.green),
+      );
+      _fetchOrders();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Không thể hủy đơn hàng.'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = AuthService().currentUser;
@@ -1064,6 +1083,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final status = o['status'] ?? 'pending';
     final code = o['code'] ?? o['orderNumber'] ?? o['id'];
     final buyer = o['buyerName'] ?? o['recipientName'] ?? 'Khách lẻ';
+    final orderId = o['id']?.toString() ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1073,9 +1093,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           backgroundColor: Colors.blue.shade50,
           child: const Icon(Icons.receipt_rounded, color: Colors.blue),
         ),
-        title: Text('#$code • ${_currencyFormat.format(total)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        subtitle: Text('Khách: $buyer • Shop: ${o['shopName'] ?? "ShopNova"}', style: const TextStyle(fontSize: 11)),
+        title: Text('#' + code.toString() + ' • ' + _currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        subtitle: Text('Khách: ' + buyer.toString() + ' • Shop: ' + (o['shopName'] ?? 'ShopNova').toString(), style: const TextStyle(fontSize: 11)),
         trailing: _buildStatusBadge(status),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Chi tiết đơn #' + code.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Trạng thái: ' + _statusLabel(status), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Text('Khách hàng: ' + buyer.toString()),
+                    if (o['recipientPhone'] != null || o['buyerPhone'] != null)
+                      Text('Số điện thoại: ' + (o['recipientPhone'] ?? o['buyerPhone']).toString()),
+                    if (o['deliveryAddress'] != null || o['recipientAddress'] != null || o['addressDetail'] != null)
+                      Text('Địa chỉ giao: ' + (o['deliveryAddress'] ?? o['recipientAddress'] ?? o['addressDetail'] ?? '').toString()),
+                    const Divider(height: 16),
+                    Text('Gian hàng: ' + (o['shopName'] ?? 'ShopNova').toString()),
+                    Text('Tổng thanh toán: ' + _currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                    if (o['paymentMethod'] != null)
+                      Text('Phương thức: ' + (o['paymentMethod'] == 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản / Ví')),
+                  ],
+                ),
+              ),
+              actions: [
+                if (status == 'pending')
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _adminCancelOrder(orderId);
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                    child: const Text('Hủy đơn hàng'),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Đóng'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1359,6 +1423,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         onSelected: (_) => onSelect(value),
       ),
     );
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'active': return 'Đang hoạt động';
+      case 'delivered': return 'Đã giao hàng';
+      case 'confirmed_violation': return 'Đã xác nhận vi phạm';
+      case 'pending': return 'Chờ duyệt / Chờ xử lý';
+      case 'open': return 'Chờ xử lý';
+      case 'shipping': return 'Đang giao hàng';
+      case 'investigating': return 'Đang xác minh';
+      case 'dismissed': return 'Đã bác bỏ';
+      case 'suspended': return 'Đã tạm khóa';
+      case 'blocked': return 'Đã khóa';
+      case 'cancelled': return 'Đã hủy';
+      default: return status;
+    }
   }
 
   Widget _buildStatusBadge(String status) {

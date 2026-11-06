@@ -10,6 +10,7 @@ import '../../services/upload_service.dart';
 import '../../config/api_config.dart';
 import '../../utils/product_image_resolver.dart';
 import 'seller_register_screen.dart';
+import 'seller_payout_screen.dart';
 import '../../theme/app_colors.dart';
 
 /// Màn hình Kênh Người Bán / Seller Hub (Kết nối trực tiếp Backend API)
@@ -63,7 +64,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadDashboard();
     _loadOrders();
     _loadProducts();
@@ -897,10 +898,12 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                 indicatorSize: TabBarIndicatorSize.tab,
                 labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                isScrollable: true,
                 tabs: const [
                   Tab(text: 'Tổng Quan'),
                   Tab(text: 'Đơn Hàng'),
                   Tab(text: 'Sản Phẩm'),
+                  Tab(text: 'Ví Tiền'),
                   Tab(text: 'Hồ Sơ Shop'),
                 ],
               ),
@@ -915,6 +918,7 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
           _buildDashboardTab(),
           _buildOrdersTab(),
           _buildProductsTab(),
+          const SellerPayoutScreen(),
           _buildShopProfileTab(),
         ],
       ),
@@ -1041,6 +1045,18 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                     subtitle: const Text('Xác nhận và chuẩn bị hàng giao vận', style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
                     trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF8F90A6)),
                     onTap: () => _tabController.animateTo(1),
+                  ),
+                  const Divider(height: 1, indent: 56, color: Color(0xFFEEEEF0)),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Color(0xFFE0F2F1), shape: BoxShape.circle),
+                      child: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF00796B), size: 20),
+                    ),
+                    title: const Text('Ví doanh thu & Nhận tiền', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
+                    subtitle: const Text('Số dư bán hàng, kích hoạt ví và rút tiền mô phỏng', style: TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
+                    trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF8F90A6)),
+                    onTap: () => _tabController.animateTo(3),
                   ),
                 ],
               ),

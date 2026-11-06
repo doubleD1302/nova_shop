@@ -4,6 +4,7 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/upload_service.dart';
 import 'login_screen.dart';
+import 'seller_payout_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
   const SellerMainScreen({super.key});
@@ -41,7 +42,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAll();
   }
 
@@ -762,10 +763,12 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.amber,
           indicatorWeight: 3,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Tổng Quan', icon: Icon(Icons.dashboard_rounded, size: 18)),
             Tab(text: 'Đơn Hàng', icon: Icon(Icons.local_shipping_rounded, size: 18)),
             Tab(text: 'Sản Phẩm', icon: Icon(Icons.inventory_2_rounded, size: 18)),
+            Tab(text: 'Ví Tiền', icon: Icon(Icons.account_balance_wallet_rounded, size: 18)),
             Tab(text: 'Hồ Sơ Shop', icon: Icon(Icons.store_mall_directory_rounded, size: 18)),
           ],
         ),
@@ -776,6 +779,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
           _buildDashboardTab(),
           _buildOrdersTab(),
           _buildProductsTab(),
+          const SellerPayoutScreen(),
           _buildProfileTab(),
         ],
       ),
@@ -896,7 +900,62 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 14),
+            // Thẻ Ví Doanh Thu & Rút Tiền
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00796B), Color(0xFF004D40)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00796B).withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Ví Doanh Thu ShopNova', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        SizedBox(height: 3),
+                        Text('Quản lý số dư bán hàng, kích hoạt ví nhận tiền và rút tiền.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _tabController.animateTo(3),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF00796B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: const Size(0, 34),
+                    ),
+                    child: const Text('Mở ví', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1015,6 +1074,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     final orderId = order['id']?.toString() ?? '';
     final shopOrderId = (order['shopOrderId'] ?? order['id'])?.toString() ?? '';
     final total = ((order['total'] ?? order['totalForShop'] ?? order['totalAmount'] ?? order['totalPrice'] ?? 0) as num).toDouble();
+    final items = (order['items'] as List?) ?? [];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1036,17 +1096,110 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             Text('Khách: ${order['buyerName'] ?? "Khách lẻ"} • SĐT: ${order['buyerPhone'] ?? "N/A"}', style: const TextStyle(fontSize: 12, color: Colors.black87)),
             if (order['buyerAddress'] != null)
               Text('Giao tới: ${order['buyerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.black54), maxLines: 1),
+
+            if (items.isNotEmpty) ...[
+              const Divider(height: 16),
+              ...items.take(3).map((it) {
+                final itMap = it is Map ? it : {};
+                final itName = itMap['name'] ?? itMap['productName'] ?? 'Sản phẩm';
+                final itVariant = itMap['variant'] ?? itMap['variantName'] ?? 'Mặc định';
+                final itQty = itMap['qty'] ?? itMap['quantity'] ?? 1;
+                final itPrice = ((itMap['price'] ?? 0) as num).toDouble();
+                final itImg = (itMap['image'] ?? itMap['imageUrl'] ?? '').toString();
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: itImg.isNotEmpty && (itImg.startsWith('http://') || itImg.startsWith('https://'))
+                              ? Image.network(itImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, size: 20))
+                              : const Icon(Icons.shopping_bag_outlined, size: 20),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(itName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('PL: $itVariant • SL: x$itQty', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                      Text(_currencyFormat.format(itPrice * (itQty as num)), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    ],
+                  ),
+                );
+              }),
+              if (items.length > 3)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('+ thêm ${items.length - 3} sản phẩm khác...', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
+                ),
+            ],
+
             const Divider(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Tổng thanh toán:', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                const Text('Tổng thu gian hàng:', style: TextStyle(fontSize: 12, color: Colors.black54)),
                 Text(_currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red)),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
+                OutlinedButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        title: Text('Đơn #${order['code'] ?? orderId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Người mua: ${order['buyerName'] ?? "Khách lẻ"}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text('Số điện thoại: ${order['buyerPhone'] ?? "N/A"}'),
+                              Text('Địa chỉ giao hàng: ${order['buyerAddress'] ?? "Chưa có"}'),
+                              if (order['note'] != null && order['note'].toString().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text('Ghi chú khách: ${order['note']}', style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.deepOrange)),
+                              ],
+                              const Divider(height: 16),
+                              Text('Tổng tiền: ${_currencyFormat.format(total)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                              const SizedBox(height: 8),
+                              Text('Trạng thái hiện tại: ${_orderStatusLabel(status)}'),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+                        ],
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black87,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  child: const Text('Chi tiết', style: TextStyle(fontSize: 11)),
+                ),
+                const SizedBox(width: 8),
                 if (status == 'pending') ...[
                   Expanded(
                     child: ElevatedButton(
@@ -1059,7 +1212,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                   OutlinedButton(
                     onPressed: () => _updateOrderStatus(shopOrderId, 'cancelled'),
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Hủy đơn', style: TextStyle(fontSize: 12)),
+                    child: const Text('Hủy', style: TextStyle(fontSize: 12)),
                   ),
                 ] else if (status == 'confirmed') ...[
                   Expanded(
@@ -1367,6 +1520,17 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
         onSelected: (_) => onSelect(value),
       ),
     );
+  }
+
+  String _orderStatusLabel(String status) {
+    switch (status) {
+      case 'pending': return 'Chờ xác nhận';
+      case 'confirmed': return 'Chờ lấy hàng';
+      case 'shipping': return 'Đang giao';
+      case 'delivered': return 'Đã giao thành công';
+      case 'cancelled': return 'Đã hủy';
+      default: return status;
+    }
   }
 
   Widget _buildOrderStatusBadge(String status) {

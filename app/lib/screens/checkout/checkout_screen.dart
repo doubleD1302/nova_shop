@@ -301,11 +301,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _appliedVoucherDiscount = 50000.0;
       });
     } else {
-      setState(() {
-        _voucherError = 'Mã giảm giá "$cleanCode" không hợp lệ hoặc đã hết lượt dùng.';
-        _appliedVoucherCode = null;
-        _appliedVoucherDiscount = 0.0;
-      });
+      _validateVoucherWithBackend(cleanCode, subtotal);
       return;
     }
 
@@ -315,6 +311,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         backgroundColor: const Color(0xFF00BFA5),
       ),
     );
+  }
+
+  Future<void> _validateVoucherWithBackend(String cleanCode, double subtotal) async {
+    final rawMethod = _selectedShippingMethod == 'hoatoc'
+        ? 'express'
+        : (_selectedShippingMethod == 'nhanh' ? 'standard' : 'economy');
+
+    final items = _getItems().map((it) {
+      final vId = int.tryParse(it.variantId?.toString() ?? '') ?? 1;
+      return {
+        'variantId': vId,
+        'qty': it.qty,
+      };
+    }).toList();
+
+    final preview = await OrderService().previewOrder(
+      items: items,
+      shippingMethod: rawMethod,
+      voucherCode: cleanCode,
+    );
+
+    if (!mounted) return;
+
+    if (preview != null && preview['discountAmount'] != null && (preview['discountAmount'] as num) > 0) {
+      final discount = (preview['discountAmount'] as num).toDouble();
+      setState(() {
+        _voucherError = null;
+        _appliedVoucherCode = cleanCode;
+        _appliedVoucherDiscount = discount;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Áp dụng mã ' + cleanCode + ' thành công từ API Backend! Giảm ' + _formatVND(discount)),
+          backgroundColor: const Color(0xFF00BFA5),
+        ),
+      );
+    } else {
+      setState(() {
+        _voucherError = 'Mã giảm giá "' + cleanCode + '" không hợp lệ hoặc chưa đủ điều kiện.';
+        _appliedVoucherCode = null;
+        _appliedVoucherDiscount = 0.0;
+      });
+    }
   }
 
   InputDecoration _inputDeco(String label, IconData? icon, {String? hintText}) {

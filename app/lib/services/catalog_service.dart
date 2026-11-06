@@ -531,6 +531,34 @@ class CatalogService {
       query: query,
     );
   }
+
+  /// Lấy danh sách định nghĩa thuộc tính ngành hàng từ Backend
+  /// GET /api/v1/categories/:categorySlug/attributes
+  Future<Map<String, dynamic>?> getCategoryAttributes(String categorySlug) async {
+    try {
+      final res = await _apiClient.get('/api/v1/categories/' + categorySlug + '/attributes');
+      if (res.success && res.data is Map<String, dynamic>) {
+        return res.data as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('[CatalogService] getCategoryAttributes error: ' + e.toString());
+    }
+    return null;
+  }
+
+  /// Lấy giá trị thông số ngành hàng của một sản phẩm cụ thể
+  /// GET /api/v1/products/:id/category-attributes
+  Future<Map<String, dynamic>?> getProductCategoryAttributes(dynamic productId) async {
+    try {
+      final res = await _apiClient.get('/api/v1/products/' + productId.toString() + '/category-attributes');
+      if (res.success && res.data is Map<String, dynamic>) {
+        return res.data as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('[CatalogService] getProductCategoryAttributes error: ' + e.toString());
+    }
+    return null;
+  }
 }
 
 /// Kết quả tìm kiếm sản phẩm kèm metadata phân loại

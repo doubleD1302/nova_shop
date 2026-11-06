@@ -673,6 +673,36 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                 ),
                 Row(
                   children: [
+                    // Nút Hủy đơn (khi đơn còn đang chờ)
+                    if (status == 'pending' || status == 'created' || status.isEmpty) ...[
+                      OutlinedButton(
+                        onPressed: () => _cancelOrder(order['id']?.toString() ?? ''),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 34),
+                        ),
+                        child: const Text('Hủy đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Nút Đã nhận hàng (khi đơn đang vận chuyển)
+                    if (status == 'shipping' || status == 'in_transit') ...[
+                      ElevatedButton(
+                        onPressed: () => _confirmOrderReceived(order['id']?.toString() ?? ''),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 34),
+                        ),
+                        child: const Text('Đã nhận hàng', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     // Nút Đánh Giá Sản Phẩm (Chỉ hiển thị khi đơn đã giao thành công)
                     if (canReview) ...[
                       ElevatedButton.icon(
@@ -739,5 +769,108 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         ],
       ),
     );
+  }
+  Future<void> _confirmOrderReceived(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xác nhận nhận hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: const Text('Bạn xác nhận đã nhận đầy đủ sản phẩm và hàng hóa nguyên vẹn, hài lòng với đơn hàng?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Chưa nhận', style: TextStyle(color: Color(0xFF8F90A6))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+            child: const Text('Đã nhận đủ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await OrderService().confirmOrderReceived(orderId);
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Xác nhận đã nhận hàng thành công. Cảm ơn bạn!'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+          _loadOrders();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể xác nhận lúc này. Vui lòng thử lại sau.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _cancelOrder(String orderId) async {
+    final reasonController = TextEditingController(text: 'Khách hàng đổi ý / Đặt lại');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hủy đơn hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Bạn có chắc chắn muốn hủy đơn hàng này không?', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Lý do hủy đơn',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không hủy', style: TextStyle(color: Color(0xFF8F90A6))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Xác nhận hủy'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await OrderService().cancelOrder(orderId, reason: reasonController.text.trim());
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã hủy đơn hàng thành công.'),
+              backgroundColor: Color(0xFF1E2022),
+            ),
+          );
+          _loadOrders();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể hủy đơn hàng này.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }

@@ -431,4 +431,15 @@ class OrderService {
 
     return response.success;
   }
+
+
+  /// Xác nhận đã nhận được hàng (Người mua)
+  /// POST /api/v1/orders/:orderId/confirm-received
+  Future<bool> confirmOrderReceived(String orderId) async {
+    final response = await _client.post(
+      '/api/v1/orders/' + orderId + '/confirm-received',
+    );
+
+    return response.success;
+  }
 }

@@ -53,10 +53,15 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _loadVouchers() async {
     final list = await VoucherService().getActiveVouchers();
     final saved = await VoucherService().getSavedVoucherCodes();
+    final walletList = await VoucherService().getWalletVouchers();
+    final allSaved = Set<String>.from(saved);
+    for (final v in walletList) {
+      allSaved.add(v.code);
+    }
     if (mounted) {
       setState(() {
         _apiVouchers = list;
-        _savedVouchers = saved;
+        _savedVouchers = allSaved;
       });
     }
   }
@@ -1038,6 +1043,9 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   void _showVouchersModal() {
+    final codeInputController = TextEditingController();
+    bool isSavingCode = false;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -1055,8 +1063,13 @@ class _AccountScreenState extends State<AccountScreen> {
                 ];
 
           return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-            padding: const EdgeInsets.all(20),
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1084,35 +1097,81 @@ class _AccountScreenState extends State<AccountScreen> {
                           children: [
                             Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 13),
                             SizedBox(width: 4),
-                            Text('API Sẵn sàng', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text('API Wallet Live', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // Ô nhập mã lưu vào ví
                   Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.verified_outlined, color: Color(0xFF2E7D32), size: 18),
-                        SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            'Đã kết nối API Voucher ShopNova. Các mã bên dưới có hiệu lực thực tế và tự động khấu trừ khi thanh toán.',
-                            style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.w500),
+                          child: TextField(
+                            controller: codeInputController,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập mã giảm giá (VD: NOVA20K)',
+                              hintStyle: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: InputBorder.none,
+                            ),
                           ),
+                        ),
+                        ElevatedButton(
+                          onPressed: isSavingCode
+                              ? null
+                              : () async {
+                                  final code = codeInputController.text.trim().toUpperCase();
+                                  if (code.isEmpty) return;
+                                  setModalState(() => isSavingCode = true);
+                                  final res = await VoucherService().saveVoucherToWallet(code);
+                                  setModalState(() {
+                                    isSavingCode = false;
+                                    if (res['success'] == true) {
+                                      _savedVouchers.add(code);
+                                      codeInputController.clear();
+                                    }
+                                  });
+                                  setState(() {
+                                    if (res['success'] == true) {
+                                      _savedVouchers.add(code);
+                                    }
+                                  });
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(res['message']?.toString() ?? 'Đã lưu voucher vào ví.'),
+                                        backgroundColor: res['success'] == true ? const Color(0xFF16A34A) : Colors.red,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            minimumSize: const Size(0, 34),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: isSavingCode
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Lưu vào ví', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   ...vouchers.map((v) {
                     final isSaved = _savedVouchers.contains(v.code);
                     return Container(
@@ -1169,7 +1228,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           const SizedBox(width: 8),
                           ElevatedButton(
                             onPressed: () async {
-                              await VoucherService().saveVoucher(v.code);
+                              final res = await VoucherService().saveVoucherToWallet(v.code);
                               setModalState(() {
                                 _savedVouchers.add(v.code);
                               });
@@ -1177,6 +1236,15 @@ class _AccountScreenState extends State<AccountScreen> {
                                 _savedVouchers.add(v.code);
                               });
                               _copyToClipboard(v.code);
+                              if (mounted && res['message'] != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(res['message'].toString()),
+                                    backgroundColor: const Color(0xFF1E2022),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isSaved ? const Color(0xFFE8F5E9) : primaryColor,
