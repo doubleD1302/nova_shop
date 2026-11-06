@@ -296,6 +296,7 @@ class AuthService extends ChangeNotifier {
     String? phone,
     String role = 'buyer',
     String? shopName,
+    String? shopTagline,
   }) async {
     _isLoading = true;
     _lastError = null;
@@ -308,10 +309,13 @@ class AuthService extends ChangeNotifier {
         'fullName': fullName.trim(),
         'role': role,
       };
-      if (email != null && email.trim().isNotEmpty) payload['email'] = email.trim();
+      if (email != null && email.trim().isNotEmpty) payload['email'] = email.trim().toLowerCase();
       if (phone != null && phone.trim().isNotEmpty) payload['phone'] = phone.trim();
       if (role == 'seller' && shopName != null && shopName.trim().isNotEmpty) {
         payload['shopName'] = shopName.trim();
+      }
+      if (role == 'seller' && shopTagline != null && shopTagline.trim().isNotEmpty) {
+        payload['shopTagline'] = shopTagline.trim();
       }
 
       final response = await http

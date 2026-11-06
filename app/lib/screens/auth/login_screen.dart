@@ -430,7 +430,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Mật khẩu', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Quên mật khẩu?', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  GestureDetector(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Tài khoản mẫu: demo_buyer (mật khẩu Buyer@123) hoặc liên hệ 1900 1234'),
+                          backgroundColor: AppColors.primary,
+                        ),
+                      );
+                    },
+                    child: const Text('Quên mật khẩu?', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -601,6 +611,43 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: const Text('Kích hoạt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     )
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              // GỢI Ý TÀI KHOẢN MẪU THỰC TẾ
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.key_rounded, size: 16, color: AppColors.primary),
+                        SizedBox(width: 6),
+                        Text('Tài khoản mẫu thử nghiệm:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.textPrimary)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('demo_buyer / Buyer@123', style: TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        TextButton(
+                          onPressed: () {
+                            _usernameController.text = 'demo_buyer';
+                            _passwordController.text = 'Buyer@123';
+                          },
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 24)),
+                          child: const Text('Tự động điền', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               )

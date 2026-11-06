@@ -138,6 +138,48 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<ApiResponse> registerSeller({
+    required String username,
+    required String password,
+    required String fullName,
+    required String email,
+    String? phone,
+    required String shopName,
+    String? shopTagline,
+  }) async {
+    try {
+      final res = await _api.post('/api/v1/auth/register', body: {
+        'username': username.trim().toLowerCase(),
+        'password': password,
+        'fullName': fullName.trim(),
+        'email': email.trim().toLowerCase(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        'role': 'seller',
+        'shopName': shopName.trim(),
+        if (shopTagline != null && shopTagline.trim().isNotEmpty) 'shopTagline': shopTagline.trim(),
+      });
+
+      if (res.success && res.data != null) {
+        final token = res.data['accessToken'] ?? res.data['token'];
+        final userData = res.data['user'] ?? res.data;
+        if (token != null) {
+          await _api.saveToken(token.toString());
+        }
+        _currentUser = SellerUser.fromJson(userData);
+        _isAuthenticated = true;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
+
+        notifyListeners();
+        return res;
+      }
+      return res;
+    } catch (e) {
+      return ApiResponse.error('Lỗi khi đăng ký gian hàng: ');
+    }
+  }
+
   Future<void> logout() async {
     try {
       await _api.post('/api/v1/auth/logout');

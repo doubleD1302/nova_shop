@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../config/api_config.dart';
 import 'seller_main_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -225,6 +226,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Chưa có gian hàng trên ShopNova? ', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        );
+                      },
+                      child: const Text('Đăng ký ngay', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryColor)),
+                    ),
+                  ],
                 ),
               ],
             ),

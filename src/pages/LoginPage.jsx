@@ -158,7 +158,7 @@ export default function LoginPage() {
         </Link>
         <button
           type="button"
-          onClick={() => pushToast('Vui lòng liên hệ hỗ trợ hoặc dùng tài khoản có sẵn: demo_buyer / demo_seller_a (mật khẩu Buyer123456 / Seller123456)', 'info')}
+          onClick={() => pushToast('Vui lòng liên hệ hỗ trợ hoặc dùng tài khoản có sẵn: demo_buyer / demo_seller_a (mật khẩu Buyer@123 / Seller@123)', 'info')}
           className="text-[#8B7566] transition hover:text-[#BD6E49] cursor-pointer"
         >
           Quên mật khẩu?
