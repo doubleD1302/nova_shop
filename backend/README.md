@@ -414,3 +414,15 @@ Sau khi hoàn thành BE-003A (đăng nhập, lấy thông tin cá nhân và phâ
   - Cơ chế Refresh Token an toàn và thu hồi phiên đăng xuất phía server.
   - Đổi mật khẩu tài khoản và cập nhật thông tin cá nhân.
   - Tích hợp kết nối đăng nhập từ giao diện React Web và Flutter App.
+
+## Nova AI
+
+Nova AI sử dụng duy nhất `gemini-3.1-flash-lite` và nhận khóa từ biến `GEMINI_API_KEY` ở Backend. Web và app gọi `POST /api/v1/ai/chat`; không đặt khóa vào frontend. Khi Gemini không phản hồi, endpoint trả lỗi 503 `AI_UNAVAILABLE`.
+
+Câu hỏi mua sắm sử dụng tối đa 100 sản phẩm công khai do Data API cung cấp, đối chiếu từ khóa rồi chuyển tối đa 5 sản phẩm vào ngữ cảnh. Việc tìm kiếm này có thể bỏ sót sản phẩm ngoài trang dữ liệu được lấy hoặc cách diễn đạt khác. Không dựng sản phẩm mẫu khi Data API không khả dụng.
+
+Phân quyền dựa vào hồ sơ tài khoản hiện hành do Data API trả về, không dựa vào role hay userId trong nội dung client. Khách chưa đăng nhập chỉ truy cập dữ liệu công khai; buyer đăng nhập có thể xem tối đa 5 đơn của chính mình qua API đơn hàng. Người bán có thể hỏi về tối đa 20 sản phẩm hoặc đơn thuộc shop của mình. Admin có thể hỏi thống kê và danh sách tài khoản, đơn hàng, shop, sản phẩm, báo cáo, đánh giá qua các API quản trị; mỗi danh sách đưa tối đa 20 bản ghi gần đây vào ngữ cảnh. Cách nhận biết chủ đề dựa trên một số cụm từ, không bao phủ mọi cách hỏi. Trợ lý chưa có quyền truy cập tùy ý tất cả dữ liệu, chưa hỗ trợ thao tác sửa dữ liệu và không đưa mật khẩu hay token vào ngữ cảnh.
+
+Thông tin quản trị có thể bao gồm tên, email và số điện thoại được gửi cho Gemini khi admin yêu cầu danh sách tương ứng. Kiểm tra chính sách xử lý dữ liệu của gói API trước khi dùng dữ liệu thật. Chỉ dẫn giới hạn lĩnh vực và dữ liệu giúp giảm câu trả lời ngoài phạm vi nhưng không bảo đảm mô hình luôn chính xác.
+
+Kiểm tra: `node scripts/test-ai-data.mjs`, `node scripts/test-ai-keys.mjs`, `node scripts/test-ai-privacy.mjs`. Các bài này dùng dịch vụ giả lập; kiểm tra Gemini và MySQL thật cần thực hiện riêng.

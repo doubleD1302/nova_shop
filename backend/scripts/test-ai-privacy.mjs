@@ -13,6 +13,7 @@ for (const file of files) assert.equal(fs.existsSync(file), false, 'KhÃ´ng ghi Ä
 const dataApi = http.createServer((req, res) => {
   const id = req.url?.match(/^\/internal\/v1\/users\/(\d+)\/auth-profile$/)?.[1]
   res.setHeader('content-type', 'application/json')
+  if (req.url?.startsWith('/internal/v1/orders?')) return res.end(JSON.stringify({ success: true, data: { orders: [] } }))
   if (!id) return res.writeHead(404).end(JSON.stringify({ success: false, error: { code: 'NOT_FOUND' } }))
   return res.end(JSON.stringify({ success: true, data: { user: { id, username: `test${id}`, fullName: 'Test', email: null, phone: null, avatarUrl: null, role: 'buyer', status: 'active', shopId: null, address: null } } }))
 })

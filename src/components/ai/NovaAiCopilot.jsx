@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
+import { useAuth } from '../../context/AuthContext'
 import {
   apiGetAiBrainProfile,
   apiResetAiBrain,
@@ -46,11 +47,23 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const { addItem } = useCart()
+  const { user } = useAuth()
+  const sessionKey = `${user?.id || 'guest'}:${user?.role || 'guest'}`
+  const sessionRef = useRef(sessionKey)
+  sessionRef.current = sessionKey
+
+  useEffect(() => {
+    setMessages(INITIAL_MESSAGES)
+    setInputText('')
+    setIsLoading(false)
+    setBrainMemory({ learnedFacts: [], preferredStyles: [], location: null, stats: { totalInteractions: 0, acceptedRecommendations: 0 } })
+  }, [sessionKey])
 
   // Tải hồ sơ bộ não AI khi mở
   useEffect(() => {
+    const requestedSession = sessionKey
     apiGetAiBrainProfile().then((res) => {
-      if (res?.data?.profile) {
+      if (requestedSession === sessionRef.current && res?.data?.profile) {
         setBrainMemory({
           learnedFacts: res.data.profile.learnedFacts || [],
           preferredStyles: res.data.profile.preferredStyles || [],
@@ -59,7 +72,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         })
       }
     }).catch(() => {})
-  }, [isOpen])
+  }, [isOpen, sessionKey])
 
   // Lắng nghe sự kiện toàn cục để mở Nova AI từ Header hoặc nút bất kỳ
   useEffect(() => {
@@ -87,6 +100,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   }
 
   const handleSendMessage = async (textToSend) => {
+    const requestedSession = sessionRef.current
     const text = (textToSend || inputText).trim()
     if (!text || isLoading) return
 
@@ -109,6 +123,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         text: m.text,
       }))
       const response = await apiSendAiMessage(text, { history: recentHistory })
+      if (requestedSession !== sessionRef.current) return
       const aiData = response?.data || {}
 
       if (aiData.brain) {
@@ -135,83 +150,18 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
 
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Khi Backend API chưa phản hồi (ví dụ máy chủ Render đang khởi động hoặc ngủ đông),
-      // Web tự động kích hoạt tư duy trực tiếp từ Google Gemini API!
-      try {
-        const p1 = 'AQ.Ab8RN6JT1znasy'
-        const p2 = '8nffQNUDMtnBIxz'
-        const p3 = 'hm8gxA9oQWNoLOhjTkg5A'
-        const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || `${p1}${p2}${p3}`
-
-        const habitFacts = brainMemory.learnedFacts?.length ? brainMemory.learnedFacts.slice(-4).join('; ') : 'Khách hàng mới'
-        const historyContext = messages.slice(-4).map((m) => `• ${m.isUser ? 'Khách' : 'Tư vấn viên Nova'}: "${m.text.slice(0, 160)}"`).join('\n')
-        const prompt = `Bạn là Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của sàn thương mại điện tử NovaShop (nhận diện thương hiệu phong cách Terracotta & Kem).
-
-Hồ sơ thói quen & tiêu chuẩn của khách hàng: ${habitFacts}
-
-LỊCH SỬ CÁC CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ:
-${historyContext || 'Đây là câu hỏi đầu tiên.'}
-
-YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG: "${text}"
-
-QUY TẮC TƯ VẤN BẮT BUỘC:
-1. GHI NHỚ LỊCH SỬ TRAO ĐỔI: Nếu câu hỏi là câu hỏi tiếp nối (về giá, size, màu sắc, chống nước, so sánh...), hãy hiểu ngay khách đang nói về sản phẩm ở lượt trước. Kế thừa thông tin, tuyệt đối không hỏi lại những gì khách đã nêu.
-2. TRẢ LỜI NGẮN GỌN & LOGIC: Đi thẳng vào trọng tâm điều khách muốn (khoảng 80 - 130 từ), súc tích, mạch lạc.
-3. CHUYÊN MÔN TƯ VẤN VIÊN: Sử dụng kiến thức về chất liệu, thông số kỹ thuật, form dáng và tính ứng dụng thực tế. Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".`
-
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [{ text: prompt }],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.75,
-                maxOutputTokens: 350,
-              },
-            }),
-          }
-        )
-
-        const geminiData = await geminiRes.json()
-        const dynamicReply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
-
-        if (dynamicReply && dynamicReply.trim()) {
-          const aiMessage = {
-            id: 'ai_gemini_' + Date.now(),
-            isUser: false,
-            text: dynamicReply.trim(),
-            time: timeNow,
-            intentTitle: 'Tư Vấn Mua Sắm Nova AI',
-            intentMatch: 'Khớp 99%',
-            suggestions: QUICK_PROMPTS,
-          }
-          setMessages((prev) => [...prev, aiMessage])
-          return
-        }
-      } catch (geminiErr) {
-        console.warn('Lỗi gọi Gemini trực tiếp trên web:', geminiErr)
-      }
-
-      // Fallback chỉ kích hoạt khi hoàn toàn mất mạng
+      if (requestedSession !== sessionRef.current) return
       const aiMessage = {
         id: 'ai_fallback_' + Date.now(),
         isUser: false,
-        text: `Nova đã nhận câu hỏi "${text}" của bạn. Hiện kết nối mạng chập chờn, bạn vui lòng kiểm tra lại đường truyền internet và thử lại nhé!`,
+        text: 'Nova AI hiện không kết nối được với máy chủ. Bạn vui lòng thử lại sau.',
         time: timeNow,
         intentTitle: 'Nova AI',
-        intentMatch: '95%',
         suggestions: QUICK_PROMPTS,
       }
       setMessages((prev) => [...prev, aiMessage])
     } finally {
-      setIsLoading(false)
+      if (requestedSession === sessionRef.current) setIsLoading(false)
     }
   }
 

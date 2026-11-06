@@ -118,6 +118,8 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
   // Shared session memory so user conversations are preserved across tab switches and app pauses
   static final List<_AiChatMessage> _sessionMessages = [];
+  static String? _sessionOwner;
+  String get _currentOwner => '${AuthService().currentUser?.id ?? 'guest'}:${AuthService().currentUser?.role ?? 'guest'}';
   List<_AiChatMessage> get _messages => _sessionMessages;
 
   static void resetSessionForTest() {
@@ -136,6 +138,11 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    if (_sessionOwner != _currentOwner) {
+      _sessionMessages.clear();
+      _sessionOwner = _currentOwner;
+    }
+    AuthService().addListener(_onAuthChanged);
 
     if (widget.loadDemoIfEmpty && _sessionMessages.isEmpty) {
       // Dành cho chế độ kiểm thử mẫu
@@ -182,6 +189,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
+    AuthService().removeListener(_onAuthChanged);
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -270,9 +278,10 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     });
     _scrollToBottom();
 
+    final requestOwner = _currentOwner;
     _AiChatMessage? aiResponse;
 
-    // 1. Thử gọi API Backend Nova AI (đã tích hợp Gemini + AI Brain)
+    // Gọi Nova AI thông qua Backend.
     try {
       final recentHistory = _messages.take(6).map((m) => {
         'isUser': m.isUser,
@@ -282,7 +291,10 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       final uri = Uri.parse('${ApiConfig.baseUrl}/api/v1/ai/chat');
       final res = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (AuthService().token != null) 'Authorization': 'Bearer ${AuthService().token}',
+        },
         body: jsonEncode({
           'message': query,
           'context': {
@@ -291,7 +303,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           },
           'history': recentHistory,
         }),
-      ).timeout(const Duration(milliseconds: 10000));
+      ).timeout(const Duration(seconds: 30));
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -342,103 +354,19 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         }
       }
     } catch (_) {
-      // Tiếp tục xuống gọi trực tiếp Gemini nếu backend offline
+      // Hiển thị lỗi kết nối bên dưới.
     }
 
-    // 2. Nếu máy chủ chưa phản hồi, kiểm tra API key trực tiếp từ môi trường compile
-    if (aiResponse == null) {
-      try {
-        const envKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-        const p1 = 'AQ.Ab8RN6JT1znasy';
-        const p2 = '8nffQNUDMtnBIxz';
-        const p3 = 'hm8gxA9oQWNoLOhjTkg5A';
-        final geminiKey = envKey.isNotEmpty ? envKey : '$p1$p2$p3';
-        if (geminiKey.isNotEmpty) {
-          final historyTurns = _messages.take(4).map((m) {
-            final shortT = m.text.length > 150 ? '${m.text.substring(0, 150)}...' : m.text;
-            return '• ${m.isUser ? 'Khách' : 'Tư vấn viên Nova'}: "$shortT"';
-          }).join('\n');
-
-          final prompt = 'Bạn là Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của sàn thương mại điện tử NovaShop (nhận diện thương hiệu phong cách Terracotta & Kem).\n'
-              'Hồ sơ thói quen khách hàng: $_activeContextText\n\n'
-              'LỊCH SỬ CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ:\n'
-              '${historyTurns.isNotEmpty ? historyTurns : 'Đây là câu hỏi đầu tiên.'}\n\n'
-              'YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG: "$query"\n\n'
-              'QUY TẮC TƯ VẤN BẮT BUỘC:\n'
-              '1. GHI NHỚ LỊCH SỬ TRAO ĐỔI: Nếu câu hỏi là câu hỏi tiếp nối (về giá, size, màu sắc, chống nước, so sánh...), hãy hiểu ngay khách đang nói về sản phẩm ở lượt trước. Kế thừa thông tin, tuyệt đối không hỏi lại những gì khách đã nêu.\n'
-              '2. TRẢ LỜI NGẮN GỌN & LOGIC: Đi thẳng vào trọng tâm điều khách muốn (khoảng 80 - 130 từ), súc tích, mạch lạc.\n'
-              '3. CHUYÊN MÔN TƯ VẤN VIÊN: Sử dụng kiến thức về chất liệu, thông số kỹ thuật, form dáng và tính ứng dụng thực tế. Tuyệt đối không dùng văn mẫu rập khuôn. Xưng "Nova" và gọi "bạn".';
-
-          final geminiUrl = Uri.parse(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$geminiKey',
-          );
-          final gRes = await http.post(
-            geminiUrl,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'role': 'user',
-                  'parts': [
-                    {
-                      'text': prompt,
-                    }
-                  ]
-                }
-              ],
-            'generationConfig': {
-              'temperature': 0.7,
-              'maxOutputTokens': 350,
-            }
-          }),
-        ).timeout(const Duration(milliseconds: 9000));
-
-        if (gRes.statusCode == 200) {
-          final gDecoded = jsonDecode(gRes.body);
-          final candidates = gDecoded['candidates'] as List<dynamic>?;
-          String? text;
-          if (candidates != null && candidates.isNotEmpty) {
-            final firstCandidate = candidates.first;
-            if (firstCandidate is Map) {
-              final content = firstCandidate['content'];
-              if (content is Map) {
-                final parts = content['parts'];
-                if (parts is List && parts.isNotEmpty) {
-                  final firstPart = parts.first;
-                  if (firstPart is Map) {
-                    text = firstPart['text']?.toString();
-                  }
-                }
-              }
-            }
-          }
-
-          if (text != null && text.trim().isNotEmpty) {
-            aiResponse = _AiChatMessage(
-              isUser: false,
-              text: text.trim(),
-              intentTitle: 'Trợ lý Nova',
-              intentMatch: 'Khớp 99%',
-            );
-          }
-        }
-      }
-      } catch (_) {
-        // Mạng ngoại tuyến hoàn toàn
-      }
-    }
-
-    // 3. Fallback chỉ kích hoạt khi mất toàn bộ kết nối mạng
     if (aiResponse == null) {
       aiResponse = _AiChatMessage(
         isUser: false,
-        text: 'Nova đã lắng nghe câu hỏi "$query" của bạn. Kết nối mạng hiện đang chập chờn, bạn vui lòng kiểm tra lại đường truyền internet và thử lại nhé!',
+        text: 'Nova AI hiện không kết nối được với máy chủ. Bạn vui lòng thử lại sau.',
         intentTitle: 'Thông Báo Kết Nối',
-        intentMatch: '95%',
       );
     }
 
 
+    if (requestOwner != _currentOwner) return;
     if (mounted && aiResponse != null) {
       setState(() {
         _isThinking = false;
@@ -450,6 +378,16 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         _isThinking = false;
       });
     }
+  }
+
+  void _onAuthChanged() {
+    if (_sessionOwner == _currentOwner) return;
+    _sessionOwner = _currentOwner;
+    if (!mounted) return;
+    setState(() {
+      _sessionMessages.clear();
+      _isThinking = false;
+    });
   }
 
   // Dialog Ướm thử ảo (AI Virtual Try-On)

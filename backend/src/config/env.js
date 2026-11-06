@@ -291,7 +291,7 @@ function parseAndValidateEnv() {
       redirectUrl: gatewayUrl('MOMO_REDIRECT_URL', process.env.MOMO_REDIRECT_URL),
       ipnUrl: gatewayUrl('MOMO_IPN_URL', process.env.MOMO_IPN_URL),
     } : null,
-    geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
+    geminiApiKeys: [...new Set([...(process.env.GEMINI_API_KEYS || '').split(','), process.env.GEMINI_API_KEY || ''].map((key) => key.trim()).filter(Boolean))],
   })
 }
 
