@@ -1,6 +1,8 @@
 import { readPagination } from '../utils/pagination.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
+const validBodyId = (value) => (typeof value === 'string' || (typeof value === 'number' && Number.isSafeInteger(value))) && /^[1-9]\d{0,19}$/.test(String(value))
+
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
          err?.code === 'ER_NO_SUCH_TABLE' ||
@@ -22,7 +24,7 @@ export async function createOrderReturn(req, res, next) {
     if (
       !/^[1-9]\d{0,19}$/.test(orderId) ||
       !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
-      !/^[1-9]\d{0,19}$/.test(String(shopOrderId || '')) ||
+      !validBodyId(shopOrderId) ||
       (refundAmount !== undefined && (!Number.isSafeInteger(refundAmount) || refundAmount <= 0)) ||
       typeof reason !== 'string' || !reason.trim() || reason.trim().length > 255 ||
       (detail != null && (typeof detail !== 'string' || detail.trim().length > 2000)) ||

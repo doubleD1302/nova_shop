@@ -702,7 +702,7 @@ export async function createReport(req, res, next) {
     const details = typeof req.body?.details === 'string' ? req.body.details.trim() : ''
     const evidenceUrl = typeof req.body?.evidenceUrl === 'string' && req.body.evidenceUrl.trim().length > 0 ? req.body.evidenceUrl.trim() : null
 
-    if (!validId(userId) || !validId(targetId) || !['shop', 'product', 'user', 'review'].includes(targetType) || reason.length < 3 || reason.length > 2000 ||
+    if (!validId(userId) || !(typeof req.body?.targetId === 'string' || (typeof req.body?.targetId === 'number' && Number.isSafeInteger(req.body.targetId))) || !validId(targetId) || !['shop', 'product', 'user', 'review'].includes(targetType) || reason.length < 3 || reason.length > 2000 ||
         (req.body?.details != null && typeof req.body.details !== 'string') || Buffer.byteLength(details, 'utf8') > 65535 ||
         (req.body?.evidenceUrl != null && typeof req.body.evidenceUrl !== 'string') || (evidenceUrl && evidenceUrl.length > 1024)) {
       return res.status(400).json({ success: false, message: 'Loại đối tượng, mã đối tượng hoặc nội dung báo cáo không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })

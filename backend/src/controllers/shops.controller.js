@@ -3,7 +3,11 @@ import { callDataApi } from '../clients/data.client.js'
 export async function listShops(req, res, next) {
   try {
     const params = new URLSearchParams()
-    for (const key of ['limit', 'offset', 'q', 'mall', 'featured']) {
+    const allowed = ['limit', 'offset', 'q', 'mall', 'featured']
+    if (allowed.some((key) => req.query[key] !== undefined && typeof req.query[key] !== 'string')) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc shop không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    for (const key of allowed) {
       const value = req.query[key]
       if (value !== undefined && value !== '') params.set(key, String(value))
     }

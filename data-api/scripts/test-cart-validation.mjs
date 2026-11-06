@@ -111,6 +111,11 @@ try {
       assert.equal((await invoke(controller.createOrderReturn, { ...base, ...invalid })).status, 400)
       assert.equal(queries.length, before)
     }
+    for (const shopOrderId of [['3'], { id: '3' }, true, Number.MAX_SAFE_INTEGER + 1]) {
+      const before = queries.length
+      assert.equal((await invoke(controller.createOrderReturn, { ...base, shopOrderId })).status, 400)
+      assert.equal(queries.length, before)
+    }
     for (const sellerNote of [false, {}, 'x'.repeat(501)]) {
       assert.equal((await invoke(controller.updateSellerReturnStatus, { userId: '1', status: 'approved', sellerNote }, {}, { returnId: '1' })).status, 400)
     }
@@ -155,6 +160,7 @@ try {
       ['POST', '/internal/cart/sync', { userId: '1', items: [{ variantId: '1', qty: 2, selected: 'false' }] }],
       ['PATCH', '/internal/seller/orders/3/tracking', { userId: '1', trackingCode: 'TRACK', autoAdvanceStatus: 'false' }],
       ['POST', '/internal/orders/2/returns', { userId: '1', shopOrderId: '3', reason: 'Hỏng', refundAmount: 0 }],
+      ['POST', '/internal/orders/2/returns', { userId: '1', shopOrderId: ['3'], reason: 'Hỏng' }],
       ['POST', '/internal/orders', { ...order, items: [{ variantId: '1', qty: true }] }],
     ]
     for (const [method, endpoint, body] of cases) {

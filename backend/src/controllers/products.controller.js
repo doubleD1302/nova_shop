@@ -8,6 +8,9 @@ export async function listProducts(req, res, next) {
   try {
     const params = new URLSearchParams()
     const allowed = ['limit', 'offset', 'categoryId', 'shopId', 'q', 'flash', 'mall', 'freeship', 'minPrice', 'maxPrice', 'minRating', 'minDiscount', 'location', 'sort', 'slug', 'ids', 'fullImages']
+    if (allowed.some((key) => req.query[key] !== undefined && typeof req.query[key] !== 'string')) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
     for (const key of allowed) {
       const value = req.query[key]
       if (value !== undefined && value !== '') params.set(key, String(value))

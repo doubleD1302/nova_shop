@@ -34,7 +34,7 @@ try {
   }
   assert.equal((await call('/chat/conversations/1/messages?userId=1&limit=50&offset=0')).status, 200)
   const report = { userId: '1', targetType: 'shop', targetId: '1', reason: 'Báo cáo' }
-  for (const invalid of [{ evidenceUrl: 'a'.repeat(1025) }, { evidenceUrl: 123 }, { details: 'é'.repeat(32768) }, { details: {} }]) {
+  for (const invalid of [{ evidenceUrl: 'a'.repeat(1025) }, { evidenceUrl: 123 }, { targetId: ['1'] }, { targetId: Number.MAX_SAFE_INTEGER + 1 }, { details: 'é'.repeat(32768) }, { details: {} }]) {
     assert.equal((await call('/reports', { ...report, ...invalid })).status, 400)
   }
   assert.equal((await call('/reports', { ...report, evidenceUrl: '/uploads/a.jpg', details: 'Thông tin bổ sung' })).status, 201)

@@ -1,5 +1,7 @@
 import { callDataApi } from '../clients/data.client.js'
 
+const validBodyId = (value) => (typeof value === 'string' || (typeof value === 'number' && Number.isSafeInteger(value))) && /^[1-9]\d{0,19}$/.test(String(value))
+
 /**
  * Buyer gửi yêu cầu trả hàng / hoàn tiền cho một đơn hàng con
  */
@@ -10,7 +12,7 @@ export async function createOrderReturn(req, res, next) {
 
     if (
       !/^[1-9]\d{0,19}$/.test(orderId) ||
-      !/^[1-9]\d{0,19}$/.test(String(shopOrderId || '')) ||
+      !validBodyId(shopOrderId) ||
       (refundAmount !== undefined && (!Number.isSafeInteger(refundAmount) || refundAmount <= 0)) ||
       typeof reason !== 'string' || !reason.trim() || reason.trim().length > 255 ||
       (detail != null && (typeof detail !== 'string' || detail.trim().length > 2000)) ||

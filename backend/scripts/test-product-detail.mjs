@@ -18,6 +18,9 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}/api/v1/products`
 async function get(key) { const r = await fetch(`${base}/${key}`); return { status: r.status, body: await r.json() } }
 try {
+  assert.equal((await fetch(`${base}?ids=1&ids=2`)).status, 400)
+  assert.equal((await fetch(`${base}?q=one&q=two`)).status, 400)
+  assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/api/v1/shops?limit=1&limit=2`)).status, 400)
   assert.equal((await get('1')).body.data.id, '1')
   assert.equal((await get('demo-product')).body.data.slug, 'demo-product')
   assert.equal((await get('BAD')).status, 400)
