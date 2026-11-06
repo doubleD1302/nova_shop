@@ -4,9 +4,25 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Bài này có xóa/sửa giỏ. Chỉ chạy khi chỉ định rõ database test cục bộ riêng.
+const testPort = Number(process.env.CART_TEST_DB_PORT)
+const testName = process.env.CART_TEST_DB_NAME
+if (process.env.CART_INTEGRATION_TEST !== '1' || !/^shopnova_test_cart_[a-z0-9_]+$/.test(testName || '') ||
+    !Number.isInteger(testPort) || testPort < 1 || testPort > 65535 ||
+    !process.env.CART_TEST_DB_USER || !process.env.CART_TEST_DB_PASSWORD) {
+  console.error('Cần CART_INTEGRATION_TEST=1 và database test cục bộ riêng shopnova_test_cart_* với CART_TEST_DB_PORT, CART_TEST_DB_USER, CART_TEST_DB_PASSWORD.')
+  process.exit(1)
+}
 process.env.NODE_ENV = 'test'
 process.env.PORT = '3000'
-process.env.DOTENV_CONFIG_PATH = path.resolve(__dirname, '../../data-api/.env')
+process.env.DOTENV_CONFIG_PATH = path.resolve(__dirname, 'missing-cart-test.env')
+process.env.DB_HOST = '127.0.0.1'
+process.env.DB_PORT = String(testPort)
+process.env.DB_NAME = testName
+process.env.DB_USER = process.env.CART_TEST_DB_USER
+process.env.DB_PASSWORD = process.env.CART_TEST_DB_PASSWORD
+process.env.DB_SSL_ENABLED = 'false'
+process.env.DATA_API_KEY = 'cart-integration-local-test-service-key'
 
 // 1. Nạp cấu hình Data API trước
 const { env: dataEnv } = await import('../../data-api/src/config/env.js')
