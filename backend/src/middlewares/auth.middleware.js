@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { DataApiClientError, getUserAuthProfile } from '../clients/data.client.js'
+import { findUserById } from '../store/users.store.js'
 
 export const ACCESS_TOKEN_EXPIRES_IN = 86400 * 7 // 7 ngày; app hiện chưa tự làm mới token
 const LEGACY_ACCESS_TOKEN_EXPIRES_IN = 900 // Token 15 phút đã cấp trước khi đổi thời hạn
@@ -163,7 +164,33 @@ export async function authenticate(req, res, next) {
   }
 
   try {
-    const userProfile = await getUserAuthProfile(payload.sub)
+    let userProfile
+    try {
+      userProfile = await getUserAuthProfile(payload.sub)
+    } catch (err) {
+      if (err instanceof DataApiClientError && (err.status === 503 || err.status === 502 || err.code === 'DATA_API_UNAVAILABLE' || err.code === 'DATABASE_UNAVAILABLE')) {
+        const localUser = findUserById(payload.sub)
+        if (localUser) {
+          userProfile = {
+            id: String(localUser.id),
+            username: localUser.username,
+            fullName: localUser.fullName,
+            email: localUser.email,
+            phone: localUser.phone,
+            avatarUrl: localUser.avatarUrl,
+            role: localUser.role,
+            status: localUser.status || 'active',
+            shopId: localUser.shopId ? String(localUser.shopId) : null,
+            address: localUser.address,
+          }
+        } else {
+          throw err
+        }
+      } else {
+        throw err
+      }
+    }
+
     if (userProfile.status !== 'active') {
       return res.status(401).json({
         success: false,

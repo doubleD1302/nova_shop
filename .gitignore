@@ -140,3 +140,7 @@ mcp_config.json
 /scripts/verify-smtp-final.mjs
 /scripts/verify-step2-google-auth.mjs
 /scripts/verify-ui-open-shop.mjs
+
+# Local SQLite database
+*.sqlite
+data-api/data/

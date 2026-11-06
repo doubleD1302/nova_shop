@@ -1,10 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const defaultEnvPath = path.resolve(__dirname, '../../.env')
+
 // Nạp các biến môi trường từ file .env nếu có (cho phép override đường dẫn khi chạy test cô lập)
-dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || undefined })
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || defaultEnvPath })
 
 // Danh sách các giá trị placeholder mẫu không được phép dùng trong cấu hình thực tế
 const FORBIDDEN_PLACEHOLDERS = Object.freeze([
@@ -138,7 +142,9 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
     const trimmedCa = rawCa.trim()
     const resolvedCaPath = path.isAbsolute(trimmedCa)
       ? trimmedCa
-      : path.resolve(process.cwd(), trimmedCa)
+      : (fs.existsSync(path.resolve(process.cwd(), trimmedCa))
+          ? path.resolve(process.cwd(), trimmedCa)
+          : path.resolve(__dirname, '../../', trimmedCa))
 
     if (!fs.existsSync(resolvedCaPath)) {
       fail('[Lỗi cấu hình] File chứng chỉ DB_SSL_CA không tồn tại hoặc không đọc được.')

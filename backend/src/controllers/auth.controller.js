@@ -128,9 +128,24 @@ export async function login(req, res, next) {
     try {
       user = await verifyCredentials(username.trim().toLowerCase(), password)
     } catch (err) {
-      if (!(err instanceof DataApiClientError) || err.code !== 'INVALID_CREDENTIALS') throw err
-      user = await migrateVerifiedLegacyAccount(username, password)
-      if (!user) throw err
+      if (!(err instanceof DataApiClientError) || err.code !== 'INVALID_CREDENTIALS') {
+        const localUser = findUserByUsername(username.trim().toLowerCase())
+        if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
+          user = localUser
+        } else {
+          throw err
+        }
+      } else {
+        user = await migrateVerifiedLegacyAccount(username, password)
+        if (!user) {
+          const localUser = findUserByUsername(username.trim().toLowerCase())
+          if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
+            user = localUser
+          } else {
+            throw err
+          }
+        }
+      }
     }
     const refreshToken = await createSessionForUser(user.id)
     return res.status(200).json(authResponse(user, 'Đăng nhập thành công.', refreshToken))

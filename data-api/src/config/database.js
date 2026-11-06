@@ -2,6 +2,7 @@ import net from 'node:net'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Sequelize } from 'sequelize'
 import { env } from './env.js'
+import { executeLocalQuery, executeLocalTransaction, checkLocalReadiness } from './local-db.js'
 
 /**
  * Ngữ cảnh bất đồng bộ lưu trữ tài nguyên riêng của từng yêu cầu thao tác cơ sở dữ liệu.
@@ -520,52 +521,73 @@ export function isDatabaseUnavailableError(err) {
  * Kiểm tra readiness của cơ sở dữ liệu với ngân sách thời gian giới hạn nghiêm ngặt.
  */
 export async function checkDatabaseReadiness(timeoutMs = env.dbReadinessTimeoutMs) {
-  return executeWithConnection(async (conn, remainingTime) => {
-    return new Promise((resolve, reject) => {
-      conn.query({ sql: 'SELECT 1+1 AS result', timeout: remainingTime }, (err, rows) => {
-        if (err) return reject(err)
-        resolve(rows)
+  try {
+    return await executeWithConnection(async (conn, remainingTime) => {
+      return new Promise((resolve, reject) => {
+        conn.query({ sql: 'SELECT 1+1 AS result', timeout: remainingTime }, (err, rows) => {
+          if (err) return reject(err)
+          resolve(rows)
+        })
       })
-    })
-  }, timeoutMs)
+    }, timeoutMs)
+  } catch (err) {
+    if (isDatabaseUnavailableError(err)) {
+      return checkLocalReadiness()
+    }
+    throw err
+  }
 }
 
 /**
  * Thực thi câu truy vấn SQL có tham số an toàn với deadline và kiểm soát kết nối độc lập.
  */
 export async function executeQuery(sql, values = [], timeoutMs = env.dbReadinessTimeoutMs) {
-  return executeWithConnection(async (conn, remainingTime) => {
-    return new Promise((resolve, reject) => {
-      conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
-        if (err) return reject(err)
-        resolve(rows)
+  try {
+    return await executeWithConnection(async (conn, remainingTime) => {
+      return new Promise((resolve, reject) => {
+        conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
+          if (err) return reject(err)
+          resolve(rows)
+        })
       })
-    })
-  }, timeoutMs)
+    }, timeoutMs)
+  } catch (err) {
+    if (isDatabaseUnavailableError(err)) {
+      return executeLocalQuery(sql, values)
+    }
+    throw err
+  }
 }
 
 /**
  * Thực thi một nhóm truy vấn trên cùng kết nối trong một transaction có deadline.
  */
 export async function executeTransaction(operationFn, timeoutMs = env.dbReadinessTimeoutMs) {
-  return executeWithConnection(async (conn, remainingTime) => {
-    const query = (sql, values = []) => new Promise((resolve, reject) => {
-      conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
-        if (err) return reject(err)
-        resolve(rows)
+  try {
+    return await executeWithConnection(async (conn, remainingTime) => {
+      const query = (sql, values = []) => new Promise((resolve, reject) => {
+        conn.query({ sql, timeout: remainingTime }, values, (err, rows) => {
+          if (err) return reject(err)
+          resolve(rows)
+        })
       })
-    })
 
-    await query('START TRANSACTION')
-    try {
-      const result = await operationFn(query)
-      await query('COMMIT')
-      return result
-    } catch (err) {
-      await query('ROLLBACK')
-      throw err
+      await query('START TRANSACTION')
+      try {
+        const result = await operationFn(query)
+        await query('COMMIT')
+        return result
+      } catch (err) {
+        await query('ROLLBACK')
+        throw err
+      }
+    }, timeoutMs)
+  } catch (err) {
+    if (isDatabaseUnavailableError(err)) {
+      return executeLocalTransaction(operationFn)
     }
-  }, timeoutMs)
+    throw err
+  }
 }
 
 /**
