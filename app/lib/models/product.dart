@@ -234,8 +234,8 @@ class Product {
       soldCount: soldStr,
       badges: badges,
       isFavorite: json['isFavorite'] == true,
-      isFlashSale: json['isFlashSale'] == true || badges.contains('flash') || badges.contains('Flash Sale'),
-      isFeatured: json['isFeatured'] == true,
+      isFlashSale: json['isFlashSale'] == true || json['flash'] == true || badges.contains('flash') || badges.contains('Flash Sale'),
+      isFeatured: json['isFeatured'] == true || json['featured'] == true,
       shopName: sName,
       categoryName: cName,
       description: json['description']?.toString() ?? '',
@@ -249,6 +249,37 @@ class Product {
       stock: stockVal,
       variants: variants,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'imageUrl': imageUrl,
+      'price': price,
+      'originalPrice': originalPrice,
+      'discount': discount,
+      'rating': rating,
+      'soldCount': soldCount,
+      'badges': badges,
+      'isFavorite': isFavorite,
+      'isFlashSale': isFlashSale,
+      'flash': isFlashSale,
+      'isFeatured': isFeatured,
+      'featured': isFeatured,
+      'shopName': shopName,
+      'categoryName': categoryName,
+      'description': description,
+      'images': images,
+      'specs': specs,
+      'emoji': emoji,
+      'location': location,
+      'soldPercent': soldPercent,
+      'categoryId': categoryId,
+      'shopId': shopId,
+      'stock': stock,
+      'variants': variants,
+    };
   }
 }
 

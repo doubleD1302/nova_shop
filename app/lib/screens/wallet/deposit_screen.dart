@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_colors.dart';
+import '../../services/auth_service.dart';
 
 class DepositScreen extends StatefulWidget {
   const DepositScreen({super.key});
@@ -13,7 +14,12 @@ class DepositScreen extends StatefulWidget {
 class _DepositScreenState extends State<DepositScreen> {
   final Color primaryColor = AppColors.primary;
   bool _isBalanceVisible = true;
-  final String _realBalance = "350.000";
+  int _currentBalance = 0;
+  String get _displayBalance {
+    final auth = AuthService();
+    if (!auth.isAuthenticated) return "0";
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '', decimalDigits: 0).format(_currentBalance).trim();
+  }
   
   final TextEditingController _amountController = TextEditingController(text: "500.000");
   final FocusNode _amountFocus = FocusNode();
@@ -27,6 +33,7 @@ class _DepositScreenState extends State<DepositScreen> {
   void initState() {
     super.initState();
     _amountController.addListener(_onAmountChanged);
+    _loadBalance();
   }
 
   @override
@@ -34,6 +41,19 @@ class _DepositScreenState extends State<DepositScreen> {
     _amountController.dispose();
     _amountFocus.dispose();
     super.dispose();
+  }
+
+  
+  Future<void> _loadBalance() async {
+    final auth = AuthService();
+    if (auth.isAuthenticated) {
+      final stats = await auth.fetchUserStats();
+      if (mounted && stats != null && stats['balance'] != null) {
+        setState(() {
+          _currentBalance = (stats['balance'] as num).toInt();
+        });
+      }
+    }
   }
 
   void _onAmountChanged() {
@@ -285,7 +305,7 @@ class _DepositScreenState extends State<DepositScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(_isBalanceVisible ? _realBalance : '••••••••', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+              Text(_isBalanceVisible ? _displayBalance : '••••••••', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
               const SizedBox(width: 4),
               Text('đ', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16, fontWeight: FontWeight.bold)),
             ],
@@ -300,7 +320,7 @@ class _DepositScreenState extends State<DepositScreen> {
                 children: [
                   Text('MÃ SỐ VÍ ĐIỆN TỬ', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 10, letterSpacing: 1)),
                   const SizedBox(height: 2),
-                  const Text('NOVAPAY •••• 6879', style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace', letterSpacing: 2)),
+                  Text('NOVAPAY •••• ' + (AuthService().currentUser?.id.padLeft(4, '0') ?? '6879'), style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace', letterSpacing: 2)),
                 ],
               ),
               Container(

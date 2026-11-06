@@ -53,7 +53,7 @@ class CatalogService {
   CatalogService._internal({http.Client? client}) : _client = client ?? http.Client();
 
   /// Lấy danh sách danh mục sản phẩm từ Backend API (kết hợp đầy đủ 12 ngành hàng giao diện)
-  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = true}) async {
+  Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = false}) async {
     List<CategoryItem> apiCategories = [];
     try {
       final res = await _client.get(
@@ -70,6 +70,7 @@ class CatalogService {
       }
     } catch (_) {}
 
+    if (apiCategories.isNotEmpty && !mergeWebsiteData) return apiCategories;
     if (mergeWebsiteData) {
       // Hợp nhất để luôn hiển thị đầy đủ 12 ngành hàng, ưu tiên dữ liệu từ API
       final categoryMap = <String, CategoryItem>{};
@@ -102,15 +103,15 @@ class CatalogService {
     bool? isFlashSale,
     bool? isFeatured,
     String? filterTab,
-    bool mergeWebsiteData = true,
+    bool mergeWebsiteData = false,
   }) async {
     List<Product> allProducts = [];
 
     try {
       final uri = Uri.parse(ApiConfig.productsUrl).replace(queryParameters: {
         if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
-        if (isFlashSale != null) 'is_flash_sale': isFlashSale ? '1' : '0',
-        if (isFeatured != null) 'is_featured': isFeatured ? '1' : '0',
+        if (isFlashSale != null && isFlashSale) 'flash': '1',
+        if (isFeatured != null && isFeatured) 'featured': '1',
         'limit': '100',
       });
 
@@ -128,22 +129,20 @@ class CatalogService {
       }
     } catch (_) {}
 
-    final productMap = <String, Product>{};
-    if (mergeWebsiteData) {
-      for (final p in WebsiteData.products) {
-        productMap[p.id] = p;
-      }
-    }
-    for (final p in allProducts) {
-      // Giữ lại ảnh sắc nét nếu API trả về sản phẩm không có ảnh
-      if (productMap.containsKey(p.id) && (p.imageUrl.isEmpty || !p.imageUrl.startsWith('http'))) {
-        productMap[p.id] = p.copyWith(imageUrl: productMap[p.id]!.imageUrl);
+    List<Product> result;
+    if (allProducts.isNotEmpty) {
+      if (mergeWebsiteData) {
+        final productMap = <String, Product>{};
+        for (final p in WebsiteData.products) productMap[p.id] = p;
+        for (final p in allProducts) productMap[p.id] = p;
+        result = productMap.values.toList();
       } else {
-        productMap[p.id] = p;
+        result = allProducts;
       }
+    } else {
+      // Dự phòng khi máy chủ ngoại tuyến
+      result = List<Product>.from(WebsiteData.products);
     }
-
-    var result = productMap.values.toList();
 
     // Lọc theo danh mục với bộ so khớp thông minh
     if (categoryId != null && categoryId.isNotEmpty) {
@@ -326,11 +325,17 @@ class CatalogService {
   /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ
   /// GET /api/v1/products/featured
   Future<Map<String, dynamic>> getFeaturedHomeData() async {
-    final response = await _apiClient.get('/api/v1/products/featured');
-    if (response.success && response.data is Map<String, dynamic>) {
-      return response.data as Map<String, dynamic>;
+    try {
+      final flashSale = await getProducts(isFlashSale: true);
+      final all = await getProducts();
+      final featured = all.where((p) => p.isFeatured).toList();
+      return {
+        'flashSale': flashSale.map((p) => p.toJson()).toList(),
+        'featuredProducts': (featured.isNotEmpty ? featured : all).map((p) => p.toJson()).toList(),
+      };
+    } catch (_) {
+      return {'flashSale': [], 'featuredProducts': []};
     }
-    return {'flashSale': [], 'featuredProducts': []};
   }
 
   /// Lấy 8 tiện ích nhanh (QuickLinks) như trên Website

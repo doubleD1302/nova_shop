@@ -135,9 +135,15 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
 
   Future<void> _loadCategories() async {
     final res = await _client.get('/api/v1/categories');
-    if (res.success && res.data is List && mounted) {
+    if (res.success && mounted) {
+      List<dynamic> list = [];
+      if (res.data is List) {
+        list = res.data as List;
+      } else if (res.data is Map && (res.data as Map)['categories'] is List) {
+        list = (res.data as Map)['categories'] as List;
+      }
       setState(() {
-        _categories = List<Map<String, dynamic>>.from(res.data as List);
+        _categories = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       });
     }
   }
