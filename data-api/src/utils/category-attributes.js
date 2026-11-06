@@ -19,16 +19,39 @@ const definitions = {
   'tui-xach': [brand, material, color],
   'phu-kien-cong-nghe': [brand, text('model', 'Mẫu thiết bị'), color],
 }
-export function getCategoryDefinitions(slug) {
-  return { version: 1, attributes: Object.hasOwn(definitions, slug) ? definitions[slug] : [] }
+// Version 1 giữ nguyên để đọc và sửa dữ liệu đã lưu trước đây.
+// Version 2 bổ sung thông tin hiển thị; không thay thế lựa chọn SKU.
+const origin = text('country_of_origin', 'Xuất xứ')
+const warranty = text('warranty', 'Bảo hành')
+const extras = {
+  'thoi-trang-nam': [text('style', 'Kiểu dáng'), origin],
+  'thoi-trang-nu': [text('style', 'Kiểu dáng'), origin],
+  'dien-thoai': [text('device_type', 'Loại thiết bị'), origin, warranty],
+  'may-tinh': [text('device_type', 'Loại thiết bị'), origin, warranty],
+  'thiet-bi-gia-dung': [text('appliance_type', 'Loại thiết bị'), origin, warranty],
+  'sac-dep': [text('product_type', 'Loại sản phẩm'), origin],
+  'my-pham': [text('product_type', 'Loại sản phẩm'), origin],
+  'nha-cua': [text('product_type', 'Loại sản phẩm'), origin],
+  'nha-cua-doi-song': [text('product_type', 'Loại sản phẩm'), origin],
+  'me-be': [text('product_type', 'Loại sản phẩm'), origin],
+  'giay-dep': [text('style', 'Kiểu dáng'), origin],
+  'tui-xach': [text('style', 'Kiểu dáng'), origin],
+  'phu-kien-cong-nghe': [text('product_type', 'Loại sản phẩm'), origin, warranty],
+}
+export function getCategoryDefinitions(slug, version = 2) {
+  if (![1, 2].includes(version)) return null
+  const original = Object.hasOwn(definitions, slug) ? definitions[slug] : []
+  if (version === 1) return { version, attributes: original }
+  return { version, attributes: original.length ? [...original, ...(extras[slug] || [origin])] : [brand, origin] }
 }
 export function validateCategoryAttributes(slug, input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input) || input.version !== 1 ||
+  if (!input || typeof input !== 'object' || Array.isArray(input) || ![1, 2].includes(input.version) ||
       !input.values || typeof input.values !== 'object' || Array.isArray(input.values)) return null
-  const fields = getCategoryDefinitions(slug).attributes
+  const definition = getCategoryDefinitions(slug, input.version)
+  if (!definition) return null
   const values = {}
   for (const [key, value] of Object.entries(input.values)) {
-    const field = fields.find((item) => item.key === key)
+    const field = definition.attributes.find((item) => item.key === key)
     if (!field) return null
     if (field.type === 'text') {
       if (typeof value !== 'string' || !value.trim() || value.trim().length > field.maxLength) return null
@@ -38,5 +61,5 @@ export function validateCategoryAttributes(slug, input) {
       values[key] = value
     }
   }
-  return { version: 1, values }
+  return { version: input.version, values }
 }

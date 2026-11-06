@@ -218,8 +218,10 @@ export async function getCategoryAttributes(req, res, next) {
   try {
     const slug = req.params.categorySlug
     if (!/^[a-z0-9-]{1,160}$/.test(slug)) return res.status(400).json({ success: false, message: 'Danh mục không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const version = req.query.version === undefined ? 2 : Number(req.query.version)
+    if (req.query.version !== undefined && !['1', '2'].includes(req.query.version)) return res.status(400).json({ success: false, message: 'Phiên bản không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     const rows = await executeQuery('SELECT id FROM categories WHERE slug = ? AND is_active = 1', [slug])
     if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy danh mục.', error: { code: 'CATEGORY_NOT_FOUND' } })
-    return res.json({ success: true, data: { categoryId: slug, ...getCategoryDefinitions(slug), example: true } })
+    return res.json({ success: true, data: { categoryId: slug, ...getCategoryDefinitions(slug, version), example: version === 1 } })
   } catch (err) { return next(err) }
 }

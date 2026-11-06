@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import mysql from 'mysql2/promise'
@@ -9,6 +10,7 @@ const port = Number(process.env.CATEGORY_LEGACY_DB_PORT)
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Cổng MySQL test không hợp lệ.')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const name = `shopnova_test_category_legacy_${Date.now()}`
+const uploadDir = await mkdtemp(path.join(tmpdir(), 'shopnova-category-legacy-'))
 const db = await mysql.createConnection({ host: '127.0.0.1', port, user: process.env.CATEGORY_LEGACY_DB_USER || 'root', password: process.env.CATEGORY_LEGACY_DB_PASSWORD, multipleStatements: true })
 let dataServer, backendServer, closeDatabase
 const listen = (app) => new Promise((resolve) => { const server = app.listen(0, '127.0.0.1', () => resolve(server)) })
@@ -27,7 +29,7 @@ try {
   const [[imageAfter]] = await db.query('SELECT id,product_id,url,alt_text,sort_order FROM product_images WHERE product_id=1')
   assert.deepEqual(imageAfter, imageBefore)
 
-  Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: path.join(root, 'missing-category-test.env'), DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: name, DB_USER: process.env.CATEGORY_LEGACY_DB_USER || 'root', DB_PASSWORD: process.env.CATEGORY_LEGACY_DB_PASSWORD, DB_SSL_ENABLED: 'false', DATA_API_KEY: 'wallet-test-service-key', JWT_SECRET: 'wallet-test-jwt-secret-at-least-32-characters' })
+  Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: path.join(root, 'missing-category-test.env'), DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: name, DB_USER: process.env.CATEGORY_LEGACY_DB_USER || 'root', DB_PASSWORD: process.env.CATEGORY_LEGACY_DB_PASSWORD, DB_SSL_ENABLED: 'false', UPLOAD_STORAGE: 'local', UPLOAD_DIR: uploadDir, DATA_API_KEY: 'wallet-test-service-key', JWT_SECRET: 'wallet-test-jwt-secret-at-least-32-characters' })
   const dataApp = (await import(pathToFileURL(path.join(root, 'data-api/src/app.js')))).default
   ;({ closeDatabase } = await import(pathToFileURL(path.join(root, 'data-api/src/config/database.js'))))
   dataServer = await listen(dataApp)
@@ -52,11 +54,19 @@ try {
   assert.equal((await call('PUT', '/seller/shop', { name: 'Shop mẫu', province: 'Hà Nội' }, '2')).status, 200)
   let result = await call('GET', '/categories/thoi-trang-nam/attributes')
   assert.equal(result.status, 200, JSON.stringify(result))
-  assert.equal(result.body.data.version, 1)
-  assert.equal(result.body.data.example, true)
+  assert.equal(result.body.data.version, 2)
+  assert.equal(result.body.data.example, false)
+  assert.equal((await call('GET', '/categories/thoi-trang-nam/attributes?version=1')).body.data.version, 1)
   assert.ok(result.body.data.attributes.some((item) => item.key === 'material'))
   assert.equal((await call('GET', '/categories/khong-co/attributes')).status, 404)
-  const product = { name: 'Test', categoryId: 'thoi-trang-nam', description: 'Mô tả', price: 120000, stock: 0, images: [1, 2, 3, 4].map((i) => ({ url: `/uploads/test-${i}.jpg` })) }
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWNYffb96rPvGSAUAEJCCZ0WY1CJAAAAAElFTkSuQmCC'
+  const images = []
+  for (let i = 0; i < 4; i++) {
+    const uploaded = await call('POST', '/uploads/images', { purpose: 'product', dataUrl: `data:image/png;base64,${png}` }, '2')
+    assert.equal(uploaded.status, 201, JSON.stringify(uploaded))
+    images.push({ url: uploaded.body.data.url })
+  }
+  const product = { name: 'Test', categoryId: 'thoi-trang-nam', description: 'Mô tả', price: 120000, stock: 0, images }
   const get = (id, user = '2') => call('GET', `/seller/products/${id}/category-attributes`, undefined, user)
   const save = (body, user = '2') => call('PUT', '/seller/products/1', body, user)
   assert.equal((await get('1')).status, 200)
@@ -69,7 +79,7 @@ try {
   assert.deepEqual(result.body.data.values, { brand: 'Mẫu', material: 'Cotton' })
   const [[original]] = await db.query('SELECT specs FROM products WHERE id = 1')
   assert.ok(JSON.stringify(original.specs).includes('Cotton'))
-  for (const categoryAttributes of [null, {}, { version: 2, values: {} }, { version: 1, values: [] }, { version: 1, values: { unknown: 'x' } }, { version: 1, values: { material: false } }, { version: 1, values: { material: 'x'.repeat(121) } }]) {
+  for (const categoryAttributes of [null, {}, { version: 3, values: {} }, { version: 1, values: [] }, { version: 1, values: { unknown: 'x' } }, { version: 1, values: { material: false } }, { version: 1, values: { material: 'x'.repeat(121) } }]) {
     assert.equal((await save({ ...product, categoryAttributes })).status, 400)
   }
   assert.deepEqual((await get('1')).body.data.values, { brand: 'Mẫu', material: 'Cotton' })
@@ -101,4 +111,7 @@ try {
   if (closeDatabase) await closeDatabase()
   await db.query(`DROP DATABASE IF EXISTS \`${name}\``)
   await db.end()
+  assert.equal(path.dirname(uploadDir), path.resolve(tmpdir()))
+  assert.ok(path.basename(uploadDir).startsWith('shopnova-category-legacy-'))
+  await rm(uploadDir, { recursive: true })
 }

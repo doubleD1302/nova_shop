@@ -66,7 +66,10 @@ export async function getCategoryAttributes(req, res, next) {
   try {
     const slug = req.params.categorySlug
     if (!/^[a-z0-9-]{1,160}$/.test(slug)) return res.status(400).json({ success: false, message: 'Danh mục không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
-    const data = await callDataApi(`/internal/v1/categories/${encodeURIComponent(slug)}/attributes`)
+    const version = req.query.version
+    if (version !== undefined && !['1', '2'].includes(version)) return res.status(400).json({ success: false, message: 'Phiên bản không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const suffix = version ? `?version=${encodeURIComponent(version)}` : ''
+    const data = await callDataApi(`/internal/v1/categories/${encodeURIComponent(slug)}/attributes${suffix}`)
     return res.json({ success: true, data })
   } catch (err) { return next(err) }
 }

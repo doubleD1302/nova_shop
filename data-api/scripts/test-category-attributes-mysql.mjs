@@ -46,8 +46,10 @@ try {
   }
   let result = await call('GET', '/categories/thoi-trang-nam/attributes')
   assert.equal(result.status, 200, JSON.stringify(result))
-  assert.equal(result.body.data.version, 1)
-  assert.equal(result.body.data.example, true)
+  assert.equal(result.body.data.version, 2)
+  assert.equal(result.body.data.example, false)
+  assert.equal((await call('GET', '/categories/thoi-trang-nam/attributes?version=1')).body.data.version, 1)
+  assert.equal((await call('GET', '/categories/thoi-trang-nam/attributes?version=3')).status, 400)
   assert.ok(result.body.data.attributes.some((item) => item.key === 'material'))
   assert.equal((await call('GET', '/categories/khong-co/attributes')).status, 404)
   const png = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWNYffb96rPvGSAUAEJCCZ0WY1CJAAAAAElFTkSuQmCC'
@@ -66,6 +68,10 @@ try {
   const save = (body, user = '2') => call('PUT', '/seller/products/1', body, user)
   assert.equal((await get('1')).status, 200)
   assert.deepEqual((await get('1')).body.data.values, {})
+  assert.equal((await save({ ...product, categoryAttributes: { version: 2, values: { style: 'Áo thun', country_of_origin: 'Việt Nam' } } })).status, 200)
+  const latestAttributes = await get('1')
+  assert.equal(latestAttributes.body.data.version, 2)
+  assert.deepEqual(latestAttributes.body.data.values, { style: 'Áo thun', country_of_origin: 'Việt Nam' })
   assert.equal((await get('1', '3')).status, 404)
   assert.equal((await save({ ...product, categoryAttributes: { version: 1, values: {} } }, '1')).status, 403)
   assert.equal((await save({ ...product, categoryAttributes: { version: 1, values: {} } }, '3')).status, 404)
@@ -74,7 +80,7 @@ try {
   assert.deepEqual(result.body.data.values, { brand: 'Mẫu', material: 'Cotton' })
   const [[original]] = await db.query('SELECT specs FROM products WHERE id = 1')
   assert.ok(JSON.stringify(original.specs).includes('Cotton'))
-  for (const categoryAttributes of [null, {}, { version: 2, values: {} }, { version: 1, values: [] }, { version: 1, values: { unknown: 'x' } }, { version: 1, values: { material: false } }, { version: 1, values: { material: 'x'.repeat(121) } }]) {
+  for (const categoryAttributes of [null, {}, { version: 3, values: {} }, { version: 1, values: [] }, { version: 1, values: { unknown: 'x' } }, { version: 1, values: { material: false } }, { version: 1, values: { material: 'x'.repeat(121) } }]) {
     assert.equal((await save({ ...product, categoryAttributes })).status, 400)
   }
   assert.deepEqual((await get('1')).body.data.values, { brand: 'Mẫu', material: 'Cotton' })
