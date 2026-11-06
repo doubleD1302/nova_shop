@@ -118,7 +118,12 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
     setIsLoading(true)
 
     try {
-      const recentHistory = messages.slice(-6).map((m) => ({
+      const recentMessages = messages.slice(-5)
+      if (/^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(text)) {
+        const originalQuestion = [...messages].reverse().find((m) => m.isUser && !/^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(m.text))
+        if (originalQuestion && !recentMessages.includes(originalQuestion)) recentMessages.unshift(originalQuestion)
+      }
+      const recentHistory = recentMessages.map((m) => ({
         isUser: m.isUser,
         text: m.text,
       }))

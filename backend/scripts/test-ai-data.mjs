@@ -19,10 +19,24 @@ const dataApi = http.createServer((req, res) => {
   }
   if (req.url.startsWith('/internal/v1/orders?')) {
     const id = new URL(req.url, 'http://localhost').searchParams.get('userId')
-    return res.end(JSON.stringify({success:true,data:{orders:[{code:`ORDER-${id}`,status:'shipping'}]}}))
+    const offset = Number(new URL(req.url, 'http://localhost').searchParams.get('offset'))
+    return res.end(JSON.stringify({success:true,data:{orders:offset ? [] : [{code:`ORDER-${id}`,status:'shipping'}],total:1}}))
   }
   if (req.url.startsWith('/internal/v1/seller/orders?')) return res.end(JSON.stringify({success:true,data:{summary:{total:1},orders:[]}}))
-  if (req.url === '/internal/v1/admin/users') return res.end(JSON.stringify({success:true,data:{users:Array.from({length:25}, (_, i) => ({id:String(i + 1),username:`sample${i + 1}`,fullName:`Test User ${i + 1}`,email:'test@example.invalid',phone:'000',role:'buyer',status:'active'}))}}))
+  if (req.url.startsWith('/internal/v1/ai/admin/search?')) {
+    const params = new URL(req.url, 'http://localhost').searchParams
+    assert.equal(params.get('actorId'), ids.admin)
+    if (params.get('resource') === 'orders') {
+      const items = params.get('id') === '40' ? [{orderId:'40',code:'ORD-TEST',shopName:'Shop thử',total:100,status:'shipping'}] : []
+      return res.end(JSON.stringify({success:true,data:{items,total:items.length,offset:0,limit:20,hasMore:false}}))
+    }
+    let items = Array.from({length:725}, (_, i) => ({id:String(i + 1),username:`sample${i + 1}`,fullName:`Test User ${i + 1}`,email:'test@example.invalid',phone:'000',role:'buyer',status:'active'}))
+    if (params.has('id')) items = items.filter(item => item.id === params.get('id'))
+    const total = items.length
+    const offset = Number(params.get('offset'))
+    items = items.slice(offset, offset + 20)
+    return res.end(JSON.stringify({success:true,data:{items,total,offset,limit:20,hasMore:offset + items.length < total}}))
+  }
   if (req.url.startsWith('/internal/v1/seller/products')) {
     const id = new URL(req.url,'http://localhost').searchParams.get('userId')
     return res.end(JSON.stringify({success:true,data:{total:1,products:[{id, name:`Sản phẩm shop ${id}`, price:100, stock:2,status:'active',approvalStatus:'approved', sensitive:'PRIVATE_SHOULD_NOT_SEND'}]}}))
@@ -32,7 +46,7 @@ const dataApi = http.createServer((req, res) => {
   if (req.url.startsWith('/internal/v1/products')) return res.end(JSON.stringify({ success: true, data: { products: [
     { id: '1', name: 'Tai nghe kiểm thử', price: 199000, categoryName: 'Điện tử', stock: 2, images: [] },
     { id: '2', name: 'Áo kiểm thử', price: 99000, categoryName: 'Thời trang', stock: 1, images: [] },
-  ] } }))
+  ], total: 2 } }))
   return res.writeHead(404).end(JSON.stringify({ success: false }))
 })
 await new Promise(resolve => dataApi.listen(0, '127.0.0.1', resolve))
@@ -81,6 +95,9 @@ try {
   const myOrders=await call('Đơn hàng của tôi', ids.buyer, {userId:ids.other})
   assert.ok(myOrders.body.data.reply.includes(`ORDER-${ids.buyer}`))
   assert.ok(!myOrders.body.data.reply.includes(`ORDER-${ids.other}`))
+  const buyerPage2 = await call('Đơn hàng của tôi trang 2', ids.buyer)
+  assert.equal(buyerPage2.body.data.pagination.page,2)
+  assert.ok(buyerPage2.body.data.reply.includes('Không có đơn hàng ở trang này'))
   assert.equal((await call('Đơn hàng shop của tôi', ids.seller)).status,200)
   assert.equal((await call('Danh sách khách hàng', ids.admin)).status,200)
   assert.ok(!JSON.stringify(providerRequest.body).includes('test@example.invalid'))
@@ -89,6 +106,19 @@ try {
   assert.ok(!providerRequest.body.contents[0].parts[0].text.includes('\"phone\"'))
   assert.ok(JSON.stringify(providerRequest.body).includes('sample25'))
   assert.ok(!JSON.stringify(providerRequest.body).includes('sample24'))
+  assert.equal((await call('Đơn hàng toàn sàn mã đơn 40', ids.admin)).status,200)
+  assert.ok(JSON.stringify(providerRequest.body).includes('ORD-TEST'))
+  assert.equal((await call('Tra cứu tài khoản mã 700', ids.admin)).status,200)
+  assert.ok(JSON.stringify(providerRequest.body).includes('sample700'))
+  const page31 = await call('Danh sách khách hàng trang 31', ids.admin)
+  assert.equal(page31.status,200)
+  assert.deepEqual(page31.body.data.pagination,{page:31,total:725,hasMore:true})
+  assert.ok(JSON.stringify(providerRequest.body).includes('sample601'))
+  const followup = await call('trang 31', ids.admin, {history:[{isUser:true,text:'Danh sách khách hàng'}]})
+  assert.deepEqual(followup.body.data.pagination,{page:31,total:725,hasMore:true})
+  assert.equal((await call('trang 31', ids.buyer, {history:[{isUser:true,text:'Danh sách khách hàng'}]})).status,403)
+  assert.equal((await call('Danh sách khách hàng trang 0', ids.admin)).status,400)
+  assert.equal((await call('Danh sách khách hàng trang 12345678901234567890', ids.admin)).status,400)
   const beforeMissing = providerRequest
   const missing = await call('Tra cứu tài khoản mã 999', ids.admin)
   assert.equal(missing.status, 200)

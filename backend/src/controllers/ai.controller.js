@@ -24,93 +24,95 @@ export async function chatWithAi(req, res, next) {
 
     const userKey = extractUserKey(req)
     if (!req.user) guestKey = userKey
-    const { brain, newlyLearned, consultantInsights } = aiBrainService.learnFromMessage(userKey, query)
-    const lower = query.toLowerCase()
-    const sellerQuestion = ['shop của tôi', 'cửa hàng của tôi', 'gian hàng của tôi', 'sản phẩm của tôi', 'sản phẩm shop', 'đơn hàng shop', 'đơn hàng của shop'].some((text) => lower.includes(text))
-    const adminQuestion = ['tra cứu tài khoản', 'tra cứu khách hàng', 'tra cứu người dùng', 'thống kê sàn', 'tổng quan sàn', 'toàn sàn', 'quản trị sàn', 'danh sách khách hàng', 'danh sách người dùng', 'danh sách tài khoản', 'danh sách shop', 'danh sách gian hàng', 'danh sách sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((text) => lower.includes(text))
+    const turns = context.history || history
+    const previousQuestion = [...turns].reverse().find(turn => turn.isUser && !/^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(turn.text))?.text || ''
+    const isPageFollowUp = /^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(query)
+    const searchQuery = isPageFollowUp && previousQuestion ? `${previousQuestion} ${query}` : query
+    const lower = searchQuery.toLowerCase()
+    const sellerQuestion = ['shop của tôi', 'shop của mình', 'cửa hàng của tôi', 'cửa hàng của mình', 'gian hàng của tôi', 'sản phẩm của tôi', 'sản phẩm shop', 'sản phẩm trong shop', 'đơn hàng shop', 'đơn hàng của shop', 'đơn shop'].some((text) => lower.includes(text))
+    const adminQuestion = (req.user?.role === 'admin' && ['khách hàng', 'người dùng', 'tài khoản'].some(term => lower.includes(term))) || ['tra cứu tài khoản', 'tra cứu khách hàng', 'tra cứu người dùng', 'thống kê sàn', 'tổng quan sàn', 'toàn sàn', 'quản trị sàn', 'danh sách khách hàng', 'danh sách người dùng', 'danh sách tài khoản', 'danh sách shop', 'danh sách gian hàng', 'danh sách sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((text) => lower.includes(text))
     const isOrderQuestion = ['đơn hàng', 'đơn của tôi', 'mã đơn', 'vận đơn'].some((text) => lower.includes(text))
     const privilegedQuestion = sellerQuestion || adminQuestion
+    const pageMatch = query.toLowerCase().match(/\btrang\s+(\d+)\b/)
+    const page = pageMatch ? Number(pageMatch[1]) : 1
+    const offset = (page - 1) * 20
+    if (!Number.isSafeInteger(offset) || page < 1) return res.status(400).json({ success: false, message: 'Trang không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    if (privilegedQuestion) {
+      const allowed = adminQuestion ? req.user?.role === 'admin' : req.user?.role === 'seller'
+      if (!allowed) return res.status(req.user ? 403 : 401).json({ success: false, message: 'Bạn không có quyền xem dữ liệu này.', error: { code: req.user ? 'FORBIDDEN' : 'AUTH_REQUIRED' } })
+    }
+    const { brain, newlyLearned, consultantInsights } = aiBrainService.learnFromMessage(userKey, query)
     let aiResult
 
     if (privilegedQuestion) {
-      const role = req.user?.role
-      const allowed = adminQuestion ? role === 'admin' : role === 'seller'
-      if (!allowed) {
-        return res.status(req.user ? 403 : 401).json({ success: false, message: 'Bạn không có quyền xem dữ liệu này.', error: { code: req.user ? 'FORBIDDEN' : 'AUTH_REQUIRED' } })
-      }
       let businessContext
-      const idMatch = query.match(/(?:#|mã\s*(?:số)?\s*)([1-9]\d{0,19})/i)
+      const idMatch = searchQuery.match(/(?:#|mã\s*(?:(?:số|đơn(?:\s+hàng)?|tài\s+khoản|sản\s+phẩm)\s*)?)([1-9]\d{0,19})/i)
       const emailMatch = lower.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)
-      const phoneMatch = query.match(/\b0\d{8,10}\b/)
-      const selectRecords = (records, idField = 'id') => {
-        const matching = records.filter((record) => {
-          if (idMatch && String(record[idField]) !== idMatch[1]) return false
-          if (emailMatch && String(record.email || record.ownerEmail || '').toLowerCase() !== emailMatch[0]) return false
-          if (phoneMatch && String(record.phone || record.ownerPhone || record.recipientPhone || '') !== phoneMatch[0]) return false
-          return true
-        })
-        return matching.slice(0, 20)
-      }
+      const phoneMatch = searchQuery.match(/\b0\d{8,10}\b/)
+      const codeMatch = searchQuery.match(/\bORD-[A-Za-z0-9-]{1,28}\b/i)
       const includeEmail = lower.includes('email') || lower.includes('liên hệ')
       const includePhone = lower.includes('điện thoại') || lower.includes('liên hệ')
-      if (adminQuestion && ['khách hàng', 'người dùng', 'tài khoản'].some((term) => lower.includes(term))) {
-        const result = await callDataApi('/internal/v1/admin/users')
-        if (!Array.isArray(result?.users)) throw new Error('Invalid admin users')
-        businessContext = { note: 'Tra cứu trong tối đa 500 tài khoản gần đây; mỗi lượt tối đa 20 kết quả', users: selectRecords(result.users).map((user) => ({ id: user.id, username: user.username, fullName: user.fullName, ...(includeEmail ? { email: user.email } : {}), ...(includePhone ? { phone: user.phone } : {}), role: user.role, status: user.status })) }
-      } else if (adminQuestion && lower.includes('đơn hàng')) {
-        const result = await callDataApi('/internal/v1/admin/orders')
-        if (!Array.isArray(result?.orders)) throw new Error('Invalid admin orders')
-        businessContext = { note: 'Tra cứu trong tối đa 200 đơn shop gần đây; mỗi lượt tối đa 20 kết quả', orders: selectRecords(result.orders, 'orderId').map((order) => ({ orderId: order.orderId, code: order.code, recipientName: order.recipientName, ...(includePhone ? { recipientPhone: order.recipientPhone } : {}), shopName: order.shopName, total: order.total, status: order.status })) }
-      } else if (adminQuestion && ['danh sách shop', 'danh sách gian hàng', 'sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((term) => lower.includes(term))) {
+      const includeAddress = lower.includes('địa chỉ')
+      if (adminQuestion && ['khách hàng', 'người dùng', 'tài khoản', 'đơn hàng', 'danh sách shop', 'danh sách gian hàng', 'sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((term) => lower.includes(term))) {
         let resource
         let fields
-        if (lower.includes('sản phẩm')) { resource = 'products'; fields = ['id', 'name', 'shopName', 'price', 'stock', 'status', 'approvalStatus'] }
-        else if (lower.includes('báo cáo')) { resource = 'reports'; fields = ['id', 'targetType', 'targetName', 'shopName', 'reason', 'details', 'status'] }
+        if (['khách hàng', 'người dùng', 'tài khoản'].some(term => lower.includes(term))) { resource = 'users'; fields = ['id', 'username', 'fullName', ...(includeEmail ? ['email'] : []), ...(includePhone ? ['phone'] : []), 'role', 'status'] }
+        else if (lower.includes('đơn hàng')) { resource = 'orders'; fields = ['orderId', 'shopOrderId', 'code', 'recipientName', ...(includePhone ? ['recipientPhone'] : []), ...(includeAddress ? ['address', 'province', 'district', 'ward'] : []), 'shopName', 'total', 'status'] }
+        else if (lower.includes('sản phẩm')) { resource = 'products'; fields = ['id', 'name', 'shopName', 'status', 'description', 'specs', 'price', 'stock'] }
+        else if (lower.includes('báo cáo')) { resource = 'reports'; fields = ['id', 'targetType', 'targetId', 'shopId', 'reason', 'details', 'status'] }
         else if (lower.includes('đánh giá')) { resource = 'reviews'; fields = ['id', 'productName', 'shopName', 'username', 'rating', 'comment', 'status'] }
-        else { resource = 'shops'; fields = ['id', 'name', 'ownerName', ...(includeEmail ? ['ownerEmail'] : []), ...(includePhone ? ['ownerPhone'] : []), 'status', 'productCount'] }
-        const result = await callDataApi(`/internal/v1/admin/${resource}`)
-        if (!Array.isArray(result?.[resource])) throw new Error('Invalid admin resource')
-        businessContext = { note: 'Tra cứu trong tối đa 500 bản ghi gần đây; mỗi lượt tối đa 20 kết quả', [resource]: selectRecords(result[resource]).map((item) => Object.fromEntries(fields.filter((key) => item[key] !== undefined).map((key) => [key, item[key]]))) }
+        else { resource = 'shops'; fields = ['id', 'name', 'ownerName', 'description', ...(includeAddress ? ['address', 'location'] : []), ...(includeEmail ? ['ownerEmail'] : []), ...(includePhone ? ['ownerPhone'] : []), 'status'] }
+        const params = new URLSearchParams({ actorId: String(req.user.id), resource, limit: '20', offset: String(offset) })
+        if (idMatch) params.set('id', idMatch[1])
+        if (emailMatch) params.set('email', emailMatch[0])
+        if (phoneMatch) params.set('phone', phoneMatch[0])
+        if (codeMatch && resource === 'orders') params.set('code', codeMatch[0].toUpperCase())
+        const result = await callDataApi(`/internal/v1/ai/admin/search?${params}`)
+        if (!Array.isArray(result?.items) || !Number.isSafeInteger(result.total) || typeof result.hasMore !== 'boolean') throw new Error('Invalid admin search')
+        businessContext = { note: resource === 'orders' ? 'Mỗi bản ghi là đơn của một shop; một đơn tổng có thể có nhiều bản ghi. Chỉ có dữ liệu trang hiện tại.' : 'Dữ liệu chỉ thuộc trang được yêu cầu. Không suy đoán bản ghi của trang khác.', page, total: result.total, hasMore: result.hasMore, [resource]: result.items.map(item => Object.fromEntries(fields.filter(key => item[key] !== undefined).map(key => [key, item[key]]))) }
       } else if (adminQuestion) {
         const result = await callDataApi('/internal/v1/admin/stats')
         if (!result?.stats || !result?.orderStatusCounts) throw new Error('Invalid admin stats')
         const keys = ['totalShops', 'totalProducts', 'totalOrders', 'totalCustomers', 'totalRevenue']
         const statuses = ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled']
-        businessContext = { stats: Object.fromEntries(keys.filter((key) => Number.isFinite(result.stats[key])).map((key) => [key, result.stats[key]])), orderStatusCounts: Object.fromEntries(statuses.filter((key) => Number.isFinite(result.orderStatusCounts[key])).map((key) => [key, result.orderStatusCounts[key]])) }
+        businessContext = { stats: Object.fromEntries(keys.filter(key => Number.isFinite(result.stats[key])).map(key => [key, result.stats[key]])), orderStatusCounts: Object.fromEntries(statuses.filter(key => Number.isFinite(result.orderStatusCounts[key])).map(key => [key, result.orderStatusCounts[key]])) }
       } else if (lower.includes('đơn hàng')) {
-        const result = await callDataApi(`/internal/v1/seller/orders?userId=${encodeURIComponent(req.user.id)}&limit=20`)
+        const result = await callDataApi(`/internal/v1/seller/orders?userId=${encodeURIComponent(req.user.id)}&limit=20&offset=${offset}`)
         if (!result?.summary || !Array.isArray(result.orders)) throw new Error('Invalid seller orders')
-        businessContext = { summary: result.summary, orders: result.orders.slice(0, 20).map((order) => ({ code: order.code, status: order.status, total: order.total, createdAt: order.createdAt })) }
+        businessContext = { page, total: result.total, hasMore: offset + result.orders.length < result.total, summary: result.summary, orders: result.orders.map(order => ({ code: order.code, status: order.status, total: order.total, createdAt: order.createdAt })) }
       } else {
-        const result = await callDataApi(`/internal/v1/seller/products?userId=${encodeURIComponent(req.user.id)}&limit=100`)
+        const result = await callDataApi(`/internal/v1/seller/products?userId=${encodeURIComponent(req.user.id)}&limit=20&offset=${offset}`)
         if (!Array.isArray(result?.products)) throw new Error('Invalid seller products')
-        businessContext = { total: result.total, products: result.products.slice(0, 20).map((product) => ({ id: product.id, name: product.name, price: product.price, stock: product.stock, status: product.status, approvalStatus: product.approvalStatus })) }
+        businessContext = { page, total: result.total, hasMore: offset + result.products.length < result.total, products: result.products.map(product => ({ id: product.id, name: product.name, price: product.price, stock: product.stock, status: product.status, approvalStatus: product.approvalStatus })) }
       }
-      const selectedRecords = adminQuestion && (idMatch || emailMatch || phoneMatch)
+      const pagination = Number.isSafeInteger(businessContext.total) && typeof businessContext.hasMore === 'boolean'
+        ? { page, total: businessContext.total, hasMore: businessContext.hasMore }
+        : undefined
+      const selectedRecords = adminQuestion && (idMatch || emailMatch || phoneMatch || codeMatch)
         ? Object.values(businessContext).find(Array.isArray)
         : null
       if (selectedRecords && selectedRecords.length === 0) {
-        aiResult = { reply: 'Không tìm thấy bản ghi phù hợp trong phạm vi dữ liệu đã truy vấn. Vui lòng kiểm tra mã hoặc tìm trong trang quản trị.', intent: 'business_info', intentTitle: 'Tra cứu quản trị', products: [] }
+        aiResult = { reply: 'Không tìm thấy bản ghi phù hợp tại trang được yêu cầu. Vui lòng kiểm tra thông tin hoặc trang khác.', intent: 'business_info', intentTitle: 'Tra cứu quản trị', products: [], pagination }
       } else {
         const response = await generateGeminiShoppingAdvice({ query, businessContext })
         if (!response?.reply) return res.status(503).json({ success: false, message: 'Nova AI tạm thời không khả dụng. Bạn hãy thử lại sau.', error: { code: 'AI_UNAVAILABLE' } })
-        aiResult = { reply: response.reply, intent: 'business_info', intentTitle: adminQuestion ? 'Tổng quan ShopNova' : 'Gian hàng của bạn', poweredBy: response.modelUsed, products: [] }
+        aiResult = { reply: response.reply, intent: 'business_info', intentTitle: adminQuestion ? 'Tổng quan ShopNova' : 'Gian hàng của bạn', poweredBy: response.modelUsed, products: [], pagination }
       }
     } else if (isOrderQuestion) {
       if (!req.user) {
         aiResult = { reply: 'Bạn hãy đăng nhập và mở mục Đơn hàng để xem trạng thái đơn của mình.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [] }
       } else {
-        const result = await callDataApi(`/internal/v1/orders?userId=${encodeURIComponent(req.user.id)}&limit=5`)
-        if (!Array.isArray(result?.orders)) throw new Error('Invalid orders')
+        const result = await callDataApi(`/internal/v1/orders?userId=${encodeURIComponent(req.user.id)}&limit=20&offset=${offset}`)
+        if (!Array.isArray(result?.orders) || !Number.isSafeInteger(result.total)) throw new Error('Invalid orders')
         const orders = result.orders.map((order) => `${order.code}: ${order.status}`).join('; ')
-        aiResult = { reply: orders ? `Các đơn gần đây của bạn: ${orders}. Bạn có thể xem chi tiết trong mục Đơn hàng.` : 'Bạn chưa có đơn hàng để hiển thị.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [] }
+        aiResult = { reply: orders ? `Các đơn của bạn: ${orders}. Bạn có thể xem chi tiết trong mục Đơn hàng.` : result.total ? 'Không có đơn hàng ở trang này.' : 'Bạn chưa có đơn hàng để hiển thị.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [], pagination: { page, total: result.total, hasMore: offset + result.orders.length < result.total } }
       }
     } else {
-      const catalog = await findCatalogProducts(query)
+      const catalog = await findCatalogProducts(searchQuery, page)
       const products = catalog.products
       const catalogAvailable = catalog.available
       if (catalogAvailable === false) return res.status(503).json({ success: false, message: 'Chưa thể lấy dữ liệu sản phẩm ShopNova. Bạn hãy thử lại sau.', error: { code: 'DATA_API_UNAVAILABLE' } })
-      const ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 5)
+      const ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 15)
       const recentHistory = (context.history || history).map((turn) => ({
         userQuery: turn.isUser ? turn.text : undefined,
         aiReply: turn.isUser ? undefined : turn.text,
@@ -121,6 +123,8 @@ export async function chatWithAi(req, res, next) {
         brainProfile: brain.profile,
         catalogProducts: ranked,
         catalogPartial: catalog.partial,
+        catalogPage: page,
+        catalogHasMore: catalog.hasMore,
         consultantInsights,
       })
       if (!response?.reply) {
@@ -133,12 +137,20 @@ export async function chatWithAi(req, res, next) {
         poweredBy: response.modelUsed,
         catalogAvailable,
         catalogPartial: catalog.partial,
+        catalogPage: page,
+        catalogHasMore: catalog.hasMore,
         products: ranked.map((product) => ({
           id: product.id, name: product.name, price: product.price,
           originalPrice: product.originalPrice, rating: product.rating, sold: product.sold,
           mall: product.shopMall, imageUrl: product.images?.[0]?.url, categoryName: product.categoryName,
         })),
       }
+    }
+    if (aiResult.pagination) {
+      const { total, hasMore } = aiResult.pagination
+      aiResult.reply += `\nTrang ${page}; tổng số bản ghi: ${total}. ${hasMore ? `Bạn có thể hỏi trang ${page + 1}.` : 'Không còn trang tiếp theo.'}`
+    } else if (aiResult.intent === 'product_recommendation' && aiResult.catalogAvailable === true) {
+      aiResult.reply += `\nTrang ${page}. ${aiResult.catalogHasMore === true ? `Bạn có thể hỏi trang ${page + 1}.` : aiResult.catalogHasMore === false ? 'Không còn trang tiếp theo trong kết quả đã tìm.' : 'Một phần kết quả tìm kiếm chưa khả dụng.'}`
     }
     if (!privilegedQuestion && !isOrderQuestion) aiBrainService.recordConversationTurn(userKey, { userQuery: query, aiReply: aiResult.reply, intent: aiResult.intent, products: aiResult.products })
     aiResult.brain = {

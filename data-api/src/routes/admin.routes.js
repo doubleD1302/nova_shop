@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { searchAdmin } from '../controllers/ai-admin.controller.js'
 import {
   createReport,
   getAdminStats,
@@ -24,6 +25,7 @@ import {
 
 const router = Router()
 
+router.get('/ai/admin/search', searchAdmin)
 router.get('/admin/stats', getAdminStats)
 router.get('/admin/orders', listAdminOrders)
 router.get('/admin/users', listAdminUsers)

@@ -283,7 +283,17 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
 
     // Gọi Nova AI thông qua Backend.
     try {
-      final recentHistory = _messages.take(6).map((m) => {
+      final pageQuery = RegExp(r'^\s*(?:xem\s+)?trang\s+\d+\s*$', caseSensitive: false);
+      final recentMessages = _messages.reversed.take(5).toList().reversed.toList();
+      if (pageQuery.hasMatch(query)) {
+        for (final message in _messages.reversed) {
+          if (message.isUser && !pageQuery.hasMatch(message.text)) {
+            if (!recentMessages.contains(message)) recentMessages.insert(0, message);
+            break;
+          }
+        }
+      }
+      final recentHistory = recentMessages.map((m) => {
         'isUser': m.isUser,
         'text': m.text,
       }).toList();

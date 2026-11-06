@@ -9,10 +9,11 @@ const dataApi = http.createServer((req, res) => {
   requests.push(q)
   res.setHeader('content-type', 'application/json')
   if (failing.has(q)) return res.writeHead(503).end(JSON.stringify({ success: false, message: 'Tạm ngưng' }))
+  const offset = Number(url.searchParams.get('offset'))
   const products = q === 'tai' || q === 'nghe'
     ? [{ id: '201', name: 'Tai nghe thật', categoryName: 'Điện tử' }]
-    : []
-  return res.end(JSON.stringify({ success: true, data: { products } }))
+    : q === 'balo' ? [{ id: String(offset + 1), name: 'Balo kiểm thử', categoryName: 'Túi' }] : []
+  return res.end(JSON.stringify({ success: true, data: { products, total: q === 'balo' ? 1002 : products.length } }))
 })
 await new Promise(resolve => dataApi.listen(0, '127.0.0.1', resolve))
 Object.assign(process.env, { NODE_ENV: 'test', DOTENV_CONFIG_PATH: 'missing-ai-catalog-test.env', DATA_API_URL: `http://127.0.0.1:${dataApi.address().port}`, DATA_API_KEY: 'ai-catalog-test-service-key', JWT_SECRET: 'ai-catalog-test-jwt-secret-32-characters' })
@@ -32,6 +33,9 @@ try {
   const down = await findCatalogProducts('Tìm tai nghe')
   assert.equal(down.available, false)
   assert.equal(down.partial, true)
+  const deepPage = await findCatalogProducts('Tìm balo trang 101', 101)
+  assert.equal(deepPage.products[0].id, '501')
+  assert.equal(deepPage.hasMore, true)
   const count = requests.length
   const noKeywords = await findCatalogProducts('giúp tôi')
   assert.deepEqual(noKeywords.products, [])

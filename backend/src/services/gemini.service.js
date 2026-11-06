@@ -16,6 +16,8 @@ export async function generateGeminiShoppingAdvice({
   brainProfile = {},
   catalogProducts = [],
   catalogPartial = false,
+  catalogPage = 1,
+  catalogHasMore = null,
   intent = 'general',
   consultantInsights = null,
   businessContext = null,
@@ -26,7 +28,7 @@ export async function generateGeminiShoppingAdvice({
   }
 
   // Chỉ cung cấp dữ liệu sản phẩm nhận được từ Data API.
-  const productContext = (catalogProducts || []).slice(0, 5).map((product) => ({
+  const productContext = (catalogProducts || []).slice(0, 15).map((product) => ({
     id: product.id,
     name: product.name,
     price: product.price,
@@ -89,6 +91,7 @@ ${consultantNotes.length ? `\n=== PHÂN TÍCH CHUYÊN MÔN TƯ VẤN VIÊN ===\n
 ${businessContext ? JSON.stringify(businessContext) : 'Không có dữ liệu nghiệp vụ riêng.'}
 
 === SẢN PHẨM PHÙ HỢP CÓ SẴN TRONG KHO NOVASHOP ===
+Trang hiện tại: ${catalogPage}. ${catalogHasMore === true ? 'Còn kết quả ở trang tiếp theo.' : catalogHasMore === false ? 'Không còn kết quả ở trang tiếp theo trong các truy vấn đã chạy.' : 'Chưa xác định còn trang tiếp theo hay không.'}
 ${catalogPartial ? 'Dữ liệu tìm kiếm chưa đầy đủ, không khẳng định toàn bộ danh mục.' : 'Kết quả chỉ thuộc các trang đã truy vấn, không khẳng định toàn bộ danh mục.'}
 ${productContext.length ? JSON.stringify(productContext) : 'Không có dữ liệu sản phẩm phù hợp.'}
 
