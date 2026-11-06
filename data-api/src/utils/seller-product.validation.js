@@ -70,10 +70,3 @@ export function validateSellerProductInput({ body = {}, userId, productId = null
     value: { name, categorySlug, description, price, originalPrice, stock, images, status },
   }
 }
-
-export function resolveSellerProductStatus(currentStatus, requestedStatus) {
-  if (requestedStatus === 'active' && currentStatus !== 'active') {
-    return currentStatus || 'draft'
-  }
-  return requestedStatus
-}

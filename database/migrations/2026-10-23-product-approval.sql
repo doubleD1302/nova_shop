@@ -8,12 +8,12 @@
 -- ==============================================================================
 
 ALTER TABLE products
-  ADD COLUMN approval_status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' AFTER status,
+  ADD COLUMN approval_status ENUM('pending', 'approved', 'rejected') NULL DEFAULT NULL AFTER status,
   ADD COLUMN rejection_reason VARCHAR(1000) NULL DEFAULT NULL AFTER approval_status,
   ADD COLUMN reviewed_by BIGINT UNSIGNED NULL DEFAULT NULL AFTER rejection_reason,
   ADD COLUMN reviewed_at DATETIME(3) NULL DEFAULT NULL AFTER reviewed_by,
   ADD CONSTRAINT fk_products_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id);
 
--- Bảo toàn 39 sản phẩm gốc hiện tại của sàn đã hoạt động: đặt approval_status = 'approved'
-UPDATE products SET approval_status = 'approved', reviewed_at = CURRENT_TIMESTAMP(3) WHERE status = 'active';
+-- Sản phẩm cũ giữ NULL: chưa có bằng chứng duyệt. Sản phẩm mới mặc định chờ duyệt.
+ALTER TABLE products MODIFY COLUMN approval_status ENUM('pending', 'approved', 'rejected') NULL DEFAULT 'pending';
 

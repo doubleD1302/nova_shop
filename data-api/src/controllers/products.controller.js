@@ -3,7 +3,6 @@ import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import {
-  resolveSellerProductStatus,
   validUploadedImage,
   validateSellerProductInput,
 } from '../utils/seller-product.validation.js'
@@ -62,7 +61,7 @@ export async function listProducts(req, res, next) {
       "s.status = 'active'",
       "shop_owner.status = 'active'",
       'c.is_active = 1',
-      ...(hasApprovalStatusColumn ? ["p.approval_status = 'approved'"] : []),
+      ...(hasApprovalStatusColumn ? ["(p.approval_status = 'approved' OR p.approval_status IS NULL)"] : []),
     ]
     const params = []
     const categoryId = String(req.query.categoryId || '').trim()
@@ -274,7 +273,7 @@ export async function listProductReviews(req, res, next) {
        FROM reviews r
        JOIN users u ON u.id = r.user_id AND u.status = 'active'
        JOIN order_items oi ON oi.id = r.order_item_id
-       JOIN products p ON p.id = r.product_id AND p.status = 'active' ${approved ? "AND p.approval_status = 'approved'" : ''}
+       JOIN products p ON p.id = r.product_id AND p.status = 'active' ${approved ? "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)" : ''}
        JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
        JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
        WHERE r.product_id = ? AND r.status = 'visible'
@@ -619,20 +618,12 @@ export async function saveSellerProduct(req, res, next) {
           const previous = await query('SELECT product_id FROM product_category_attributes WHERE product_id = ? FOR UPDATE', [productId])
           if (previous.length) return { error: 'CATEGORY_ATTRIBUTES_CONFIRM_REQUIRED' }
         }
-        let nextApprovalStatus = owned[0].approval_status
-        let nextRejectionReason = owned[0].rejection_reason
-        let nextReviewedBy = owned[0].reviewed_by || null
-        let nextReviewedAt = owned[0].reviewed_at || null
-        if (owned[0].approval_status === 'rejected') {
-          nextApprovalStatus = 'pending'
-          nextRejectionReason = null
-          nextReviewedBy = null
-          nextReviewedAt = null
-        }
-        let nextStatus = resolveSellerProductStatus(owned[0].status, status)
-        if (hasApproval && nextApprovalStatus !== 'approved' && nextStatus === 'active') {
-          nextStatus = 'draft'
-        }
+        // Nội dung seller gửi lại phải qua kiểm duyệt trước khi tiếp tục bán.
+        const nextApprovalStatus = 'pending'
+        const nextRejectionReason = null
+        const nextReviewedBy = null
+        const nextReviewedAt = null
+        const nextStatus = status === 'hidden' ? 'hidden' : 'draft'
         if (hasApproval) {
           await query(
             `UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ?, approval_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND shop_id = ?`,
@@ -779,7 +770,7 @@ export async function getPublicCategoryAttributes(req, res, next) {
       FROM products p JOIN shops s ON s.id = p.shop_id JOIN users owner ON owner.id = s.owner_id
       JOIN categories c ON c.id = p.category_id LEFT JOIN product_category_attributes a ON a.product_id = p.id
       WHERE p.id = ? AND p.status = 'active' AND s.status = 'active' AND owner.status = 'active' AND c.is_active = 1
-      ${approved ? "AND p.approval_status = 'approved'" : ''}`, [productId])
+      ${approved ? "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)" : ''}`, [productId])
     if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.', error: { code: 'PRODUCT_NOT_FOUND' } })
     return res.json({ success: true, data: { categoryId: rows[0].slug, version: Number(rows[0].definition_version || 1), values: parseJson(rows[0].attribute_values, {}) } })
   } catch (err) { return next(err) }

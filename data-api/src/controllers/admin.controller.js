@@ -330,7 +330,7 @@ export async function listAdminProducts(req, res, next) {
           name: row.name,
           description: row.description || '',
           status: row.status,
-          approvalStatus: row.approval_status || 'pending',
+          approvalStatus: row.approval_status ?? null,
           rejectionReason: row.rejection_reason || null,
           reviewedAt: row.reviewed_at instanceof Date ? row.reviewed_at.toISOString() : (row.reviewed_at ? String(row.reviewed_at) : null),
           flash: Boolean(row.is_flash_sale),

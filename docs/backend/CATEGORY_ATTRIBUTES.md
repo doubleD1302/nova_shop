@@ -12,3 +12,5 @@ Các giá trị được lưu riêng tại `product_category_attributes`; không
 Kiểm thử `node data-api/scripts/test-category-attributes-mysql.mjs` trên MySQL 8 cục bộ riêng với `CATEGORY_TEST=1`, `CATEGORY_DB_PORT`, `CATEGORY_DB_PASSWORD`; tùy chọn `CATEGORY_DB_USER`. Test tạo và xóa database test riêng, không dùng database ứng dụng. Frontend và runtime triển khai chưa nằm trong phạm vi này.
 
 Với schema cũ chưa có các cột kiểm duyệt sản phẩm và lý do khóa shop, luồng seller vẫn đọc/sửa sản phẩm đúng owner, tạo sản phẩm mới ở trạng thái draft, và trả `approvalStatus: null` thay vì tự khẳng định đã duyệt. Khả năng kiểm duyệt đầy đủ vẫn cần migration kiểm duyệt riêng; cần rà trạng thái và dữ liệu trước khi áp dụng.
+
+Khi seller lưu thay đổi sản phẩm, sản phẩm về `draft` (hoặc giữ `hidden` nếu yêu cầu ẩn) và `approvalStatus: pending` nếu schema có kiểm duyệt; thông tin duyệt cũ được xóa. Với schema cũ chưa có cột duyệt, sản phẩm cũng về draft và cần migration kiểm duyệt trước khi có thể duyệt lại. Việc cập nhật giá hoặc tồn kho qua endpoint lưu sản phẩm này cũng cần duyệt lại.
