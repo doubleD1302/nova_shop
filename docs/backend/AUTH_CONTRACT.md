@@ -6,7 +6,7 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
 
 - **Tiền tố đường dẫn**: `/api/v1/auth`
 - **Định dạng dữ liệu**: `application/json; charset=utf-8`
-- **Thời hạn Access Token**: 15 phút (900 giây).
+- **Thời hạn Access Token**: 7 ngày (604800 giây). Token 15 phút đã cấp vẫn được chấp nhận tới khi hết hạn. App chưa tự làm mới token; cần hoàn thiện việc này trước khi rút ngắn hạn token.
 - **Thuật toán JWT**: `HS256`, ký bởi `JWT_SECRET` (bắt buộc sinh từ ít nhất 32 byte ngẫu nhiên độc lập bằng crypto, mã hóa hex/base64).
 - **Cơ chế Refresh Token & Quản lý Phiên (BE-003B)**:
   - Sinh chuỗi ngẫu nhiên cryptographically secure 40 bytes (hex 80 ký tự).
@@ -20,8 +20,8 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
   - `sub`: Bắt buộc là chuỗi số nguyên dương chuẩn trong phạm vi `BIGINT UNSIGNED` (từ `1` đến `18446744073709551615`), biểu thức chính quy `/^[1-9]\d*$/`. Tuyệt đối không chứa khoảng trắng, không có số 0 ở đầu, không ký tự lạ. Token có `sub` không chuẩn bị từ chối với HTTP 401 `AUTH_INVALID` ngay lập tức mà **không gọi sang Data API upstream**.
   - `role`: Vai trò người dùng (`buyer` hoặc `seller`) tại thời điểm phát hành (Backend không tin cậy `role` trong token mà luôn tra cứu quyền mới nhất từ Data API tại thời điểm xử lý request).
   - `iat`: Thời điểm phát hành (epoch seconds, số nguyên dương).
-  - `exp`: Thời điểm hết hạn (`iat + 900`, số nguyên dương).
-  - `clockTolerance`: Cho phép sai lệch đồng hồ tối đa 60 giây (`CLOCK_SKEW_TOLERANCE_SECONDS = 60`). Token có `exp - iat` chênh lệch quá 60 giây so với 900 giây bị từ chối HTTP 401 `AUTH_INVALID`.
+  - `exp`: Thời điểm hết hạn (`iat + 604800` với token mới, số nguyên dương).
+  - `clockTolerance`: Cho phép sai lệch đồng hồ tối đa 60 giây (`CLOCK_SKEW_TOLERANCE_SECONDS = 60`). Chấp nhận `exp - iat` đúng 604800 giây hoặc đúng 900 giây đối với token cũ còn hạn; thời hạn khác bị từ chối HTTP 401 `AUTH_INVALID`.
 - **Phân quyền vai trò**:
   - `buyer`: Người mua hàng thông thường.
   - `seller`: Người bán hàng (có gian hàng `shops`). `seller` kế thừa toàn bộ quyền của `buyer` (vẫn có thể mua hàng bình thường). `buyer` bị chặn hoàn toàn khi truy cập tài nguyên yêu cầu quyền `seller` với HTTP 403 `FORBIDDEN`.
@@ -67,7 +67,7 @@ Tài liệu này định nghĩa giao diện API công khai của dịch vụ `sh
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "tokenType": "Bearer",
-    "expiresIn": 900,
+    "expiresIn": 604800,
     "refreshToken": "4a7f0e9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
     "user": {
       "id": "1",
@@ -160,7 +160,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     }
   }
   ```
-- **HTTP 401 Unauthorized** (Token hết hạn 15 phút):
+- **HTTP 401 Unauthorized** (Token hết hạn):
   ```json
   {
     "success": false,
@@ -196,7 +196,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 #### Phản hồi thành công (HTTP 200 OK):
-Trả về Access Token mới (15 phút) kèm Refresh Token xoay vòng mới (7 ngày):
+Trả về Access Token mới (7 ngày) kèm Refresh Token xoay vòng mới (7 ngày):
 ```json
 {
   "success": true,
@@ -204,7 +204,7 @@ Trả về Access Token mới (15 phút) kèm Refresh Token xoay vòng mới (7 
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "tokenType": "Bearer",
-    "expiresIn": 900,
+    "expiresIn": 604800,
     "refreshToken": "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c",
     "user": {
       "id": "1",

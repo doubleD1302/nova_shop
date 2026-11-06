@@ -97,7 +97,7 @@ async function runTests() {
       assert(res.status === 200, 'Đăng nhập thành công trả về HTTP 200')
       assert(body.success === true, 'Phản hồi có success === true')
       assert(typeof body.data?.token === 'string' && body.data.token.length > 20, 'Nhận được access token JWT')
-      assert(body.data?.expiresIn === 900, 'Access token có thời hạn 900 giây (15 phút)')
+      assert(body.data?.expiresIn === 604800, 'Access token có thời hạn 604800 giây (7 ngày)')
       assert(typeof body.data?.refreshToken === 'string' && body.data.refreshToken.length === 64, 'Nhận được refreshToken ngẫu nhiên 64 ký tự hex')
 
       firstAccessToken = body.data.token

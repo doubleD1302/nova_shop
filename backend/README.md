@@ -21,7 +21,7 @@ Frontend (Web / App) ──(HTTP /api/v1/*)──> Backend ──(HTTP /internal
   - Đã triển khai `GET /api/v1/ready` phản ánh trạng thái sẵn sàng của cả Backend, Data API và cơ sở dữ liệu MySQL.
   - Giữ `GET /api/v1/health` làm liveness độc lập (vẫn trả 200 khi Data API hoặc MySQL ngừng hoạt động).
   - Đã triển khai xác thực tài khoản và phân quyền người dùng (BE-003A):
-    - `POST /api/v1/auth/login`: Xác thực username/password, bảo vệ bằng Rate Limiting (in-memory, 429 `RATE_LIMITED`, `Retry-After`), phát hành JWT Bearer HS256 (hạn 15 phút).
+    - `POST /api/v1/auth/login`: Xác thực username/password, bảo vệ bằng Rate Limiting (in-memory, 429 `RATE_LIMITED`, `Retry-After`), phát hành JWT Bearer HS256 (hạn 7 ngày).
     - `GET /api/v1/auth/me`: Đọc hồ sơ tài khoản hiện tại từ Data API qua token đã xác minh.
     - Middleware `authenticate` thẩm định JWT (signature, algorithm allowlist, issuer, audience, sub, exp) và tra cứu trạng thái/vai trò người dùng thời gian thực từ Data API; từ chối người dùng đã bị khóa (`blocked`) hoặc không tồn tại.
     - Middleware `requireRole` phân quyền tài khoản (seller kế thừa quyền mua hàng của buyer; buyer bị chặn khi truy cập chức năng yêu cầu quyền seller).
@@ -177,7 +177,7 @@ Khi server khởi chạy thành công, console sẽ hiển thị:
   curl.exe http://localhost:3000/api/v1/ready
   ```
 - **Kết quả thành công### 6.3. Đăng Nhập & Cấp Token (`POST /api/v1/auth/login`)
-- **Mục đích:** Xác thực tài khoản bằng username và password; cấp phát JWT Bearer token có hạn 15 phút.
+- **Mục đích:** Xác thực tài khoản bằng username và password; cấp phát JWT Bearer token có hạn 7 ngày.
 - **Bảo vệ:** Rate Limiting in-memory (tối đa 5 lần thử sai trong 1 phút trên cùng IP; trả HTTP 429 `RATE_LIMITED` kèm header `Retry-After`).
 - **Body:** `{ "username": "...", "password": "..." }`.
 - **Validation:** Username được chuẩn hóa chữ thường; từ chối password > 72 byte UTF-8; không nhận các field quyền tự khai (`role`, `userId`, `shopId`).
@@ -189,7 +189,7 @@ Khi server khởi chạy thành công, console sẽ hiển thị:
     "data": {
       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
       "tokenType": "Bearer",
-      "expiresIn": 900,
+      "expiresIn": 604800,
       "user": {
         "id": "1",
         "username": "buyer_test",
@@ -236,7 +236,7 @@ Khi server khởi chạy thành công, console sẽ hiển thị:
 | Sai username, mật khẩu sai, hoặc tài khoản `blocked` | **401** | `INVALID_CREDENTIALS` | Thông điệp chung, không lộ lý do cụ thể |
 | Thiếu header Authorization hoặc sai cú pháp `Bearer <token>` | **401** | `AUTH_REQUIRED` | Bắt buộc phải có token hợp lệ |
 | Token sai signature, sai issuer/audience, sai thuật toán, thiếu sub | **401** | `AUTH_INVALID` | Token không hợp lệ |
-| Token đã quá thời hạn 15 phút (900 giây) | **401** | `AUTH_EXPIRED` | Token đã hết hạn, cần đăng nhập lại |
+| Token đã quá thời hạn 7 ngày (604800 giây) | **401** | `AUTH_EXPIRED` | Token đã hết hạn, cần đăng nhập lại |
 | Tài khoản không đủ quyền hạn (vd: buyer gọi API của seller) | **403** | `FORBIDDEN` | Phân quyền vai trò người dùng |
 | Vượt quá giới hạn thử đăng nhập (Rate limit) | **429** | `RATE_LIMITED` | Kèm header `Retry-After: <giây>` |
 | Data API ready trả 503 `DATABASE_UNAVAILABLE` với envelope hợp lệ | **503** | `DATA_API_UNAVAILABLE` | Cơ sở dữ liệu MySQL không sẵn sàng |
@@ -314,7 +314,7 @@ Kiểm thử toàn diện xác thực và phân quyền BE-003A-R1 với 128 ass
 2. **Thẩm định JWT Claims & Sub Chuẩn:**
    - Thẩm định `sub` trước khi gọi Data API: Bắt buộc là chuỗi số nguyên dương chuẩn (`/^[1-9]\d*$/`), không khoảng trắng, không số 0 ở đầu, không ký tự lạ và không vượt $2^{64}-1$.
    - Token có `sub` không hợp lệ bị từ chối với HTTP 401 `AUTH_INVALID` ngay lập tức mà **không gọi sang Data API upstream**.
-   - Kiểm tra `iat` và `exp` là số nguyên dương, thời hạn access token chuẩn 900 giây với dung sai lệch đồng hồ (`clockTolerance`) tối đa 60 giây.
+   - Kiểm tra `iat` và `exp` là số nguyên dương, thời hạn access token 604800 giây hoặc token cũ 900 giây với dung sai lệch đồng hồ (`clockTolerance`) tối đa 60 giây.
    - Không sử dụng `role` trong token để thay thế vai trò thực tế; luôn tra cứu trạng thái và vai trò mới nhất từ Data API tại thời điểm xử lý request.
 3. **Phân quyền và Kế thừa vai trò:**
    - Middleware `requireRole` bảo đảm: Người bán (`seller`) kế thừa đầy đủ quyền của người mua (`buyer`); người mua bị từ chối truy cập chức năng người bán với HTTP 403 `FORBIDDEN`.
@@ -377,8 +377,8 @@ backend/
 4. **Validation:** Controller kiểm tra kiểu dữ liệu, chuẩn hóa username, kiểm tra độ dài password (tối đa 72 bytes).
 5. **Giao tiếp Data API:** Gọi `verifyCredentials(username, password)` qua `data.client.js` với timeout 5000ms.
 6. **Data API phản hồi:** So sánh bcrypt hash bằng dummy hash chống timing attack. Nếu hợp lệ, trả hồ sơ người dùng.
-7. **Phát hành JWT:** Backend ký JWT HS256 với issuer `shopnova-backend`, audience `shopnova-clients`, subject `userId`, hạn 15 phút.
-8. **Trả phản hồi:** Trả JSON envelope kèm `token`, `tokenType: "Bearer"`, `expiresIn: 900` và whitelist thông tin người dùng.
+7. **Phát hành JWT:** Backend ký JWT HS256 với issuer `shopnova-backend`, audience `shopnova-clients`, subject `userId`, hạn 7 ngày.
+8. **Trả phản hồi:** Trả JSON envelope kèm `token`, `tokenType: "Bearer"`, `expiresIn: 604800` và whitelist thông tin người dùng.
 
 ---
 
@@ -386,7 +386,7 @@ backend/
 
 - **CORS:** Cấu hình cho phép ứng dụng Frontend (React Vite trên cổng 5173) gọi API an toàn.
 - **Bảo mật dịch vụ nội bộ:** Giao tiếp Backend -> Data API được bảo vệ bằng header `x-service-key`. Client ngoài không thể truy cập trực tiếp Data API.
-- **Bảo mật JWT:** Chuỗi ký `JWT_SECRET` được lưu độc lập tại Backend, không chia sẻ cho Data API hay Frontend; token có hạn ngắn 15 phút.
+- **Bảo mật JWT:** Chuỗi ký `JWT_SECRET` được lưu độc lập tại Backend, không chia sẻ cho Data API hay Frontend; token có hạn 7 ngày.
 
 ---
 
@@ -398,7 +398,7 @@ backend/
 2. **Gọi API bị từ chối 401 `INVALID_CREDENTIALS`:**
    - *Nguyên nhân:* Username hoặc password không chính xác, hoặc tài khoản đã bị khóa (`blocked`).
 3. **Gọi `/api/v1/auth/me` trả về 401 `AUTH_EXPIRED`:**
-   - *Nguyên nhân:* Access token đã vượt quá hạn 15 phút.
+   - *Nguyên nhân:* Access token đã vượt quá hạn 7 ngày.
    - *Khắc phục:* Thực hiện đăng nhập lại để nhận token mới.
 4. **Gọi API bị chặn 429 `RATE_LIMITED`:**
    - *Nguyên nhân:* Đăng nhập sai quá 5 lần trong 1 phút từ cùng một IP.

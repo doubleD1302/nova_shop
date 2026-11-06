@@ -2,7 +2,8 @@ import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { DataApiClientError, getUserAuthProfile } from '../clients/data.client.js'
 
-export const ACCESS_TOKEN_EXPIRES_IN = 86400 * 7 // 7 ngày (604800 giây) cho môi trường dev & mobile apps
+export const ACCESS_TOKEN_EXPIRES_IN = 86400 * 7 // 7 ngày; app hiện chưa tự làm mới token
+const LEGACY_ACCESS_TOKEN_EXPIRES_IN = 900 // Token 15 phút đã cấp trước khi đổi thời hạn
 export const TOKEN_ISSUER = 'shopnova-backend'
 export const TOKEN_AUDIENCE = 'shopnova-clients'
 export const MAX_TOKEN_LENGTH = 2048
@@ -43,7 +44,7 @@ export function verifyAccessToken(token) {
  * - Kiểm tra Authorization header và cấu trúc 'Bearer <token>'.
  * - Giới hạn độ dài token <= 2048 ký tự.
  * - Xác minh signature, thuật toán HS256, issuer, audience, sub, iat, exp.
- * - Kiểm tra thời gian claim phù hợp access token 900 giây và clock skew quy định rõ ràng.
+ * - Kiểm tra thời hạn access token và clock skew quy định rõ ràng.
  * - Validate sub trước khi gọi Data API: chuỗi ID chuẩn, không khoảng trắng, không số 0 đầu, không vượt BIGINT UNSIGNED.
  * - Token sai sub trả 401 AUTH_INVALID ngay mà không gọi Data API upstream.
  * - Đọc auth-profile thời gian thực từ Data API để lấy status và role mới nhất (không dùng role trong token).
@@ -139,8 +140,8 @@ export async function authenticate(req, res, next) {
     })
   }
 
-  // Bắt buộc thời hạn access token khớp chính xác hằng số 900 giây (exp - iat === 900)
-  if (payload.exp - payload.iat !== ACCESS_TOKEN_EXPIRES_IN) {
+  // Chấp nhận token cũ 15 phút còn hạn để tránh gián đoạn khi cập nhật.
+  if (![ACCESS_TOKEN_EXPIRES_IN, LEGACY_ACCESS_TOKEN_EXPIRES_IN].includes(payload.exp - payload.iat)) {
     return res.status(401).json({
       success: false,
       message: 'Token xác thực không hợp lệ.',

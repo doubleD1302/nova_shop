@@ -680,7 +680,7 @@ async function runAllAuthTests() {
       assertReal(body.success === true, 'Phản hồi đăng nhập có success === true')
       assertReal(typeof body.data?.token === 'string' && body.data.token.length > 20, 'Nhận được access token JWT')
       assertReal(body.data?.tokenType === 'Bearer', 'tokenType là "Bearer"')
-      assertReal(body.data?.expiresIn === 900, 'expiresIn là 900 giây (15 phút)')
+      assertReal(body.data?.expiresIn === 604800, 'expiresIn là 604800 giây (7 ngày)')
       assertReal(body.data?.user?.id === FIXTURES.buyer.id, 'User ID đúng khớp với MySQL')
       assertReal(body.data?.user?.role === 'buyer', 'User role là "buyer"')
       assertReal(body.data?.user?.shopId === null, 'Buyer shopId là null')
