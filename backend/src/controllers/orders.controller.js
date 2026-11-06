@@ -1,4 +1,5 @@
 import { callDataApi } from '../clients/data.client.js'
+import { env } from '../config/env.js'
 
 export async function listOrders(req, res, next) {
   try {
@@ -15,6 +16,13 @@ export async function listOrders(req, res, next) {
 
 export async function createOrder(req, res, next) {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ success: false, message: 'Thông tin đơn hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    if (['momo', 'vnpay'].includes(req.body.paymentMethod) &&
+        (!env.paymentGatewaysEnabled || !env[req.body.paymentMethod])) {
+      return res.status(503).json({ success: false, message: 'Phương thức thanh toán chưa được cấu hình.', error: { code: 'PAYMENT_UNAVAILABLE' } })
+    }
     const idempotencyKey = req.headers['idempotency-key']
     if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(idempotencyKey)) {
       return res.status(400).json({

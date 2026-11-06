@@ -81,6 +81,16 @@ async function runTests() {
       assert(data.data?.status === 'ok', 'Health check data.status === "ok"')
     }
 
+    for (const query of ['?limit=1&limit=2', '?filter%5Bid%5D=1']) {
+      const res = await fetch(`${baseUrl}/api/v1/health${query}`)
+      const data = await res.json()
+      assert(res.status === 400 && data.error?.code === 'VALIDATION_ERROR', `Query lặp/lồng nhau bị chặn: ${query}`)
+    }
+    {
+      const session = await fetch(`${baseUrl}/api/v1/orders/1/payment-session`, { method: 'POST' })
+      assert(session.status === 401, 'Phiên thanh toán yêu cầu đăng nhập')
+    }
+
     // 2. Kiểm tra URL không tồn tại trả về 404 JSON với mã NOT_FOUND
     {
       const res = await fetch(`${baseUrl}/api/v1/duong-dan-khong-ton-tai`)

@@ -1,15 +1,18 @@
 import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
-import { calculateShipping } from '../utils/shipping.js'
+import { calculateShipping, estimateItemWeight } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
 import { allocateDiscounts, isValidAmount } from '../utils/money.js'
+import { getWeatherRisk } from '../services/weather.js'
 
 const responseError = (res, status, code, message) => res.status(status).json({
   success: false,
   message,
   error: { code },
 })
+const validUserId = (value) => (typeof value === 'string' || Number.isSafeInteger(value)) &&
+  /^[1-9]\d{0,19}$/.test(String(value))
 
 function normalizeOrderRequest(body) {
   const items = Array.isArray(body.items)
@@ -92,7 +95,7 @@ export async function createOrder(req, res, next) {
     order.address.ward.length > 120 ||
     order.address.detail.length > 255 ||
     order.note.length > 500 ||
-    order.paymentMethod !== 'cod' ||
+    !['cod', 'momo', 'vnpay'].includes(order.paymentMethod) ||
     !calculateShipping(order.shippingMethod, { subtotal: 0 }) ||
     order.voucherCode.length > 32
   ) {
@@ -101,6 +104,7 @@ export async function createOrder(req, res, next) {
 
   const requestHash = crypto.createHash('sha256').update(JSON.stringify(order)).digest('hex')
   try {
+    const weatherRisk = await getWeatherRisk(order.address.province)
     const result = await executeTransaction(async (query) => {
       const priorOrders = await query(
         `SELECT id, code, request_hash, subtotal, shipping_fee, discount_amount, total_amount, created_at
@@ -136,10 +140,12 @@ export async function createOrder(req, res, next) {
         const rows = await query(
           `SELECT v.id AS variant_id, v.product_id, v.name AS variant_name, v.attributes, v.sku,
                   v.price, v.original_price, v.stock_qty, p.shop_id, p.name AS product_name,
-                  p.slug AS product_slug, p.free_shipping, s.name AS shop_name,
+                  p.slug AS product_slug, p.free_shipping, s.name AS shop_name, s.province AS shop_province,
+                  c.slug AS category_slug,
                   (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort_order LIMIT 1) AS image_url
            FROM product_variants v
            JOIN products p ON p.id = v.product_id
+           JOIN categories c ON c.id = p.category_id
            JOIN shops s ON s.id = p.shop_id
            JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
            WHERE v.id = ? AND v.is_active = 1 AND p.status = 'active' AND s.status = 'active'
@@ -167,10 +173,15 @@ export async function createOrder(req, res, next) {
           lines: [],
           subtotal: 0,
           hasFreeShipping: false,
+          fromProvince: variant.shop_province,
+          toProvince: order.address.province,
+          weightGrams: 0,
+          weatherRisk,
         }
         group.lines.push({ ...variant, lineTotal })
         group.subtotal += lineTotal
         group.hasFreeShipping ||= Boolean(variant.free_shipping)
+        group.weightGrams += estimateItemWeight(variant.category_slug, variant.qty)
         groups.set(shopId, group)
       }
 
@@ -187,6 +198,13 @@ export async function createOrder(req, res, next) {
       if (!isValidAmount(discountAmount) || !isValidAmount(shippingFee) || !isValidAmount(subtotal + shippingFee - discountAmount)) {
         return { error: 'ORDER_AMOUNT_INVALID' }
       }
+      const totalAmount = subtotal + shippingFee - discountAmount
+      if (order.paymentMethod === 'momo' && (totalAmount < 1000 || totalAmount > 50000000)) {
+        return { error: 'ORDER_AMOUNT_INVALID' }
+      }
+      if (order.paymentMethod === 'vnpay' && totalAmount > 9999999999) {
+        return { error: 'ORDER_AMOUNT_INVALID' }
+      }
 
       const orderCode = makeOrderCode()
       const orderIdResult = await query(
@@ -194,7 +212,7 @@ export async function createOrder(req, res, next) {
           (buyer_id, code, idempotency_key, request_hash, recipient_name, recipient_phone, province,
            district, ward, address_detail, note, voucher_code, payment_method, subtotal,
            shipping_fee, discount_amount, total_amount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
           orderCode,
@@ -208,10 +226,11 @@ export async function createOrder(req, res, next) {
           order.address.detail,
           order.note || null,
           voucher && discountAmount ? order.voucherCode : null,
+          order.paymentMethod,
           subtotal,
           shippingFee,
           discountAmount,
-          subtotal + shippingFee - discountAmount,
+          totalAmount,
         ],
       )
       const orderId = String(orderIdResult.insertId)
@@ -245,8 +264,8 @@ export async function createOrder(req, res, next) {
         )
         await query(
           `INSERT INTO payments (shop_order_id, method, status, amount)
-           VALUES (?, 'cod', 'unpaid', ?)`,
-          [shopOrderId, group.subtotal + group.shippingFee - groupDiscount],
+           VALUES (?, ?, 'unpaid', ?)`,
+          [shopOrderId, order.paymentMethod, group.subtotal + group.shippingFee - groupDiscount],
         )
 
         for (const line of group.lines) {
@@ -432,7 +451,7 @@ export async function cancelOrder(req, res, next) {
   try {
     const orderId = req.params.orderId
     const { userId } = req.body || {}
-    if (!/^[1-9]\d{0,19}$/.test(orderId)) {
+    if (!/^[1-9]\d{0,19}$/.test(orderId) || !validUserId(userId)) {
       return responseError(res, 400, 'INVALID_ORDER_ID', 'Mã đơn hàng không hợp lệ.')
     }
     const result = await executeTransaction(async (query) => {
@@ -448,6 +467,10 @@ export async function cancelOrder(req, res, next) {
       if (!shopOrders.length || shopOrders.some((shopOrder) => shopOrder.status !== 'pending')) {
         return { error: 'ORDER_NOT_CANCELLABLE' }
       }
+      const paid = await query(
+        `SELECT p.id FROM payments p JOIN shop_orders so ON so.id = p.shop_order_id
+         WHERE so.order_id = ? AND p.status = 'paid' LIMIT 1 FOR UPDATE`, [orderId])
+      if (paid.length) return { error: 'ORDER_NOT_CANCELLABLE' }
 
       for (const shopOrder of shopOrders) {
         await query(
@@ -603,7 +626,7 @@ export async function confirmOrderReceived(req, res, next) {
   try {
     const orderId = req.params.orderId
     const { userId } = req.body || {}
-    if (!/^[1-9]\d{0,19}$/.test(orderId)) {
+    if (!/^[1-9]\d{0,19}$/.test(orderId) || !validUserId(userId)) {
       return responseError(res, 400, 'INVALID_ORDER_ID', 'Mã đơn hàng không hợp lệ.')
     }
     const result = await executeTransaction(async (query) => {
@@ -743,8 +766,9 @@ export async function updateSellerOrderStatus(req, res, next) {
     }
     const result = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT so.id, so.order_id, so.status, so.shop_id, s.owner_id
+        `SELECT so.id, so.order_id, so.status, so.shop_id, s.owner_id, o.payment_method
          FROM shop_orders so JOIN shops s ON s.id = so.shop_id
+         JOIN orders o ON o.id = so.order_id
          WHERE so.id = ? FOR UPDATE`,
         [shopOrderId],
       )
@@ -756,6 +780,14 @@ export async function updateSellerOrderStatus(req, res, next) {
         shipping: ['delivered'],
       }
       if (!allowed[order.status]?.includes(status)) return { error: 'INVALID_STATUS_TRANSITION' }
+      if (status !== 'cancelled' && order.payment_method !== 'cod') {
+        const payments = await query('SELECT status FROM payments WHERE shop_order_id = ? FOR UPDATE', [shopOrderId])
+        if (payments[0]?.status !== 'paid') return { error: 'PAYMENT_REQUIRED' }
+      }
+      if (status === 'cancelled') {
+        const paid = await query('SELECT id FROM payments WHERE shop_order_id = ? AND status = \'paid\' FOR UPDATE', [shopOrderId])
+        if (paid.length) return { error: 'PAID_ORDER_REQUIRES_REFUND' }
+      }
 
       if (status === 'cancelled') {
         await query(

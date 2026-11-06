@@ -1,5 +1,9 @@
 # ShopNova — thiết kế database MySQL
 
+Cập nhật 06/11/2026: migration `migrations/2026-11-06-online-payments.sql` bổ sung `payment_attempts`
+và giá trị `vnpay` cho enum phương thức. `schema.sql` dành cho database mới đã có thay đổi tương ứng;
+không chạy lại schema khởi tạo trên database đang có dữ liệu. Xem `docs/backend/PAYMENTS_AND_SHIPPING.md`.
+
 **Bản đề xuất v1, ngày 01/10/2026.** Thiết kế dựa trên source trong `ShopNova_BE001B-R1_Review.zip`. Source chưa có schema SQL của nhóm database. Bộ này cung cấp schema khởi tạo để nhóm đối chiếu và thống nhất trước khi tạo Sequelize migrations; chưa thay đổi database hoặc runtime của project.
 
 ## 1. Phạm vi và cách đọc
@@ -10,7 +14,7 @@ Bộ bàn giao có ba file cần thiết:
 
 | File | Công dụng |
 |---|---|
-| `schema.sql` | Tạo 22 bảng, khóa ngoại, unique, check và index trên database mới |
+| `schema.sql` | Tạo các bảng, khóa ngoại, unique, check và index trên database mới |
 | `seed.sql` | Dữ liệu dev tối thiểu: 3 user, 2 shop, 2 sản phẩm, 3 SKU, giỏ và voucher |
 | `README.md` | Quyết định thiết kế, sơ đồ quan hệ, từ điển cột, quy trình transaction và cách chạy |
 
@@ -35,7 +39,7 @@ Bộ bàn giao có ba file cần thiết:
 | Đánh giá | Một review mỗi dòng đơn đã giao | Data API xác minh người viết là buyer của đơn |
 | Hủy/xóa | Hủy đơn bằng trạng thái; sản phẩm/shop đổi trạng thái | Giữ tham chiếu và lịch sử đơn; FK mặc định RESTRICT |
 
-`bank`, `momo`, `zalopay`, `card` được dự trù trong enum thanh toán. Giai đoạn MVP Data API chỉ chấp nhận `cod`. Tích hợp online cần thiết kế payment attempts, xác minh callback, refund và settlement trước khi bật. Chính sách trả hàng/hoàn tiền, nhiều nhân viên một shop, campaign flash sale, chat và vận chuyển qua hãng ngoài còn planned.
+`bank`, `zalopay`, `card` vẫn chỉ được dự trù trong enum. Data API nhận `cod`, `momo`, `vnpay`; Backend mặc định chỉ bật COD. Payment attempts và xác minh callback đã có trong source; hoàn tiền và đối soát định kỳ chưa triển khai, nên chưa bật cổng online khi thiếu sandbox.
 
 Địa chỉ giữ các trường tỉnh/phường/quận theo UI đang có. Đây là dữ liệu nhận hàng dạng chữ; danh mục địa giới/codes có thể cập nhật riêng, không coi mock locations là nguồn hành chính chuẩn.
 
@@ -820,7 +824,7 @@ Ràng buộc và index:
 | `address_detail` | `VARCHAR(255) NOT NULL` | Snapshot địa chỉ chi tiết |
 | `note` | `VARCHAR(500) NULL` | Ghi chú giao hàng |
 | `voucher_code` | `VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL` | Snapshot mã voucher; NULL nếu không dùng |
-| `payment_method` | `ENUM('cod','bank','momo','zalopay','card') NOT NULL DEFAULT 'cod'` | Lựa chọn thanh toán; MVP chỉ bật COD |
+| `payment_method` | `ENUM('cod','bank','momo','vnpay','zalopay','card') NOT NULL DEFAULT 'cod'` | Lựa chọn thanh toán; Backend mặc định chỉ bật COD |
 | `subtotal` | `DECIMAL(15,0) NOT NULL DEFAULT 0` | Tổng tiền hàng ban đầu |
 | `shipping_fee` | `DECIMAL(15,0) NOT NULL DEFAULT 0` | Tổng phí ship ban đầu |
 | `discount_amount` | `DECIMAL(15,0) NOT NULL DEFAULT 0` | Tổng giảm voucher ban đầu |

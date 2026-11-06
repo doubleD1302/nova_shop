@@ -1,7 +1,8 @@
 import { executeTransaction } from '../config/database.js'
-import { calculateShipping } from '../utils/shipping.js'
+import { calculateShipping, estimateItemWeight } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
 import { isValidAmount } from '../utils/money.js'
+import { getWeatherRisk } from '../services/weather.js'
 
 const messages = {
   PRODUCT_UNAVAILABLE: [409, 'Một sản phẩm trong giỏ không còn được bán.'],
@@ -11,14 +12,16 @@ const messages = {
 }
 
 // Xem trước chỉ đọc dữ liệu; giá, tồn kho và lượt dùng sẽ được kiểm tra lại khi tạo đơn.
-export async function calculateCheckoutPreview(query, { userId, items, shippingMethod, voucherCode }) {
+export async function calculateCheckoutPreview(query, { userId, items, shippingMethod, voucherCode, toProvince, weatherRisk = 'normal' }) {
   const groups = new Map()
   let subtotal = 0
   const placeholders = items.map(() => '?').join(', ')
   const rows = await query(
-    `SELECT v.id AS variant_id, v.price, v.stock_qty, p.shop_id, p.free_shipping, s.name AS shop_name
+    `SELECT v.id AS variant_id, v.price, v.stock_qty, p.shop_id, p.free_shipping,
+            s.name AS shop_name, s.province AS shop_province, c.slug AS category_slug
      FROM product_variants v
      JOIN products p ON p.id = v.product_id
+     JOIN categories c ON c.id = p.category_id
      JOIN shops s ON s.id = p.shop_id
      JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
      WHERE v.id IN (${placeholders}) AND v.is_active = 1 AND p.status = 'active' AND s.status = 'active'`,
@@ -34,9 +37,11 @@ export async function calculateCheckoutPreview(query, { userId, items, shippingM
     if (!isValidAmount(price) || !isValidAmount(lineTotal) || !isValidAmount(subtotal + lineTotal)) return { error: 'ORDER_AMOUNT_INVALID' }
     subtotal += lineTotal
     const shopId = String(variant.shop_id)
-    const group = groups.get(shopId) || { shopId, shopName: variant.shop_name, subtotal: 0, hasFreeShipping: false }
+    const group = groups.get(shopId) || { shopId, shopName: variant.shop_name, subtotal: 0,
+      hasFreeShipping: false, fromProvince: variant.shop_province, toProvince, weightGrams: 0, weatherRisk }
     group.subtotal += lineTotal
     group.hasFreeShipping ||= Boolean(variant.free_shipping)
+    group.weightGrams += estimateItemWeight(variant.category_slug, item.qty)
     groups.set(shopId, group)
   }
 
@@ -58,7 +63,7 @@ export async function calculateCheckoutPreview(query, { userId, items, shippingM
 }
 
 export async function previewCheckout(req, res, next) {
-  const { userId, items, shippingMethod, voucherCode = '' } = req.body || {}
+  const { userId, items, shippingMethod, voucherCode = '', address } = req.body || {}
   if (!/^[1-9]\d{0,19}$/.test(String(userId || '')) || !Array.isArray(items) || !items.length || items.length > 50 ||
       items.some((item) => !item || (typeof item.variantId !== 'string' &&
         !(typeof item.variantId === 'number' && Number.isSafeInteger(item.variantId))) ||
@@ -66,12 +71,16 @@ export async function previewCheckout(req, res, next) {
         !Number.isInteger(item.qty) || item.qty < 1 || item.qty > 99) ||
       new Set(items.map((item) => String(item.variantId))).size !== items.length ||
       typeof shippingMethod !== 'string' || !calculateShipping(shippingMethod, { subtotal: 0, hasFreeShipping: false }) ||
-      typeof voucherCode !== 'string' || voucherCode.trim().length > 32) {
+      typeof voucherCode !== 'string' || voucherCode.trim().length > 32 ||
+      (address !== undefined && (!address || typeof address !== 'object' || Array.isArray(address) ||
+        typeof address.province !== 'string' || !address.province.trim() || address.province.length > 120))) {
     return res.status(400).json({ success: false, message: 'Thông tin xem trước đơn hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
   }
   try {
+    const weatherRisk = await getWeatherRisk(address?.province)
     const result = await executeTransaction((query) => calculateCheckoutPreview(query, {
       userId, items, shippingMethod, voucherCode: voucherCode.trim().toUpperCase(),
+      toProvince: address?.province, weatherRisk,
     }))
     if (result.error) {
       const [status, message] = messages[result.error] || [400, 'Thông tin xem trước đơn hàng không hợp lệ.']

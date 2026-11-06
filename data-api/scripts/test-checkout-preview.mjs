@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { calculateCheckoutPreview, previewCheckout } from '../src/controllers/checkout-preview.controller.js'
+import { calculateShipping } from '../src/utils/shipping.js'
 import { closeDatabase } from '../src/config/database.js'
 
 const makeQuery = ({ voucher = true, used = 0, stock = 5, minSubtotal = 0, price = 100000 } = {}) => async (sql, params) => {
@@ -15,9 +16,11 @@ const makeQuery = ({ voucher = true, used = 0, stock = 5, minSubtotal = 0, price
 const input = { userId: '1', items: [{ variantId: '1', qty: 2 }, { variantId: '2', qty: 1 }], shippingMethod: 'tietkiem', voucherCode: 'NOVA20K' }
 const result = await calculateCheckoutPreview(makeQuery(), input)
 assert.equal(result.subtotal, 300000)
-assert.equal(result.shippingFee, 33000)
+const expectedShipping = calculateShipping('tietkiem', { subtotal: 200000, weightGrams: 2000 }).fee +
+  calculateShipping('tietkiem', { subtotal: 100000, weightGrams: 1000 }).fee
+assert.equal(result.shippingFee, expectedShipping)
 assert.equal(result.discountAmount, 20000)
-assert.equal(result.total, 313000)
+assert.equal(result.total, 300000 + expectedShipping - 20000)
 assert.equal(result.shops.length, 2)
 assert.equal((await calculateCheckoutPreview(makeQuery({ voucher: false }), input)).error, 'VOUCHER_INVALID')
 assert.equal((await calculateCheckoutPreview(makeQuery({ used: 1 }), input)).error, 'VOUCHER_UNAVAILABLE')
@@ -28,7 +31,7 @@ assert.equal((await calculateCheckoutPreview(makeQuery({ price: 999999999999999 
 assert.equal((await calculateCheckoutPreview(makeQuery({ price: 999999999999999 }), { ...input, items: [{ variantId: '1', qty: 1 }], voucherCode: '' })).total, 999999999999999)
 const noVoucher = await calculateCheckoutPreview(makeQuery(), { ...input, voucherCode: '' })
 assert.equal(noVoucher.discountAmount, 0)
-assert.equal(noVoucher.total, 333000)
+assert.equal(noVoucher.total, 300000 + expectedShipping)
 
 const smallOrderQuery = async (sql, params) => {
   if (sql.includes('FROM product_variants')) return params.map((id) => ({ variant_id: id, price: 1, stock_qty: 1, shop_id: id, free_shipping: 1, shop_name: `Shop ${id}` }))

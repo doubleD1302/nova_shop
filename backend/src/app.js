@@ -17,8 +17,10 @@ import cartRouter from './routes/cart.routes.js'
 import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
 import chatRouter from './routes/chat.routes.js'
+import paymentsRouter from './routes/payments.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
+import { validateQuery } from './middlewares/input.middleware.js'
 
 // Khởi tạo instance ứng dụng Express
 const app = express()
@@ -50,6 +52,7 @@ app.use(cors(corsOptions))
 
 // 3. Phân tích cú pháp JSON và ảnh tải lên đã mã hóa base64 (giới hạn 8MB)
 app.use(express.json({ limit: '8mb' }))
+app.use('/api/v1', validateQuery)
 
 if (env.uploadStorage === 's3') {
   app.get('/uploads/:filename', serveUploadedImage)
@@ -62,6 +65,7 @@ app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1', shopsRouter)
 app.use('/api/v1', uploadsRouter)
+app.use('/api/v1', paymentsRouter)
 app.use('/api/v1', adminRouter)
 app.use('/api/v1/products', productsRouter)
 app.use('/api/v1/orders', ordersRouter)

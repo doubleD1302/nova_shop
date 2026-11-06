@@ -73,6 +73,30 @@ async function runSmokeTests() {
       assert(data.data?.status === 'ok', 'Health check data.status === "ok"')
     }
 
+    for (const query of ['?limit=1&limit=2', '?filter%5Bid%5D=1']) {
+      const res = await fetch(`${baseUrl}/internal/v1/health${query}`, {
+        headers: { 'x-service-key': env.dataApiKey }, signal: AbortSignal.timeout(4000),
+      })
+      const data = await res.json()
+      assert(res.status === 400 && data.error?.code === 'VALIDATION_ERROR', `Query nội bộ lặp/lồng nhau bị chặn: ${query}`)
+    }
+    {
+      const res = await fetch(`${baseUrl}/internal/v1/orders/1/cancel`, { method: 'POST',
+        headers: { 'x-service-key': env.dataApiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: [1] }), signal: AbortSignal.timeout(4000) })
+      const data = await res.json()
+      assert(res.status === 400 && data.error?.code === 'VALIDATION_ERROR', 'userId dạng mảng bị chặn trước MySQL')
+    }
+    {
+      const headers = { 'x-service-key': env.dataApiKey, 'Content-Type': 'application/json' }
+      const invalidOrder = await fetch(`${baseUrl}/internal/v1/orders/not-an-id/payment-session`, {
+        method: 'POST', headers, body: JSON.stringify({ userId: '1' }), signal: AbortSignal.timeout(4000) })
+      assert(invalidOrder.status === 400, 'Phiên thanh toán từ chối mã đơn sai trước MySQL')
+      const forgedIpn = await fetch(`${baseUrl}/internal/v1/payments/notification`, {
+        method: 'POST', headers, body: JSON.stringify({ provider: 'momo', amount: '1000' }), signal: AbortSignal.timeout(4000) })
+      assert(forgedIpn.status === 400, 'Thông báo thanh toán sai kiểu bị chặn trước MySQL')
+    }
+
     // 1.2 Yêu cầu thiếu header x-service-key bị từ chối -> HTTP 401
     {
       const res = await fetch(`${baseUrl}/internal/v1/health`, {

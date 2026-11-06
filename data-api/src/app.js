@@ -12,9 +12,11 @@ import cartRouter from './routes/cart.routes.js'
 import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
 import chatRouter from './routes/chat.routes.js'
+import paymentsRouter from './routes/payments.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
+import { validateQuery } from './middlewares/input.middleware.js'
 
 // Khởi tạo instance ứng dụng Express cho Data API
 const app = express()
@@ -30,6 +32,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use(
   '/internal/v1',
   serviceAuthMiddleware,
+  validateQuery,
   systemRouter,
   authRouter,
   productsRouter,
@@ -42,6 +45,7 @@ app.use(
   returnsRouter,
   shippingRouter,
   chatRouter,
+  paymentsRouter,
 )
 
 // 4. Middleware xử lý khi client gọi route không tồn tại (404)

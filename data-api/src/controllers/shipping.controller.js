@@ -1,6 +1,7 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { calculateShippingOptions } from '../utils/shipping.js'
 import { isValidAmount } from '../utils/money.js'
+import { getWeatherRisk } from '../services/weather.js'
 
 function isTableMissingError(err) {
   return err?.original?.code === 'ER_NO_SUCH_TABLE' ||
@@ -13,21 +14,23 @@ function isTableMissingError(err) {
  */
 export async function calculateShippingFee(req, res, next) {
   try {
-    const { subtotal = 0 } = req.body || {}
-    if (!isValidAmount(subtotal)) {
-      return res.status(400).json({ success: false, message: 'Giá trị đơn hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    const { fromProvince, toProvince, weightGrams, subtotal = 0, isMall } = req.body || {}
+    if (!isValidAmount(subtotal) ||
+        (fromProvince !== undefined && (typeof fromProvince !== 'string' || !fromProvince.trim() || fromProvince.length > 120)) ||
+        (toProvince !== undefined && (typeof toProvince !== 'string' || !toProvince.trim() || toProvince.length > 120)) ||
+        (weightGrams !== undefined && (!Number.isSafeInteger(weightGrams) || weightGrams < 1 || weightGrams > 30000)) ||
+        (isMall !== undefined && typeof isMall !== 'boolean')) {
+      return res.status(400).json({ success: false, message: 'Thông tin tính phí vận chuyển không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
-    const options = calculateShippingOptions({ subtotal }).map((option, index) => ({
-      ...option,
-      isDefault: index === 0,
-    }))
+    const weatherRisk = await getWeatherRisk(toProvince)
+    const options = calculateShippingOptions({ subtotal, fromProvince, toProvince, weightGrams, weatherRisk })
 
     return res.status(200).json({
       success: true,
       message: 'Tính phí vận chuyển thành công.',
       data: {
         estimated: true,
-        note: 'Phí cố định cho một shop; không tính theo địa chỉ hay cân nặng. Đơn hàng được tính lại từ dữ liệu trên server.',
+        note: 'Cước ShopNova ước tính theo vùng, khối lượng và thời điểm; thời tiết được xét khi dịch vụ dự báo đã cấu hình. Checkout tính lại từ sản phẩm và địa chỉ trên server.',
         options,
       },
     })
@@ -42,7 +45,7 @@ export async function calculateShippingFee(req, res, next) {
 export async function updateOrderTracking(req, res, next) {
   try {
     const shopOrderId = req.params.shopOrderId
-    const { userId, trackingCode, carrier = 'Giao Hàng Nhanh (GHN)', autoAdvanceStatus = true } = req.body || {}
+    const { userId, trackingCode, carrier = 'ShopNova', autoAdvanceStatus = true } = req.body || {}
 
     if (
       !/^[1-9]\d{0,19}$/.test(shopOrderId) ||
@@ -63,9 +66,10 @@ export async function updateOrderTracking(req, res, next) {
 
     const result = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT so.id, so.order_id, so.status, so.shop_id, s.owner_id
+        `SELECT so.id, so.order_id, so.status, so.shop_id, s.owner_id, o.payment_method
          FROM shop_orders so
          JOIN shops s ON s.id = so.shop_id
+         JOIN orders o ON o.id = so.order_id
          WHERE so.id = ? FOR UPDATE`,
         [shopOrderId],
       )
@@ -77,6 +81,10 @@ export async function updateOrderTracking(req, res, next) {
       const shopOrder = rows[0]
       if (['delivered', 'cancelled'].includes(shopOrder.status)) {
         return { error: 'INVALID_STATUS_FOR_TRACKING' }
+      }
+      if (shopOrder.payment_method !== 'cod') {
+        const payments = await query('SELECT status FROM payments WHERE shop_order_id = ? FOR UPDATE', [shopOrderId])
+        if (payments[0]?.status !== 'paid') return { error: 'PAYMENT_REQUIRED' }
       }
 
       // Tự động chuyển từ 'confirmed' hoặc 'pending' sang 'shipping' khi gán mã vận đơn
@@ -125,6 +133,9 @@ export async function updateOrderTracking(req, res, next) {
         error: { code: 'INVALID_STATUS_FOR_TRACKING' },
       })
     }
+    if (result.error === 'PAYMENT_REQUIRED') {
+      return res.status(409).json({ success: false, message: 'Cần xác nhận thanh toán trước khi giao hàng.', error: { code: 'PAYMENT_REQUIRED' } })
+    }
 
     return res.status(200).json({
       success: true,
@@ -144,6 +155,9 @@ export async function getOrderTracking(req, res, next) {
   try {
     const orderId = req.params.orderId
     const userId = req.query.userId
+    if (!/^[1-9]\d{0,19}$/.test(orderId) || typeof userId !== 'string' || !/^[1-9]\d{0,19}$/.test(userId)) {
+      return res.status(400).json({ success: false, message: 'Mã đơn hoặc tài khoản không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
 
     // 1. Kiểm tra đơn hàng thuộc về user (hoặc user là seller của một shop order)
     const rows = await executeQuery(

@@ -196,6 +196,7 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
     dbSslEnabled,
     dbSslCa,
     dbSslCaContent,
+    weatherApiKey: isValidSecret(sourceEnv.WEATHER_API_KEY) ? sourceEnv.WEATHER_API_KEY.trim() : '',
   })
 }
 

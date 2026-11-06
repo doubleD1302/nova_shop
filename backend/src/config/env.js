@@ -226,6 +226,35 @@ function parseAndValidateEnv() {
   const smtpPass = rawSmtpPass.replace(/^["']|["']$/g, '').replace(/\s+/g, '')
   const smtpFrom = (process.env.SMTP_FROM || 'Nova Shop <no-reply@novashop.vn>').trim()
 
+  const gatewayUrl = (name, value) => {
+    let url
+    try { url = new URL(value) } catch { console.error(`[Lỗi cấu hình] ${name} không hợp lệ.`); process.exit(1) }
+    if (!['http:', 'https:'].includes(url.protocol) || (rawNodeEnv === 'production' && url.protocol !== 'https:') ||
+        url.username || url.password || url.hash) {
+      console.error(`[Lỗi cấu hình] ${name} phải là URL hợp lệ; production yêu cầu HTTPS.`)
+      process.exit(1)
+    }
+    return url.toString()
+  }
+  const vnpayValues = ['VNPAY_TMN_CODE', 'VNPAY_HASH_SECRET', 'VNPAY_PAYMENT_URL', 'VNPAY_RETURN_URL']
+  const momoValues = ['MOMO_PARTNER_CODE', 'MOMO_ACCESS_KEY', 'MOMO_SECRET_KEY', 'MOMO_API_URL', 'MOMO_REDIRECT_URL', 'MOMO_IPN_URL']
+  const hasGateway = (names) => names.some((name) => process.env[name]?.trim())
+  const checkGateway = (names) => {
+    if (!hasGateway(names)) return false
+    if (names.some((name) => !isValidSecret(process.env[name]))) {
+      console.error(`[Lỗi cấu hình] Cần cấu hình đủ ${names.join(', ')}.`)
+      process.exit(1)
+    }
+    return true
+  }
+  const hasVnpay = checkGateway(vnpayValues)
+  const hasMomo = checkGateway(momoValues)
+  const paymentGatewaysEnabled = (process.env.PAYMENT_GATEWAYS_ENABLED || 'false').trim().toLowerCase()
+  if (!['true', 'false'].includes(paymentGatewaysEnabled)) {
+    console.error('[Lỗi cấu hình] PAYMENT_GATEWAYS_ENABLED chỉ chấp nhận true hoặc false.')
+    process.exit(1)
+  }
+
   return Object.freeze({
     port,
     nodeEnv: rawNodeEnv,
@@ -250,6 +279,18 @@ function parseAndValidateEnv() {
     smtpPass,
     smtpFrom,
     isSmtpConfigured: Boolean(smtpHost && smtpUser && smtpPass),
+    paymentGatewaysEnabled: paymentGatewaysEnabled === 'true',
+    vnpay: hasVnpay ? {
+      tmnCode: process.env.VNPAY_TMN_CODE.trim(), hashSecret: process.env.VNPAY_HASH_SECRET.trim(),
+      paymentUrl: gatewayUrl('VNPAY_PAYMENT_URL', process.env.VNPAY_PAYMENT_URL),
+      returnUrl: gatewayUrl('VNPAY_RETURN_URL', process.env.VNPAY_RETURN_URL),
+    } : null,
+    momo: hasMomo ? {
+      partnerCode: process.env.MOMO_PARTNER_CODE.trim(), accessKey: process.env.MOMO_ACCESS_KEY.trim(),
+      secretKey: process.env.MOMO_SECRET_KEY.trim(), apiUrl: gatewayUrl('MOMO_API_URL', process.env.MOMO_API_URL),
+      redirectUrl: gatewayUrl('MOMO_REDIRECT_URL', process.env.MOMO_REDIRECT_URL),
+      ipnUrl: gatewayUrl('MOMO_IPN_URL', process.env.MOMO_IPN_URL),
+    } : null,
     geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
   })
 }

@@ -1,5 +1,10 @@
 # Đối chiếu validation API
 
+Rà soát bổ sung: hai tầng chặn query lặp/lồng nhau, query quá dài và JSON body cấp cao không phải object.
+Shipping kiểm tra kiểu tỉnh, cân nặng, subtotal, boolean trước khi tính; Data API kiểm tra lại.
+Thông báo VNPay/MoMo chỉ được ghi sau khi xác thực chữ ký và đối chiếu số tiền, chủ đơn chỉ đọc/tạo phiên
+thanh toán của mình. Các kiểm tra này không thay thế audit từng field của toàn bộ endpoint trong bảng dưới.
+
 Tài liệu kiểm kê input và kết quả đã kiểm tra; không coi danh sách này là chứng nhận mọi nhánh đã được kiểm thử. Các endpoint bên dưới có tiền tố `/api/v1`. Backend lấy identity từ token; Data API nhận identity qua HTTP nội bộ và xác thực service key. 400 là lỗi input, 401 là thiếu/invalid token, 403 là sai quyền; các lỗi 404/409 phụ thuộc tài nguyên và trạng thái.
 
 | Nhóm / endpoint | Input chính cần kiểm tra | Hiện trạng và bằng chứng |

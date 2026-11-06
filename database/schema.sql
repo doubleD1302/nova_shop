@@ -299,7 +299,7 @@ CREATE TABLE orders (
   address_detail VARCHAR(255) NOT NULL COMMENT 'Snapshot địa chỉ chi tiết',
   note VARCHAR(500) NULL COMMENT 'Ghi chú giao hàng',
   voucher_code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Snapshot mã voucher; NULL nếu không dùng',
-  payment_method ENUM('cod','bank','momo','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Lựa chọn thanh toán; MVP chỉ bật COD',
+  payment_method ENUM('cod','bank','momo','vnpay','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Phương thức thanh toán đã chọn',
   subtotal DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng tiền hàng ban đầu',
   shipping_fee DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng phí ship ban đầu',
   discount_amount DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng giảm voucher ban đầu',
@@ -394,11 +394,11 @@ CREATE TABLE order_events (
   CONSTRAINT fk_order_events_actor FOREIGN KEY (actor_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Lịch sử chuyển trạng thái đơn con';
 
--- Ghi nhận tiền COD theo từng đơn con
+-- Ghi nhận trạng thái thanh toán theo từng đơn con
 CREATE TABLE payments (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID thanh toán',
   shop_order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn con thu tiền',
-  method ENUM('cod','bank','momo','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'MVP sử dụng cod',
+  method ENUM('cod','bank','momo','vnpay','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Phương thức thanh toán',
   status ENUM('unpaid','paid','void') NOT NULL DEFAULT 'unpaid' COMMENT 'Chưa thu, đã thu hoặc hủy yêu cầu thu',
   amount DECIMAL(15,0) NOT NULL COMMENT 'Số tiền phải thu của đơn con',
   paid_at DATETIME(3) NULL COMMENT 'Thời điểm xác nhận thực nhận tiền',
@@ -409,7 +409,27 @@ CREATE TABLE payments (
   CONSTRAINT fk_payments_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_orders (id),
   CONSTRAINT ck_payments_amount CHECK (amount >= 0),
   CONSTRAINT ck_payments_paid_at CHECK ((status = 'paid' AND paid_at IS NOT NULL) OR (status <> 'paid' AND paid_at IS NULL))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Ghi nhận tiền COD theo từng đơn con';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Ghi nhận tiền theo từng đơn con';
+
+CREATE TABLE payment_attempts (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  order_id BIGINT UNSIGNED NOT NULL,
+  provider ENUM('momo','vnpay') NOT NULL,
+  reference VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  amount DECIMAL(15,0) NOT NULL,
+  status ENUM('pending','paid','failed','review') NOT NULL DEFAULT 'pending',
+  provider_transaction_id VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  result_code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  expires_at DATETIME(3) NOT NULL,
+  processed_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_payment_attempts_reference (reference),
+  UNIQUE KEY uq_payment_attempts_provider_transaction (provider, provider_transaction_id),
+  KEY ix_payment_attempts_order_created (order_id, created_at, id),
+  CONSTRAINT fk_payment_attempts_order FOREIGN KEY (order_id) REFERENCES orders (id),
+  CONSTRAINT ck_payment_attempts_amount CHECK (amount >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Lượt dùng voucher và việc hoàn trả lượt
 CREATE TABLE voucher_uses (

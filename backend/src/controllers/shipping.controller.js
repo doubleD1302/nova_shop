@@ -6,6 +6,15 @@ import { callDataApi } from '../clients/data.client.js'
 export async function calculateShippingFee(req, res, next) {
   try {
     const { fromProvince, toProvince, weightGrams, subtotal, isMall } = req.body || {}
+    if (
+      (fromProvince !== undefined && (typeof fromProvince !== 'string' || !fromProvince.trim() || fromProvince.length > 120)) ||
+      (toProvince !== undefined && (typeof toProvince !== 'string' || !toProvince.trim() || toProvince.length > 120)) ||
+      (weightGrams !== undefined && (!Number.isSafeInteger(weightGrams) || weightGrams < 1 || weightGrams > 30000)) ||
+      (subtotal !== undefined && (!Number.isSafeInteger(subtotal) || subtotal < 0 || subtotal > 999999999999999)) ||
+      (isMall !== undefined && typeof isMall !== 'boolean')
+    ) {
+      return res.status(400).json({ success: false, message: 'Thông tin tính phí vận chuyển không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
 
     const result = await callDataApi('/internal/v1/shipping/calculate', {
       method: 'POST',
@@ -14,7 +23,7 @@ export async function calculateShippingFee(req, res, next) {
         toProvince,
         weightGrams: typeof weightGrams === 'number' ? weightGrams : undefined,
         subtotal,
-        isMall: Boolean(isMall),
+        isMall,
       },
     })
 

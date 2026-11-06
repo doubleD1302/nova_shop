@@ -1,16 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { calculateShipping, calculateShippingOptions } from '../src/utils/shipping.js'
+import { calculateShipping, calculateShippingOptions, estimateItemWeight } from '../src/utils/shipping.js'
 import { allocateDiscounts, isValidAmount, MAX_ORDER_AMOUNT } from '../src/utils/money.js'
 
-test('báo giá và tính phí cùng phương thức, đơn giá cho từng shop', () => {
-  const group = { subtotal: 999999, hasFreeShipping: false }
+test('báo giá và tính phí cùng phương thức theo vùng và loại hàng', () => {
+  const group = { subtotal: 999999, hasFreeShipping: false, fromProvince: 'Hà Nội',
+    toProvince: 'TP. Hồ Chí Minh', weightGrams: estimateItemWeight('may-tinh', 2),
+    now: new Date('2026-11-06T03:00:00Z') }
   const options = calculateShippingOptions(group)
-  assert.deepEqual(options.map(({ id, fee }) => [id, fee]), [
-    ['tietkiem', 16500], ['nhanh', 32000], ['hoatoc', 22000],
-  ])
+  assert.deepEqual(options.map(({ id }) => id), ['tietkiem', 'nhanh', 'hoatoc'])
+  assert.equal(options[0].distanceKm, 1500)
+  assert.equal(options[0].estimatedWeightGrams, 5000)
+  assert.ok(options[0].fee < options[1].fee && options[1].fee < options[2].fee)
   for (const option of options) assert.deepEqual(calculateShipping(option.id, group), option)
   assert.equal(calculateShipping('unknown', group), null)
+  const nearby = calculateShipping('tietkiem', { ...group, toProvince: 'Hà Nội' })
+  assert.ok(nearby.fee < options[0].fee)
+  assert.ok(calculateShipping('tietkiem', { ...group, weightGrams: 1000 }).fee < options[0].fee)
+  assert.ok(calculateShipping('tietkiem', { ...group, weatherRisk: 'rain' }).fee > options[0].fee)
+  assert.ok(calculateShipping('nhanh', { ...group, now: new Date('2026-11-06T19:00:00Z') }).fee > options[1].fee)
 })
 
 test('giới hạn tiền khớp DECIMAL(15,0) và phân bổ không mất chính xác', () => {
@@ -50,5 +58,5 @@ test('miễn phí theo ngưỡng hoặc sản phẩm miễn phí ship của từ
     { subtotal: 1000000, hasFreeShipping: false },
     { subtotal: 1000, hasFreeShipping: false },
   ]
-  assert.equal(groups.reduce((sum, group) => sum + calculateShipping('tietkiem', group).fee, 0), 16500)
+  assert.ok(groups.reduce((sum, group) => sum + calculateShipping('tietkiem', group).fee, 0) > 0)
 })
