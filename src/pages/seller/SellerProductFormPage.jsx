@@ -181,7 +181,7 @@ export default function SellerProductFormPage() {
           savedImages.push(image)
           continue
         }
-        const response = await apiUploadSellerImage(image.dataUrl)
+        const response = await apiUploadSellerImage(image.dataUrl, 'product')
         const payload = await response.json().catch(() => null)
         if (!response.ok || !payload?.success || !payload?.data?.url) {
           throw new Error(payload?.message || `Không thể tải ảnh lên (HTTP ${response.status}).`)

@@ -303,14 +303,14 @@ export function apiDeleteSellerProduct(productId) {
   return apiRequest(`/seller/products/${encodeURIComponent(productId)}`, { method: 'DELETE', body: {} })
 }
 
-export async function apiUploadSellerImage(file) {
+export async function apiUploadSellerImage(file, purpose) {
   const dataUrl = typeof file === 'string' ? file : await new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'))
     reader.onload = () => resolve(reader.result)
     reader.readAsDataURL(file)
   })
-  return apiRequest('/uploads/images', { method: 'POST', body: { dataUrl } })
+  return apiRequest('/uploads/images', { method: 'POST', body: { dataUrl, ...(purpose ? { purpose } : {}) } })
 }
 
 export function apiGetProductReviews(productId) {
