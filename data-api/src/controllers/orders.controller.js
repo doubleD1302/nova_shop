@@ -127,6 +127,10 @@ export async function createOrder(req, res, next) {
         }
       }
 
+      // Khóa user giống luồng sửa hồ sơ để hai lần đặt hàng không tạo hai địa chỉ mặc định.
+      const buyers = await query("SELECT id FROM users WHERE id = ? AND status = 'active' FOR UPDATE", [userId])
+      if (!buyers.length) return { error: 'BUYER_NOT_FOUND' }
+
       const variants = []
       for (const item of order.items) {
         const rows = await query(
@@ -302,6 +306,20 @@ export async function createOrder(req, res, next) {
         )
       }
 
+      // Chỉ lưu địa chỉ đầu tiên; không ghi đè địa chỉ mặc định người dùng đã chọn.
+      const defaultAddresses = await query(
+        'SELECT id FROM addresses WHERE user_id = ? AND is_default = 1 AND deleted_at IS NULL FOR UPDATE',
+        [userId],
+      )
+      if (!defaultAddresses.length) {
+        await query(
+          `INSERT INTO addresses (user_id, recipient_name, phone, province, district, ward, detail, is_default)
+           VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+          [userId, order.address.recipientName, order.address.phone, order.address.province,
+            order.address.district || null, order.address.ward || null, order.address.detail],
+        )
+      }
+
       return {
         order: {
           id: orderId,
@@ -329,6 +347,7 @@ export async function createOrder(req, res, next) {
 
     if (result.error) {
       const errors = {
+        BUYER_NOT_FOUND: [404, 'BUYER_NOT_FOUND', 'Không tìm thấy tài khoản đang hoạt động.'],
         IDEMPOTENCY_CONFLICT: [409, 'IDEMPOTENCY_CONFLICT', 'Yêu cầu đặt hàng đã được sử dụng với thông tin khác.'],
         PRODUCT_UNAVAILABLE: [409, 'PRODUCT_UNAVAILABLE', 'Một sản phẩm trong giỏ không còn được bán.'],
         INSUFFICIENT_STOCK: [409, 'INSUFFICIENT_STOCK', 'Số lượng đặt vượt quá tồn kho hiện tại.'],

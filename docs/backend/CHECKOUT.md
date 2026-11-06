@@ -38,7 +38,7 @@ Lỗi nghiệp vụ: `400 VALIDATION_ERROR`, `400 VOUCHER_INVALID`, `400 ORDER_A
 
 `POST /api/v1/orders` yêu cầu Bearer token và header `Idempotency-Key` gồm 16–64 ký tự chữ, số, `_` hoặc `-`. Body gồm `items`, `shippingMethod`, `voucherCode` tùy chọn, `paymentMethod: "cod"`, `address` với `fullName`, `phone`, `province`, `detail` và tùy chọn `district`, `ward`, cùng `note` tùy chọn.
 
-Server kiểm tra dữ liệu, giá, kho và voucher; tạo đơn, trừ kho, ghi nhận voucher trong transaction. Tổng tiền từ client không được dùng làm nguồn tính tiền. Dùng cùng khóa với cùng nội dung khi thử lại; nếu dùng cùng khóa cho nội dung khác, API trả `409 IDEMPOTENCY_CONFLICT`. Response thành công có `data.order` với `subtotal`, `shippingFee`, `discount`, `total` và thông tin đơn. Phương thức thanh toán hiện được chấp nhận là COD.
+Server kiểm tra dữ liệu, giá, kho và voucher; tạo đơn, trừ kho, ghi nhận voucher trong transaction. Khi tài khoản chưa có địa chỉ mặc định, đơn tạo thành công đồng thời lưu địa chỉ nhận hàng làm địa chỉ mặc định; đơn lỗi không lưu. Nếu đã có địa chỉ mặc định, địa chỉ từ đơn mới không ghi đè; người dùng có thể sửa qua `PUT /api/v1/auth/profile`. `GET /api/v1/auth/me` trả địa chỉ đã lưu. Tổng tiền từ client không được dùng làm nguồn tính tiền. Dùng cùng khóa với cùng nội dung khi thử lại; nếu dùng cùng khóa cho nội dung khác, API trả `409 IDEMPOTENCY_CONFLICT`. Response thành công có `data.order` với `subtotal`, `shippingFee`, `discount`, `total` và thông tin đơn. Phương thức thanh toán hiện được chấp nhận là COD.
 
 Voucher được phân bổ theo tỷ lệ tiền hàng tích lũy giữa các shop, làm tròn xuống đến đồng. Phần giảm của mỗi shop không vượt tiền hàng của shop đó và tổng phần giảm luôn bằng mức giảm của đơn.
 

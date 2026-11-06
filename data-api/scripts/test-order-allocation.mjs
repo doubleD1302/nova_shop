@@ -8,7 +8,7 @@ process.env.DATA_API_KEY = 'checkout-test-only-key'
 const { sequelize, closeDatabase } = await import('../src/config/database.js')
 const { createOrder } = await import('../src/controllers/orders.controller.js')
 
-async function runOrder({ failStock = false, lockError = null } = {}) {
+async function runOrder({ failStock = false, lockError = null, hasAddress = false, failAddress = false } = {}) {
   const commands = []
   const shopOrders = []
   const payments = []
@@ -19,6 +19,9 @@ async function runOrder({ failStock = false, lockError = null } = {}) {
         if (lockError && sql.includes('FROM product_variants v')) return callback(Object.assign(new Error('test lock error'), { code: lockError }))
         let result = { insertId: 1, affectedRows: 1 }
         if (sql.includes('FROM orders WHERE')) result = []
+        else if (sql.includes('SELECT id FROM users WHERE')) result = [{ id: '1' }]
+        else if (sql.includes('SELECT id FROM addresses WHERE')) result = hasAddress ? [{ id: '1' }] : []
+        else if (sql.includes('INSERT INTO addresses') && failAddress) return callback(new Error('test address write failure'))
         else if (sql.includes('FROM product_variants v')) {
           const id = values[0]
           result = [{ variant_id: id, product_id: id, variant_name: 'SKU', attributes: {}, sku: id,
@@ -56,11 +59,17 @@ try {
   assert.deepEqual(success.shopOrders.map((values) => values[6]), [1, 0, 0])
   assert.deepEqual(success.payments.map((values) => values[1]), [1, 0, 0])
   assert.ok(success.commands.includes('COMMIT'))
+  assert.ok(success.commands.some((sql) => sql.includes('INSERT INTO addresses')))
+  const existing = await runOrder({ hasAddress: true })
+  assert.equal(existing.status, 201)
+  assert.ok(!existing.commands.some((sql) => sql.includes('INSERT INTO addresses')))
+  await assert.rejects(runOrder({ failAddress: true }), /test address write failure/)
   const failure = await runOrder({ failStock: true })
   assert.equal(failure.status, 409)
   assert.equal(failure.body.error.code, 'INSUFFICIENT_STOCK')
   assert.ok(failure.commands.includes('ROLLBACK'))
   assert.ok(!failure.commands.includes('COMMIT'))
+  assert.ok(!failure.commands.some((sql) => sql.includes('INSERT INTO addresses')))
   for (const code of ['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']) {
     const conflict = await runOrder({ lockError: code })
     assert.equal(conflict.status, 409)
