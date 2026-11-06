@@ -20,7 +20,7 @@ class ShopListResult {
   });
 }
 
-/// Service tương tác với Backend Shop API (/api/v1/shops/*)
+/// Service tương tác với Backend Shop API (/api/v1/shops/* và /api/v1/seller/shop*)
 class ShopService {
   static final ShopService _instance = ShopService._internal();
   factory ShopService() => _instance;
@@ -50,22 +50,29 @@ class ShopService {
 
     final response = await _client.get('/api/v1/shops', queryParams: queryParams);
 
-    if (response.success && response.data is List) {
-      final list = (response.data as List)
+    if (response.success && response.data != null) {
+      List<dynamic> rawList = [];
+      int total = 0;
+      if (response.data is List) {
+        rawList = response.data as List;
+        total = rawList.length;
+      } else if (response.data is Map) {
+        final m = response.data as Map;
+        if (m['shops'] is List) rawList = m['shops'] as List;
+        total = (m['total'] is num) ? (m['total'] as num).toInt() : rawList.length;
+      }
+
+      final list = rawList
           .whereType<Map<String, dynamic>>()
           .map((item) => Shop.fromJson(item))
           .toList();
-
-      final meta = response.meta ?? {};
-      final total = (meta['total'] is num) ? (meta['total'] as num).toInt() : list.length;
-      final totalPages = (meta['totalPages'] is num) ? (meta['totalPages'] as num).toInt() : 1;
 
       return ShopListResult(
         shops: list,
         total: total,
         page: page,
         limit: limit,
-        totalPages: totalPages,
+        totalPages: (total / (limit > 0 ? limit : 1)).ceil(),
       );
     }
 
@@ -159,5 +166,50 @@ class ShopService {
       return ok ? true : false;
     }
   }
-}
 
+  // ===================== SELLER SHOP APIS (Chủ sở hữu gian hàng) =====================
+
+  /// Lấy thông tin hồ sơ gian hàng của chính seller hiện tại (kể cả pending/rejected)
+  /// GET /api/v1/seller/shop
+  Future<Shop?> getSellerShop() async {
+    final response = await _client.get('/api/v1/seller/shop');
+    if (response.success && response.data is Map<String, dynamic>) {
+      final data = response.data as Map<String, dynamic>;
+      if (data['shop'] is Map<String, dynamic>) {
+        return Shop.fromJson(data['shop'] as Map<String, dynamic>);
+      }
+    }
+    return null;
+  }
+
+  /// Cập nhật hồ sơ gian hàng của seller (pending, rejected hoặc active)
+  /// PUT /api/v1/seller/shop
+  Future<ApiResponse> updateSellerShop({
+    required String name,
+    String? tagline,
+    String? description,
+    required String province,
+    String? address,
+    String? logoUrl,
+    String? bannerUrl,
+  }) async {
+    return await _client.put(
+      '/api/v1/seller/shop',
+      body: {
+        'name': name.trim(),
+        'tagline': tagline?.trim(),
+        'description': description?.trim(),
+        'province': province.trim(),
+        'address': address?.trim(),
+        if (logoUrl != null && logoUrl.trim().isNotEmpty) 'logoUrl': logoUrl.trim(),
+        if (bannerUrl != null && bannerUrl.trim().isNotEmpty) 'bannerUrl': bannerUrl.trim(),
+      },
+    );
+  }
+
+  /// Gửi lại hồ sơ gian hàng sau khi bị từ chối (chuyển từ rejected -> pending)
+  /// POST /api/v1/seller/shop/resubmit
+  Future<ApiResponse> resubmitSellerShop() async {
+    return await _client.post('/api/v1/seller/shop/resubmit');
+  }
+}

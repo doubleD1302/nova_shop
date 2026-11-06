@@ -47,3 +47,29 @@ export async function saveVoucher(req, res, next) {
     return res.json({ success: true, data: result })
   } catch (err) { return next(err) }
 }
+
+export async function listPublicVouchers(req, res, next) {
+  try {
+    const rows = await executeQuery(
+      `SELECT id, code, name, discount_amount, min_subtotal, starts_at, ends_at, usage_limit, per_user_limit, used_count
+       FROM vouchers
+       WHERE is_active = 1 AND (ends_at IS NULL OR ends_at > UTC_TIMESTAMP(3))
+       ORDER BY discount_amount DESC, id DESC LIMIT 50`
+    );
+    const vouchers = rows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      discountAmount: Number(r.discount_amount),
+      minSubtotal: Number(r.min_subtotal),
+      startsAt: r.starts_at ? new Date(r.starts_at).toISOString() : null,
+      endsAt: r.ends_at ? new Date(r.ends_at).toISOString() : null,
+      usageLimit: r.usage_limit,
+      perUserLimit: r.per_user_limit,
+      usedCount: r.used_count,
+    }));
+    return res.status(200).json({ success: true, data: vouchers });
+  } catch (err) {
+    return next(err);
+  }
+}

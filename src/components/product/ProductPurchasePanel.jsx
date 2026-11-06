@@ -7,6 +7,7 @@ import { DiscountBadge, ShipBadge } from '../ui/Badge'
 import { IconCart, IconChat, IconShieldCheck, IconStar, IconTruck } from '../ui/Icons'
 import Price, { OldPrice } from '../ui/Price'
 import QuantityStepper from '../ui/QuantityStepper'
+import { Countdown } from '../home/FlashSale'
 
 /** Panel mua hàng: giá, phân loại, số lượng, nút Thêm vào giỏ / Mua ngay */
 export default function ProductPurchasePanel({ product, rating = product.rating, selected: controlledSelection, onVariantChange }) {
@@ -71,6 +72,18 @@ export default function ProductPurchasePanel({ product, rating = product.rating,
           Yêu thích
         </span>
       </div>
+
+      {Boolean(product.flash || product.is_flash_sale || (product.discount && product.discount >= 30)) && (
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-gradient-to-r from-[#E53935] to-[#FF6F00] px-4 py-2 text-white shadow-xs">
+          <div className="flex items-center gap-1.5 font-black text-[13px] tracking-wide">
+            <span className="text-yellow-300">⚡</span> FLASH SALE SHOPNOVA
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-bold">
+            <span className="opacity-90">KẾT THÚC TRONG</span>
+            <Countdown compact />
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl bg-page px-4 py-3">
         <div className="flex items-baseline gap-2">

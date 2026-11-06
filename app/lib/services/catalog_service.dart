@@ -7,6 +7,7 @@ import '../models/banner_item.dart';
 import '../models/flash_sale_item.dart';
 import '../data/website_data.dart';
 import '../utils/product_image_resolver.dart';
+import '../utils/flash_sale_rotator.dart';
 import 'api_client.dart';
 import '../config/api_config.dart';
 
@@ -28,6 +29,16 @@ class ProductListResult {
 }
 
 class CatalogService {
+  List<dynamic> _extractList(dynamic data, String preferredKey) {
+    if (data is List) return data;
+    if (data is Map) {
+      if (data[preferredKey] is List) return data[preferredKey] as List;
+      for (final v in data.values) {
+        if (v is List) return v;
+      }
+    }
+    return [];
+  }
   static final CatalogService _instance = CatalogService._internal();
   factory CatalogService({http.Client? client}) {
     if (client != null) {
@@ -52,8 +63,8 @@ class CatalogService {
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is List) {
-          final list = body['data'] as List;
+        if (body['success'] == true && body['data'] != null) {
+          final list = _extractList(body['data'], 'categories');
           apiCategories = list.map((e) => CategoryItem.fromJson(e as Map<String, dynamic>)).toList();
         }
       }
@@ -78,8 +89,9 @@ class CatalogService {
   /// GET /api/v1/categories
   Future<List<Map<String, dynamic>>> getRawCategories() async {
     final response = await _apiClient.get('/api/v1/categories');
-    if (response.success && response.data is List) {
-      return (response.data as List).whereType<Map<String, dynamic>>().toList();
+    if (response.success && response.data != null) {
+      final list = _extractList(response.data, 'categories');
+      return list.whereType<Map<String, dynamic>>().toList();
     }
     return [];
   }
@@ -109,8 +121,8 @@ class CatalogService {
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is List) {
-          final list = body['data'] as List;
+        if (body['success'] == true && body['data'] != null) {
+          final list = _extractList(body['data'], 'products');
           allProducts = list.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
         }
       }
@@ -191,18 +203,25 @@ class CatalogService {
 
     final response = await _apiClient.get('/api/v1/products', queryParams: queryParams);
 
-    if (response.success && response.data is List) {
-      final list = (response.data as List)
+    if (response.success && response.data != null) {
+      final list = _extractList(response.data, 'products')
           .whereType<Map<String, dynamic>>()
           .map((item) => Product.fromJson(item))
           .toList();
+
+      int total = list.length;
+      if (response.data is Map && response.data['total'] is num) {
+        total = (response.data['total'] as num).toInt();
+      } else if (response.meta?['total'] is num) {
+        total = (response.meta!['total'] as num).toInt();
+      }
 
       return ProductListResult(
         products: list,
         page: (response.meta?['page'] as num?)?.toInt() ?? page,
         limit: (response.meta?['limit'] as num?)?.toInt() ?? limit,
-        total: (response.meta?['total'] as num?)?.toInt() ?? list.length,
-        totalPages: (response.meta?['totalPages'] as num?)?.toInt() ?? 1,
+        total: total,
+        totalPages: (total / (limit > 0 ? limit : 1)).ceil(),
       );
     }
 
@@ -231,63 +250,19 @@ class CatalogService {
     return WebsiteData.banners;
   }
 
-  /// Lấy danh sách sản phẩm Flash Sale từ Backend API
+  /// Lấy danh sách sản phẩm Flash Sale xoay tua thông minh theo khung giờ & sự kiện (Shopee-style)
   Future<List<FlashSaleItem>> getFlashSaleItems() async {
     try {
-      // 1. Ưu tiên lấy từ API Backend /api/v1/products/featured
-      final featured = await getFeaturedHomeData();
-      final flashList = featured['flashSale'];
-      if (flashList is List && flashList.isNotEmpty) {
-        return flashList.map((item) {
-          final m = item as Map<String, dynamic>;
-          final num price = num.tryParse(m['price']?.toString() ?? '') ?? 0;
-          final num origPrice = num.tryParse(m['originalPrice']?.toString() ?? '') ?? price;
-          final num discount = num.tryParse(m['discount']?.toString() ?? '') ??
-              (origPrice > price && origPrice > 0 ? (((origPrice - price) / origPrice) * 100).round() : 0);
-          final stock = num.tryParse(m['stock']?.toString() ?? '') ?? 50;
-
-          final itemId = m['id']?.toString() ?? '';
-          final itemName = m['name']?.toString() ?? 'Sản phẩm Flash Sale';
-          final rawImg = m['imageUrl']?.toString() ?? '';
-          final resolvedImg = ProductImageResolver.resolve(
-            id: itemId,
-            imageUrl: rawImg,
-            name: itemName,
-          );
-
-          return FlashSaleItem(
-            id: itemId,
-            name: itemName,
-            imageUrl: resolvedImg,
-            price: price.toDouble(),
-            discount: discount.toInt(),
-            soldPercentage: 0.65,
-            soldLabel: stock <= 10 ? 'SẮP CHÁY HÀNG' : 'ĐÃ BÁN 65%',
-            emoji: '⚡',
-          );
-        }).toList();
-      }
-
-      // 2. Dự phòng lấy từ getProducts(isFlashSale: true)
-      final products = await getProducts(isFlashSale: true);
-      if (products.isNotEmpty) {
-        return products.take(6).map((p) {
-          return FlashSaleItem(
-            id: p.id,
-            name: p.name,
-            imageUrl: p.effectiveImageUrl,
-            price: p.price,
-            discount: p.discount > 0 ? p.discount : 35,
-            soldPercentage: p.soldPercent / 100.0,
-            soldLabel: p.soldPercent >= 90 ? 'SẮP CHÁY HÀNG' : 'ĐÃ BÁN ${p.soldPercent}%',
-            emoji: p.emoji,
-          );
-        }).toList();
+      // 1. Lấy danh sách sản phẩm từ Backend API làm kho dữ liệu xoay tua
+      final apiProducts = await getProducts();
+      if (apiProducts.isNotEmpty) {
+        return FlashSaleRotator.rotateItems(apiProducts: apiProducts, count: 6);
       }
     } catch (e) {
       debugPrint('[CatalogService] getFlashSaleItems error: $e');
     }
-    return WebsiteData.flashSales;
+    // 2. Tự động xoay tua dựa trên toàn bộ 63+ sản phẩm chuẩn sàn của ShopNova
+    return FlashSaleRotator.rotateItems(count: 6);
   }
 
   /// Lấy chi tiết sản phẩm từ Backend API (kèm fallback thông minh theo WebsiteData)
@@ -328,8 +303,9 @@ class CatalogService {
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
-        if (body['success'] == true && body['data'] is List) {
-          final apiShops = List<Map<String, dynamic>>.from(body['data']);
+        if (body['success'] == true && body['data'] != null) {
+          final list = _extractList(body['data'], 'shops');
+          final apiShops = list.whereType<Map<String, dynamic>>().toList();
           if (apiShops.isNotEmpty) return apiShops;
         }
       }

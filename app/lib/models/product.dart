@@ -62,6 +62,14 @@ class Product {
         name: name,
       );
 
+  /// Bộ ảnh gallery thực tế (đã lọc sạch link lỗi / link giả lập)
+  List<String> get effectiveGalleryImages => ProductImageResolver.resolveGallery(
+        id: id,
+        images: images,
+        categoryId: categoryId,
+        name: name,
+      );
+
   Product copyWith({
     String? id,
     String? name,
@@ -148,10 +156,15 @@ class Product {
     final rawImages = json['images'] ?? json['gallery'];
     List<String> images = [];
     if (rawImages is List) {
-      images = rawImages.where((e) => e != null).map((e) {
-        if (e is Map && e['url'] != null) return e['url'].toString();
-        return e.toString();
-      }).toList();
+      images = rawImages
+          .where((e) => e != null)
+          .map((e) {
+            if (e is Map && e['url'] != null) return e['url'].toString();
+            return e.toString();
+          })
+          .map((u) => ProductImageResolver.resolveUrl(u))
+          .where((u) => u.isNotEmpty && !ProductImageResolver.isDummyUrl(u))
+          .toList();
     }
 
     final rawSpecs = json['specs'];

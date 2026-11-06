@@ -106,7 +106,8 @@ async function migrateVerifiedLegacyAccount(username, password) {
 }
 
 export async function login(req, res, next) {
-  const { username, password } = req.body || {}
+  const username = req.body?.username || req.body?.usernameOrEmail
+  const { password } = req.body || {}
   if (typeof username !== 'string' || !username.trim() || typeof password !== 'string' || !password) {
     return res.status(400).json({
       success: false,

@@ -4,14 +4,15 @@ import 'package:shopnova/screens/orders/orders_screen.dart';
 import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
 import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/account/favorites_screen.dart';
-import 'package:shopnova/screens/seller/seller_hub_screen.dart';
 import 'package:shopnova/screens/seller/seller_register_screen.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/cart_service.dart';
-import 'package:shopnova/screens/admin/admin_screen.dart';
+import 'package:shopnova/services/upload_service.dart';
 import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/theme/app_colors.dart';
+import 'package:shopnova/models/voucher.dart';
+import 'package:shopnova/services/voucher_service.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -31,6 +32,8 @@ class _AccountScreenState extends State<AccountScreen> {
   String _receiverAddress = 'Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh';
   bool _isCheckingServer = false;
   Map<String, dynamic>? _serverStatus;
+  List<Voucher> _apiVouchers = [];
+  Set<String> _savedVouchers = {};
 
   @override
   void initState() {
@@ -44,6 +47,18 @@ class _AccountScreenState extends State<AccountScreen> {
     });
     _loadUserStats();
     _checkServerStatus();
+    _loadVouchers();
+  }
+
+  Future<void> _loadVouchers() async {
+    final list = await VoucherService().getActiveVouchers();
+    final saved = await VoucherService().getSavedVoucherCodes();
+    if (mounted) {
+      setState(() {
+        _apiVouchers = list;
+        _savedVouchers = saved;
+      });
+    }
   }
 
   @override
@@ -104,6 +119,9 @@ class _AccountScreenState extends State<AccountScreen> {
     final phoneController = TextEditingController(text: user.phone ?? '');
     final emailController = TextEditingController(text: user.email ?? '');
     final avatarController = TextEditingController(text: user.avatarUrl ?? '');
+    String? previewAvatarUrl = user.avatarUrl;
+    bool shouldClearAvatar = false;
+    bool isUploadingAvatar = false;
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -116,6 +134,8 @@ class _AccountScreenState extends State<AccountScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
+            final hasAvatar = !shouldClearAvatar && (previewAvatarUrl != null && previewAvatarUrl!.isNotEmpty);
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
@@ -142,6 +162,114 @@ class _AccountScreenState extends State<AccountScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
+
+                    // Khu vực Avatar: Xem trước, Tải từ máy và Xóa ảnh
+                    Center(
+                      child: Column(
+                        children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 44,
+                                backgroundColor: const Color(0xFFF0F2F5),
+                                backgroundImage: hasAvatar
+                                    ? NetworkImage(ApiConfig.resolveImageUrl(previewAvatarUrl))
+                                    : null,
+                                child: hasAvatar
+                                    ? null
+                                    : const Icon(Icons.person_rounded, size: 48, color: Color(0xFF90949C)),
+                              ),
+                              if (isUploadingAvatar)
+                                Container(
+                                  width: 88,
+                                  height: 88,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: (isUploadingAvatar || isSaving)
+                                    ? null
+                                    : () async {
+                                        setModalState(() => isUploadingAvatar = true);
+                                        final result = await UploadService().pickAndUploadImage(purpose: 'avatar');
+                                        setModalState(() => isUploadingAvatar = false);
+
+                                        if (result != null) {
+                                          if (result.success && result.url != null) {
+                                            setModalState(() {
+                                              previewAvatarUrl = result.url;
+                                              avatarController.text = result.url!;
+                                              shouldClearAvatar = false;
+                                            });
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Đã tải ảnh đại diện thành công!'),
+                                                  backgroundColor: Color(0xFF00BFA5),
+                                                ),
+                                              );
+                                            }
+                                          } else {
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(result.error ?? 'Tải ảnh thất bại.'),
+                                                  backgroundColor: const Color(0xFFD0011B),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        }
+                                      },
+                                icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                                label: const Text('Chọn ảnh từ máy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                ),
+                              ),
+                              if (hasAvatar || avatarController.text.trim().isNotEmpty) ...[
+                                const SizedBox(width: 10),
+                                TextButton.icon(
+                                  onPressed: (isUploadingAvatar || isSaving)
+                                      ? null
+                                      : () {
+                                          setModalState(() {
+                                            shouldClearAvatar = true;
+                                            previewAvatarUrl = null;
+                                            avatarController.clear();
+                                          });
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Đã chọn xóa ảnh đại diện. Nhấn "Lưu thay đổi" để áp dụng.'),
+                                            ),
+                                          );
+                                        },
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFD0011B)),
+                                  label: const Text('Xóa ảnh', style: TextStyle(color: Color(0xFFD0011B), fontSize: 13, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
@@ -173,6 +301,12 @@ class _AccountScreenState extends State<AccountScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: avatarController,
+                      onChanged: (val) {
+                        setModalState(() {
+                          previewAvatarUrl = val.trim();
+                          shouldClearAvatar = false;
+                        });
+                      },
                       decoration: InputDecoration(
                         labelText: 'URL ảnh đại diện (Tùy chọn)',
                         prefixIcon: const Icon(Icons.image_outlined),
@@ -201,14 +335,34 @@ class _AccountScreenState extends State<AccountScreen> {
                                 }
 
                                 setModalState(() => isSaving = true);
-                                final ok = await auth.updateProfile(
-                                  fullName: name,
-                                  phone: phoneController.text.trim(),
-                                  email: emailController.text.trim(),
-                                  avatarUrl: avatarController.text.trim().isNotEmpty
-                                      ? avatarController.text.trim()
-                                      : null,
-                                );
+
+                                final initialAvatar = user.avatarUrl ?? '';
+                                final currentAvatarInput = avatarController.text.trim();
+                                bool ok = false;
+
+                                if (shouldClearAvatar) {
+                                  ok = await auth.updateProfile(
+                                    fullName: name,
+                                    phone: phoneController.text.trim(),
+                                    email: emailController.text.trim(),
+                                    clearAvatar: true,
+                                  );
+                                } else if (currentAvatarInput.isNotEmpty && currentAvatarInput != initialAvatar) {
+                                  ok = await auth.updateProfile(
+                                    fullName: name,
+                                    phone: phoneController.text.trim(),
+                                    email: emailController.text.trim(),
+                                    avatarUrl: currentAvatarInput,
+                                  );
+                                } else {
+                                  // Giữ nguyên ảnh đại diện trên máy chủ
+                                  ok = await auth.updateProfile(
+                                    fullName: name,
+                                    phone: phoneController.text.trim(),
+                                    email: emailController.text.trim(),
+                                  );
+                                }
+
                                 setModalState(() => isSaving = false);
 
                                 if (mounted) {
@@ -521,7 +675,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         radius: 32,
                         backgroundColor: isLoggedIn ? primaryColor : const Color(0xFFE2E2E6),
                         backgroundImage: (isLoggedIn && user.avatarUrl != null && user.avatarUrl!.isNotEmpty)
-                            ? NetworkImage(user.avatarUrl!)
+                            ? NetworkImage(ApiConfig.resolveImageUrl(user.avatarUrl))
                             : null,
                         child: (isLoggedIn && user.avatarUrl != null && user.avatarUrl!.isNotEmpty)
                             ? null
@@ -739,12 +893,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SellerHubScreen()),
-                    );
-                  },
+                  onPressed: _showSellerAppNoticeDialog,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00BFA5),
                     foregroundColor: Colors.white,
@@ -754,7 +903,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Vào Kênh', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: const Text('Quản Lý Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -780,82 +929,106 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.earth],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Bán Hàng Cùng ShopNova',
-                          style: TextStyle(
-                            color: Color(0xFF1E2022),
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.all(Radius.circular(4)),
-                          ),
-                          child: const Text(
-                            '0đ PHÍ',
-                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
-                          ),
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.earth],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Mở gian hàng miễn phí, tiếp cận hàng triệu khách hàng toàn quốc',
-                      style: TextStyle(color: Color(0xFF6E7191), fontSize: 11),
-                      maxLines: 2,
+                    child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'Bán Hàng Cùng ShopNova',
+                              style: TextStyle(
+                                color: Color(0xFF1E2022),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.all(Radius.circular(4)),
+                              ),
+                              child: const Text(
+                                '0đ PHÍ',
+                                style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Mở gian hàng miễn phí, tiếp cận hàng triệu khách hàng toàn quốc',
+                          style: TextStyle(color: Color(0xFF6E7191), fontSize: 11),
+                          maxLines: 2,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Đăng Ký', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showSellerAppNoticeDialog,
+                      icon: const Icon(Icons.storefront_outlined, size: 15),
+                      label: const Text('Quản Lý Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.how_to_reg_outlined, size: 15),
+                      label: const Text('Đăng Ký Mở Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -869,85 +1042,232 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final vouchers = _apiVouchers.isNotEmpty
+              ? _apiVouchers
+              : [
+                  Voucher(id: 1, code: 'NOVA20K', name: 'Giảm 20.000₫ cho đơn từ 200k', discountAmount: 20000, minSubtotal: 200000),
+                  Voucher(id: 2, code: 'FREESHIPMAX', name: 'Giảm 30.000₫ phí vận chuyển đơn từ 99k', discountAmount: 30000, minSubtotal: 99000),
+                  Voucher(id: 3, code: 'CHAOBANMOI', name: 'Giảm 50.000₫ cho đơn từ 150k', discountAmount: 50000, minSubtotal: 150000),
+                  Voucher(id: 4, code: 'NOVAMEGA50', name: 'Giảm 50.000₫ cho đơn từ 350k', discountAmount: 50000, minSubtotal: 350000),
+                ];
+
+          return Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.confirmation_number_outlined, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text('Ví Voucher Của Tôi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFC8E6C9)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 13),
+                            SizedBox(width: 4),
+                            Text('API Sẵn sàng', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFC8E6C9)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.verified_outlined, color: Color(0xFF2E7D32), size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Đã kết nối API Voucher ShopNova. Các mã bên dưới có hiệu lực thực tế và tự động khấu trừ khi thanh toán.',
+                            style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...vouchers.map((v) {
+                    final isSaved = _savedVouchers.contains(v.code);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAFAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFEEEEF0)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        v.code,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 11),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        v.discountFormatted,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  v.name,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF2B2B2B)),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  v.minSubtotalFormatted,
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () async {
+                              await VoucherService().saveVoucher(v.code);
+                              setModalState(() {
+                                _savedVouchers.add(v.code);
+                              });
+                              setState(() {
+                                _savedVouchers.add(v.code);
+                              });
+                              _copyToClipboard(v.code);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isSaved ? const Color(0xFFE8F5E9) : primaryColor,
+                              foregroundColor: isSaved ? const Color(0xFF2E7D32) : Colors.white,
+                              elevation: isSaved ? 0 : 1,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              minimumSize: const Size(0, 32),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                side: isSaved ? const BorderSide(color: Color(0xFF81C784)) : BorderSide.none,
+                              ),
+                            ),
+                            child: Text(
+                              isSaved ? 'Đã lưu ✓' : 'Lưu mã',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSellerAppNoticeDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.storefront_rounded, color: Color(0xFF00796B), size: 24),
+            SizedBox(width: 8),
+            Text('Kênh Người Bán ShopNova', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
-              children: [
-                Icon(Icons.confirmation_number_outlined, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text('Ví Voucher Của Tôi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-              ],
+            const Text(
+              'Tính năng quản lý shop, xử lý đơn hàng và đăng sản phẩm đã được chuyển sang ứng dụng riêng biệt:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF555770)),
             ),
             const SizedBox(height: 12),
             Container(
-              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3CD),
+                color: const Color(0xFFE0F2F1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFFEEBA)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFF856404), size: 18),
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF00796B), size: 20),
                   SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Chưa có API kết nối: Tính năng Voucher hiện chưa có API trên hệ thống Backend website. Các mã bên dưới là mã ưu đãi mẫu.',
-                      style: TextStyle(color: Color(0xFF856404), fontSize: 11),
-                    ),
+                    child: Text('Ứng dụng: ShopNova Seller', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF004D40))),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
-            ...[
-              {'code': 'FREESHIPMAX', 'title': 'Giảm 30K phí vận chuyển', 'desc': 'Đơn từ 99.000 ₫'},
-              {'code': 'CHAOBANMOI', 'title': 'Giảm 15% tối đa 50K', 'desc': 'Cho mọi đơn hàng đầu tiên'},
-              {'code': 'NOVAMEGA50', 'title': 'Giảm ngay 50.000 ₫', 'desc': 'Đơn từ 350.000 ₫'},
-            ].map((v) => Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFEEEEF0)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(v['code']!, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                      const SizedBox(height: 2),
-                      Text(v['title']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      Text(v['desc']!, style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
-                    ],
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _copyToClipboard(v['code']!);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      minimumSize: const Size(0, 32),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
-                    child: const Text('Lưu mã', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            )),
+            const SizedBox(height: 10),
+            const Text(
+              'Vui lòng tải hoặc mở ứng dụng ShopNova Seller trên thiết bị để đăng nhập và quản lý gian hàng của bạn.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
+            ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
+              );
+            },
+            child: const Text('Đăng ký mở shop mới', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00796B), foregroundColor: Colors.white),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
       ),
     );
   }
@@ -955,7 +1275,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildStatsBar(BuildContext context) {
     final orderCount = _backendStats?['orderCount'] ?? 0;
     final totalSpent = _backendStats?['totalSpent'] ?? 0;
-    final voucherCount = _backendStats?['voucherCount'] ?? 3;
+    final voucherCount = _backendStats?['voucherCount'] ?? (_apiVouchers.isNotEmpty ? _apiVouchers.length : 4);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -1133,28 +1453,20 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildVouchersSection(BuildContext context) {
-    final vouchers = [
-      {
-        'code': 'FREESHIPMAX',
-        'title': 'Miễn phí vận chuyển toàn quốc',
-        'desc': 'Giảm 30K phí vận chuyển',
-        'minSpend': 'Đơn từ 99.000 ₫',
-        'color': const Color(0xFF00BFA5),
-      },
-      {
-        'code': 'CHAOBANMOI',
-        'title': 'Ưu đãi chào mừng thành viên mới',
-        'desc': 'Giảm 15% tối đa 50K',
-        'minSpend': 'Mọi đơn hàng',
-        'color': const Color(0xFFD97706),
-      },
-      {
-        'code': 'NOVAMEGA50',
-        'title': 'Mã giảm giá Mega Sale',
-        'desc': 'Giảm ngay 50.000 ₫',
-        'minSpend': 'Đơn từ 350.000 ₫',
-        'color': const Color(0xFFD0011B),
-      },
+    final vouchers = _apiVouchers.isNotEmpty
+        ? _apiVouchers
+        : [
+            Voucher(id: 1, code: 'NOVA20K', name: 'Giảm 20.000₫ cho đơn từ 200k', discountAmount: 20000, minSubtotal: 200000),
+            Voucher(id: 2, code: 'FREESHIPMAX', name: 'Giảm 30.000₫ phí vận chuyển đơn từ 99k', discountAmount: 30000, minSubtotal: 99000),
+            Voucher(id: 3, code: 'CHAOBANMOI', name: 'Giảm 50.000₫ cho đơn từ 150k', discountAmount: 50000, minSubtotal: 150000),
+            Voucher(id: 4, code: 'NOVAMEGA50', name: 'Giảm 50.000₫ cho đơn từ 350k', discountAmount: 50000, minSubtotal: 350000),
+          ];
+
+    final colors = [
+      const Color(0xFF00BFA5),
+      const Color(0xFFD97706),
+      const Color(0xFFD0011B),
+      const Color(0xFF1E88E5),
     ];
 
     return Container(
@@ -1183,11 +1495,18 @@ class _AccountScreenState extends State<AccountScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3CD),
+                  color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFFFEEBA)),
+                  border: Border.all(color: const Color(0xFFC8E6C9)),
                 ),
-                child: const Text('Chưa có API', style: TextStyle(color: Color(0xFF856404), fontSize: 10, fontWeight: FontWeight.bold)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt, color: Color(0xFF2E7D32), size: 12),
+                    SizedBox(width: 2),
+                    Text('API Đang hoạt động', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1200,7 +1519,8 @@ class _AccountScreenState extends State<AccountScreen> {
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, idx) {
                 final v = vouchers[idx];
-                final col = v['color'] as Color;
+                final col = colors[idx % colors.length];
+                final isSaved = _savedVouchers.contains(v.code);
                 return Container(
                   width: 220,
                   padding: const EdgeInsets.all(12),
@@ -1223,32 +1543,48 @@ class _AccountScreenState extends State<AccountScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              v['code'] as String,
+                              v.code,
                               style: TextStyle(color: col, fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => _copyToClipboard(v['code'] as String),
+                            onTap: () async {
+                              await VoucherService().saveVoucher(v.code);
+                              setState(() {
+                                _savedVouchers.add(v.code);
+                              });
+                              _copyToClipboard(v.code);
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: primaryColor,
+                                color: isSaved ? const Color(0xFFE8F5E9) : primaryColor,
                                 borderRadius: BorderRadius.circular(4),
+                                border: isSaved ? Border.all(color: const Color(0xFF81C784)) : null,
                               ),
-                              child: const Text('Lưu mã', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                isSaved ? 'Đã lưu ✓' : 'Lưu mã',
+                                style: TextStyle(
+                                  color: isSaved ? const Color(0xFF2E7D32) : Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                       Text(
-                        v['desc'] as String,
+                        v.discountFormatted,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E2022)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        v['minSpend'] as String,
+                        '${v.name} • ${v.minSubtotalFormatted}',
                         style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -1301,56 +1637,25 @@ class _AccountScreenState extends State<AccountScreen> {
               },
             ),
             const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
-            AnimatedBuilder(
-              animation: AuthService(),
-              builder: (context, _) {
-                final isSeller = AuthService().isAuthenticated && AuthService().currentUser?.isSeller == true;
-                return _buildSettingsTile(
-                  icon: isSeller ? Icons.storefront_rounded : Icons.add_business_rounded,
-                  title: isSeller ? 'Kênh Người Bán' : 'Đăng Ký Đối Tác Bán Hàng',
-                  subtitle: isSeller
-                      ? 'Quản lý cửa hàng, doanh thu và đơn hàng'
-                      : 'Mở gian hàng 0đ, tiếp cận triệu khách hàng toàn quốc',
-                  onTap: () {
-                    if (isSeller) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SellerHubScreen()),
-                      );
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
-                      );
-                    }
-                  },
+            _buildSettingsTile(
+              icon: Icons.add_business_rounded,
+              title: 'Đăng Ký Đối Tác Bán Hàng',
+              subtitle: 'Mở gian hàng 0đ, tiếp cận triệu khách hàng toàn quốc',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
                 );
               },
             ),
             const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
-            AnimatedBuilder(
-              animation: AuthService(),
-              builder: (context, _) {
-                final isAdmin = AuthService().isAuthenticated && AuthService().currentUser?.role == 'admin';
-                if (!isAdmin) return const SizedBox.shrink();
-                return Column(
-                  children: [
-                    _buildSettingsTile(
-                      icon: Icons.admin_panel_settings_rounded,
-                      title: 'Trung Tâm Quản Trị (Admin)',
-                      subtitle: 'Xử lý báo cáo vi phạm, duyệt sản phẩm và quản lý shop',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AdminScreen()),
-                        );
-                      },
-                    ),
-                    const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
-                  ],
-                );
-              },
+            _buildSettingsTile(
+              icon: Icons.storefront_rounded,
+              title: 'Quản Lý Shop (App Seller)',
+              subtitle: 'Mở ứng dụng ShopNova Seller để quản lý kho và đơn bán',
+              onTap: _showSellerAppNoticeDialog,
             ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
             _buildSettingsTile(
               icon: Icons.lock_outline_rounded,
               title: 'Đổi mật khẩu tài khoản',

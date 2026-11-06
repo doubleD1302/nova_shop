@@ -4,24 +4,36 @@ import { useCatalog } from '../../context/CatalogContext'
 import { secondsToHms } from '../../utils/format'
 import { IconBolt, IconChevronRight } from '../ui/Icons'
 import ProductCard from '../product/ProductCard'
+import { getCurrentCampaign, getSessionLabel, rotateFlashProducts } from '../../utils/flashSaleRotator'
 
 /** Đồng hồ đếm ngược khung giờ Flash Sale */
-function Countdown() {
-  const getSecondsToHour = () => {
+export function Countdown({ className = '', compact = false }) {
+  const getSecondsToSession = () => {
     const now = new Date()
-    return (59 - now.getMinutes()) * 60 + (60 - now.getSeconds())
+    const currentHour = now.getHours()
+    const nextHour = currentHour + (2 - (currentHour % 2))
+    const nextSession = new Date(now.getFullYear(), now.getMonth(), now.getDate(), nextHour, 0, 0)
+    return Math.max(0, Math.floor((nextSession - now) / 1000))
   }
-  const [left, setLeft] = useState(getSecondsToHour)
+  const [left, setLeft] = useState(getSecondsToSession)
 
   useEffect(() => {
-    const timer = window.setInterval(() => setLeft(getSecondsToHour()), 1000)
+    const timer = window.setInterval(() => setLeft(getSecondsToSession()), 1000)
     return () => window.clearInterval(timer)
   }, [])
 
   const { h, m, s } = secondsToHms(left)
 
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1 font-mono font-bold text-xs bg-black/60 text-white px-2 py-0.5 rounded ${className}`}>
+        <span>{h}:{m}:{s}</span>
+      </span>
+    )
+  }
+
   return (
-    <div className="flex items-center gap-1">
+    <div className={`flex items-center gap-1 ${className}`}>
       <span className="hidden text-xs text-[#8B7566] sm:inline">Làm mới sau</span>
       <span className="grid h-6 w-7 place-items-center rounded-md bg-[#49352D] text-[12px] font-bold text-[#FFFCF7] shadow-2xs">
         {h}
@@ -44,13 +56,21 @@ export default function FlashSale() {
   const [flashProducts, setFlashProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const campaign = getCurrentCampaign()
+  const sessionLabel = getSessionLabel()
+
   useEffect(() => {
     let current = true
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    loadProducts({ flash: true, sort: 'popular', limit: 5, offset: 0, signal: controller.signal })
-      .then((result) => { if (current) setFlashProducts(result.products) })
+    loadProducts({ sort: 'popular', limit: 30, offset: 0, signal: controller.signal })
+      .then((result) => {
+        if (current) {
+          const rotated = rotateFlashProducts(result.products || [], 5)
+          setFlashProducts(rotated)
+        }
+      })
       .catch((loadError) => {
         if (current && loadError.name !== 'AbortError') setError(loadError.message || 'Không thể tải sản phẩm Flash Sale.')
       })
@@ -60,13 +80,19 @@ export default function FlashSale() {
 
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6D5C2] bg-gradient-to-r from-[#F5E7D4] to-[#FFFCF7] px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6D5C2] bg-gradient-to-r from-[#F5E7D4] to-[#FFFCF7] px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <span className="flex items-center gap-1.5 text-base font-black uppercase tracking-tight text-[#BD6E49] sm:text-lg">
             <IconBolt className="h-5 w-5" />
             Flash Sale
           </span>
+          <span className="rounded bg-[#B93832] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+            {campaign.badge}
+          </span>
           <Countdown />
+          <span className="hidden text-xs text-[#8B7566] md:inline">
+            • {sessionLabel}
+          </span>
         </div>
         <Link to="/tim-kiem?flash=1" className="flex items-center gap-0.5 text-[13px] font-medium text-[#BD6E49] transition hover:text-[#A95532]">
           Xem tất cả

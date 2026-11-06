@@ -30,7 +30,9 @@ class User {
       username: json['username']?.toString() ?? '',
       fullName: (json['fullName'] ?? json['full_name'] ?? json['username'] ?? '').toString(),
       email: json['email']?.toString(),
-      phone: json['phone']?.toString(),
+      phone: (json['phone'] != null && !RegExp(r'[a-zA-Z]').hasMatch(json['phone'].toString()))
+          ? json['phone'].toString()
+          : null,
       avatarUrl: (json['avatarUrl'] ?? json['avatar_url'])?.toString(),
       role: json['role']?.toString() ?? 'buyer',
       status: json['status']?.toString() ?? 'active',
@@ -57,6 +59,7 @@ class User {
     String? email,
     String? phone,
     String? avatarUrl,
+    bool clearAvatar = false,
     String? role,
     String? status,
     String? shopId,
@@ -67,7 +70,7 @@ class User {
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatar ? null : (avatarUrl ?? this.avatarUrl),
       role: role ?? this.role,
       status: status ?? this.status,
       shopId: shopId ?? this.shopId,

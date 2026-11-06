@@ -1,9 +1,42 @@
 import 'package:flutter/material.dart';
+import '../config/api_config.dart';
 
 /// Bộ phân giải hình ảnh sản phẩm thực tế cho ShopNova.
 /// Đảm bảo mọi sản phẩm từ WebsiteData, Backend API MySQL hoặc Mock
 /// đều luôn có hình ảnh chụp thật sắc nét, chuyên nghiệp, chuẩn sàn thương mại điện tử.
 class ProductImageResolver {
+  /// Kiểm tra xem URL có phải là URL giả lập / dữ liệu mẫu seed không tải được không
+  static bool isDummyUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return true;
+    final u = url.toLowerCase().trim();
+    if (u.contains('cdn.shopnova.vn') ||
+        u.contains('example.com') ||
+        u.contains('example.test') ||
+        u.contains('test-image') ||
+        u.contains('via.placeholder.com') ||
+        u.contains('dummyimage.com') ||
+        u.contains('placeholder') ||
+        u.contains('demo-image') ||
+        u.contains('invalid') ||
+        u.endsWith('/null') ||
+        u.endsWith('/undefined')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Chuẩn hóa URL ảnh: tự động ghép ApiConfig.baseUrl nếu là đường dẫn tương đối (/uploads/...)
+  static String resolveUrl(String? url) {
+    if (url == null || isDummyUrl(url)) return '';
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return '${ApiConfig.baseUrl}$trimmed';
+    }
+    return trimmed;
+  }
   static const Map<String, String> _productImages = {
     'p01': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
     'p02': 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=600&q=80',
@@ -92,9 +125,10 @@ class ProductImageResolver {
     String? categoryId,
     String? name,
   }) {
-    // 1. Nếu đã có URL ảnh hợp lệ bắt đầu bằng http/https
-    if (imageUrl != null && imageUrl.trim().startsWith('http')) {
-      return imageUrl.trim();
+    // 1. Nếu có URL ảnh hợp lệ và không phải dummy URL
+    final cleanUrl = resolveUrl(imageUrl);
+    if (cleanUrl.isNotEmpty && (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'))) {
+      return cleanUrl;
     }
 
     // 2. Tra theo mã định danh sản phẩm (p01 - p63)
@@ -105,49 +139,58 @@ class ProductImageResolver {
     // 3. Tra thông minh theo từ khóa trong tên sản phẩm
     final n = (name ?? '').toLowerCase();
     if (n.contains('tai nghe') || n.contains('headphone') || n.contains('earphone') || n.contains('sound pro')) {
-      return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('robot') || n.contains('hút bụi') || n.contains('cleaner')) {
-      return 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1518640467707-6811f4a6ab73?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('bàn phím') || n.contains('keyboard') || n.contains('hotswap')) {
-      return 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('sữa tắm') || n.contains('dưỡng') || n.contains('serum') || n.contains('kem') || n.contains('son') || n.contains('nước hoa') || n.contains('mỹ phẩm')) {
-      return 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('giày') || n.contains('sneaker') || n.contains('dép')) {
-      return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('sạc') || n.contains('cáp') || n.contains('pin dự phòng') || n.contains('gan 65w')) {
-      return 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('chuột') || n.contains('mouse')) {
-      return 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('màn hình') || n.contains('monitor')) {
-      return 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('nồi') || n.contains('chảo') || n.contains('bếp') || n.contains('chiên không dầu')) {
-      return 'https://images.unsplash.com/photo-1584990347449-397a61be6b8e?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1584990347449-397a61be6b8e?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('quạt') || n.contains('lọc không khí')) {
-      return 'https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('mũ bảo hiểm') || n.contains('xe máy') || n.contains('ô tô') || n.contains('bơm lốp')) {
-      return 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('máy ảnh') || n.contains('camera') || n.contains('tripod')) {
-      return 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('áo') || n.contains('polo') || n.contains('sơ mi') || n.contains('thun') || n.contains('hoodie')) {
-      return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('quần') || n.contains('jean') || n.contains('short') || n.contains('kaki')) {
-      return 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('kính') || n.contains('mắt kính') || n.contains('sunglass')) {
+      return 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('túi') || n.contains('balo') || n.contains('ví')) {
+      return 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('đồng hồ') || n.contains('watch')) {
+      return 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=80';
     }
     if (n.contains('váy') || n.contains('đầm')) {
-      return 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=600&q=80';
+      return 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=800&q=80';
     }
 
     // 4. Tra theo danh mục ngành hàng
@@ -169,7 +212,54 @@ class ProductImageResolver {
     if (cat == '12') return _categoryImages['may-anh']!;
 
     // 5. Ảnh mặc định tổng quan cực đẹp
-    return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80';
+    return 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80';
+  }
+
+  /// Tra cứu bộ ảnh gallery chuẩn đẹp cho trang chi tiết sản phẩm
+  static List<String> resolveGallery({
+    String? id,
+    List<String>? images,
+    String? categoryId,
+    String? name,
+  }) {
+    final validList = <String>[];
+    if (images != null) {
+      for (final img in images) {
+        final r = resolveUrl(img);
+        if (r.isNotEmpty && !validList.contains(r)) {
+          validList.add(r);
+        }
+      }
+    }
+
+    if (validList.isNotEmpty) {
+      return validList;
+    }
+
+    // Khi server chưa có bộ ảnh hoặc dữ liệu là URL giả lập:
+    final primary = resolve(id: id, categoryId: categoryId, name: name);
+    final secondary = _getSecondaryImage(name: name, categoryId: categoryId, primaryUrl: primary);
+    return [primary, if (secondary != null && secondary != primary) secondary];
+  }
+
+  static String? _getSecondaryImage({String? name, String? categoryId, required String primaryUrl}) {
+    final n = (name ?? '').toLowerCase();
+    if (n.contains('tai nghe') || n.contains('headphone') || n.contains('earphone')) {
+      return 'https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('giày') || n.contains('sneaker')) {
+      return 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('áo') || n.contains('thun') || n.contains('sơ mi')) {
+      return 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('kính') || n.contains('mắt kính')) {
+      return 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&w=800&q=80';
+    }
+    if (n.contains('bàn phím') || n.contains('keyboard')) {
+      return 'https://images.unsplash.com/photo-1595225476474-87563907a212?auto=format&fit=crop&w=800&q=80';
+    }
+    return null;
   }
 
   /// Ảnh mặc định cho từng danh mục

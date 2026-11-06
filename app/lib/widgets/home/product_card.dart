@@ -269,7 +269,7 @@ class _ProductCardState extends State<ProductCard> {
               // 2. Body Details
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -280,8 +280,8 @@ class _ProductCardState extends State<ProductCard> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 12.5,
-                          height: 1.25,
+                          fontSize: 12,
+                          height: 1.22,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
@@ -300,7 +300,7 @@ class _ProductCardState extends State<ProductCard> {
                                 style: const TextStyle(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
+                                  fontSize: 13.5,
                                   letterSpacing: -0.2,
                                 ),
                               ),
@@ -312,7 +312,7 @@ class _ProductCardState extends State<ProductCard> {
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 decoration: TextDecoration.lineThrough,
-                                fontSize: 10.5,
+                                fontSize: 10,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -322,30 +322,32 @@ class _ProductCardState extends State<ProductCard> {
                       // Rating & Sold & Location Line
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, color: AppColors.starYellow, size: 14),
+                          const Icon(Icons.star_rounded, color: AppColors.starYellow, size: 13),
                           const SizedBox(width: 2),
                           Text(
                             product.rating.toStringAsFixed(1),
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            product.soldCount.isNotEmpty ? product.soldCount : 'Đã bán 0',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 10.5,
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              product.soldCount.isNotEmpty ? product.soldCount : 'Đã bán 0',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 10,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
                           Text(
                             product.location.isNotEmpty ? product.location.replaceAll('TP. ', '') : 'HCM',
                             style: const TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 10,
+                              fontSize: 9.5,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

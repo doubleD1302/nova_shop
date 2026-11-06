@@ -32,12 +32,14 @@ class AuthService extends ChangeNotifier {
   User? _currentUser;
   bool _isLoading = false;
   String? _lastError;
+  String? _sellerShopStatus;
 
   String? get token => _token;
   User? get currentUser => _currentUser;
   User? get user => _currentUser;
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
+  String? get sellerShopStatus => _sellerShopStatus;
   bool get isAuthenticated => _currentUser != null;
 
   /// Kiểm tra trạng thái đã đăng nhập
@@ -383,6 +385,7 @@ class AuthService extends ChangeNotifier {
 
       if (response.success && response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
+        _sellerShopStatus = data['shopStatus']?.toString() ?? 'pending';
 
         // 1. Cập nhật JWT Token mới mang quyền seller
         if (data['token'] != null) {
@@ -550,11 +553,15 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Cập nhật thông tin hồ sơ tài khoản
+  /// [clearAvatar]: Nếu true, gửi null để chủ động xóa avatar trên server
+  /// [avatarUrl]: Nếu truyền chuỗi URL, cập nhật sang ảnh đại diện mới
+  /// Nếu cả hai đều không chỉ định, không gửi trường avatarUrl để Backend giữ nguyên avatar cũ
   Future<bool> updateProfile({
     String? fullName,
     String? phone,
     String? email,
     String? avatarUrl,
+    bool clearAvatar = false,
   }) async {
     final t = _token ?? await _client.getToken();
     if (t == null) {
@@ -571,7 +578,11 @@ class AuthService extends ChangeNotifier {
       if (fullName != null) payload['fullName'] = fullName.trim();
       if (email != null) payload['email'] = email.trim();
       if (phone != null) payload['phone'] = phone.trim();
-      if (avatarUrl != null) payload['avatarUrl'] = avatarUrl.trim();
+      if (clearAvatar) {
+        payload['avatarUrl'] = null;
+      } else if (avatarUrl != null) {
+        payload['avatarUrl'] = avatarUrl.trim();
+      }
 
       final response = await http
           .put(
@@ -607,6 +618,23 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Lấy thông tin hồ sơ gian hàng của seller hiện tại
+  Future<Map<String, dynamic>?> getSellerShop() async {
+    final response = await _client.get('/api/v1/seller/shop');
+    if (response.success && response.data is Map<String, dynamic>) {
+      final data = response.data as Map<String, dynamic>;
+      if (data['shop'] is Map<String, dynamic>) {
+        return data['shop'] as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  /// Gửi lại hồ sơ gian hàng sau khi bị từ chối duyệt (rejected -> pending)
+  Future<ApiResponse> resubmitSellerShop() async {
+    return await _client.post('/api/v1/seller/shop/resubmit');
   }
 
   /// Đổi mật khẩu tài khoản

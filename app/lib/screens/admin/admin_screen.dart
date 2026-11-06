@@ -30,6 +30,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   // Tab 3: Shops
   List<Map<String, dynamic>> _shops = [];
   bool _isLoadingShops = true;
+  String _selectedShopFilter = 'all';
 
   @override
   void initState() {
@@ -51,9 +52,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     setState(() => _isLoadingReports = true);
     final response = await _client.get('/api/v1/admin/reports');
     if (mounted) {
-      if (response.success && response.data is List) {
+      if (response.success && response.data != null) {
+        List<dynamic> list = [];
+        if (response.data is List) {
+          list = response.data as List;
+        } else if (response.data is Map && response.data['reports'] is List) {
+          list = response.data['reports'] as List;
+        }
         setState(() {
-          _reports = List<Map<String, dynamic>>.from(response.data as List);
+          _reports = list.whereType<Map<String, dynamic>>().toList();
           _isLoadingReports = false;
         });
       } else {
@@ -67,9 +74,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     setState(() => _isLoadingProducts = true);
     final response = await _client.get('/api/v1/admin/products');
     if (mounted) {
-      if (response.success && response.data is List) {
+      if (response.success && response.data != null) {
+        List<dynamic> list = [];
+        if (response.data is List) {
+          list = response.data as List;
+        } else if (response.data is Map && response.data['products'] is List) {
+          list = response.data['products'] as List;
+        }
         setState(() {
-          _products = List<Map<String, dynamic>>.from(response.data as List);
+          _products = list.whereType<Map<String, dynamic>>().toList();
           _isLoadingProducts = false;
         });
       } else {
@@ -83,9 +96,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     setState(() => _isLoadingShops = true);
     final response = await _client.get('/api/v1/admin/shops');
     if (mounted) {
-      if (response.success && response.data is List) {
+      if (response.success && response.data != null) {
+        List<dynamic> list = [];
+        if (response.data is List) {
+          list = response.data as List;
+        } else if (response.data is Map && response.data['shops'] is List) {
+          list = response.data['shops'] as List;
+        }
         setState(() {
-          _shops = List<Map<String, dynamic>>.from(response.data as List);
+          _shops = list.whereType<Map<String, dynamic>>().toList();
           _isLoadingShops = false;
         });
       } else {
@@ -162,6 +181,295 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
         SnackBar(backgroundColor: Colors.red, content: Text(response.message)),
       );
     }
+  }
+
+  // Duyệt hồ sơ gian hàng (approved)
+  Future<void> _approveShop(String shopId, int approvalVersion) async {
+    final response = await _client.patch(
+      '/api/v1/admin/shops/$shopId/approval',
+      body: {
+        'approvalStatus': 'approved',
+        'approvalVersion': approvalVersion,
+      },
+    );
+
+    if (!mounted) return;
+
+    if (response.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã duyệt gian hàng #$shopId thành công!'),
+          backgroundColor: const Color(0xFF00BFA5),
+        ),
+      );
+      _loadShops();
+    } else {
+      if (response.statusCode == 409 || response.message.contains('SHOP_APPROVAL_CONFLICT')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Xung đột phiên bản duyệt (409)! Đang tự động tải lại dữ liệu mới nhất...'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            content: Text(response.message.isNotEmpty ? response.message : 'Phê duyệt thất bại.'),
+          ),
+        );
+      }
+      _loadShops();
+    }
+  }
+
+  // Từ chối duyệt hồ sơ gian hàng kèm lý do
+  Future<void> _rejectShopDialog(String shopId, int approvalVersion, String shopName) async {
+    final reasonCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Text('Từ chối duyệt: $shopName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vui lòng nhập lý do từ chối hồ sơ gian hàng (tối thiểu 3 ký tự, tối đa 1000 ký tự):',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF555770)),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: reasonCtrl,
+                  maxLines: 4,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Ví dụ: Tên gian hàng không phù hợp quy định hoặc thiếu thông tin...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().length < 3) {
+                      return 'Lý do từ chối phải có ít nhất 3 ký tự.';
+                    }
+                    if (val.trim().length > 1000) {
+                      return 'Lý do từ chối không vượt quá 1000 ký tự.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDlgState(() => isSubmitting = true);
+
+                      final response = await _client.patch(
+                        '/api/v1/admin/shops/$shopId/approval',
+                        body: {
+                          'approvalStatus': 'rejected',
+                          'approvalVersion': approvalVersion,
+                          'rejectionReason': reasonCtrl.text.trim(),
+                        },
+                      );
+
+                      if (mounted) {
+                        Navigator.pop(ctx);
+                        if (response.success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Đã từ chối duyệt gian hàng "$shopName".'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          _loadShops();
+                        } else {
+                          if (response.statusCode == 409 || response.message.contains('SHOP_APPROVAL_CONFLICT')) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Xung đột phiên bản duyệt (409)! Đang tải lại dữ liệu...'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(backgroundColor: Colors.red, content: Text(response.message)),
+                            );
+                          }
+                          _loadShops();
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+              child: isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Xác nhận từ chối'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Xem lịch sử duyệt gian hàng (Approval Events)
+  Future<void> _showApprovalEventsSheet(String shopId, String shopName) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return FutureBuilder<ApiResponse>(
+          future: _client.get('/api/v1/admin/shops/$shopId/approval-events'),
+          builder: (ctx, snapshot) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Lịch sử duyệt: $shopName',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const Divider(),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.primary)))
+                  else if (snapshot.hasError || snapshot.data?.success != true)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          snapshot.data?.message.isNotEmpty == true
+                              ? snapshot.data!.message
+                              : 'Không thể tải lịch sử duyệt.',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    )
+                  else ...[
+                    Builder(
+                      builder: (ctx) {
+                        final data = snapshot.data!.data;
+                        final List events = (data is Map && data['events'] is List) ? (data['events'] as List) : [];
+
+                        if (events.isEmpty) {
+                          return const Expanded(
+                            child: Center(
+                              child: Text('Chưa có lịch sử duyệt cho gian hàng này.', style: TextStyle(color: Colors.grey)),
+                            ),
+                          );
+                        }
+
+                        return Expanded(
+                          child: ListView.separated(
+                            itemCount: events.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (ctx, i) {
+                              final event = events[i] as Map<String, dynamic>;
+                              final action = event['action']?.toString() ?? 'unknown';
+                              final version = event['profileVersion'] ?? event['profile_version'] ?? 1;
+                              final reason = event['reason']?.toString();
+                              final actorId = event['actorId'] ?? event['actor_id'] ?? '';
+                              final createdAt = event['createdAt'] ?? event['created_at'] ?? '';
+
+                              Color badgeBg = Colors.grey.shade100;
+                              Color badgeFg = Colors.grey.shade800;
+                              String actionLabel = action;
+
+                              if (action == 'approved') {
+                                badgeBg = const Color(0xFFE8F5E9);
+                                badgeFg = const Color(0xFF2E7D32);
+                                actionLabel = 'Phê duyệt (Approved)';
+                              } else if (action == 'rejected') {
+                                badgeBg = const Color(0xFFFFEBEE);
+                                badgeFg = const Color(0xFFC62828);
+                                actionLabel = 'Từ chối (Rejected)';
+                              } else if (action == 'submitted') {
+                                badgeBg = const Color(0xFFE3F2FD);
+                                badgeFg = const Color(0xFF1565C0);
+                                actionLabel = 'Gửi duyệt (Submitted)';
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
+                                          child: Text(actionLabel, style: TextStyle(color: badgeFg, fontWeight: FontWeight.bold, fontSize: 11)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text('Phiên bản v$version', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                                        const Spacer(),
+                                        Text(
+                                          createdAt.toString().replaceFirst('T', ' ').split('.').first,
+                                          style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                    if (reason != null && reason.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFF1F2),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'Lý do: $reason',
+                                          style: const TextStyle(color: Color(0xFFBE123C), fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 4),
+                                    Text('Người thao tác: ID #$actorId', style: const TextStyle(color: Color(0xFF6E7191), fontSize: 11)),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -500,60 +808,242 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     );
   }
 
-  // TAB 3: QUẢN LÝ GIAN HÀNG
+  // TAB 3: QUẢN LÝ GIAN HÀNG & KIỂM DUYỆT
   Widget _buildShopsTab() {
     if (_isLoadingShops) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadShops,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: _shops.length,
-        itemBuilder: (context, index) {
-          final shop = _shops[index];
-          final id = (shop['id'] ?? '').toString();
-          final name = shop['name'] ?? 'Gian hàng';
-          final status = shop['status'] ?? 'active';
-          final isSuspended = status == 'suspended';
+    final pendingCount = _shops.where((s) => s['status'] == 'pending').length;
+    final activeCount = _shops.where((s) => s['status'] == 'active').length;
+    final rejectedCount = _shops.where((s) => s['status'] == 'rejected').length;
+    final suspendedCount = _shops.where((s) => s['status'] == 'suspended').length;
 
-          return Card(
-            elevation: 0,
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFEEEEEE)),
+    final filteredShops = _shops.where((s) {
+      final status = s['status']?.toString() ?? 'active';
+      if (_selectedShopFilter == 'all') return true;
+      return status == _selectedShopFilter;
+    }).toList();
+
+    return Column(
+      children: [
+        // Thanh bộ lọc trạng thái gian hàng
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          color: Colors.white,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip('all', 'Tất cả (${_shops.length})', _selectedShopFilter, (val) {
+                  setState(() => _selectedShopFilter = val);
+                }),
+                _buildFilterChip('pending', 'Chờ duyệt ($pendingCount)', _selectedShopFilter, (val) {
+                  setState(() => _selectedShopFilter = val);
+                }),
+                _buildFilterChip('active', 'Hoạt động ($activeCount)', _selectedShopFilter, (val) {
+                  setState(() => _selectedShopFilter = val);
+                }),
+                _buildFilterChip('rejected', 'Bị từ chối ($rejectedCount)', _selectedShopFilter, (val) {
+                  setState(() => _selectedShopFilter = val);
+                }),
+                _buildFilterChip('suspended', 'Đã khóa ($suspendedCount)', _selectedShopFilter, (val) {
+                  setState(() => _selectedShopFilter = val);
+                }),
+              ],
             ),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: isSuspended ? Colors.red.shade100 : AppColors.surfaceAlt,
-                child: Icon(
-                  Icons.storefront_rounded,
-                  color: isSuspended ? Colors.red : AppColors.primary,
-                ),
-              ),
-              title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Text(
-                'Mã: #$id • Trạng thái: ${isSuspended ? "Đang bị khóa" : "Hoạt động"}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isSuspended ? Colors.red.shade700 : Colors.grey.shade600,
-                ),
-              ),
-              trailing: ElevatedButton(
-                onPressed: () => _updateShopStatus(id, isSuspended ? 'active' : 'suspended'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isSuspended ? Colors.green.shade600 : Colors.red.shade700,
-                  foregroundColor: Colors.white,
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: Text(isSuspended ? 'Mở Khóa' : 'Khóa Shop'),
-              ),
-            ),
-          );
-        },
-      ),
+          ),
+        ),
+        const Divider(height: 1),
+
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadShops,
+            child: filteredShops.isEmpty
+                ? const Center(
+                    child: Text('Không có gian hàng nào trong mục này.', style: TextStyle(color: Colors.grey)),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: filteredShops.length,
+                    itemBuilder: (context, index) {
+                      final shop = filteredShops[index];
+                      final id = (shop['id'] ?? '').toString();
+                      final name = shop['name']?.toString() ?? 'Gian hàng';
+                      final status = shop['status']?.toString() ?? 'active';
+                      final version = (shop['approvalVersion'] is num)
+                          ? (shop['approvalVersion'] as num).toInt()
+                          : (int.tryParse(shop['approval_version']?.toString() ?? '1') ?? 1);
+                      final ownerName = shop['ownerName'] ?? shop['owner_name'] ?? 'Chưa rõ';
+                      final province = shop['province'] ?? shop['location'] ?? '';
+                      final rejectionReason = shop['rejectionReason'] ?? shop['rejection_reason'];
+                      final isSuspended = status == 'suspended';
+                      final isPending = status == 'pending';
+                      final isRejected = status == 'rejected';
+
+                      Color badgeBg = Colors.grey.shade100;
+                      Color badgeFg = Colors.grey.shade800;
+                      String statusText = status;
+
+                      if (isPending) {
+                        badgeBg = const Color(0xFFFFFBEB);
+                        badgeFg = const Color(0xFFD97706);
+                        statusText = 'Chờ duyệt';
+                      } else if (isRejected) {
+                        badgeBg = const Color(0xFFFFEBEE);
+                        badgeFg = const Color(0xFFC62828);
+                        statusText = 'Bị từ chối';
+                      } else if (status == 'active') {
+                        badgeBg = const Color(0xFFE8F5E9);
+                        badgeFg = const Color(0xFF2E7D32);
+                        statusText = 'Đang hoạt động';
+                      } else if (isSuspended) {
+                        badgeBg = const Color(0xFFECEFF1);
+                        badgeFg = const Color(0xFF455A64);
+                        statusText = 'Đã khóa';
+                      }
+
+                      return Card(
+                        elevation: 0,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFFEEEEEE)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: isSuspended ? Colors.red.shade100 : (isPending ? const Color(0xFFFEF3C7) : AppColors.surfaceAlt),
+                                    child: Icon(
+                                      Icons.storefront_rounded,
+                                      color: isSuspended ? Colors.red : (isPending ? const Color(0xFFD97706) : AppColors.primary),
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Mã: #$id • Chủ: $ownerName • $province',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
+                                        child: Text(statusText, style: TextStyle(color: badgeFg, fontWeight: FontWeight.bold, fontSize: 11)),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text('v$version', style: const TextStyle(fontSize: 11, color: Color(0xFF8F90A6))),
+                                    ],
+                                  ),
+                                ],
+                              ),
+
+                              // Hiển thị lý do từ chối nếu có
+                              if (isRejected && rejectionReason != null && rejectionReason.toString().isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF1F2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFFECDD3)),
+                                  ),
+                                  child: Text(
+                                    'Lý do từ chối: $rejectionReason',
+                                    style: const TextStyle(color: Color(0xFFBE123C), fontSize: 12),
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 12),
+                              const Divider(height: 1),
+                              const SizedBox(height: 8),
+
+                              // Thanh thao tác theo trạng thái
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  // Nút xem lịch sử duyệt
+                                  OutlinedButton.icon(
+                                    onPressed: () => _showApprovalEventsSheet(id, name),
+                                    icon: const Icon(Icons.history_rounded, size: 16),
+                                    label: const Text('Lịch sử', style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF555770),
+                                      side: const BorderSide(color: Color(0xFFD1D5DB)),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+
+                                  // Luồng Phê duyệt / Từ chối cho Shop Pending
+                                  if (isPending) ...[
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _rejectShopDialog(id, version, name),
+                                      icon: const Icon(Icons.close_rounded, size: 16),
+                                      label: const Text('Từ chối', style: TextStyle(fontSize: 12)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFDC2626),
+                                        foregroundColor: Colors.white,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _approveShop(id, version),
+                                      icon: const Icon(Icons.check_rounded, size: 16),
+                                      label: const Text('Duyệt Shop', style: TextStyle(fontSize: 12)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF16A34A),
+                                        foregroundColor: Colors.white,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ),
+                                  ],
+
+                                  // Luồng Khóa / Mở Khóa cho Shop Active hoặc Suspended
+                                  if (!isPending && !isRejected) ...[
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: () => _updateShopStatus(id, isSuspended ? 'active' : 'suspended'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isSuspended ? Colors.green.shade600 : Colors.red.shade700,
+                                        foregroundColor: Colors.white,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      child: Text(isSuspended ? 'Mở Khóa' : 'Khóa Shop', style: const TextStyle(fontSize: 12)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 

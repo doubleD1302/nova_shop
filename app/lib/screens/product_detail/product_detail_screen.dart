@@ -14,6 +14,8 @@ import 'package:shopnova/screens/shop/shop_detail_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
 import 'package:shopnova/widgets/common/report_content_sheet.dart';
 import 'package:shopnova/widgets/home/product_card.dart';
+import 'package:shopnova/widgets/home/flash_sale_countdown_widget.dart';
+import 'package:shopnova/utils/flash_sale_rotator.dart';
 import 'package:shopnova/theme/app_colors.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -486,8 +488,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     }
 
     final p = _product;
-    final images = (p?.images != null && p!.images.isNotEmpty)
-        ? p.images
+    final images = (p?.effectiveGalleryImages != null && p!.effectiveGalleryImages.isNotEmpty)
+        ? p.effectiveGalleryImages
         : [p?.effectiveImageUrl ?? ''];
 
     return Scaffold(
@@ -652,12 +654,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     return Image.network(
                       images[i],
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: AppColors.surfaceAlt,
-                        child: Center(
-                          child: Text(
-                            p?.emoji.isNotEmpty == true ? p!.emoji : '🛍️',
-                            style: const TextStyle(fontSize: 80),
+                      errorBuilder: (_, __, ___) => Image.network(
+                        p?.effectiveImageUrl ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: AppColors.surfaceAlt,
+                          child: Center(
+                            child: Text(
+                              p?.emoji.isNotEmpty == true ? p!.emoji : '🛍️',
+                              style: const TextStyle(fontSize: 80),
+                            ),
                           ),
                         ),
                       ),
@@ -724,7 +730,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Image.network(images[i], fit: BoxFit.cover),
+                        child: Image.network(
+                          images[i],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.network(
+                            p?.effectiveImageUrl ?? '',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: AppColors.surfaceAlt,
+                              child: const Icon(Icons.image_outlined, size: 20, color: Colors.grey),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -738,6 +755,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   // 2. FLASH SALE BANNER
   Widget _buildFlashSaleBanner() {
+    final campaign = FlashSaleRotator.getCurrentCampaign();
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -746,28 +764,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           end: Alignment.centerRight,
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.bolt, color: Colors.yellowAccent, size: 22),
-              SizedBox(width: 4),
-              Text(
-                'FLASH SALE SHOPNOVA',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+              const Icon(Icons.bolt, color: Colors.yellowAccent, size: 22),
+              const SizedBox(width: 5),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'FLASH SALE SHOPNOVA',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3),
+                  ),
+                  Text(
+                    campaign.title,
+                    style: const TextStyle(color: Colors.yellowAccent, fontSize: 9.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ],
           ),
           Row(
             children: [
-              const Text('KẾT THÚC TRONG ', style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.bold)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(4)),
-                child: const Text('02:45:10', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
+              const Text('KẾT THÚC TRONG ', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 4),
+              const FlashSaleCountdownWidget(style: FlashSaleTimerStyle.compact),
             ],
           ),
         ],
@@ -1539,7 +1564,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
-                  height: 250,
+                  height: 280,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _sameShopProducts.length,
@@ -1565,7 +1590,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 const Text('CÓ THỂ BẠN CŨNG THÍCH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.3)),
                 const SizedBox(height: 12),
                 SizedBox(
-                  height: 250,
+                  height: 280,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _sameCategoryProducts.length,

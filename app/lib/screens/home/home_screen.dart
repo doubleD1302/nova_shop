@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shopnova/widgets/home/banner_carousel.dart';
 import 'package:shopnova/widgets/home/quick_links_section.dart';
@@ -64,12 +65,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final categories = results[1] as List<CategoryItem>;
         final flashSale = results[2] as List<FlashSaleItem>;
         final products = results[3] as List<Product>;
+        final dynamicProducts = _shuffleRecommendedProducts(products);
 
         setState(() {
           _banners = banners;
           _categories = categories;
           _flashSaleItems = flashSale;
-          _allProducts = products;
+          _allProducts = dynamicProducts;
           _isLoading = false;
         });
       }
@@ -81,6 +83,16 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  /// Xoay tua và xáo trộn ngẫu nhiên danh sách gợi ý cho phiên truy cập hiện tại
+  List<Product> _shuffleRecommendedProducts(List<Product> products) {
+    if (products.isEmpty) return products;
+    final list = List<Product>.from(products);
+    // Sử dụng seed dựa theo timestamp millisecond để mỗi lần mở app hay refresh đều có danh sách đề xuất khác nhau
+    final rnd = Random(DateTime.now().millisecondsSinceEpoch);
+    list.shuffle(rnd);
+    return list;
   }
 
   List<Product> _getFilteredProducts() {
@@ -294,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
-                      childAspectRatio: 0.60,
+                      childAspectRatio: 0.58,
                     ),
                     itemCount: displayProducts.length,
                     itemBuilder: (ctx, i) => ProductCard(product: displayProducts[i]),

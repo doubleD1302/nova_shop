@@ -4,6 +4,7 @@ import 'package:shopnova/screens/main_screen.dart';
 import 'package:shopnova/theme/app_theme.dart';
 
 import 'package:shopnova/services/auth_service.dart';
+import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/cart_service.dart';
 
 void main() async {
@@ -14,8 +15,9 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  // Khôi phục đồng thời phiên đăng nhập và giỏ hàng trước khi khởi chạy giao diện
+  // Dò tìm Base URL và khôi phục đồng thời phiên đăng nhập và giỏ hàng trước khi khởi chạy giao diện
   await Future.wait([
+    ApiConfig.autoDetectBaseUrl(),
     CartService().loadFromPrefs(),
     AuthService().restoreSession(),
   ]);

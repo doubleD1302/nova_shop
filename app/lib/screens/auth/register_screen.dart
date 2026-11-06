@@ -70,7 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       username: username,
       password: password,
       fullName: fullName,
-      phone: phone,
+      phone: (phone.length >= 9 && int.tryParse(phone) != null) ? phone : null,
       role: 'buyer',
     );
 

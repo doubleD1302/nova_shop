@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { DataApiClientError, getUserAuthProfile } from '../clients/data.client.js'
 
-export const ACCESS_TOKEN_EXPIRES_IN = 900 // 15 phút (900 giây)
+export const ACCESS_TOKEN_EXPIRES_IN = 86400 * 7 // 7 ngày (604800 giây) cho môi trường dev & mobile apps
 export const TOKEN_ISSUER = 'shopnova-backend'
 export const TOKEN_AUDIENCE = 'shopnova-clients'
 export const MAX_TOKEN_LENGTH = 2048

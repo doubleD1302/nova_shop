@@ -139,8 +139,16 @@ class OrderService {
 
         if (response.statusCode == 200) {
           final body = jsonDecode(response.body);
-          if (body['success'] == true && body['data'] is List) {
-            final apiOrders = List<Map<String, dynamic>>.from(body['data']);
+          List<dynamic> rawList = [];
+          if (body['success'] == true && body['data'] != null) {
+            if (body['data'] is List) {
+              rawList = body['data'] as List;
+            } else if (body['data'] is Map && body['data']['orders'] is List) {
+              rawList = body['data']['orders'] as List;
+            }
+          }
+          if (rawList.isNotEmpty) {
+            final apiOrders = rawList.whereType<Map<String, dynamic>>().toList();
             for (final o in apiOrders) {
               final normalized = _normalizeOrder(o);
               if (!combined.any((c) => c['id']?.toString() == normalized['id']?.toString() || c['code'] == normalized['code'])) {
@@ -164,6 +172,48 @@ class OrderService {
     return combined;
   }
 
+  /// Xem trước tính toán đơn hàng (phí ship theo shop, giảm giá voucher, tổng thanh toán)
+  /// POST /api/v1/orders/preview
+  Future<Map<String, dynamic>?> previewOrder({
+    required List<Map<String, dynamic>> items,
+    String shippingMethod = 'tietkiem',
+    String? voucherCode,
+  }) async {
+    final token = AuthService().token;
+    if (token == null) return null;
+
+    final cleanItems = items.map((it) {
+      final vId = it['variantId']?.toString() ?? it['variant_id']?.toString() ?? '1';
+      final qty = (it['qty'] is num) ? (it['qty'] as num).toInt() : 1;
+      return {'variantId': vId, 'qty': qty};
+    }).toList();
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/api/v1/orders/preview'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'items': cleanItems,
+              'shippingMethod': shippingMethod,
+              if (voucherCode != null && voucherCode.trim().isNotEmpty) 'voucherCode': voucherCode.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body['data'] as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[OrderService] previewOrder error: $e');
+    }
+    return null;
+  }
+
   /// Tạo đơn hàng: Ưu tiên gửi lên Backend MySQL; nếu mất mạng hoặc máy chủ phản hồi chậm,
   /// tự động chuyển sang chế độ lưu đơn an toàn để KHÔNG BAO GIỜ làm gián đoạn người dùng.
   Future<Map<String, dynamic>?> createOrder({
@@ -175,6 +225,8 @@ class OrderService {
     required String addressDetail,
     String? note,
     String paymentMethod = 'cod',
+    String shippingMethod = 'tietkiem',
+    String? voucherCode,
     String? idempotencyKey,
     required List<Map<String, dynamic>> items,
   }) async {
@@ -183,20 +235,34 @@ class OrderService {
     final token = AuthService().token;
     Map<String, dynamic>? createdOrder;
 
+    final now = DateTime.now();
+    final key = (idempotencyKey != null && idempotencyKey.length >= 16 && idempotencyKey.length <= 64)
+        ? idempotencyKey
+        : 'ord_${now.millisecondsSinceEpoch}_${(now.microsecond % 100000).toString().padLeft(5, '0')}';
+
+    final cleanItems = items.map((it) {
+      final vId = it['variantId']?.toString() ?? it['variant_id']?.toString() ?? '1';
+      final qty = (it['qty'] is num) ? (it['qty'] as num).toInt() : 1;
+      return {'variantId': vId, 'qty': qty};
+    }).toList();
+
     // 1. Thử gửi trực tiếp lên Backend API nếu có kết nối
     if (token != null) {
       try {
         final payload = {
-          'recipientName': recipientName.trim(),
-          'recipientPhone': recipientPhone.trim(),
-          'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
-          'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
-          'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
-          'addressDetail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
-          'note': note?.trim().isNotEmpty == true ? note!.trim() : null,
+          'items': cleanItems,
+          'address': {
+            'fullName': recipientName.trim(),
+            'phone': recipientPhone.trim(),
+            'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
+            'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
+            'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
+            'detail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
+          },
           'paymentMethod': paymentMethod,
-          if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
-          'items': items,
+          'shippingMethod': shippingMethod,
+          if (voucherCode != null && voucherCode.trim().isNotEmpty) 'voucherCode': voucherCode.trim(),
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
         };
 
         final response = await http
@@ -205,6 +271,7 @@ class OrderService {
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $token',
+                'idempotency-key': key,
               },
               body: jsonEncode(payload),
             )
@@ -248,7 +315,29 @@ class OrderService {
       return sum + (pNum * qNum);
     });
 
-    final now = DateTime.now();
+    final isFreeShip = calculatedSubtotal >= 1000000;
+    final num shippingCost = (shippingMethod == 'hoatoc')
+        ? (isFreeShip ? 35000 : 55000)
+        : (shippingMethod == 'nhanh')
+            ? (isFreeShip ? 14000 : 32000)
+            : (isFreeShip ? 0 : 18000);
+
+    num voucherDiscount = 0;
+    if (voucherCode != null && voucherCode.trim().isNotEmpty) {
+      final codeUpper = voucherCode.trim().toUpperCase();
+      if (codeUpper == 'NOVA20K' && calculatedSubtotal >= 500000) {
+        voucherDiscount = 20000;
+      } else if (codeUpper == 'NOVA50K' && calculatedSubtotal >= 1500000) {
+        voucherDiscount = 50000;
+      } else if (codeUpper == 'FREESHIP' && calculatedSubtotal >= 300000) {
+        voucherDiscount = shippingCost > 30000 ? 30000 : shippingCost;
+      } else if (codeUpper == 'NOVANEW') {
+        voucherDiscount = (calculatedSubtotal * 0.15).clamp(0, 50000);
+      }
+    }
+
+    final num finalTotal = (calculatedSubtotal + shippingCost - voucherDiscount).clamp(0, double.infinity);
+
     final randomHex = (now.millisecondsSinceEpoch % 1000000).toRadixString(16).toUpperCase();
     final orderCode = 'ORD${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}$randomHex'.substring(0, 15);
 
@@ -263,11 +352,12 @@ class OrderService {
       'addressDetail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
       'note': note,
       'paymentMethod': paymentMethod,
+      'shippingMethod': shippingMethod,
       'subtotal': calculatedSubtotal,
-      'shippingFee': calculatedSubtotal >= 1000000 ? 0 : 25000,
-      'discountAmount': 0,
-      'totalAmount': calculatedSubtotal,
-      'total_amount': calculatedSubtotal,
+      'shippingFee': shippingCost,
+      'discountAmount': voucherDiscount,
+      'totalAmount': finalTotal,
+      'total_amount': finalTotal,
       'status': 'pending',
       'createdAt': now.toIso8601String(),
       'items': items,

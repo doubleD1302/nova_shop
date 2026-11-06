@@ -19,7 +19,8 @@ class ApiConfig {
   static const String productionUrl = 'https://novashop-api-952u.onrender.com';
 
   /// Địa chỉ IP máy tính trong mạng Wi-Fi LAN:
-  static const String lanHostUrl = 'http://192.168.1.11:3000';
+  static const String lanHostUrl = 'http://192.168.1.9:3000';
+  static const String altLanHostUrl = 'http://192.168.1.11:3000';
 
   /// Địa chỉ loopback khi cắm cáp USB và chạy adb reverse:
   static const String usbLoopbackUrl = 'http://127.0.0.1:3000';
@@ -35,7 +36,7 @@ class ApiConfig {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl.replaceAll(RegExp(r'/+$'), '');
     }
-    return productionUrl;
+    return usbLoopbackUrl;
   }
 
   /// Base URL hiện tại đang sử dụng
@@ -49,6 +50,14 @@ class ApiConfig {
   /// Đặt lại Base URL về mặc định
   static void resetBaseUrl() {
     _customBaseUrl = null;
+  }
+
+  /// Chuyển đổi đường dẫn ảnh tương đối (ví dụ: /uploads/...) thành URL đầy đủ
+  static String resolveImageUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$baseUrl$cleanPath';
   }
 
   /// Thời gian chờ request tối đa (10 giây)
@@ -68,10 +77,11 @@ class ApiConfig {
     }
 
     final candidates = [
-      productionUrl,  // Backend Online Render
-      usbLoopbackUrl, // Kiểm tra qua cáp USB (nếu có adb reverse)
-      lanHostUrl,     // Kiểm tra qua Wi-Fi máy tính
-      emulatorUrl,    // Kiểm tra máy ảo Android
+      usbLoopbackUrl, // Cáp USB adb reverse (http://127.0.0.1:3000)
+      lanHostUrl,     // Wi-Fi LAN (http://192.168.1.9:3000)
+      altLanHostUrl,  // Wi-Fi LAN phụ (http://192.168.1.11:3000)
+      emulatorUrl,    // Máy ảo Android (http://10.0.2.2:3000)
+      productionUrl,  // Backend Render Online
     ];
 
     for (final url in candidates) {
@@ -111,4 +121,5 @@ class ApiConfig {
   static String get updateProfileUrl => '$baseUrl/api/v1/auth/profile';
   static String get changePasswordUrl => '$baseUrl/api/v1/auth/change-password';
   static String get userStatsUrl => '$baseUrl/api/v1/auth/stats';
+  static String get vouchersUrl => '$baseUrl/api/v1/vouchers';
 }

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/upload_service.dart';
 import '../auth/login_screen.dart';
 import 'seller_hub_screen.dart';
 import '../../theme/app_colors.dart';
 
 /// Màn hình Đăng Ký Đối Tác Bán Hàng / Mở Gian Hàng ShopNova
-/// Kết nối trực tiếp Backend API:
-/// - POST /api/v1/seller/register-shop (Người dùng đã đăng nhập nâng cấp tài khoản)
-/// - POST /api/v1/auth/register (Người dùng mới tạo tài khoản đối tác)
+/// Quy trình 3 bước chuẩn:
+/// - Bước 1: Khởi tạo tài khoản, ngân hàng đối soát & KYC (Registration & KYC)
+/// - Bước 2: Thiết lập hồ sơ & Cấu hình gian hàng tại Seller Center (Store Profile Setup)
+/// - Bước 3: Kiểm duyệt từ Admin Sàn ShopNova (Admin Approval & Moderation)
 class SellerRegisterScreen extends StatefulWidget {
   const SellerRegisterScreen({super.key});
 
@@ -19,12 +21,24 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
 
-  // Controllers
+  // Controllers thông tin cơ bản
   final TextEditingController _shopNameController = TextEditingController();
   final TextEditingController _taglineController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  // Thông tin ngân hàng đối soát doanh thu (Bước 1)
+  final TextEditingController _bankNameController = TextEditingController(text: 'Vietcombank');
+  final TextEditingController _bankAccountNumberController = TextEditingController();
+  final TextEditingController _bankAccountOwnerController = TextEditingController();
+
+  // KYC (CCCD/CMND mặt trước & mặt sau - UploadService purpose: 'shop')
+  String? _idCardFrontUrl;
+  String? _idCardBackUrl;
+  bool _isUploadingFront = false;
+  bool _isUploadingBack = false;
 
   String _selectedProvince = 'TP. Hồ Chí Minh';
   String _selectedCategory = 'dien-thoai';
@@ -74,7 +88,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       if (user.phone != null && user.phone!.isNotEmpty) {
         _phoneController.text = user.phone!;
       }
+      if (user.email != null && user.email!.isNotEmpty) {
+        _emailController.text = user.email!;
+      }
       _shopNameController.text = '${user.fullName} Store';
+      _bankAccountOwnerController.text = user.fullName.toUpperCase();
     }
   }
 
@@ -84,7 +102,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     _taglineController.dispose();
     _fullNameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
+    _bankNameController.dispose();
+    _bankAccountNumberController.dispose();
+    _bankAccountOwnerController.dispose();
     super.dispose();
   }
 
@@ -111,14 +133,14 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     bool success = false;
 
     if (user != null) {
-      // 1. Người dùng đã đăng nhập -> Gọi API POST /api/v1/seller/register-shop
+      // 1. Người dùng đã đăng nhập -> Nâng cấp tài khoản lên Seller
       success = await _authService.registerSellerShop(
         shopName: shopName,
         province: province,
         tagline: tagline.isNotEmpty ? tagline : 'Cung cấp sản phẩm chính hãng chất lượng cao',
       );
     } else {
-      // 2. Người dùng chưa đăng nhập -> Gọi API POST /api/v1/auth/register với role: seller
+      // 2. Người dùng mới -> Đăng ký tài khoản Seller mới
       final fullName = _fullNameController.text.trim();
       final phone = _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
       final password = _passwordController.text;
@@ -209,7 +231,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Tài khoản của bạn đã được nâng cấp quyền Người bán hàng (Seller).',
+                      'Hồ sơ đang ở trạng thái Chờ Duyệt. Bạn có thể vào Kênh Người Bán để cấu hình logo, banner và địa chỉ kho.',
                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF28293D)),
                     ),
                   ),
@@ -222,7 +244,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx); // Đóng dialog
+                  Navigator.pop(ctx);
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (_) => const SellerHubScreen()),
@@ -391,6 +413,53 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                     ],
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // QUY TRÌNH 3 BƯỚC ĐỐI TÁC BÁN HÀNG
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFEEEEF0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'QUY TRÌNH 3 BƯỚC MỞ GIAN HÀNG',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildProcessStep(
+                      step: '1',
+                      title: 'Khởi tạo tài khoản & Định danh KYC',
+                      desc: 'Cung cấp tên shop, email, mật khẩu & tài khoản ngân hàng chính chủ nhận doanh thu',
+                      isCurrent: true,
+                    ),
+                    _buildProcessStep(
+                      step: '2',
+                      title: 'Thiết lập hồ sơ & Cấu hình gian hàng',
+                      desc: 'Cập nhật logo, ảnh bìa banner, địa chỉ kho lấy hàng mặc định tại Seller Center',
+                      isCurrent: false,
+                    ),
+                    _buildProcessStep(
+                      step: '3',
+                      title: 'Kiểm duyệt từ Admin sàn ShopNova',
+                      desc: 'Admin phê duyệt trạng thái "Đang hoạt động" để shop chính thức đăng bán sản phẩm',
+                      isCurrent: false,
+                      isLast: true,
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -613,6 +682,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                           ),
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) return 'Vui lòng nhập số điện thoại.';
+                            final clean = val.replaceAll(RegExp(r'\D'), '');
+                            if (clean.length < 9) return 'Số điện thoại không hợp lệ.';
                             return null;
                           },
                         ),
@@ -658,6 +729,155 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                           ],
                         ),
                       ],
+
+                      // Email liên hệ & đối soát
+                      const SizedBox(height: 16),
+                      _buildFieldLabel('Email Liên Hệ Đối Soát & Nhận Đơn'),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: _inputDecoration(
+                          hint: 'VD: seller@shopnova.vn (Tùy chọn)',
+                          prefixIcon: Icons.email_outlined,
+                        ),
+                      ),
+
+                      // THÔNG TIN TÀI KHOẢN NGÂN HÀNG (BƯỚC 1)
+                      const SizedBox(height: 20),
+                      const Divider(height: 1, color: Color(0xFFEEEEF0)),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00BFA5),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Tài Khoản Ngân Hàng Nhận Doanh Thu',
+                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Thông tin tài khoản chính chủ để ShopNova thực hiện đối soát và chuyển tiền bán hàng.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF8F90A6)),
+                      ),
+                      const SizedBox(height: 14),
+
+                      _buildFieldLabel('Ngân Hàng Thụ Hưởng *'),
+                      TextFormField(
+                        controller: _bankNameController,
+                        decoration: _inputDecoration(
+                          hint: 'VD: Vietcombank, MB Bank, Techcombank, ACB...',
+                          prefixIcon: Icons.account_balance_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      _buildFieldLabel('Số Tài Khoản Ngân Hàng *'),
+                      TextFormField(
+                        controller: _bankAccountNumberController,
+                        keyboardType: TextInputType.number,
+                        decoration: _inputDecoration(
+                          hint: 'VD: 0123456789 (STK chính chủ)',
+                          prefixIcon: Icons.credit_card_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      _buildFieldLabel('Tên Chủ Tài Khoản (Viết hoa không dấu) *'),
+                      TextFormField(
+                        controller: _bankAccountOwnerController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: _inputDecoration(
+                          hint: 'VD: NGUYEN VAN A',
+                          prefixIcon: Icons.person_pin_rounded,
+                        ),
+                      ),
+
+                      // XÁC THỰC ĐỊNH DANH KYC (CCCD / CMND)
+                      const SizedBox(height: 20),
+                      const Divider(height: 1, color: Color(0xFFEEEEF0)),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF9100),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Xác Thực Định Danh Điện Tử (KYC - Tùy Chọn)',
+                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Tải ảnh chụp CCCD/CMND 2 mặt để gian hàng được cấp huy hiệu Uy Tín và ưu tiên duyệt nhanh.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF8F90A6)),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildKycUploadCard(
+                              title: 'Mặt trước CCCD',
+                              imageUrl: _idCardFrontUrl,
+                              isLoading: _isUploadingFront,
+                              onTap: () async {
+                                setState(() => _isUploadingFront = true);
+                                final res = await UploadService().pickAndUploadImage(purpose: 'shop');
+                                setState(() {
+                                  _isUploadingFront = false;
+                                  if (res != null && res.success && res.url != null) {
+                                    _idCardFrontUrl = res.url;
+                                  } else if (res != null && res.error != null && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(res.error!), backgroundColor: const Color(0xFFD0011B)),
+                                    );
+                                  }
+                                });
+                              },
+                              onRemove: () => setState(() => _idCardFrontUrl = null),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildKycUploadCard(
+                              title: 'Mặt sau CCCD',
+                              imageUrl: _idCardBackUrl,
+                              isLoading: _isUploadingBack,
+                              onTap: () async {
+                                setState(() => _isUploadingBack = true);
+                                final res = await UploadService().pickAndUploadImage(purpose: 'shop');
+                                setState(() {
+                                  _isUploadingBack = false;
+                                  if (res != null && res.success && res.url != null) {
+                                    _idCardBackUrl = res.url;
+                                  } else if (res != null && res.error != null && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(res.error!), backgroundColor: const Color(0xFFD0011B)),
+                                    );
+                                  }
+                                });
+                              },
+                              onRemove: () => setState(() => _idCardBackUrl = null),
+                            ),
+                          ),
+                        ],
+                      ),
 
                       const SizedBox(height: 20),
 
@@ -826,6 +1046,143 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProcessStep({
+    required String step,
+    required String title,
+    required String desc,
+    required bool isCurrent,
+    bool isLast = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: isCurrent ? AppColors.primary : const Color(0xFFF0F1F5),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              step,
+              style: TextStyle(
+                color: isCurrent ? Colors.white : const Color(0xFF555770),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bước $step: $title',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                    color: isCurrent ? AppColors.primary : const Color(0xFF1E2022),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  desc,
+                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E7191), height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKycUploadCard({
+    required String title,
+    required String? imageUrl,
+    required bool isLoading,
+    required VoidCallback onTap,
+    required VoidCallback onRemove,
+  }) {
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    return Container(
+      height: 110,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hasImage ? const Color(0xFF00BFA5) : const Color(0xFFE2E2E6),
+          width: hasImage ? 1.5 : 1,
+        ),
+      ),
+      child: hasImage
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.credit_card_rounded, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: InkWell(
+                    onTap: onRemove,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 4,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                    child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            )
+          : InkWell(
+              onTap: isLoading ? null : onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: Center(
+                child: isLoading
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_a_photo_outlined, size: 24, color: Color(0xFF8F90A6)),
+                          const SizedBox(height: 6),
+                          Text(
+                            title,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF555770)),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Tối đa 5MB (JPG/PNG)',
+                            style: TextStyle(fontSize: 9.5, color: Color(0xFF8F90A6)),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
     );
   }
 }

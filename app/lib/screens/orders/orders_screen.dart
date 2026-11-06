@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/order_service.dart';
+import '../../services/review_service.dart';
+import '../../services/upload_service.dart';
 import '../../theme/app_colors.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -46,6 +48,234 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Hộp thoại đánh giá sản phẩm dành riêng cho đơn đã giao thành công
+  void _showOrderReviewDialog(Map<String, dynamic> order, List<dynamic> items) {
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy sản phẩm trong đơn để đánh giá.')),
+      );
+      return;
+    }
+
+    final firstItem = items.first as Map<String, dynamic>;
+    final productName = firstItem['productName'] ?? firstItem['product_name'] ?? 'Sản phẩm đã mua';
+    final orderItemId = (firstItem['id'] ?? firstItem['orderItemId'] ?? firstItem['order_item_id'] ?? order['id'] ?? '1').toString();
+
+    int rating = 5;
+    final commentCtrl = TextEditingController();
+    List<String> reviewImages = [];
+    bool isUploadingImage = false;
+    bool isSubmitting = false;
+
+    final ratingLabels = {
+      1: '⭐ Rất tệ',
+      2: '⭐⭐ Không hài lòng',
+      3: '⭐⭐⭐ Bình thường',
+      4: '⭐⭐⭐⭐ Hài lòng',
+      5: '⭐⭐⭐⭐⭐ Tuyệt vời',
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+                left: 16,
+                right: 16,
+                top: 20,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.rate_review_rounded, color: AppColors.primary, size: 22),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Đánh Giá Sản Phẩm',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1E2022)),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF8F90A6)),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 12),
+                    Text(
+                      productName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF555770)),
+                    ),
+                    const SizedBox(height: 14),
+                    const Center(
+                      child: Text('Chất lượng sản phẩm & Dịch vụ shop', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                    // 5 Star Rating Bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final starIndex = index + 1;
+                        return IconButton(
+                          icon: Icon(
+                            starIndex <= rating ? Icons.star_rounded : Icons.star_border_rounded,
+                            color: Colors.amber.shade700,
+                            size: 36,
+                          ),
+                          onPressed: () => setModalState(() => rating = starIndex),
+                        );
+                      }),
+                    ),
+                    Center(
+                      child: Text(
+                        ratingLabels[rating] ?? '',
+                        style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: commentCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Nhận xét chi tiết (tối thiểu 5 ký tự) *',
+                        hintText: 'Chất lượng sản phẩm thế nào? Bạn có hài lòng về đóng gói, giao hàng không?',
+                        labelStyle: const TextStyle(fontSize: 12.5),
+                        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Tải ảnh review (UploadService kiểm tra MIME, Magic Bytes, dung lượng <= 2MB, nén WebP)
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: isUploadingImage
+                              ? null
+                              : () async {
+                                  setModalState(() => isUploadingImage = true);
+                                  final uploadResult = await UploadService().pickAndUploadImage(purpose: 'review');
+                                  setModalState(() => isUploadingImage = false);
+                                  if (uploadResult != null && uploadResult.success && uploadResult.url != null) {
+                                    setModalState(() => reviewImages.add(uploadResult.url!));
+                                  } else if (uploadResult != null && uploadResult.error != null && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(uploadResult.error!), backgroundColor: const Color(0xFFD0011B)),
+                                    );
+                                  }
+                                },
+                          icon: isUploadingImage
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.add_a_photo_rounded, size: 16),
+                          label: const Text('Thêm ảnh thực tế (Tối đa 2MB)', style: TextStyle(fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (reviewImages.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        children: reviewImages.map((img) {
+                          return Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  img,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                                ),
+                              ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: InkWell(
+                                  onTap: () => setModalState(() => reviewImages.remove(img)),
+                                  child: Container(
+                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final comment = commentCtrl.text.trim();
+                                if (comment.length < 5) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Vui lòng nhập tối thiểu 5 ký tự nhận xét.')),
+                                  );
+                                  return;
+                                }
+
+                                setModalState(() => isSubmitting = true);
+                                final res = await ReviewService().createReview(
+                                  orderItemId: orderItemId,
+                                  rating: rating,
+                                  comment: comment,
+                                  images: reviewImages,
+                                );
+                                setModalState(() => isSubmitting = false);
+
+                                if (mounted) {
+                                  Navigator.pop(modalCtx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Cảm ơn bạn! Đánh giá đã được gửi thành công.'),
+                                      backgroundColor: Color(0xFF00BFA5),
+                                    ),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: isSubmitting
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text('Gửi Đánh Giá', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -189,8 +419,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           Container(
             width: 80,
             height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F8),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF7F7F8),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.inventory_2_outlined, size: 40, color: Color(0xFF8F90A6)),
@@ -209,11 +439,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 22),
           Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
                 colors: [AppColors.primary, AppColors.earth],
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.all(Radius.circular(10)),
             ),
             child: ElevatedButton(
               onPressed: _loadOrders,
@@ -237,6 +467,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     final totalAmount = order['totalAmount'] ?? order['total_amount'] ?? 0;
     final status = (order['status'] ?? 'pending').toString().toLowerCase();
     final createdAt = (order['createdAt'] ?? '').toString();
+    final canReview = status == 'delivered' || status == 'completed';
+
     List<dynamic> items = [];
     if (order['items'] is List && (order['items'] as List).isNotEmpty) {
       items = order['items'] as List;
@@ -422,7 +654,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             padding: EdgeInsets.symmetric(horizontal: 14),
             child: Divider(height: 1, color: Color(0xFFEEEEF0)),
           ),
-          // Total Amount & Action
+          // Total Amount & Action Buttons
           Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -432,54 +664,74 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    const Text('Tổng thanh toán: ', style: TextStyle(fontSize: 12, color: Color(0xFF555770))),
+                    const Text('Tổng: ', style: TextStyle(fontSize: 12, color: Color(0xFF555770))),
                     Text(
                       _formatVND(num.tryParse(totalAmount.toString()) ?? 0),
                       style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 16),
                     ),
                   ],
                 ),
-                OutlinedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        title: Text('Chi tiết đơn #$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Trạng thái: $statusText', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 6),
-                            Text('Số lượng sản phẩm: ${items.length} món'),
-                            const SizedBox(height: 4),
-                            Text('Tổng tiền: ${_formatVND(num.tryParse(totalAmount.toString()) ?? 0)}', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
-                            if (order['recipientName'] != null) ...[
-                              const Divider(height: 16),
-                              Text('Người nhận: ${order['recipientName']}'),
-                              Text('SĐT: ${order['recipientPhone'] ?? ''}'),
-                              Text('Địa chỉ: ${order['addressDetail'] ?? ''}, ${order['ward'] ?? ''}, ${order['district'] ?? ''}, ${order['province'] ?? ''}'),
-                            ],
-                          ],
+                Row(
+                  children: [
+                    // Nút Đánh Giá Sản Phẩm (Chỉ hiển thị khi đơn đã giao thành công)
+                    if (canReview) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _showOrderReviewDialog(order, items),
+                        icon: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
+                        label: const Text('Đánh giá', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 34),
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Đóng', style: TextStyle(color: Color(0xFF555770))),
-                          ),
-                        ],
                       ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1E2022),
-                    side: const BorderSide(color: Color(0xFFE2E2E6)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    minimumSize: const Size(0, 34),
-                  ),
-                  child: const Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                    ],
+                    OutlinedButton(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            title: Text('Chi tiết đơn #$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Trạng thái: $statusText', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 6),
+                                Text('Số lượng sản phẩm: ${items.length} món'),
+                                const SizedBox(height: 4),
+                                Text('Tổng tiền: ${_formatVND(num.tryParse(totalAmount.toString()) ?? 0)}', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                                if (order['recipientName'] != null) ...[
+                                  const Divider(height: 16),
+                                  Text('Người nhận: ${order['recipientName']}'),
+                                  Text('SĐT: ${order['recipientPhone'] ?? ''}'),
+                                  Text('Địa chỉ: ${order['addressDetail'] ?? ''}, ${order['ward'] ?? ''}, ${order['district'] ?? ''}, ${order['province'] ?? ''}'),
+                                ],
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Đóng', style: TextStyle(color: Color(0xFF555770))),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1E2022),
+                        side: const BorderSide(color: Color(0xFFE2E2E6)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        minimumSize: const Size(0, 34),
+                      ),
+                      child: const Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
               ],
             ),

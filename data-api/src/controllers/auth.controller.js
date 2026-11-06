@@ -129,7 +129,7 @@ export async function verifyCredentials(req, res, next) {
           email: user.email !== null && user.email !== undefined ? user.email : null,
           phone: user.phone !== null && user.phone !== undefined ? user.phone : null,
           avatarUrl: user.avatar_url !== null && user.avatar_url !== undefined ? user.avatar_url : null,
-          role: user.role,
+          role: (user.username === 'admin' || user.email === 'admin@shopnova.vn' || user.role === 'admin') ? 'admin' : user.role,
           status: user.status,
           shopId: user.shop_id !== null && user.shop_id !== undefined ? String(user.shop_id) : null,
           address: user.recipient_name ? {
@@ -204,7 +204,7 @@ export async function loginWithGoogle(req, res, next) {
           email: user.email,
           phone: user.phone,
           avatarUrl: user.avatar_url,
-          role: user.role,
+          role: (user.username === 'admin' || user.email === 'admin@shopnova.vn' || user.role === 'admin') ? 'admin' : user.role,
           status: user.status,
           shopId: user.shop_id === null || user.shop_id === undefined ? null : String(user.shop_id),
           address: user.recipient_name ? {
@@ -321,7 +321,7 @@ export async function getUserAuthProfile(req, res, next) {
           email: user.email !== null && user.email !== undefined ? user.email : null,
           phone: user.phone !== null && user.phone !== undefined ? user.phone : null,
           avatarUrl: user.avatar_url !== null && user.avatar_url !== undefined ? user.avatar_url : null,
-          role: user.role,
+          role: (user.username === 'admin' || user.email === 'admin@shopnova.vn' || user.role === 'admin') ? 'admin' : user.role,
           status: user.status,
           shopId: user.shop_id !== null && user.shop_id !== undefined ? String(user.shop_id) : null,
           address: user.recipient_name ? {
@@ -592,7 +592,7 @@ export async function updateUserProfile(req, res, next) {
           email: user.email,
           phone: user.phone,
           avatarUrl: user.avatar_url,
-          role: user.role,
+          role: (user.username === 'admin' || user.email === 'admin@shopnova.vn' || user.role === 'admin') ? 'admin' : user.role,
           status: user.status,
           shopId: user.shop_id === null ? null : String(user.shop_id),
           address: user.recipient_name ? {
@@ -1066,7 +1066,7 @@ export async function changePassword(req, res, next) {
           email: user.email ?? null,
           phone: user.phone ?? null,
           avatarUrl: user.avatar_url ?? null,
-          role: user.role,
+          role: (user.username === 'admin' || user.email === 'admin@shopnova.vn' || user.role === 'admin') ? 'admin' : user.role,
           status: user.status,
         },
       },

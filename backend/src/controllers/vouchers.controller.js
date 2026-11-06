@@ -1,3 +1,12 @@
+export async function listPublicVouchers(req, res, next) {
+  try {
+    const result = await callDataApi('/internal/v1/vouchers')
+    return res.status(200).json({ success: true, data: result.data || result })
+  } catch (err) {
+    return next(err)
+  }
+}
+
 import { callDataApi } from '../clients/data.client.js'
 
 export async function listWallet(req, res, next) {
