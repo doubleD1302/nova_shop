@@ -119,4 +119,4 @@ try {
   await new Promise((resolve) => busy.close(resolve))
 }
 
-console.log('Kiểm tra dùng cấu hình cô lập, không đọc hoặc sửa MySQL Aiven.')
+console.log('Kiểm tra dùng cấu hình cô lập, không đọc hoặc sửa database cloud.')

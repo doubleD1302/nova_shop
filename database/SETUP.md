@@ -35,3 +35,17 @@ npm start
 `check:db` cũ kiểm tra MySQL 8.4 và fixture tồn kho 10/8/5; không phù hợp với seed hiện tại hoặc TiDB. Dùng `check:cloud` cho database mới. Schema mới đã được tạo và kiểm tra trên TiDB 8.5.3; chưa chạy lại khởi tạo trên MySQL 8.4. Kiểm tra danh sách sản phẩm công khai có thể trả rỗng vì seed chỉ có sản phẩm nháp và chưa có đủ ảnh để xuất bản.
 
 Các file môi trường, chứng chỉ, dump và bản backup cấu hình chỉ lưu riêng trên máy, không đưa vào Git hoặc ZIP source.
+
+## Docker với TiDB
+
+`compose.tidb.yml` chạy Backend và Data API nối cùng database TiDB, không tạo MySQL container hay chạy lại schema. Sao chép `docker/tidb.env.example` thành `.env.tidb.docker`, điền kết nối runtime, khóa dịch vụ/JWT và đường dẫn CA trên máy. Sau đó chạy từ root:
+
+```powershell
+docker compose --env-file .env.tidb.docker -f compose.tidb.yml up -d
+```
+
+Data API chỉ ở mạng Docker, Backend lắng nghe cổng 3000 trên loopback. File CA được mount riêng, các biến DB chỉ truyền cho Data API. Giữ các volume ảnh và dữ liệu ứng dụng khi dừng container; không thêm `-v` vào lệnh dừng nếu cần giữ dữ liệu. Cấu hình Docker cũ dùng MySQL container là môi trường riêng, không tự đồng bộ với TiDB.
+
+## Hosting
+
+`render.yaml` dùng `/etc/secrets/tidb-ca.pem`. Trên hosting phải cập nhật `DB_HOST`, `DB_PORT=4000`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` bằng cấu hình runtime TiDB, thêm Secret File đúng tên và cho phép địa chỉ outbound của hosting trong danh sách truy cập TiDB nếu đang giới hạn IP. Demo mặc định tắt; chỉ thêm ba biến mật khẩu và bật `DEMO_LOGIN_ENABLED` trên deployment trải nghiệm. Không đưa các biến này hoặc biến DB vào Vercel frontend. Việc sửa file cấu hình không tự cập nhật deployment đã chạy; cần cấu hình và deploy riêng sau khi source được duyệt.

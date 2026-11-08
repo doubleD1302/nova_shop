@@ -1,0 +1,64 @@
+services:
+  data-api:
+    image: node:24-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --omit=dev && npm start"]
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      NODE_ENV: production
+      DATA_API_KEY: "${DATA_API_KEY:?Thiếu DATA_API_KEY}"
+      DB_HOST: "${DB_HOST:?Thiếu DB_HOST TiDB}"
+      DB_PORT: "${DB_PORT:-4000}"
+      DB_NAME: "${DB_NAME:-shopnova_dev}"
+      DB_USER: "${DB_USER:?Thiếu DB_USER runtime}"
+      DB_PASSWORD: "${DB_PASSWORD:?Thiếu DB_PASSWORD}"
+      DB_SSL_ENABLED: "true"
+      DB_SSL_CA: /run/secrets/tidb-ca.pem
+    volumes:
+      - ./data-api/src:/app/src:ro
+      - ./data-api/package.json:/app/package.json:ro
+      - ./data-api/package-lock.json:/app/package-lock.json:ro
+      - data_modules:/app/node_modules
+    secrets:
+      - source: tidb_ca
+        target: tidb-ca.pem
+
+  backend:
+    image: node:24-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --omit=dev && npm start"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATA_API_URL: http://data-api:3001
+      DATA_API_KEY: "${DATA_API_KEY:?Thiếu DATA_API_KEY}"
+      JWT_SECRET: "${JWT_SECRET:?Thiếu JWT_SECRET}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:5173}"
+      DEMO_LOGIN_ENABLED: "${DEMO_LOGIN_ENABLED:-false}"
+      DEMO_BUYER_PASSWORD: "${DEMO_BUYER_PASSWORD:-}"
+      DEMO_SELLER_PASSWORD: "${DEMO_SELLER_PASSWORD:-}"
+      DEMO_ADMIN_PASSWORD: "${DEMO_ADMIN_PASSWORD:-}"
+    volumes:
+      - ./backend/src:/app/src:ro
+      - ./backend/package.json:/app/package.json:ro
+      - ./backend/package-lock.json:/app/package-lock.json:ro
+      - backend_modules:/app/node_modules
+      - uploads:/app/uploads
+      - legacy_data:/app/data
+    depends_on:
+      - data-api
+
+secrets:
+  tidb_ca:
+    file: "${TIDB_CA_FILE:?Thiếu đường dẫn file CA TiDB trên máy}"
+
+volumes:
+  data_modules:
+  backend_modules:
+  uploads:
+  legacy_data:

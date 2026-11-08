@@ -34,7 +34,9 @@ services:
       - key: DB_SSL_ENABLED
         value: "true"
       - key: DB_SSL_CA
-        value: /etc/secrets/aiven-ca.pem
+        value: /etc/secrets/tidb-ca.pem
+      - key: DEMO_LOGIN_ENABLED
+        value: "false"
       - key: UPLOAD_STORAGE
         value: s3
       - key: S3_ENDPOINT
