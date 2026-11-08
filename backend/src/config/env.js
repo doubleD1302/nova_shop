@@ -255,7 +255,29 @@ function parseAndValidateEnv() {
     process.exit(1)
   }
 
+  const rawDemoLogin = (process.env.DEMO_LOGIN_ENABLED || 'false').trim().toLowerCase()
+  if (!['true', 'false'].includes(rawDemoLogin)) {
+    console.error('[Lỗi cấu hình] DEMO_LOGIN_ENABLED chỉ chấp nhận true hoặc false.')
+    process.exit(1)
+  }
+  const demoLoginEnabled = rawDemoLogin === 'true'
+  const demoAccounts = demoLoginEnabled ? [
+    { role: 'buyer', label: 'Người mua', hint: 'Khám phá sản phẩm, giỏ hàng và đơn mua.' },
+    { role: 'seller', label: 'Người bán', hint: 'Trải nghiệm quản lý gian hàng và sản phẩm.' },
+    { role: 'admin', label: 'Quản trị viên', hint: 'Trải nghiệm trang quản trị và kiểm duyệt.' },
+  ].map((account) => {
+    const key = `DEMO_${account.role.toUpperCase()}_PASSWORD`
+    const password = process.env[key]
+    if (!isValidSecret(password) || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+      console.error(`[Lỗi cấu hình] ${key} phải có từ 8 ký tự và tối đa 72 byte khi bật demo.`)
+      process.exit(1)
+    }
+    return Object.freeze({ ...account, username: `demo_${account.role}_guest`, password })
+  }) : []
+
   return Object.freeze({
+    demoLoginEnabled,
+    demoAccounts: Object.freeze(demoAccounts),
     port,
     nodeEnv: rawNodeEnv,
     corsOrigins,

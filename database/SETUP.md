@@ -36,6 +36,16 @@ npm start
 
 Các file môi trường, chứng chỉ, dump và bản backup cấu hình chỉ lưu riêng trên máy, không đưa vào Git hoặc ZIP source.
 
+## Ba tài khoản trải nghiệm
+
+Chạy từ `data-api/`: điền ba biến `DEMO_BUYER_PASSWORD`, `DEMO_SELLER_PASSWORD`, `DEMO_ADMIN_PASSWORD` trong `.env`, đặt `DEMO_SEED_ENABLED=true`, rồi chạy `npm run seed:demo`. Script chỉ tạo `demo_buyer_guest`, `demo_seller_guest`, `demo_admin_guest` và một shop demo hoạt động; mật khẩu lưu bằng bcrypt. Có thể chạy lại với cùng cấu hình; nếu tài khoản đã bị thay đổi, script dừng và giữ nguyên dữ liệu. Không tự reset mật khẩu hoặc nâng quyền tài khoản khác.
+
+Trong `backend/.env`, đặt ba mật khẩu tương ứng và `DEMO_LOGIN_ENABLED=true`, rồi khởi động lại Backend. Trang đăng nhập lấy gợi ý qua `GET /api/v1/auth/demo-accounts`. API chỉ trả tài khoản sau khi Data API xác minh mật khẩu và đúng vai trò trong database. Chọn vai trò sẽ điền username/mật khẩu vào form; người dùng bấm Đăng nhập để tiếp tục. Mặc định tính năng tắt, khi tắt API trả danh sách rỗng.
+
+Đây là quyền truy cập công khai có chủ đích của môi trường demo, gồm cả admin. Không bật trên môi trường chứa tài khoản, đơn hàng hoặc dữ liệu thật. Mật khẩu demo chỉ lưu trong env riêng; không hardcode vào frontend hoặc Git. Tắt gợi ý không tự vô hiệu hóa các tài khoản đã tạo: khi ngừng demo, khóa đúng ba tài khoản hoặc đổi mật khẩu của chúng.
+
+Sau khi cả Backend và Data API chạy: từ root chạy `npm run check:demo` để kiểm tra ba vai trò, phân quyền, dữ liệu giỏ/đơn/gian hàng/quản trị và refresh/logout. Mặc định Backend ở cổng 3000; có thể đặt `DEMO_TEST_BASE_URL` nếu dùng cổng khác. `npm --prefix backend run test:demo` kiểm tra bằng Data API giả lập rằng gợi ý mặc định tắt và không trả mật khẩu khi xác minh thất bại.
+
 ## Docker với TiDB
 
 `compose.tidb.yml` chạy Backend và Data API nối cùng database TiDB, không tạo MySQL container hay chạy lại schema. Sao chép `docker/tidb.env.example` thành `.env.tidb.docker`, điền kết nối runtime, khóa dịch vụ/JWT và đường dẫn CA trên máy. Sau đó chạy từ root:

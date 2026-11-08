@@ -18,6 +18,9 @@ const isLoopbackApiUrl = (() => {
 // A production build must never send visitors to their own machine. With an
 // empty base URL, the host can route /api and /uploads to the deployed backend.
 export const API_BASE_URL = import.meta.env.PROD && isLoopbackApiUrl ? '' : configuredApiBaseUrl
+export function apiDemoAccounts(signal) {
+  return fetch(`${API_BASE_URL}/api/v1/auth/demo-accounts`, { signal, cache: 'no-store' })
+}
 const TOKEN_KEY = 'novashop_token'
 export const REFRESH_TOKEN_KEY = 'novashop_refresh_token'
 

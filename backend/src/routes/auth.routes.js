@@ -12,8 +12,10 @@ import {
 } from '../controllers/auth.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 import { loginRateLimiter } from '../middlewares/rate-limit.middleware.js'
+import { listDemoAccounts } from '../controllers/demo.controller.js'
 
 const router = Router()
+router.get('/demo-accounts', loginRateLimiter, listDemoAccounts)
 
 // POST /api/v1/auth/login - Đăng nhập tài khoản với giới hạn thử tần suất (Rate Limiter)
 router.post('/login', loginRateLimiter, login)

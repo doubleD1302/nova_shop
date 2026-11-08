@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import AuthLayout from '../components/auth/AuthLayout'
 import { IconUser, IconLock, IconEye } from '../components/ui/Icons'
+import { apiDemoAccounts } from '../utils/api'
 
 /** TRANG ĐĂNG NHẬP - Thiết kế theo phong cách Terracotta + Cream */
 export default function LoginPage() {
@@ -16,11 +17,32 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [demoAccounts, setDemoAccounts] = useState([])
+  const [demoRole, setDemoRole] = useState('')
 
   // Đảm bảo không hiển thị cảnh báo lỗi cố định khi vừa vào trang
   useEffect(() => {
     setError('')
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiDemoAccounts(controller.signal)
+      .then(async (response) => {
+        const body = await response.json()
+        if (!controller.signal.aborted && response.ok && body.success && Array.isArray(body.data?.accounts)) {
+          setDemoAccounts(body.data.accounts)
+        }
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  const fillDemoAccount = (account) => {
+    setForm({ username: account.username, password: account.password })
+    setDemoRole(account.role)
+    setError('')
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -83,13 +105,36 @@ export default function LoginPage() {
   return (
     <AuthLayout
       title="Đăng Nhập"
-      subtitle="Dùng tài khoản người mua hoặc người bán để tiếp tục."
+      subtitle="Đăng nhập để mua sắm, bán hàng hoặc quản trị."
       bannerTitle="Mua sắm & bán hàng trên cùng một sàn"
     >
+      {demoAccounts.length > 0 && (
+        <section aria-label="Tài khoản trải nghiệm" className="mb-5 rounded-xl border border-[#E6D5C2] bg-[#FBF3E8] p-3.5">
+          <p className="text-sm font-semibold text-[#49352D]">Trải nghiệm Nova Shop</p>
+          <p className="mt-1 text-xs text-[#8B7566]">Chọn vai trò để điền tài khoản và mật khẩu demo.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {demoAccounts.map((account) => (
+              <button
+                key={account.role}
+                type="button"
+                aria-pressed={demoRole === account.role}
+                disabled={loading || googleLoading}
+                onClick={() => fillDemoAccount(account)}
+                className={`rounded-lg border px-2 py-2.5 text-xs font-semibold transition disabled:opacity-50 ${demoRole === account.role ? 'border-[#BD6E49] bg-[#BD6E49] text-white' : 'border-[#E6D5C2] bg-[#FFFCF7] text-[#80513B] hover:border-[#BD6E49]'}`}
+              >
+                {account.label}
+              </button>
+            ))}
+          </div>
+          <p aria-live="polite" className="mt-2 text-xs text-[#8B7566]">
+            {demoAccounts.find((account) => account.role === demoRole)?.hint || 'Ba vai trò để khám phá các chức năng của sàn.'}
+          </p>
+        </section>
+      )}
       <form onSubmit={submit} className="space-y-4">
         {/* Tên đăng nhập */}
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#49352D]">
+          <label htmlFor="login-username" className="mb-1.5 block text-[13px] font-medium text-[#49352D]">
             Tên đăng nhập
           </label>
           <div className="relative flex items-center">
@@ -97,8 +142,10 @@ export default function LoginPage() {
               <IconUser className="h-4.5 w-4.5" />
             </span>
             <input
+              id="login-username"
+              autoComplete="username"
               value={form.username}
-              onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+              onChange={(e) => { setForm((f) => ({ ...f, username: e.target.value })); setDemoRole('') }}
               placeholder="Nhập số điện thoại / email / tên tài khoản"
               disabled={loading}
               className="w-full rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] pl-10 pr-3.5 py-3 text-[14px] text-[#49352D] placeholder:text-[#8B7566] outline-none transition focus:border-[#BD6E49] focus:ring-2 focus:ring-[#BD6E49]/20 disabled:bg-[#FBF3E8]"
@@ -108,7 +155,7 @@ export default function LoginPage() {
 
         {/* Mật khẩu */}
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[#49352D]">
+          <label htmlFor="login-password" className="mb-1.5 block text-[13px] font-medium text-[#49352D]">
             Mật khẩu
           </label>
           <div className="relative flex items-center">
@@ -116,9 +163,11 @@ export default function LoginPage() {
               <IconLock className="h-4.5 w-4.5" />
             </span>
             <input
+              id="login-password"
+              autoComplete="current-password"
               type={showPassword ? 'text' : 'password'}
               value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              onChange={(e) => { setForm((f) => ({ ...f, password: e.target.value })); setDemoRole('') }}
               placeholder="Nhập mật khẩu"
               disabled={loading}
               className="w-full rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] pl-10 pr-10 py-3 text-[14px] text-[#49352D] placeholder:text-[#8B7566] outline-none transition focus:border-[#BD6E49] focus:ring-2 focus:ring-[#BD6E49]/20 disabled:bg-[#FBF3E8]"
@@ -158,7 +207,7 @@ export default function LoginPage() {
         </Link>
         <button
           type="button"
-          onClick={() => pushToast('Vui lòng liên hệ hỗ trợ hoặc dùng tài khoản có sẵn: demo_buyer / demo_seller_a (mật khẩu Buyer@123 / Seller@123)', 'info')}
+          onClick={() => pushToast('Vui lòng liên hệ hỗ trợ để được hướng dẫn khôi phục tài khoản.', 'info')}
           className="text-[#8B7566] transition hover:text-[#BD6E49] cursor-pointer"
         >
           Quên mật khẩu?
@@ -229,7 +278,7 @@ export default function LoginPage() {
       {/* Hiển thị tài khoản đang đăng nhập nếu có */}
       {user ? (
         <div className="mt-4 rounded-xl border border-[#E6D5C2] bg-[#FBF3E8] p-3 text-[12px] text-[#8B7566]">
-          Đang đăng nhập với <b className="text-[#49352D]">{user.fullName || user.username}</b> ({user.role === 'seller' ? 'người bán' : 'người mua'}).
+          Đang đăng nhập với <b className="text-[#49352D]">{user.fullName || user.username}</b> ({user.role === 'admin' ? 'quản trị viên' : user.role === 'seller' ? 'người bán' : 'người mua'}).
         </div>
       ) : null}
     </AuthLayout>

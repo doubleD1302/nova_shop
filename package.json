@@ -12,7 +12,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start:hosting": "node scripts/host.mjs",
-    "check:hosting": "node scripts/check-hosting.mjs"
+    "check:hosting": "node scripts/check-hosting.mjs",
+    "check:demo": "node scripts/check-demo.mjs"
   },
   "dependencies": {
     "firebase": "^13.1.0",

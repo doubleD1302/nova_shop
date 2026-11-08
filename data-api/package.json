@@ -8,6 +8,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "init:db": "node scripts/init-db.mjs",
+    "seed:demo": "node scripts/seed-demo.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "test:seller-product-validation": "node scripts/test-seller-product-validation.mjs",
     "check:db": "node scripts/check-db.mjs",
