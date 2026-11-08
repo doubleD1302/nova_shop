@@ -13,6 +13,7 @@
     "test:seller-product-validation": "node scripts/test-seller-product-validation.mjs",
     "check:db": "node scripts/check-db.mjs",
     "check:cloud": "node scripts/check-cloud-db.mjs",
+    "check:cloud-required": "node scripts/test-cloud-required.mjs",
     "check:timeout": "node scripts/test-timeout-hang.mjs",
     "grant-admin": "node scripts/grant-admin.mjs",
     "check:tls": "node scripts/test-tls.mjs"

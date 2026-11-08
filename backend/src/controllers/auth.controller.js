@@ -1,3 +1,4 @@
+import { env } from '../config/env.js'
 import crypto from 'node:crypto'
 import { signAccessToken, ACCESS_TOKEN_EXPIRES_IN } from '../middlewares/auth.middleware.js'
 import {
@@ -129,6 +130,7 @@ export async function login(req, res, next) {
       user = await verifyCredentials(username.trim().toLowerCase(), password)
     } catch (err) {
       if (!(err instanceof DataApiClientError) || err.code !== 'INVALID_CREDENTIALS') {
+        if (!env.allowLocalDbFallback) throw err
         const localUser = findUserByUsername(username.trim().toLowerCase())
         if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
           user = localUser
@@ -138,6 +140,7 @@ export async function login(req, res, next) {
       } else {
         user = await migrateVerifiedLegacyAccount(username, password)
         if (!user) {
+          if (!env.allowLocalDbFallback) throw err
           const localUser = findUserByUsername(username.trim().toLowerCase())
           if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
             user = localUser

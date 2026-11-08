@@ -2,7 +2,6 @@ import net from 'node:net'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Sequelize } from 'sequelize'
 import { env } from './env.js'
-import { executeLocalQuery, executeLocalTransaction, checkLocalReadiness } from './local-db.js'
 
 /**
  * Ngữ cảnh bất đồng bộ lưu trữ tài nguyên riêng của từng yêu cầu thao tác cơ sở dữ liệu.
@@ -531,7 +530,8 @@ export async function checkDatabaseReadiness(timeoutMs = env.dbReadinessTimeoutM
       })
     }, timeoutMs)
   } catch (err) {
-    if (isDatabaseUnavailableError(err)) {
+    if (env.allowLocalDbFallback && isDatabaseUnavailableError(err)) {
+      const { checkLocalReadiness } = await import('./local-db.js')
       return checkLocalReadiness()
     }
     throw err
@@ -552,7 +552,8 @@ export async function executeQuery(sql, values = [], timeoutMs = env.dbReadiness
       })
     }, timeoutMs)
   } catch (err) {
-    if (isDatabaseUnavailableError(err)) {
+    if (env.allowLocalDbFallback && isDatabaseUnavailableError(err)) {
+      const { executeLocalQuery } = await import('./local-db.js')
       return executeLocalQuery(sql, values)
     }
     throw err
@@ -583,7 +584,8 @@ export async function executeTransaction(operationFn, timeoutMs = env.dbReadines
       }
     }, timeoutMs)
   } catch (err) {
-    if (isDatabaseUnavailableError(err)) {
+    if (env.allowLocalDbFallback && isDatabaseUnavailableError(err)) {
+      const { executeLocalTransaction } = await import('./local-db.js')
       return executeLocalTransaction(operationFn)
     }
     throw err

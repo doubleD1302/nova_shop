@@ -275,7 +275,14 @@ function parseAndValidateEnv() {
     return Object.freeze({ ...account, username: `demo_${account.role}_guest`, password })
   }) : []
 
+  const rawLocalFallback = (process.env.ALLOW_LOCAL_DB_FALLBACK || 'false').trim().toLowerCase()
+  if (!['true', 'false'].includes(rawLocalFallback) || rawLocalFallback === 'true' && rawNodeEnv === 'production') {
+    console.error('[Lỗi cấu hình] ALLOW_LOCAL_DB_FALLBACK chỉ được bật có chủ đích ngoài production.')
+    process.exit(1)
+  }
+
   return Object.freeze({
+    allowLocalDbFallback: rawLocalFallback === 'true',
     demoLoginEnabled,
     demoAccounts: Object.freeze(demoAccounts),
     port,

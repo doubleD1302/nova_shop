@@ -188,7 +188,13 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
     dbSslCaContent = fileContent
   }
 
+  const rawLocalFallback = (sourceEnv.ALLOW_LOCAL_DB_FALLBACK || 'false').trim().toLowerCase()
+  if (!['true', 'false'].includes(rawLocalFallback) || rawLocalFallback === 'true' && rawNodeEnv === 'production') {
+    fail('[Lỗi cấu hình] ALLOW_LOCAL_DB_FALLBACK chỉ được bật có chủ đích ngoài production.')
+  }
+
   return Object.freeze({
+    allowLocalDbFallback: rawLocalFallback === 'true',
     host,
     port,
     nodeEnv: rawNodeEnv,

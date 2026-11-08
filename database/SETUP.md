@@ -1,6 +1,6 @@
 # Khởi tạo database mới
 
-`schema.sql` là schema đầy đủ cho database trống, gồm 33 bảng. Các thay đổi kiểm duyệt sản phẩm, khóa shop, báo cáo vi phạm, hậu mãi, vận chuyển và chat đã được gộp từ migration hiện có. Không chạy lại toàn bộ migration lịch sử sau khi nạp schema này vì nhiều cột và bảng đã có sẵn.
+`schema.sql` là schema đầy đủ cho database trống, gồm 34 bảng. Các thay đổi kiểm duyệt sản phẩm, khóa shop, báo cáo vi phạm, hậu mãi, vận chuyển và chat đã được gộp từ migration hiện có. Không chạy lại toàn bộ migration lịch sử sau khi nạp schema này vì nhiều cột và bảng đã có sẵn.
 
 Đây là cách tạo database mới từ source, không khôi phục dữ liệu từng nhập trên database cũ. `seed.sql` có 3 tài khoản mẫu không có mật khẩu đăng nhập, 2 shop, 8 danh mục, 8 sản phẩm nháp, 9 SKU tồn kho bằng 0, 1 địa chỉ và 1 voucher. Không có đơn hàng hoặc admin mẫu. Đăng ký tài khoản mới qua ứng dụng; cấp admin riêng bằng công cụ `grant-admin` khi cần.
 
@@ -30,7 +30,7 @@ npm run smoke
 npm start
 ```
 
-`check:cloud` kiểm tra kết nối bằng lớp truy vấn Data API, toàn bộ bảng/cột, 37 CHECK, 60 khóa ngoại, quyền runtime, cùng kiểm tra âm cho giá SKU, khóa ngoại, username trùng và địa chỉ mặc định trùng. Các thao tác kiểm tra nằm trong transaction được rollback; cần có ít nhất một SKU để thử CHECK giá. Không dùng tài khoản root hoặc một tài khoản có quyền DDL để chạy bài này.
+`check:cloud` kiểm tra kết nối bằng lớp truy vấn Data API, toàn bộ bảng/cột, 38 CHECK, 61 khóa ngoại, quyền runtime, cùng kiểm tra âm cho giá SKU, khóa ngoại, username trùng và địa chỉ mặc định trùng. Các thao tác kiểm tra nằm trong transaction được rollback; cần có ít nhất một SKU để thử CHECK giá. Không dùng tài khoản root hoặc một tài khoản có quyền DDL để chạy bài này.
 
 `check:db` cũ kiểm tra MySQL 8.4 và fixture tồn kho 10/8/5; không phù hợp với seed hiện tại hoặc TiDB. Dùng `check:cloud` cho database mới. Schema mới đã được tạo và kiểm tra trên TiDB 8.5.3; chưa chạy lại khởi tạo trên MySQL 8.4. Kiểm tra danh sách sản phẩm công khai có thể trả rỗng vì seed chỉ có sản phẩm nháp và chưa có đủ ảnh để xuất bản.
 
@@ -59,3 +59,7 @@ Data API chỉ ở mạng Docker, Backend lắng nghe cổng 3000 trên loopback
 ## Hosting
 
 `render.yaml` dùng `/etc/secrets/tidb-ca.pem`. Trên hosting phải cập nhật `DB_HOST`, `DB_PORT=4000`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` bằng cấu hình runtime TiDB, thêm Secret File đúng tên và cho phép địa chỉ outbound của hosting trong danh sách truy cập TiDB nếu đang giới hạn IP. Demo mặc định tắt; chỉ thêm ba biến mật khẩu và bật `DEMO_LOGIN_ENABLED` trên deployment trải nghiệm. Không đưa các biến này hoặc biến DB vào Vercel frontend. Việc sửa file cấu hình không tự cập nhật deployment đã chạy; cần cấu hình và deploy riêng sau khi source được duyệt.
+
+## Dữ liệu khi mất kết nối
+
+Backend và Data API mặc định đặt `ALLOW_LOCAL_DB_FALLBACK=false`: mất kết nối TiDB phải trả lỗi dịch vụ, không tự đăng nhập bằng dữ liệu cũ hoặc ghi sang SQLite/file local. Cơ chế offline cũ chỉ được bật có chủ đích ngoài production; dữ liệu offline không tự đồng bộ lên TiDB. Schema hiện tại giữ bảng `payment_attempts` và các enum thanh toán đã có trên nhánh chính. Database đã tạo trước khi cập nhật phần thanh toán chỉ cần migration `2026-11-06-online-payments.sql` sau khi đối chiếu bảng/cột, không chạy lại schema/seed.

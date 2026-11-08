@@ -168,7 +168,7 @@ export async function authenticate(req, res, next) {
     try {
       userProfile = await getUserAuthProfile(payload.sub)
     } catch (err) {
-      if (err instanceof DataApiClientError && (err.status === 503 || err.status === 502 || err.code === 'DATA_API_UNAVAILABLE' || err.code === 'DATABASE_UNAVAILABLE')) {
+      if (env.allowLocalDbFallback && err instanceof DataApiClientError && (err.status === 503 || err.status === 502 || err.code === 'DATA_API_UNAVAILABLE' || err.code === 'DATABASE_UNAVAILABLE')) {
         const localUser = findUserById(payload.sub)
         if (localUser) {
           userProfile = {
