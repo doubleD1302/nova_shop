@@ -4,6 +4,8 @@ Cập nhật 06/11/2026: migration `migrations/2026-11-06-online-payments.sql` b
 và giá trị `vnpay` cho enum phương thức. `schema.sql` dành cho database mới đã có thay đổi tương ứng;
 không chạy lại schema khởi tạo trên database đang có dữ liệu. Xem `docs/backend/PAYMENTS_AND_SHIPPING.md`.
 
+Hướng dẫn khởi tạo database trống theo schema hiện tại: [SETUP.md](SETUP.md). Schema khởi tạo mới gồm 34 bảng và các phần bổ sung từ migration; nội dung thiết kế lịch sử bên dưới được giữ để tham khảo, không thay thế hiện trạng source.
+
 **Bản đề xuất v1, ngày 01/10/2026.** Thiết kế dựa trên source trong `ShopNova_BE001B-R1_Review.zip`. Source chưa có schema SQL của nhóm database. Bộ này cung cấp schema khởi tạo để nhóm đối chiếu và thống nhất trước khi tạo Sequelize migrations; chưa thay đổi database hoặc runtime của project.
 
 ## 1. Phạm vi và cách đọc

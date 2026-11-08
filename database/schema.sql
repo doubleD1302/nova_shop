@@ -1,4 +1,4 @@
--- ShopNova: schema đề xuất v1, MySQL 8.4 / InnoDB / utf8mb4.
+-- ShopNova: schema khởi tạo mới, MySQL 8.4 hoặc TiDB 8.5 / utf8mb4.
 -- Chạy một lần trên database dev mới đã chọn; không tự xóa hoặc sửa schema cũ.
 -- Đặt timezone UTC cả trong pool kết nối Data API.
 SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -13,7 +13,7 @@ CREATE TABLE users (
   password_hash VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'Hash mật khẩu; không trả qua API',
   firebase_uid VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'UID Firebase đã xác minh; NULL với tài khoản mật khẩu',
   full_name VARCHAR(120) NOT NULL COMMENT 'Họ tên hiển thị',
-  email VARCHAR(254) CHARACTER SET ascii COLLATE ascii_general_ci NULL COMMENT 'Email duy nhất nếu có; chuẩn hóa trước lưu',
+  email VARCHAR(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT 'Email duy nhất nếu có; chuẩn hóa trước lưu',
   phone VARCHAR(20) NULL COMMENT 'Số điện thoại dạng chuỗi',
   avatar_url VARCHAR(1024) NULL COMMENT 'URL ảnh đại diện',
   role ENUM('buyer','seller','admin') NOT NULL DEFAULT 'buyer' COMMENT 'Seller vẫn có quyền mua hàng; admin chỉ được cấp bởi vận hành',
@@ -79,6 +79,9 @@ CREATE TABLE shops (
   address_detail VARCHAR(255) NULL COMMENT 'Địa chỉ shop',
   is_mall BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Nhãn shop chính hãng do hệ thống quản lý',
   status ENUM('active','suspended','closed','pending','rejected') NOT NULL DEFAULT 'pending' COMMENT 'Trạng thái gian hàng',
+  suspension_reason VARCHAR(1000) NULL COMMENT 'Lý do khóa shop',
+  suspended_by BIGINT UNSIGNED NULL COMMENT 'Admin thực hiện khóa',
+  suspended_at DATETIME(3) NULL COMMENT 'Thời điểm khóa',
   approval_version INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Phiên bản hồ sơ để kiểm duyệt',
   rejection_reason VARCHAR(1000) NULL COMMENT 'Lý do từ chối gần nhất',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
@@ -88,6 +91,7 @@ CREATE TABLE shops (
   UNIQUE KEY uq_shops_slug (slug),
   KEY ix_shops_status_created (status, created_at, id),
   CONSTRAINT fk_shops_owner FOREIGN KEY (owner_id) REFERENCES users (id),
+  CONSTRAINT fk_shops_suspended_by FOREIGN KEY (suspended_by) REFERENCES users (id) ON DELETE SET NULL,
   CONSTRAINT ck_shops_mall CHECK (is_mall IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Gian hàng thuộc một seller';
 
@@ -157,6 +161,10 @@ CREATE TABLE products (
   specs JSON NULL COMMENT 'Object thông số hiển thị; không chứa kho hay quyền truy cập',
   badges JSON NULL COMMENT 'Mảng nhãn hiển thị do hệ thống quản lý',
   status ENUM('draft','active','hidden','archived') NOT NULL DEFAULT 'draft' COMMENT 'Vòng đời sản phẩm',
+  approval_status ENUM('pending','approved','rejected') NULL DEFAULT 'pending' COMMENT 'Kết quả kiểm duyệt',
+  rejection_reason VARCHAR(1000) NULL COMMENT 'Lý do từ chối',
+  reviewed_by BIGINT UNSIGNED NULL COMMENT 'Admin kiểm duyệt',
+  reviewed_at DATETIME(3) NULL COMMENT 'Thời điểm kiểm duyệt',
   is_featured BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Gợi ý nổi bật',
   is_flash_sale BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Nhãn flash sale; chưa là hệ thống campaign',
   free_shipping BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Chính sách miễn phí ship MVP',
@@ -170,6 +178,7 @@ CREATE TABLE products (
   KEY ix_products_status_created (status, created_at, id),
   CONSTRAINT fk_products_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
   CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories (id),
+  CONSTRAINT fk_products_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id),
   CONSTRAINT ck_products_specs CHECK (specs IS NULL OR JSON_TYPE(specs) = 'OBJECT'),
   CONSTRAINT ck_products_badges CHECK (badges IS NULL OR JSON_TYPE(badges) = 'ARRAY'),
   CONSTRAINT ck_products_flags CHECK (is_featured IN (0,1) AND is_flash_sale IN (0,1) AND free_shipping IN (0,1))
@@ -527,8 +536,11 @@ CREATE TABLE abuse_reports (
   reporter_id BIGINT UNSIGNED NOT NULL,
   target_type ENUM('shop','product','user','review') NOT NULL,
   target_id BIGINT UNSIGNED NOT NULL,
+  shop_id BIGINT UNSIGNED NULL,
   reason VARCHAR(2000) NOT NULL,
-  status ENUM('open','resolved','dismissed') NOT NULL DEFAULT 'open',
+  details TEXT NULL,
+  evidence_url VARCHAR(1024) NULL,
+  status ENUM('open','investigating','confirmed_violation','dismissed','resolved') NOT NULL DEFAULT 'open',
   resolved_by BIGINT UNSIGNED NULL,
   resolved_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -537,9 +549,10 @@ CREATE TABLE abuse_reports (
   KEY ix_abuse_reports_status_created (status, created_at, id),
   KEY ix_abuse_reports_target (target_type, target_id),
   KEY ix_abuse_reports_reporter (reporter_id, created_at),
+  KEY ix_abuse_reports_shop (shop_id),
   CONSTRAINT fk_abuse_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users (id),
   CONSTRAINT fk_abuse_reports_resolver FOREIGN KEY (resolved_by) REFERENCES users (id),
-  CONSTRAINT ck_abuse_reports_resolution CHECK ((status = 'open' AND resolved_by IS NULL AND resolved_at IS NULL) OR (status <> 'open' AND resolved_by IS NOT NULL AND resolved_at IS NOT NULL))
+  CONSTRAINT fk_abuse_reports_shop FOREIGN KEY (shop_id) REFERENCES shops (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Báo cáo vi phạm do người dùng gửi';
 
 -- Shop mà tài khoản đang theo dõi
@@ -563,3 +576,103 @@ CREATE TABLE product_favorites (
   CONSTRAINT fk_product_favorites_user FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT fk_product_favorites_product FOREIGN KEY (product_id) REFERENCES products (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Sản phẩm yêu thích của từng tài khoản';
+
+
+CREATE TABLE shop_violations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  shop_id BIGINT UNSIGNED NOT NULL COMMENT 'Shop vi phạm',
+  report_id BIGINT UNSIGNED NULL COMMENT 'Hồ sơ báo cáo liên kết (nếu có)',
+  violation_number INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Lần vi phạm: 1, 2,...',
+  violation_type VARCHAR(100) NOT NULL DEFAULT 'counterfeit' COMMENT 'Loại vi phạm (hàng giả, vi phạm chính sách)',
+  reason VARCHAR(2000) NOT NULL COMMENT 'Lý do vi phạm cụ thể',
+  action_taken ENUM('warning_email', 'shop_suspended') NOT NULL COMMENT 'Chế tài áp dụng',
+  admin_id BIGINT UNSIGNED NOT NULL COMMENT 'Admin phê duyệt xử lý',
+  email_sent_to VARCHAR(255) NULL COMMENT 'Email nhận thông báo của chủ shop',
+  email_status ENUM('not_configured', 'sending', 'sent', 'failed') NOT NULL DEFAULT 'not_configured' COMMENT 'Trạng thái gửi email',
+  email_sent_at DATETIME(3) NULL COMMENT 'Thời điểm email được máy chủ SMTP chấp nhận gửi',
+  email_error TEXT NULL COMMENT 'Chi tiết lỗi nếu gửi thất bại',
+  email_content TEXT NULL COMMENT 'Nội dung email cảnh cáo/khóa shop',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_shop_report_violation (report_id),
+  KEY ix_shop_violations_shop (shop_id, created_at),
+  CONSTRAINT fk_shop_violations_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+  CONSTRAINT fk_shop_violations_admin FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_shop_violations_report FOREIGN KEY (report_id) REFERENCES abuse_reports(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Lịch sử vi phạm và cảnh cáo gian hàng';
+
+
+CREATE TABLE order_returns (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn hàng tổng',
+  shop_order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn con thuộc shop',
+  buyer_id BIGINT UNSIGNED NOT NULL COMMENT 'Người mua yêu cầu',
+  shop_id BIGINT UNSIGNED NOT NULL COMMENT 'Shop bị yêu cầu trả hàng',
+  reason VARCHAR(255) NOT NULL COMMENT 'Lý do yêu cầu trả hàng',
+  detail TEXT NULL COMMENT 'Mô tả chi tiết lỗi/sự cố',
+  images JSON NULL COMMENT 'Mảng link ảnh/video bằng chứng',
+  refund_amount DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Số tiền yêu cầu hoàn lại',
+  status ENUM('requested', 'approved', 'rejected', 'completed', 'cancelled') NOT NULL DEFAULT 'requested' COMMENT 'Trạng thái xử lý',
+  seller_note VARCHAR(500) NULL COMMENT 'Phản hồi từ người bán',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_order_returns_shop_order (shop_order_id, status),
+  KEY ix_order_returns_buyer (buyer_id, created_at),
+  KEY ix_order_returns_shop (shop_id, status),
+  CONSTRAINT fk_order_returns_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_returns_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_returns_buyer FOREIGN KEY (buyer_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_returns_shop FOREIGN KEY (shop_id) REFERENCES shops (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Yêu cầu trả hàng và hoàn tiền hậu mãi';
+
+-- 2. VẬN CHUYỂN (Shipment Trackings)
+CREATE TABLE shipment_trackings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  shop_order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn hàng shop tương ứng',
+  tracking_code VARCHAR(100) NOT NULL COMMENT 'Mã vận đơn',
+  carrier VARCHAR(60) NOT NULL COMMENT 'Đơn vị vận chuyển (GHN, GHTK, Viettel Post...)',
+  status ENUM('manifest_created', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'failed_attempt') NOT NULL COMMENT 'Trạng thái mốc vận chuyển',
+  location VARCHAR(150) NULL COMMENT 'Trạm/bưu cục hiện tại',
+  description VARCHAR(255) NOT NULL COMMENT 'Mô tả chi tiết mốc hành trình',
+  event_time DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm diễn ra mốc',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_shipment_trackings_order (shop_order_id, event_time),
+  KEY ix_shipment_trackings_code (tracking_code, event_time),
+  CONSTRAINT fk_shipment_trackings_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_orders (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Lịch sử hành trình bưu kiện vận chuyển';
+
+-- 3. GIAO TIẾP (Chat Conversations & Messages)
+CREATE TABLE chat_conversations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  buyer_id BIGINT UNSIGNED NOT NULL COMMENT 'Người mua',
+  shop_id BIGINT UNSIGNED NOT NULL COMMENT 'Gian hàng',
+  last_message VARCHAR(500) NULL COMMENT 'Trích dẫn tin nhắn gần nhất',
+  last_message_at DATETIME(3) NULL COMMENT 'Thời gian tin nhắn cuối cùng',
+  buyer_unread_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Số tin chưa đọc của buyer',
+  seller_unread_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Số tin chưa đọc của seller',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_chat_buyer_shop (buyer_id, shop_id),
+  KEY ix_chat_buyer_time (buyer_id, last_message_at),
+  KEY ix_chat_shop_time (shop_id, last_message_at),
+  CONSTRAINT fk_chat_conv_buyer FOREIGN KEY (buyer_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_conv_shop FOREIGN KEY (shop_id) REFERENCES shops (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Cuộc trò chuyện giữa người mua và gian hàng';
+
+CREATE TABLE chat_messages (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  conversation_id BIGINT UNSIGNED NOT NULL COMMENT 'Hội thoại liên kết',
+  sender_id BIGINT UNSIGNED NOT NULL COMMENT 'ID người gửi',
+  sender_role ENUM('buyer', 'seller') NOT NULL COMMENT 'Vai trò khi gửi',
+  message TEXT NOT NULL COMMENT 'Nội dung tin nhắn',
+  attachments JSON NULL COMMENT 'Ảnh hoặc thẻ sản phẩm/đơn hàng đính kèm',
+  is_read BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Đã đọc hay chưa',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_chat_msg_conv (conversation_id, created_at, id),
+  CONSTRAINT fk_chat_msg_conv FOREIGN KEY (conversation_id) REFERENCES chat_conversations (id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_msg_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Chi tiết tin nhắn trong cuộc trò chuyện';
