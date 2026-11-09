@@ -124,7 +124,7 @@ void main() {
     NovaAIScreen.resetSession();
   });
 
-  testWidgets('NovaAIScreen renders all sections matching the HTML template', (WidgetTester tester) async {
+  testWidgets('NovaAIScreen renders AI Brain header, quick prompts, and opens Brain modal', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -132,41 +132,30 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: NovaAIScreen(isStandalone: false, loadDemoIfEmpty: true),
+        home: NovaAIScreen(isStandalone: false),
       ),
     );
     await tester.pumpAndSettle();
 
     // Verify AI Header
     expect(find.text('Nova AI'), findsOneWidget);
-    expect(find.text('Trực tuyến 24/7'), findsOneWidget);
-    expect(find.text('• Mua sắm thông minh'), findsOneWidget);
+    expect(find.text('AI BRAIN'), findsOneWidget);
+    expect(find.text('Ghi nhớ sở thích & học hỏi theo bạn'), findsOneWidget);
+    expect(find.text('Trí nhớ AI'), findsOneWidget);
 
     // Verify Quick Prompts Bar
     expect(find.text('Gợi ý:'), findsOneWidget);
-    expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsOneWidget);
-
-    // Verify User Message Bubble
-    expect(find.textContaining('Tìm giúp mình set đồ dạo phố mùa hè'), findsOneWidget);
-    expect(find.text('14:24'), findsOneWidget);
-
-    // Verify AI Insight Bubble
-    expect(find.text('Nova Phân Tích Ý Định'), findsOneWidget);
-    expect(find.text('Khớp 98%'), findsOneWidget);
-    expect(find.textContaining('Ngân sách tối đa: 450.000đ'), findsOneWidget);
-    expect(find.text('Tiết kiệm 61.000đ'), findsOneWidget);
-    expect(find.text('389.000đ'), findsOneWidget);
-
-    // Verify Combo CTA Button
-    expect(find.text('Thêm trọn bộ combo vào giỏ (-15%)'), findsOneWidget);
-
-    // Verify Micro Features
-    expect(find.text('Ướm thử ảo'), findsOneWidget);
-    expect(find.text('So sánh giá'), findsOneWidget);
+    expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsAtLeastNWidgets(1));
 
     // Verify Input Panel
-    expect(find.text('Nova AI đang lắng nghe theo ngữ cảnh thời trang TP.HCM'), findsOneWidget);
-    expect(find.text('Hỏi Nova về sản phẩm, phong cách, giá cả...'), findsOneWidget);
+    expect(find.text('Nhập: size của mình là M, thích màu pastel...'), findsOneWidget);
+
+    // Open Brain Modal
+    await tester.tap(find.text('Trí nhớ AI'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bộ Não Nova AI Của Bạn'), findsOneWidget);
+    expect(find.text('📌 NHỮNG ĐIỀU AI ĐÃ GHI NHỚ VỀ BẠN:'), findsOneWidget);
+    expect(find.text('Xóa ký ức AI'), findsOneWidget);
   });
 
   testWidgets('NovaAIScreen renders clean intelligent greeting by default without static mock data', (WidgetTester tester) async {
@@ -183,9 +172,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nova AI'), findsOneWidget);
-    expect(find.text('Trợ lý Nova'), findsOneWidget);
-    expect(find.textContaining('Trợ lý Nova AI ✨'), findsOneWidget);
+    expect(find.text('Trợ lý Nova AI'), findsOneWidget);
+    expect(find.text('AI Brain Kích Hoạt 100%'), findsOneWidget);
     // Ensure static mock prompt does NOT appear by default
     expect(find.textContaining('Tìm giúp mình set đồ dạo phố mùa hè'), findsNothing);
+    expect(find.text('Ướm thử ảo'), findsNothing);
+    expect(find.text('So sánh giá'), findsNothing);
   });
 }

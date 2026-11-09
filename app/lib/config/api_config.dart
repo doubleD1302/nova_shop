@@ -128,6 +128,7 @@ class ApiConfig {
   static String get changePasswordUrl => '$baseUrl/api/v1/auth/change-password';
   static String get vouchersUrl => '$baseUrl/api/v1/vouchers';
   static String get chatConversationsUrl => '$baseUrl/api/v1/chat/conversations';
+  static String get aiChatUrl => '$baseUrl/api/v1/ai/chat';
   static String get aiBrainProfileUrl => '$baseUrl/api/v1/ai/brain/profile';
   static String get aiBrainFeedbackUrl => '$baseUrl/api/v1/ai/brain/feedback';
   static String get aiBrainResetUrl => '$baseUrl/api/v1/ai/brain/reset';
