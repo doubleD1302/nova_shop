@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCatalog } from '../context/CatalogContext'
@@ -125,6 +125,10 @@ export default function AccountPage() {
   }
 
   const saveAddress = async () => {
+    if (!addressDraft.fullName?.trim() || !addressDraft.phone?.trim() || !addressDraft.province?.trim() || !addressDraft.detail?.trim()) {
+      pushToast('Vui lòng điền đầy đủ người nhận, số điện thoại, tỉnh/thành phố và địa chỉ chi tiết.', 'error')
+      return
+    }
     setSaving(true)
     const result = await updateProfile({ address: addressDraft })
     setSaving(false)
@@ -207,6 +211,7 @@ export default function AccountPage() {
                   hue: user.hue,
                   name: user.fullName,
                 }}
+                purpose="avatar"
                 onChange={(patch) => {
                   updateProfile(patch).then((result) => {
                     pushToast(result.ok ? 'ÄĂ£ cáº­p nháº­t áº£nh Ä‘áº¡i diá»‡n.' : result.error, result.ok ? 'success' : 'error')
@@ -371,7 +376,7 @@ export default function AccountPage() {
                   NĂ¢ng cáº¥p tĂ i khoáº£n thĂ nh ngÆ°á»i bĂ¡n Ä‘á»ƒ báº¯t Ä‘áº§u Ä‘Äƒng sáº£n pháº©m vĂ  nháº­n Ä‘Æ¡n hĂ ng.
                 </p>
                 <Link
-                  to="/dang-ky"
+                  to="/nguoi-ban"
                   className="mt-4 inline-block rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
                   ÄÄƒng kĂ½ bĂ¡n hĂ ng
