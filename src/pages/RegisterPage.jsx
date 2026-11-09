@@ -1,18 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { isValidEmail, normalizeEmail } from '../utils/validation'
 import AuthLayout from '../components/auth/AuthLayout'
-import { IconStore, IconUser } from '../components/ui/Icons'
+import { IconStore } from '../components/ui/Icons'
 
-/** TRANG ĐĂNG KÝ — chọn vai trò người mua hoặc người bán */
+/** TRANG ĐĂNG KÝ — Dành riêng cho Người Mua (Buyer) */
 export default function RegisterPage() {
   const { register } = useAuth()
   const { pushToast } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [role, setRole] = useState(searchParams.get('role') === 'seller' ? 'seller' : 'buyer')
+
+  // Nếu người dùng truy cập với ?role=seller, tự động điều hướng sang Kênh Người Bán
+  useEffect(() => {
+    if (searchParams.get('role') === 'seller') {
+      navigate('/nguoi-ban', { replace: true })
+    }
+  }, [searchParams, navigate])
+
   const [form, setForm] = useState({
     fullName: '',
     username: '',
@@ -20,8 +27,6 @@ export default function RegisterPage() {
     confirm: '',
     email: '',
     phone: '',
-    shopName: '',
-    shopTagline: '',
   })
   const [error, setError] = useState('')
   const [emailError, setEmailError] = useState('')
@@ -63,14 +68,6 @@ export default function RegisterPage() {
       setError('Số điện thoại chỉ được chứa chữ số và ký tự +, khoảng trắng, dấu ngoặc hoặc dấu gạch ngang.')
       return
     }
-    if (role === 'seller' && !form.shopName.trim()) {
-      setError('Người bán cần nhập tên gian hàng.')
-      return
-    }
-    if (role === 'seller' && (form.shopName.trim().length > 160 || form.shopTagline.trim().length > 255)) {
-      setError('Tên gian hàng tối đa 160 ký tự và slogan tối đa 255 ký tự.')
-      return
-    }
 
     setLoading(true)
     setError('')
@@ -81,17 +78,15 @@ export default function RegisterPage() {
         password: form.password,
         email: normalizeEmail(form.email),
         phone: form.phone.trim(),
-        role,
-        shopName: form.shopName.trim(),
-        shopTagline: form.shopTagline.trim(),
+        role: 'buyer',
       })
       if (!res.ok) {
         if (res.error?.toLowerCase().includes('email')) setEmailError(res.error)
         else setError(res.error)
         return
       }
-      pushToast('Đăng ký thành công!', 'success')
-      navigate(role === 'seller' ? '/nguoi-ban' : '/')
+      pushToast('Đăng ký tài khoản thành công! Chào mừng bạn đến với NovaShop.', 'success')
+      navigate('/')
     } finally {
       setLoading(false)
     }
@@ -102,35 +97,30 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Đăng Ký"
-      subtitle="Tạo tài khoản người mua để đặt hàng, hoặc tài khoản người bán để mở gian hàng riêng."
-      bannerTitle="Bán hàng chuyên nghiệp, miễn phí gian hàng"
+      title="Đăng Ký Tài Khoản"
+      subtitle="Tạo tài khoản người mua để khám phá hàng ngàn sản phẩm và đặt hàng tiện lợi."
+      bannerTitle="Mua sắm thông minh, ngập tràn ưu đãi mỗi ngày"
     >
-      <div className="mb-5 grid grid-cols-2 gap-3">
-        {[
-          { id: 'buyer', label: 'Tôi là Người Mua', desc: 'Đặt hàng từ nhiều shop', icon: <IconUser className="h-5 w-5" /> },
-          { id: 'seller', label: 'Tôi là Người Bán', desc: 'Mở gian hàng & bán', icon: <IconStore className="h-5 w-5" /> },
-        ].map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => setRole(r.id)}
-            className={`flex flex-col items-start gap-1 rounded-xl border p-3.5 text-left transition cursor-pointer ${
-              role === r.id ? 'border-[#BD6E49] bg-[#F5E7D4] text-[#80513B] font-medium shadow-2xs' : 'border-[#E6D5C2] bg-[#FFFCF7] text-[#8B7566] hover:border-[#BD6E49]'
-            }`}
-          >
-            {r.icon}
-            <span className="text-[13px] font-semibold text-[#49352D]">{r.label}</span>
-            <span className="text-[11px] text-[#8B7566]">{r.desc}</span>
-          </button>
-        ))}
-      </div>
-
       <form onSubmit={submit} noValidate className="space-y-3.5">
         <div className="grid gap-3.5 md:grid-cols-2">
-          <input value={form.fullName} onChange={set('fullName')} placeholder="Họ và tên" className={inputClass} />
-          <input value={form.username} onChange={set('username')} placeholder="Tên đăng nhập" className={inputClass} />
-          <input value={form.phone} onChange={set('phone')} placeholder="Số điện thoại" className={inputClass} />
+          <input
+            value={form.fullName}
+            onChange={set('fullName')}
+            placeholder="Họ và tên"
+            className={inputClass}
+          />
+          <input
+            value={form.username}
+            onChange={set('username')}
+            placeholder="Tên đăng nhập"
+            className={inputClass}
+          />
+          <input
+            value={form.phone}
+            onChange={set('phone')}
+            placeholder="Số điện thoại"
+            className={inputClass}
+          />
           <div>
             <input
               type="email"
@@ -162,31 +152,18 @@ export default function RegisterPage() {
           />
         </div>
 
-        {role === 'seller' ? (
-          <div className="grid gap-3.5 rounded-xl border border-dashed border-[#BD6E49] bg-[#F5E7D4] p-3.5 md:grid-cols-2">
-            <input
-              value={form.shopName}
-              onChange={set('shopName')}
-              placeholder="Tên gian hàng (bắt buộc)"
-              className={inputClass}
-            />
-            <input
-              value={form.shopTagline}
-              onChange={set('shopTagline')}
-              placeholder="Slogan gian hàng"
-              className={inputClass}
-            />
-          </div>
+        {error ? (
+          <p className="rounded-xl border border-[#BD6E49]/40 bg-[#F5E7D4] px-3.5 py-2.5 text-[13px] font-medium text-[#80513B] shadow-2xs">
+            {error}
+          </p>
         ) : null}
-
-        {error ? <p className="rounded-xl border border-[#BD6E49]/40 bg-[#F5E7D4] px-3.5 py-2.5 text-[13px] font-medium text-[#80513B] shadow-2xs">{error}</p> : null}
 
         <button
           type="submit"
           disabled={loading}
           className="w-full rounded-xl bg-[#BD6E49] hover:bg-[#A95532] active:scale-[0.99] py-3 text-[15px] font-semibold text-[#FFFCF7] shadow-2xs transition-all duration-200 disabled:opacity-60 cursor-pointer"
         >
-          {loading ? 'Đang đăng ký...' : `Đăng Ký ${role === 'seller' ? '& Mở Gian Hàng' : 'Tài Khoản'}`}
+          {loading ? 'Đang tạo tài khoản...' : 'Đăng Ký Tài Khoản'}
         </button>
 
         <p className="text-center text-[13px] text-[#8B7566]">
@@ -195,6 +172,20 @@ export default function RegisterPage() {
             Đăng nhập
           </Link>
         </p>
+
+        {/* Cầu nối sang Kênh Người Bán */}
+        <div className="mt-6 border-t border-[#E6D5C2]/70 pt-4 text-center">
+          <p className="text-[12px] text-[#8B7566]">
+            Bạn là đối tác bán hàng?{' '}
+            <Link
+              to="/nguoi-ban"
+              className="inline-flex items-center gap-1 font-semibold text-[#BD6E49] hover:text-[#A95532] hover:underline"
+            >
+              <IconStore className="h-3.5 w-3.5" />
+              <span>Đăng ký mở gian hàng tại Kênh Người Bán</span>
+            </Link>
+          </p>
+        </div>
       </form>
     </AuthLayout>
   )

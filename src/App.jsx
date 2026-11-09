@@ -48,6 +48,8 @@ export default function App() {
           <Route path="/tai-khoan" element={<AccountPage />} />
           <Route path="/dang-nhap" element={<LoginPage />} />
           <Route path="/dang-ky" element={<RegisterPage />} />
+          <Route path="/dang-ky-ban-hang" element={<Navigate to="/nguoi-ban" replace />} />
+          <Route path="/dang-ky-nguoi-ban" element={<Navigate to="/nguoi-ban" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path="/admin" element={<AdminPage />} />

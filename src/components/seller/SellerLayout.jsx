@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCatalog } from '../../context/CatalogContext'
+import { useToast } from '../../context/ToastContext'
+import SellerRegistrationWizard from './SellerRegistrationWizard'
 import { formatNumber } from '../../utils/format'
 import {
   IconBell,
@@ -134,14 +136,11 @@ const MENU_GROUPS = [
  * KHU VỰC NGƯỜI BÁN (Kênh Người Bán) - GIAO DIỆN SHOPEE SELLER CENTRE HỒNG PASTEL
  */
 export default function SellerLayout() {
-  const { user, openSellerShop, logout } = useAuth()
-  const { getShop, loadShop } = useCatalog()
+  const { user, openSellerShop, register, logout } = useAuth()
+  const { getShop, loadShop, loadSellerShop } = useCatalog()
+  const { pushToast } = useToast()
   const location = useLocation()
   const navigate = useNavigate()
-
-  const [shopName, setShopName] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
 
   // Trạng thái mở menu accordion bên trái
   const [openGroups, setOpenGroups] = useState({
@@ -166,10 +165,10 @@ export default function SellerLayout() {
   const notifRef = useRef(null)
 
   useEffect(() => {
-    if ((user?.role === 'seller' || user?.shopId) && user?.shopId) {
-      loadShop(user.shopId).catch((loadError) => console.error('Không thể tải gian hàng:', loadError))
+    if (user?.role === 'seller' || user?.shopId) {
+      loadSellerShop().catch((loadError) => console.error('Không thể tải gian hàng:', loadError))
     }
-  }, [user?.id, user?.role, user?.shopId, loadShop])
+  }, [user?.id, user?.role, user?.shopId, loadSellerShop])
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -209,85 +208,17 @@ export default function SellerLayout() {
     })
   }
 
-  // NẾU CHƯA CÓ GIAN HÀNG -> GIAO DIỆN ĐĂNG KÝ GIAN HÀNG HỒNG PASTEL
+  // NẾU CHƯA CÓ GIAN HÀNG HOẶC CHƯA ĐĂNG NHẬP -> GIAO DIỆN CHÀO MỪNG & STEPPER ĐĂNG KÝ BÁN HÀNG THEO CHUẨN SHOPEE
   const hasShop = Boolean(user?.shopId || user?.role === 'seller')
   if (!user || !hasShop) {
-    const openShop = async (event) => {
-      event.preventDefault()
-      if (submitting) return
-      setSubmitting(true)
-      setError('')
-      const result = await openSellerShop(shopName)
-      if (!result.ok) setError(result.error)
-      setSubmitting(false)
-    }
-
     return (
-      <div className="min-h-screen bg-[#FBF3E8] py-12 px-4">
-        <div className="mx-auto max-w-[620px] rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-8 text-center shadow-xs">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#F5E7D4] text-[32px] text-[#A95532]">
-            🏪
-          </div>
-          <h1 className="mt-4 text-[22px] font-bold text-[#49352D]">Kênh Người Bán NovaShop</h1>
-          <p className="mt-2 text-[14px] leading-relaxed text-[#8B7566]">
-            {user
-              ? 'Tạo gian hàng để trở thành Người Bán chính thức trên sàn thương mại điện tử NovaShop. Bạn vẫn sử dụng cùng tài khoản này để mua sắm bình thường.'
-              : 'Đăng nhập tài khoản người bán hoặc tạo tài khoản mới để bắt đầu kinh doanh trực tuyến cùng NovaShop.'}
-          </p>
-
-          {user ? (
-            <form onSubmit={openShop} className="mx-auto mt-6 max-w-md space-y-4 text-left">
-              <div>
-                <label htmlFor="seller-shop-name" className="mb-1.5 block text-[13px] font-medium text-[#49352D]">
-                  Tên gian hàng / Thương hiệu của bạn
-                </label>
-                <input
-                  id="seller-shop-name"
-                  value={shopName}
-                  onChange={(event) => setShopName(event.target.value)}
-                  maxLength={160}
-                  required
-                  placeholder="Ví dụ: Nova Fashion, Starfly Store, Tiệm Hoa Xinh..."
-                  className="w-full rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-3 text-[14px] text-[#49352D] placeholder:text-[#8B7566] outline-none transition focus:border-[#BD6E49] focus:ring-2 focus:ring-[#BD6E49]/20"
-                />
-              </div>
-
-              {error ? (
-                <p className="rounded-xl border border-[#E6D5C2] bg-[#F5E7D4] px-3.5 py-2.5 text-[13px] text-[#A95532]">
-                  {error}
-                </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-xl bg-[#BD6E49] hover:bg-[#A95532] py-3 text-[14px] font-semibold text-[#FFFCF7] shadow-2xs transition-all disabled:opacity-60"
-              >
-                {submitting ? 'Đang kích hoạt gian hàng...' : 'Mở Gian Hàng Với Tài Khoản Này'}
-              </button>
-            </form>
-          ) : (
-            <div className="mt-6 flex flex-wrap justify-center gap-3 text-[13px]">
-              <Link
-                to="/dang-nhap"
-                state={{ from: '/nguoi-ban' }}
-                className="rounded-xl bg-[#BD6E49] hover:bg-[#A95532] px-5 py-2.5 font-medium text-[#FFFCF7] transition shadow-2xs"
-              >
-                Đăng nhập người bán
-              </Link>
-              <Link
-                to="/dang-ky?role=seller"
-                className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#FBF3E8] hover:border-[#BD6E49] px-5 py-2.5 font-medium text-[#A95532] transition"
-              >
-                Đăng ký tài khoản người bán
-              </Link>
-              <Link to="/" className="w-full py-2 text-[#8B7566] transition hover:text-[#A95532]">
-                ← Về trang mua sắm
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+      <SellerRegistrationWizard
+        user={user}
+        openSellerShop={openSellerShop}
+        loadSellerShop={loadSellerShop}
+        register={register}
+        pushToast={pushToast}
+      />
     )
   }
 
@@ -584,6 +515,69 @@ export default function SellerLayout() {
 
         {/* NỘI DUNG CHÍNH (MAIN OUTLET) */}
         <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8">
+          {/* BANNER THÔNG BÁO KHI GIAN HÀNG ĐANG CHỜ DUYỆT */}
+          {shop?.status === 'pending' ? (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/95 p-4 sm:p-5 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-xl text-amber-700">
+                  ⏳
+                </span>
+                <div className="flex-1 text-[13px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[15px] font-bold text-amber-900">
+                      Hồ sơ gian hàng đang chờ Ban Quản Trị phê duyệt
+                    </h3>
+                    <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                      Phiên bản v{shop.approvalVersion || 1}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 leading-relaxed text-amber-800">
+                    Tài khoản của bạn đã có vai trò <b>Người Bán (Seller)</b>, tuy nhiên có role seller chưa đồng nghĩa với việc được bán hàng trên sàn cho đến khi hồ sơ gian hàng được Ban Quản Trị phê duyệt chính thức.
+                  </p>
+                  <p className="mt-1 text-[12px] text-amber-700">
+                    Bạn có thể vào mục <Link to="/nguoi-ban/gian-hang" className="font-semibold underline hover:text-amber-900">Thông tin gian hàng</Link> để kiểm tra hoặc hoàn thiện hồ sơ nếu cần thay đổi.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* BANNER CẢNH BÁO KHI HỒ SƠ GIAN HÀNG BỊ TỪ CHỐI DUYỆT */}
+          {shop?.status === 'rejected' ? (
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/95 p-4 sm:p-5 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-100 text-xl text-rose-700">
+                  ❌
+                </span>
+                <div className="flex-1 text-[13px]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-bold text-rose-900">
+                        Hồ sơ gian hàng đã bị từ chối duyệt
+                      </h3>
+                      <span className="rounded-full bg-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-900">
+                        Phiên bản v{shop.approvalVersion || 1}
+                      </span>
+                    </div>
+                    <Link
+                      to="/nguoi-ban/gian-hang"
+                      className="rounded-xl bg-rose-600 hover:bg-rose-700 px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-2xs transition"
+                    >
+                      Sửa & Gửi lại hồ sơ
+                    </Link>
+                  </div>
+                  <div className="mt-2 rounded-xl border border-rose-200/80 bg-white/90 p-3 text-rose-800">
+                    <p className="font-semibold text-rose-900">Lý do từ chối từ Ban Quản Trị:</p>
+                    <p className="mt-0.5 whitespace-pre-wrap">{shop.rejectionReason || 'Hồ sơ chưa đạt tiêu chuẩn quy định của sàn NovaShop.'}</p>
+                  </div>
+                  <p className="mt-2 text-[12px] text-rose-700">
+                    Vui lòng vào <Link to="/nguoi-ban/gian-hang" className="font-semibold underline hover:text-rose-900">Thông tin gian hàng</Link> để chỉnh sửa thông tin và gửi lại hồ sơ xét duyệt.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* BANNER CẢNH BÁO KHI GIAN HÀNG BỊ TẠM KHÓA */}
           {shop?.status === 'suspended' ? (
             <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/95 p-4 sm:p-5 shadow-xs">

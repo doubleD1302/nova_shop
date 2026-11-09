@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import AuthLayout from '../components/auth/AuthLayout'
-import { IconUser, IconLock, IconEye } from '../components/ui/Icons'
+import { IconUser, IconLock, IconEye, IconStore } from '../components/ui/Icons'
 import { apiDemoAccounts } from '../utils/api'
 
 /** TRANG ĐĂNG NHẬP - Thiết kế theo phong cách Terracotta + Cream */
@@ -281,6 +281,20 @@ export default function LoginPage() {
           Đang đăng nhập với <b className="text-[#49352D]">{user.fullName || user.username}</b> ({user.role === 'admin' ? 'quản trị viên' : user.role === 'seller' ? 'người bán' : 'người mua'}).
         </div>
       ) : null}
+
+      {/* Cầu nối sang Kênh Người Bán */}
+      <div className="mt-6 border-t border-[#E6D5C2]/70 pt-4 text-center">
+        <p className="text-[12px] text-[#8B7566]">
+          Bạn muốn mở gian hàng kinh doanh?{' '}
+          <Link
+            to="/nguoi-ban"
+            className="inline-flex items-center gap-1 font-semibold text-[#BD6E49] hover:text-[#A95532] hover:underline"
+          >
+            <IconStore className="h-3.5 w-3.5" />
+            <span>Đăng ký bán hàng tại Kênh Người Bán</span>
+          </Link>
+        </p>
+      </div>
     </AuthLayout>
   )
 }

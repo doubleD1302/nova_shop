@@ -114,74 +114,30 @@ export default function HeroBanners() {
 
       {/* 2 Banner phụ bên phải (5 cột trên Desktop) */}
       <div className="flex flex-col gap-3.5 lg:col-span-5 h-[260px] sm:h-[320px] lg:h-[370px]">
-        {/* Banner 1 (Trên): Túi xách & Phụ kiện thời thượng */}
+        {/* Banner 1 (Trên): Túi xách & Phụ kiện */}
         <Link
           to="/tim-kiem?category=tui-vi"
-          className="group relative flex flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
+          className="group relative block flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#F5E7D4] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
         >
-          <div className="relative z-10 flex flex-1 flex-col justify-between p-4 sm:p-5">
-            <div>
-              <span className="inline-block px-2 py-0.5 rounded-md bg-[#F5E7D4] border border-[#E6D5C2] text-[10px] font-bold tracking-[0.14em] text-[#80513B] uppercase shadow-2xs">
-                HOT TREND 2026
-              </span>
-              <h3 className="mt-1.5 text-[17px] sm:text-[19px] font-extrabold leading-tight text-[#49352D] group-hover:text-[#BD6E49] transition-colors">
-                Túi Xách & Phụ Kiện
-              </h3>
-              <p className="mt-1 text-[12px] text-[#8B7566] line-clamp-1">
-                BST Mới · Thiết Kế Tinh Xảo Sang Trọng
-              </p>
-            </div>
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5E7D4] text-[11px] font-semibold text-[#80513B] border border-[#E6D5C2] shadow-2xs transition-all duration-200 group-hover:bg-[#BD6E49] group-hover:text-[#FFFCF7] group-hover:border-[#BD6E49]">
-                <span>Khám phá ngay</span>
-                <span className="text-[12px] transition-transform duration-200 group-hover:translate-x-0.5">→</span>
-              </span>
-            </div>
-          </div>
-          {/* Ảnh banner bên phải với hiệu ứng bo tròn */}
-          <div className="relative w-[40%] sm:w-[42%] shrink-0 overflow-hidden bg-[#F5E7D4]/40">
-            <img
-              src="/images/banners/banner-bags-luxury.jpg"
-              alt="Bags Style in every detail"
-              className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-              loading="lazy"
-            />
-          </div>
+          <img
+            src="/images/banners/banner-bags-luxury.jpg"
+            alt="Bags Style in every detail - BST Túi Xách & Phụ Kiện"
+            className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"
+            loading="lazy"
+          />
         </Link>
 
         {/* Banner 2 (Dưới): Sắc đẹp & Chăm sóc da */}
         <Link
           to="/tim-kiem?category=my-pham"
-          className="group relative flex flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
+          className="group relative block flex-1 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#F5E7D4] shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-[#BD6E49]"
         >
-          <div className="relative z-10 flex flex-1 flex-col justify-between p-4 sm:p-5">
-            <div>
-              <span className="inline-block px-2 py-0.5 rounded-md bg-[#F5E7D4] border border-[#E6D5C2] text-[10px] font-bold tracking-[0.14em] text-[#80513B] uppercase shadow-2xs">
-                FLASH SALE 40%
-              </span>
-              <h3 className="mt-1.5 text-[17px] sm:text-[19px] font-extrabold leading-tight text-[#49352D] group-hover:text-[#BD6E49] transition-colors">
-                Làn Da Ẩm Mịn & Rạng Ngời
-              </h3>
-              <p className="mt-1 text-[12px] text-[#8B7566] line-clamp-1">
-                Body Lotion & Dầu Dưỡng Jojoba
-              </p>
-            </div>
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5E7D4] text-[11px] font-semibold text-[#80513B] border border-[#E6D5C2] shadow-2xs transition-all duration-200 group-hover:bg-[#BD6E49] group-hover:text-[#FFFCF7] group-hover:border-[#BD6E49]">
-                <span>Khám phá ngay</span>
-                <span className="text-[12px] transition-transform duration-200 group-hover:translate-x-0.5">→</span>
-              </span>
-            </div>
-          </div>
-          {/* Ảnh banner bên phải */}
-          <div className="relative w-[40%] sm:w-[42%] shrink-0 overflow-hidden bg-[#F5E7D4]/40">
-            <img
-              src="/images/banners/banner-beauty-skin.jpg"
-              alt="Be soft, smooth and hydrated skin"
-              className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-              loading="lazy"
-            />
-          </div>
+          <img
+            src="/images/banners/banner-beauty-skin.jpg"
+            alt="Flash Sale Chăm Sóc & Tái Tạo Làn Da"
+            className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"
+            loading="lazy"
+          />
         </Link>
       </div>
     </section>
