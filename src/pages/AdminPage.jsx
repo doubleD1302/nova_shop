@@ -7,11 +7,13 @@ import { formatDateTime, formatNumber, formatVnd } from '../utils/format'
 import {
   apiGetAdminEmailStatus,
   apiGetAdminResource,
+  apiGetAdminShopApprovalEvents,
   apiGetShopViolations,
   apiRetryViolationEmail,
   apiUpdateAdminProductApproval,
   apiUpdateAdminProductFlashSale,
   apiUpdateAdminResource,
+  apiUpdateAdminShopApproval,
 } from '../utils/api'
 import { productPlaceholder, resolveImageUrl } from '../utils/image'
 
@@ -54,6 +56,7 @@ const LABELS = {
   shipping: 'Đang giao',
   delivered: 'Đã giao hàng',
   cancelled: 'Đã hủy',
+  rejected: 'Bị từ chối',
 }
 
 const STATUS_BADGE_STYLES = {
@@ -74,6 +77,7 @@ const STATUS_BADGE_STYLES = {
   closed: 'bg-slate-50 text-slate-600 border-slate-200',
   cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
   dismissed: 'bg-slate-50 text-slate-600 border-slate-200',
+  rejected: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 const APPROVAL_LABELS = {
@@ -198,6 +202,17 @@ export default function AdminPage() {
   const [shopViolationsLoading, setShopViolationsLoading] = useState(false)
   const [shopViolationsList, setShopViolationsList] = useState([])
 
+  // Quản lý kiểm duyệt hồ sơ gian hàng
+  const [rejectShopTarget, setRejectShopTarget] = useState(null)
+  const [rejectShopReason, setRejectShopReason] = useState('')
+  const [rejectShopError, setRejectShopError] = useState('')
+
+  // Xem lịch sử duyệt gian hàng
+  const [viewingApprovalEventsShop, setViewingApprovalEventsShop] = useState(null)
+  const [approvalEvents, setApprovalEvents] = useState([])
+  const [approvalEventsLoading, setApprovalEventsLoading] = useState(false)
+  const [approvalEventsError, setApprovalEventsError] = useState('')
+
   // Quản lý báo cáo vi phạm
   const [reportFilterTab, setReportFilterTab] = useState('all')
   const [selectedReport, setSelectedReport] = useState(null)
@@ -283,11 +298,13 @@ export default function AdminPage() {
   // Đếm số lượng theo tab con cho Quản lý Shop
   const shopTabCounts = useMemo(() => {
     if (activeTab !== 'shops' || !Array.isArray(resourceItems)) {
-      return { all: 0, active: 0, suspended: 0, closed: 0 }
+      return { all: 0, pending: 0, active: 0, rejected: 0, suspended: 0, closed: 0 }
     }
     return {
       all: resourceItems.length,
+      pending: resourceItems.filter((s) => s.status === 'pending').length,
       active: resourceItems.filter((s) => s.status === 'active').length,
+      rejected: resourceItems.filter((s) => s.status === 'rejected').length,
       suspended: resourceItems.filter((s) => s.status === 'suspended').length,
       closed: resourceItems.filter((s) => s.status === 'closed').length,
     }
@@ -406,6 +423,97 @@ export default function AdminPage() {
       pushToast(err.message || 'Lỗi khi mở khóa gian hàng.', 'error')
     } finally {
       setSavingId('')
+    }
+  }
+
+  // Phê duyệt hồ sơ gian hàng
+  const handleApproveShop = async (shop) => {
+    setSavingId(`approve-shop:${shop.id}`)
+    try {
+      const res = await apiUpdateAdminShopApproval(shop.id, {
+        approvalStatus: 'approved',
+        approvalVersion: shop.approvalVersion || 1,
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok || !payload?.success) {
+        if (res.status === 409 || payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
+          pushToast('Hồ sơ gian hàng đã thay đổi phiên bản. Đang tải lại danh sách...', 'error')
+          loadResource('shops')
+          return
+        }
+        throw new Error(payload?.message || 'Không thể phê duyệt gian hàng.')
+      }
+      pushToast(`Đã phê duyệt gian hàng "${shop.name}" thành công!`, 'success')
+      refreshPublicCatalog()
+      loadResource('shops')
+    } catch (err) {
+      pushToast(err.message || 'Lỗi khi phê duyệt gian hàng.', 'error')
+    } finally {
+      setSavingId('')
+    }
+  }
+
+  // Mở modal từ chối gian hàng
+  const handleOpenRejectShop = (shop) => {
+    setRejectShopTarget(shop)
+    setRejectShopReason(shop.rejectionReason || '')
+    setRejectShopError('')
+  }
+
+  // Xác nhận từ chối duyệt gian hàng
+  const handleConfirmRejectShop = async () => {
+    if (!rejectShopTarget) return
+    const reason = rejectShopReason.trim()
+    if (reason.length < 3 || reason.length > 1000) {
+      setRejectShopError('Lý do từ chối bắt buộc từ 3 đến 1000 ký tự.')
+      return
+    }
+    setSavingId(`reject-shop:${rejectShopTarget.id}`)
+    try {
+      const res = await apiUpdateAdminShopApproval(rejectShopTarget.id, {
+        approvalStatus: 'rejected',
+        approvalVersion: rejectShopTarget.approvalVersion || 1,
+        rejectionReason: reason,
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok || !payload?.success) {
+        if (res.status === 409 || payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
+          pushToast('Hồ sơ gian hàng đã thay đổi phiên bản. Đang tải lại danh sách...', 'error')
+          loadResource('shops')
+          setRejectShopTarget(null)
+          return
+        }
+        throw new Error(payload?.message || 'Không thể từ chối gian hàng.')
+      }
+      pushToast(`Đã từ chối duyệt gian hàng "${rejectShopTarget.name}".`, 'success')
+      refreshPublicCatalog()
+      setRejectShopTarget(null)
+      setRejectShopReason('')
+      loadResource('shops')
+    } catch (err) {
+      setRejectShopError(err.message || 'Lỗi khi từ chối gian hàng.')
+    } finally {
+      setSavingId('')
+    }
+  }
+
+  // Xem lịch sử xét duyệt gian hàng
+  const handleViewApprovalEvents = async (shop) => {
+    setViewingApprovalEventsShop(shop)
+    setApprovalEvents([])
+    setApprovalEventsLoading(true)
+    setApprovalEventsError('')
+    try {
+      const res = await apiGetAdminShopApprovalEvents(shop.id)
+      const payload = await res.json().catch(() => null)
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.message || 'Không thể tải lịch sử duyệt.')
+      }
+      setApprovalEvents(payload.data?.events || [])
+    } catch (err) {
+      setApprovalEventsError(err.message || 'Lỗi khi tải lịch sử duyệt.')
+    } finally {
+      setApprovalEventsLoading(false)
     }
   }
 
@@ -1208,11 +1316,13 @@ export default function AdminPage() {
                 </span>
               </div>
 
-              {/* 4 TABS BỘ LỌC TRẠNG THÁI GIAN HÀNG */}
+              {/* TABS BỘ LỌC TRẠNG THÁI GIAN HÀNG */}
               <div className="flex flex-wrap items-center gap-2 border-b border-[#E6D5C2] pb-3">
                 {[
                   { id: 'all', label: 'Tất cả', count: shopTabCounts.all },
+                  { id: 'pending', label: 'Chờ duyệt', count: shopTabCounts.pending, badge: 'bg-amber-500 text-[#FFFCF7]' },
                   { id: 'active', label: 'Đang hoạt động', count: shopTabCounts.active, badge: 'bg-emerald-600 text-[#FFFCF7]' },
+                  { id: 'rejected', label: 'Bị từ chối', count: shopTabCounts.rejected, badge: 'bg-rose-500 text-[#FFFCF7]' },
                   { id: 'suspended', label: 'Đang tạm khóa', count: shopTabCounts.suspended, badge: 'bg-rose-500 text-[#FFFCF7]' },
                   { id: 'closed', label: 'Đã đóng', count: shopTabCounts.closed },
                 ].map((tab) => {
@@ -1265,8 +1375,8 @@ export default function AdminPage() {
                         <th className="pb-3">Chủ sở hữu & Email</th>
                         <th className="pb-3">Khu vực</th>
                         <th className="pb-3">Sản phẩm & Vi phạm</th>
-                        <th className="pb-3">Trạng thái & Ghi chú</th>
-                        <th className="pb-3 text-right">Khóa / Mở Khóa</th>
+                        <th className="pb-3">Trạng thái & Phiên bản</th>
+                        <th className="pb-3 text-right">Phê Duyệt & Thao Tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E6D5C2]/60">
@@ -1315,59 +1425,164 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="py-3">
-                            <span
-                              className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
-                                STATUS_BADGE_STYLES[shop.status] || 'bg-gray-50 text-gray-700'
-                              }`}
-                            >
-                              {LABELS[shop.status] || shop.status}
-                            </span>
-                            {shop.status === 'suspended' ? (
-                              <div className="mt-1.5 max-w-[260px] rounded-lg border border-rose-200 bg-rose-50/80 p-2 text-[11px] text-rose-800">
-                                <p className="font-bold text-rose-900">Lý do khóa:</p>
-                                <p className="mt-0.5 line-clamp-2">{shop.suspensionReason || 'Vi phạm chính sách sàn'}</p>
-                                {shop.suspendedAt ? (
-                                  <span className="mt-1 block text-[10px] text-rose-600">
-                                    {formatDateTime(shop.suspendedAt)}
-                                    {shop.suspendedByUsername ? ` · @${shop.suspendedByUsername}` : ''}
-                                  </span>
+                            {shop.status === 'pending' ? (
+                              <span className="inline-block rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                                ⏳ Chờ duyệt (v{shop.approvalVersion || 1})
+                              </span>
+                            ) : shop.status === 'rejected' ? (
+                              <div>
+                                <span className="inline-block rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                                  ✕ Bị từ chối (v{shop.approvalVersion || 1})
+                                </span>
+                                {shop.rejectionReason ? (
+                                  <div className="mt-1 max-w-[240px] rounded-lg border border-rose-200 bg-rose-50/70 p-2 text-[11px] text-rose-800">
+                                    <p className="font-bold text-rose-900">Lý do từ chối:</p>
+                                    <p className="mt-0.5 line-clamp-2">{shop.rejectionReason}</p>
+                                  </div>
                                 ) : null}
                               </div>
-                            ) : null}
+                            ) : shop.status === 'active' ? (
+                              <span className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                                ✓ Đang hoạt động (v{shop.approvalVersion || 1})
+                              </span>
+                            ) : shop.status === 'suspended' ? (
+                              <div>
+                                <span className="inline-block rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                                  🔒 Đang tạm khóa
+                                </span>
+                                {shop.suspensionReason ? (
+                                  <div className="mt-1.5 max-w-[260px] rounded-lg border border-rose-200 bg-rose-50/80 p-2 text-[11px] text-rose-800">
+                                    <p className="font-bold text-rose-900">Lý do khóa:</p>
+                                    <p className="mt-0.5 line-clamp-2">{shop.suspensionReason}</p>
+                                    {shop.suspendedAt ? (
+                                      <span className="mt-1 block text-[10px] text-rose-600">
+                                        {formatDateTime(shop.suspendedAt)}
+                                        {shop.suspendedByUsername ? ` · @${shop.suspendedByUsername}` : ''}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span
+                                className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                                  STATUS_BADGE_STYLES[shop.status] || 'bg-gray-50 text-gray-700'
+                                }`}
+                              >
+                                {LABELS[shop.status] || shop.status}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 text-right">
-                            {shop.status === 'active' ? (
-                              <button
-                                type="button"
-                                disabled={savingId === `lock:${shop.id}`}
-                                onClick={() => {
-                                  setLockShopTarget(shop)
-                                  setLockShopReason('')
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-50"
-                              >
-                                <span>🔒</span>
-                                <span>Khóa shop</span>
-                              </button>
+                            {shop.status === 'pending' ? (
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={savingId === `approve-shop:${shop.id}`}
+                                  onClick={() => handleApproveShop(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[12px] font-bold transition disabled:opacity-50 shadow-2xs cursor-pointer"
+                                  title="Duyệt gian hàng cho phép bán hàng"
+                                >
+                                  <span>✓</span>
+                                  <span>{savingId === `approve-shop:${shop.id}` ? 'Đang duyệt...' : 'Duyệt'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={savingId === `approve-shop:${shop.id}`}
+                                  onClick={() => handleOpenRejectShop(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-[12px] font-bold transition disabled:opacity-50 cursor-pointer"
+                                  title="Từ chối hồ sơ gian hàng"
+                                >
+                                  <span>✕</span>
+                                  <span>Từ chối</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewApprovalEvents(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer"
+                                  title="Xem lịch sử các lần duyệt hồ sơ"
+                                >
+                                  <span>📋</span>
+                                  <span>Lịch sử</span>
+                                </button>
+                              </div>
+                            ) : shop.status === 'rejected' ? (
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewApprovalEvents(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-3 py-1.5 text-[12px] font-medium transition cursor-pointer"
+                                  title="Xem lịch sử các lần duyệt hồ sơ"
+                                >
+                                  <span>📋</span>
+                                  <span>Lịch sử duyệt</span>
+                                </button>
+                              </div>
+                            ) : shop.status === 'active' ? (
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={savingId === `lock:${shop.id}`}
+                                  onClick={() => {
+                                    setLockShopTarget(shop)
+                                    setLockShopReason('')
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-50"
+                                >
+                                  <span>🔒</span>
+                                  <span>Khóa shop</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewApprovalEvents(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer"
+                                  title="Xem lịch sử các lần duyệt hồ sơ"
+                                >
+                                  <span>📋</span>
+                                  <span>Lịch sử</span>
+                                </button>
+                              </div>
                             ) : shop.status === 'suspended' ? (
-                              <button
-                                type="button"
-                                disabled={savingId === `unlock:${shop.id}`}
-                                onClick={() => setUnlockShopTarget(shop)}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-50"
-                              >
-                                <span>🔓</span>
-                                <span>Mở khóa</span>
-                              </button>
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={savingId === `unlock:${shop.id}`}
+                                  onClick={() => setUnlockShopTarget(shop)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-50"
+                                >
+                                  <span>🔓</span>
+                                  <span>Mở khóa</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewApprovalEvents(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer"
+                                  title="Xem lịch sử các lần duyệt hồ sơ"
+                                >
+                                  <span>📋</span>
+                                  <span>Lịch sử</span>
+                                </button>
+                              </div>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={savingId === `unlock:${shop.id}`}
-                                onClick={() => setUnlockShopTarget(shop)}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-[#FBF3E8] hover:bg-[#F5E7D4] text-[#8B7566] px-3 py-1.5 text-[12px] font-medium transition disabled:opacity-50"
-                              >
-                                <span>Mở lại</span>
-                              </button>
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={savingId === `unlock:${shop.id}`}
+                                  onClick={() => setUnlockShopTarget(shop)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-[#FBF3E8] hover:bg-[#F5E7D4] text-[#8B7566] px-3 py-1.5 text-[12px] font-medium transition disabled:opacity-50"
+                                >
+                                  <span>Mở lại</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewApprovalEvents(shop)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer"
+                                  title="Xem lịch sử các lần duyệt hồ sơ"
+                                >
+                                  <span>📋</span>
+                                  <span>Lịch sử</span>
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -3096,6 +3311,174 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                 <button
                   type="button"
                   onClick={() => setViewingViolationsShop(null)}
+                  className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-5 py-2 text-[13px] font-semibold text-[#49352D] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ============================================================ */}
+        {/* MODAL 8: TỪ CHỐI DUYỆT GIAN HÀNG                             */}
+        {/* ============================================================ */}
+        {rejectShopTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-lg rounded-3xl border border-[#E6D5C2] bg-[#FFFCF7] p-6 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-[#E6D5C2] pb-3">
+                <div className="flex items-center gap-2 text-rose-700">
+                  <span className="text-xl">⚠️</span>
+                  <h3 className="text-[16px] font-bold">Từ Chối Duyệt Gian Hàng</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRejectShopTarget(null)}
+                  className="grid h-8 w-8 place-items-center rounded-full text-[#8B7566] hover:bg-[#F5E7D4] hover:text-[#A95532] cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="py-4 space-y-3 text-[13px]">
+                <p className="text-[#49352D]">
+                  Bạn đang từ chối hồ sơ gian hàng <b>"{rejectShopTarget.name}"</b> (#{rejectShopTarget.id}) - Phiên bản hồ sơ <b>v{rejectShopTarget.approvalVersion || 1}</b>.
+                </p>
+                <p className="text-[12px] text-[#8B7566]">
+                  Chủ gian hàng: <b>{rejectShopTarget.ownerName}</b> (@{rejectShopTarget.ownerUsername})
+                </p>
+
+                <div>
+                  <label className="block text-[12px] font-bold text-[#49352D] mb-1">
+                    Lý do từ chối <span className="text-rose-600">*</span> (từ 3 đến 1000 ký tự):
+                  </label>
+                  <textarea
+                    value={rejectShopReason}
+                    onChange={(e) => {
+                      setRejectShopReason(e.target.value)
+                      setRejectShopError('')
+                    }}
+                    placeholder="Ví dụ: Tên gian hàng hoặc logo vi phạm bản quyền thương hiệu; mô tả gian hàng chứa nội dung không phù hợp..."
+                    rows={4}
+                    maxLength={1000}
+                    className="w-full rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] p-3 text-[13px] text-[#49352D] placeholder:text-[#8B7566] outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-[#8B7566]">
+                    <span>Lý do này sẽ hiển thị trực tiếp cho Người Bán để họ chỉnh sửa hồ sơ.</span>
+                    <span>{rejectShopReason.trim().length}/1000</span>
+                  </div>
+                </div>
+
+                {rejectShopError ? (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-[12px] text-rose-700">
+                    {rejectShopError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex justify-end gap-2.5 border-t border-[#E6D5C2] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setRejectShopTarget(null)}
+                  className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-2 text-[13px] font-semibold text-[#8B7566] hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={savingId === `reject-shop:${rejectShopTarget.id}`}
+                  onClick={handleConfirmRejectShop}
+                  className="rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2 text-[13px] font-bold text-white shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  {savingId === `reject-shop:${rejectShopTarget.id}` ? 'Đang lưu...' : 'Xác nhận từ chối'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ============================================================ */}
+        {/* MODAL 9: LỊCH SỬ XÉT DUYỆT GIAN HÀNG                         */}
+        {/* ============================================================ */}
+        {viewingApprovalEventsShop ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+            <div className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xl flex flex-col">
+              <div className="flex items-center justify-between border-b border-[#E6D5C2] px-6 py-4 bg-[#FBF3E8]">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#F5E7D4] text-sm text-[#A95532]">
+                    📋
+                  </span>
+                  <div>
+                    <h3 className="text-[16px] font-bold text-[#49352D]">
+                      Lịch Sử Xét Duyệt: {viewingApprovalEventsShop.name}
+                    </h3>
+                    <p className="text-[11px] text-[#8B7566]">
+                      Mã Shop #{viewingApprovalEventsShop.id} · Chủ sở hữu: @{viewingApprovalEventsShop.ownerUsername} · Phiên bản hiện tại: v{viewingApprovalEventsShop.approvalVersion || 1}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingApprovalEventsShop(null)}
+                  className="grid h-8 w-8 place-items-center rounded-full text-[#8B7566] hover:bg-[#F5E7D4] hover:text-[#A95532] cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-6 space-y-4 text-[13px]">
+                {approvalEventsLoading ? (
+                  <p className="py-8 text-center text-[#8B7566]">Đang tải lịch sử xét duyệt...</p>
+                ) : approvalEventsError ? (
+                  <p className="rounded-xl bg-rose-50 p-4 text-[13px] text-rose-700">{approvalEventsError}</p>
+                ) : approvalEvents.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F5E7D4] text-xl text-[#A95532]">
+                      ℹ️
+                    </span>
+                    <p className="mt-2 text-[14px] font-semibold text-[#49352D]">Chưa có sự kiện xét duyệt nào được ghi nhận</p>
+                    <p className="text-[12px] text-[#8B7566] mt-0.5">Gian hàng chưa trải qua lần phê duyệt hoặc từ chối nào.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {approvalEvents.map((evt) => {
+                      const isApproved = evt.action === 'approved'
+                      const isRejected = evt.action === 'rejected'
+                      const isResubmitted = evt.action === 'resubmitted'
+                      return (
+                        <div key={evt.id} className="rounded-2xl border border-[#E6D5C2] bg-[#FBF3E8] p-4 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className={`font-bold text-[13px] inline-flex items-center gap-1.5 ${
+                              isApproved ? 'text-emerald-700' : isRejected ? 'text-rose-700' : 'text-sky-700'
+                            }`}>
+                              <span>{isApproved ? '✓ PHÊ DUYỆT' : isRejected ? '✕ TỪ CHỐI DUYỆT' : isResubmitted ? '🚀 GỬI LẠI HỒ SƠ' : evt.action?.toUpperCase()}</span>
+                              <span className="rounded-full bg-white/80 border border-[#E6D5C2] px-2 py-0.5 text-[10px] font-semibold text-[#49352D]">
+                                Phiên bản v{evt.profileVersion}
+                              </span>
+                            </span>
+                            <span className="text-[11px] text-[#8B7566]">
+                              {formatDateTime(evt.createdAt)}
+                            </span>
+                          </div>
+                          <div className="text-[12px] text-[#49352D] leading-relaxed">
+                            <b>Người thực hiện:</b> {evt.actorId ? `Người dùng ID #${evt.actorId}` : 'Hệ thống'}
+                          </div>
+                          {evt.reason ? (
+                            <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 text-[12px] text-rose-800">
+                              <b>Lý do ghi nhận:</b> {evt.reason}
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end border-t border-[#E6D5C2] px-6 py-3 bg-[#FBF3E8]">
+                <button
+                  type="button"
+                  onClick={() => setViewingApprovalEventsShop(null)}
                   className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-5 py-2 text-[13px] font-semibold text-[#49352D] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
                 >
                   Đóng
