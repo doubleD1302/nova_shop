@@ -5,6 +5,7 @@ import {
   apiCancelOrder,
   apiConfirmOrderReceived,
   apiCreateOrder,
+  apiPreviewOrder,
   apiGetOrders,
   apiGetSellerOrders,
   apiUpdateSellerOrderStatus,
@@ -33,7 +34,10 @@ const imageForVariant = (product) => product?.image || ''
 async function readResponse(response, fallbackMessage) {
   const payload = await response.json().catch(() => null)
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || fallbackMessage)
+    const err = new Error(payload?.message || fallbackMessage)
+    err.status = response.status
+    err.code = payload?.error?.code
+    throw err
   }
   return payload.data
 }
@@ -183,6 +187,27 @@ export function OrderProvider({ children }) {
     ? sellerOrdersSummary
     : { total: 0, pending: 0, confirmed: 0, shipping: 0, delivered: 0, cancelled: 0, revenue: 0 }
 
+  const previewOrder = useCallback(async ({ items, shippingMethod, voucherCode = '', signal }) => {
+    if (!user) return null
+    const validItems = items
+      .filter((item) => item.variantId && Number(item.qty) >= 1)
+      .map((item) => ({ variantId: String(item.variantId), qty: Number(item.qty) }))
+    if (!validItems.length) return null
+    const response = await apiPreviewOrder({
+      items: validItems,
+      shippingMethod,
+      voucherCode: voucherCode ? voucherCode.trim().toUpperCase() : '',
+    }, { signal })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.success) {
+      const err = new Error(payload?.message || 'Không thể tính toán xem trước đơn hàng.')
+      err.status = response.status
+      err.code = payload?.error?.code
+      throw err
+    }
+    return payload.data
+  }, [user])
+
   const createOrder = useCallback(async ({
     buyerName,
     items,
@@ -191,13 +216,14 @@ export function OrderProvider({ children }) {
     shippingMethod,
     voucherCode = '',
     note = '',
+    idempotencyKey: customKey,
   }) => {
     if (!user) throw new Error('Vui lòng đăng nhập trước khi đặt hàng.')
     const invalidItem = items.find((item) => !item.variantId || !Number.isInteger(Number(item.qty)) || item.qty < 1 || item.qty > item.stock)
     if (invalidItem) throw new Error(`Sản phẩm "${invalidItem.name}" không còn đủ tồn kho. Vui lòng kiểm tra lại giỏ hàng.`)
-    const idempotencyKey = window.crypto?.randomUUID
+    const idempotencyKey = customKey || (window.crypto?.randomUUID
       ? window.crypto.randomUUID()
-      : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}`)
     const data = await readResponse(
       await apiCreateOrder({
         items: items.map((item) => ({ variantId: item.variantId, qty: Number(item.qty) })),
@@ -357,6 +383,7 @@ export function OrderProvider({ children }) {
     sellerOrdersSummary: visibleSellerOrdersSummary,
     loadBuyerOrders,
     loadSellerOrders,
+    previewOrder,
     createOrder,
     updateOrderStatus,
     cancelOrder,
@@ -377,6 +404,7 @@ export function OrderProvider({ children }) {
     visibleSellerOrdersSummary,
     loadBuyerOrders,
     loadSellerOrders,
+    previewOrder,
     createOrder,
     updateOrderStatus,
     cancelOrder,
