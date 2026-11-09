@@ -420,7 +420,7 @@ export function apiGetAdminEmailStatus() {
 export async function apiSendAiMessage(message, context = {}) {
   const response = await apiRequest('/ai/chat', {
     method: 'POST',
-    body: JSON.stringify({ message, context }),
+    body: { message, context },
   })
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
