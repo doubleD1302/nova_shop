@@ -694,39 +694,18 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _resetBrainProfile();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red[700],
-                      side: BorderSide(color: Colors.red.shade200),
-                      backgroundColor: Colors.red.shade50,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                    ),
-                    icon: const Icon(Icons.delete_outline, size: 17),
-                    label: const Text('Xóa ký ức AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorPrimary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                    ),
-                    child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  ),
-                ),
-              ],
+                child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
             ),
           ],
         ),
@@ -971,45 +950,27 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
               ],
             ),
           ),
-          Row(
-            children: [
-              InkWell(
-                onTap: _showAiBrainInspectorModal,
+          InkWell(
+            onTap: _showAiBrainInspectorModal,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE6D5C2)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Text('🧠', style: TextStyle(fontSize: 13)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Trí nhớ AI',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colorPrimary),
-                      ),
-                    ],
-                  ),
-                ),
+                border: Border.all(color: const Color(0xFFE6D5C2)),
               ),
-              const SizedBox(width: 6),
-              InkWell(
-                onTap: _resetBrainProfile,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE6D5C2)),
+              child: const Row(
+                children: [
+                  Text('🧠', style: TextStyle(fontSize: 13)),
+                  SizedBox(width: 4),
+                  Text(
+                    'Trí nhớ AI',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colorPrimary),
                   ),
-                  child: const Icon(Icons.refresh, color: Color(0xFF8B7566), size: 18),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),

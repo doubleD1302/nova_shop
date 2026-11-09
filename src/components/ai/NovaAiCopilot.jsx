@@ -443,18 +443,11 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
               </div>
             </div>
 
-            <div className="mt-5 flex gap-2 border-t border-gray-100 pt-3">
-              <button
-                type="button"
-                onClick={handleResetBrain}
-                className="flex-1 rounded-lg border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-600 hover:bg-red-100 transition"
-              >
-                🗑️ Xóa ký ức AI
-              </button>
+            <div className="mt-5 border-t border-gray-100 pt-3">
               <button
                 type="button"
                 onClick={() => setShowBrainModal(false)}
-                className="flex-1 rounded-lg bg-[#BD6E49] py-2 text-xs font-bold text-white hover:bg-[#A95532] transition"
+                className="w-full rounded-lg bg-[#BD6E49] py-2 text-xs font-bold text-white hover:bg-[#A95532] transition"
               >
                 Đã hiểu
               </button>

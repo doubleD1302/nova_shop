@@ -155,7 +155,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Bộ Não Nova AI Của Bạn'), findsOneWidget);
     expect(find.text('📌 NHỮNG ĐIỀU AI ĐÃ GHI NHỚ VỀ BẠN:'), findsOneWidget);
-    expect(find.text('Xóa ký ức AI'), findsOneWidget);
+    expect(find.text('Đã hiểu'), findsOneWidget);
+    expect(find.text('Xóa ký ức AI'), findsNothing);
   });
 
   testWidgets('NovaAIScreen renders clean intelligent greeting by default without static mock data', (WidgetTester tester) async {
