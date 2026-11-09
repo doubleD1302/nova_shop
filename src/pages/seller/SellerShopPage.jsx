@@ -15,12 +15,13 @@ import { API_BASE_URL, apiUploadSellerImage } from '../../utils/api'
  */
 export default function SellerShopPage() {
   const { user } = useAuth()
-  const { getShop, loadShop, updateShop } = useCatalog()
+  const { getShop, loadShop, loadSellerShop, updateShop, resubmitSellerShop } = useCatalog()
   const { pushToast } = useToast()
   const shop = getShop(user?.shopId)
   const [shopError, setShopError] = useState('')
   const bannerFileRef = useRef(null)
   const [saving, setSaving] = useState(false)
+  const [resubmitting, setResubmitting] = useState(false)
   const [bannerBusy, setBannerBusy] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState(() => ({
@@ -34,12 +35,12 @@ export default function SellerShopPage() {
   }))
 
   useEffect(() => {
-    if (user?.shopId) {
-      loadShop(user.shopId)
+    if (user?.shopId || user?.role === 'seller') {
+      loadSellerShop()
         .then(() => setShopError(''))
         .catch((err) => setShopError(err.message || 'Không thể tải gian hàng.'))
     }
-  }, [loadShop, user?.shopId])
+  }, [loadSellerShop, user?.shopId, user?.role])
 
   useEffect(() => {
     if (!shop) return
@@ -52,7 +53,7 @@ export default function SellerShopPage() {
       avatarUrl: shop.logoUrl || null,
       bannerUrl: shop.bannerUrl || null,
     })
-  }, [shop?.id])
+  }, [shop?.id, shop?.status, shop?.approvalVersion])
 
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
   const inputClass =
@@ -70,7 +71,7 @@ export default function SellerShopPage() {
     setBannerBusy(true)
     setError('')
     try {
-      const response = await apiUploadSellerImage(file)
+      const response = await apiUploadSellerImage(file, 'shop')
       const result = await response.json().catch(() => null)
       if (!response.ok || !result?.success || !result?.data?.url) {
         throw new Error(result?.message || `Không thể tải ảnh bìa lên (HTTP ${response.status}).`)
@@ -98,11 +99,26 @@ export default function SellerShopPage() {
         logoUrl: form.avatarUrl,
         bannerUrl: form.bannerUrl,
       })
+      await loadSellerShop()
       pushToast('Đã lưu thông tin gian hàng thành công', 'success')
     } catch (saveError) {
       setError(saveError.message || 'Không thể cập nhật gian hàng.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleResubmit = async () => {
+    setResubmitting(true)
+    setError('')
+    try {
+      await resubmitSellerShop()
+      pushToast('Đã gửi lại hồ sơ duyệt gian hàng thành công. Gian hàng chuyển sang trạng thái chờ duyệt.', 'success')
+      await loadSellerShop()
+    } catch (err) {
+      setError(err.message || 'Không thể gửi lại hồ sơ duyệt.')
+    } finally {
+      setResubmitting(false)
     }
   }
 
@@ -123,21 +139,98 @@ export default function SellerShopPage() {
             <IconStore className="h-6 w-6" />
           </span>
           <div>
-            <h1 className="text-[18px] font-bold text-[#49352D]">Thông Tin Gian Hàng</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[18px] font-bold text-[#49352D]">Thông Tin Gian Hàng</h1>
+              {shop.status === 'pending' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                  ⏳ Chờ duyệt (v{shop.approvalVersion || 1})
+                </span>
+              ) : shop.status === 'rejected' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                  ✕ Bị từ chối (v{shop.approvalVersion || 1})
+                </span>
+              ) : shop.status === 'active' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                  ✓ Đang hoạt động
+                </span>
+              ) : shop.status === 'suspended' ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                  🔒 Tạm khóa
+                </span>
+              ) : null}
+            </div>
             <p className="mt-0.5 text-[12px] text-[#8B7566]">
-              Hồ sơ này hiển thị công khai tới người mua trên sàn NovaShop.
+              Hồ sơ này hiển thị công khai tới người mua trên sàn NovaShop sau khi được phê duyệt.
             </p>
           </div>
         </div>
 
-        <Link
-          to={`/shop/${shop.id}`}
-          className="flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-2 text-[13px] font-medium text-[#8B7566] transition hover:border-[#BD6E49] hover:text-[#A95532] hover:bg-[#FBF3E8]"
-        >
-          <IconEye className="h-4 w-4" />
-          <span>Xem gian hàng công khai</span>
-        </Link>
+        {shop.status === 'active' ? (
+          <Link
+            to={`/shop/${shop.id}`}
+            className="flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-2 text-[13px] font-medium text-[#8B7566] transition hover:border-[#BD6E49] hover:text-[#A95532] hover:bg-[#FBF3E8]"
+          >
+            <IconEye className="h-4 w-4" />
+            <span>Xem gian hàng công khai</span>
+          </Link>
+        ) : (
+          <span
+            className="flex items-center gap-1.5 rounded-xl border border-[#E6D5C2] bg-gray-50 px-4 py-2 text-[12px] font-medium text-gray-500 cursor-not-allowed"
+            title="Gian hàng chỉ hiển thị công khai sau khi được Ban Quản Trị phê duyệt"
+          >
+            <IconEye className="h-4 w-4" />
+            <span>Chưa công khai (Chờ duyệt)</span>
+          </span>
+        )}
       </div>
+
+      {/* Thông báo trạng thái xét duyệt */}
+      {shop.status === 'pending' ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2 font-bold text-amber-800">
+            <span>⏳</span>
+            <span>Hồ sơ gian hàng đang chờ Ban Quản Trị xét duyệt</span>
+          </div>
+          <p className="mt-1 text-amber-800 leading-relaxed text-[12px]">
+            Hồ sơ gian hàng của bạn (phiên bản v{shop.approvalVersion || 1}) đang trong hàng đợi kiểm duyệt của Quản trị viên.
+            Việc tài khoản có vai trò Người Bán chưa đồng nghĩa với việc được bán hàng chính thức trên sàn cho đến khi hồ sơ được duyệt. Bạn có thể cập nhật thông tin và lưu lại bất cứ lúc nào.
+          </p>
+        </div>
+      ) : shop.status === 'rejected' ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-900 shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-bold text-rose-800">
+              <span>❌</span>
+              <span>Hồ sơ gian hàng đã bị từ chối duyệt (Phiên bản v{shop.approvalVersion || 1})</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleResubmit}
+              disabled={resubmitting || saving}
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-[12px] font-bold text-white shadow-2xs transition disabled:opacity-50"
+            >
+              {resubmitting ? 'Đang gửi lại...' : 'Gửi lại hồ sơ duyệt'}
+            </button>
+          </div>
+          <div className="mt-2.5 rounded-xl border border-rose-200 bg-white/90 p-3 text-[12px] text-rose-800">
+            <p className="font-semibold text-rose-900">Lý do từ chối từ Ban Quản Trị:</p>
+            <p className="mt-0.5 whitespace-pre-wrap">{shop.rejectionReason || 'Hồ sơ chưa đạt tiêu chuẩn quy định của sàn NovaShop.'}</p>
+          </div>
+          <p className="mt-2 text-[12px] text-rose-700">
+            Vui lòng chỉnh sửa các thông tin chưa phù hợp ở form bên dưới, bấm "Lưu Thay Đổi", sau đó bấm "Gửi lại hồ sơ duyệt" để Ban Quản Trị kiểm duyệt lại.
+          </p>
+        </div>
+      ) : shop.status === 'active' ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-[12px] text-emerald-800 shadow-2xs flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="text-emerald-600 font-bold">✓</span>
+            <span>Gian hàng đang hoạt động bình thường trên sàn NovaShop (Hồ sơ phiên bản v{shop.approvalVersion || 1}).</span>
+          </span>
+          <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[11px] font-bold">
+            Đã duyệt
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         {/* Form chỉnh sửa chính */}
@@ -148,6 +241,7 @@ export default function SellerShopPage() {
             onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
             title="Ảnh đại diện gian hàng"
             note="Tải ảnh logo vuông hoặc tròn, tỷ lệ 1:1, tối đa 5 MB."
+            purpose="shop"
           />
 
           {/* Ảnh bìa gian hàng */}
@@ -231,12 +325,23 @@ export default function SellerShopPage() {
             <button
               type="button"
               onClick={save}
-              disabled={saving}
+              disabled={saving || resubmitting}
               className="flex items-center gap-1.5 rounded-xl bg-[#BD6E49] hover:bg-[#A95532] px-5 py-2.5 text-[13px] font-semibold text-[#FFFCF7] shadow-2xs transition disabled:opacity-60"
             >
               <IconCheck className="h-4 w-4" />
               {saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}
             </button>
+            {shop.status === 'rejected' ? (
+              <button
+                type="button"
+                onClick={handleResubmit}
+                disabled={resubmitting || saving}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2.5 text-[13px] font-semibold text-white shadow-2xs transition disabled:opacity-60"
+              >
+                <span>🚀</span>
+                <span>{resubmitting ? 'Đang gửi lại...' : 'Gửi Lại Hồ Sơ Duyệt'}</span>
+              </button>
+            ) : null}
           </div>
 
           {error ? (

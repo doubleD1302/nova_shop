@@ -7,8 +7,10 @@ import {
   apiGetProduct,
   apiGetProducts,
   apiGetSellerProducts,
+  apiGetSellerShop,
   apiGetShop,
   apiGetShops,
+  apiResubmitSellerShop,
   apiSaveSellerProduct,
   apiUpdateSellerShop,
   invalidatePublicApiCache,
@@ -84,12 +86,15 @@ function normalizeProduct(product) {
 }
 
 function normalizeShop(shop, followedShopIds) {
-  const logoUrl = imageUrl(shop.logoUrl)
+  const logoUrl = imageUrl(shop.logoUrl || shop.logo_url)
   return {
     ...shop,
     id: String(shop.id),
+    status: shop.status || 'pending',
+    approvalVersion: Number(shop.approvalVersion ?? shop.approval_version ?? 1),
+    rejectionReason: shop.rejectionReason ?? shop.rejection_reason ?? null,
     logoUrl,
-    bannerUrl: imageUrl(shop.bannerUrl),
+    bannerUrl: imageUrl(shop.bannerUrl || shop.banner_url),
     avatar: logoUrl,
     followed: followedShopIds.includes(String(shop.id)),
   }
@@ -259,14 +264,36 @@ export function CatalogProvider({ children }) {
     }
   }, [followedShopIds])
 
+  const loadSellerShop = useCallback(async ({ signal } = {}) => {
+    const response = await apiGetSellerShop({ signal })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.success || !payload?.data?.shop) {
+      throw new Error(payload?.message || 'Không thể tải thông tin gian hàng người bán.')
+    }
+    const shop = normalizeShop(payload.data.shop, followedShopIds)
+    setDatabaseShops((current) => {
+      const byId = new Map(current.map((item) => [String(item.id), item]))
+      byId.set(String(shop.id), { ...byId.get(String(shop.id)), ...shop })
+      return [...byId.values()]
+    })
+    return shop
+  }, [followedShopIds])
+
   const loadShop = useCallback(async (shopId, { signal } = {}) => {
+    if (user && (String(user.shopId) === String(shopId) || user.role === 'seller')) {
+      try {
+        return await loadSellerShop({ signal })
+      } catch (err) {
+        if (signal?.aborted) throw err
+      }
+    }
     const response = await apiGetShop(shopId, { signal })
     const payload = await response.json().catch(() => null)
     if (!response.ok || !payload?.success || !payload.data?.shop) throw new Error(payload?.message || 'Không thể tải gian hàng.')
     const shop = normalizeShop(payload.data.shop, followedShopIds)
     setDatabaseShops((current) => [...current.filter((item) => String(item.id) !== shop.id), shop])
     return shop
-  }, [followedShopIds])
+  }, [followedShopIds, user, loadSellerShop])
 
   const loadSellerProducts = useCallback(async ({ force = false, limit = 50, offset = 0, productId = '' } = {}) => {
     const userId = String(user?.id || '')
@@ -419,6 +446,18 @@ export function CatalogProvider({ children }) {
     return result.data?.shop
   }, [followedShopIds])
 
+  const resubmitSellerShop = useCallback(async () => {
+    const response = await apiResubmitSellerShop()
+    const result = await response.json().catch(() => null)
+    if (!response.ok || !result?.success) throw new Error(result?.message || `Không thể gửi lại hồ sơ (HTTP ${response.status}).`)
+    if (result.data?.shop) {
+      const normalized = normalizeShop(result.data.shop, followedShopIds)
+      setDatabaseShops((current) => [...current.filter((shop) => String(shop.id) !== normalized.id), normalized])
+      return normalized
+    }
+    return await loadSellerShop()
+  }, [followedShopIds, loadSellerShop])
+
   const deleteProduct = useCallback(async (id) => {
     const response = await apiDeleteSellerProduct(id)
     const result = await response.json().catch(() => null)
@@ -429,7 +468,7 @@ export function CatalogProvider({ children }) {
 
   const value = useMemo(() => ({
     categories, products: productList, sellerProducts: sellerProductList, sellerProductsTotal, refreshProducts, refreshPublicCatalog,
-    loadProducts, loadProductBySlug, loadCategories, loadShops, loadShop, loadSellerProducts,
+    loadProducts, loadProductBySlug, loadCategories, loadShops, loadShop, loadSellerShop, resubmitSellerShop, loadSellerProducts,
     shops, flashProducts, featuredShops, shoppingLocations, followedShopIds,
     getCategory, getShop, getProductById, getProductBySlug, getProductsByShop,
     getSellerProductsByShop, queryProducts, catalogError, sellerCatalogError,
@@ -437,7 +476,7 @@ export function CatalogProvider({ children }) {
     upsertProduct, deleteProduct, mergeProducts,
   }), [
     categories, productList, sellerProductList, sellerProductsTotal, refreshProducts, refreshPublicCatalog, loadProducts, loadProductBySlug,
-    loadCategories, loadShops, loadShop, loadSellerProducts, shops, flashProducts,
+    loadCategories, loadShops, loadShop, loadSellerShop, resubmitSellerShop, loadSellerProducts, shops, flashProducts,
     featuredShops, shoppingLocations, followedShopIds, getCategory, getShop,
     getProductById, getProductBySlug, getProductsByShop, getSellerProductsByShop,
     queryProducts, catalogError, sellerCatalogError, catalogLoading,
