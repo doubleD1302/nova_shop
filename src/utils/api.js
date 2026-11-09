@@ -280,8 +280,16 @@ export function apiGetCategories(options = {}) {
   return apiRequest('/categories', options)
 }
 
+export function apiGetSellerShop(options = {}) {
+  return apiRequest('/seller/shop', options)
+}
+
 export function apiUpdateSellerShop(payload) {
   return apiRequest('/seller/shop', { method: 'PUT', body: payload })
+}
+
+export function apiResubmitSellerShop(options = {}) {
+  return apiRequest('/seller/shop/resubmit', { method: 'POST', body: {}, ...options })
 }
 
 export function apiGetSellerProducts(options = {}) {
@@ -326,6 +334,15 @@ export function apiGetEligibleReviewItems(productId) {
 
 export function apiCreateProductReview(productId, payload) {
   return apiRequest(`/products/${encodeURIComponent(productId)}/reviews`, { method: 'POST', body: payload })
+}
+
+export function apiPreviewOrder(payload, options = {}) {
+  const { signal } = options
+  return apiRequest('/orders/preview', {
+    method: 'POST',
+    body: payload,
+    signal,
+  })
 }
 
 export function apiCreateOrder(payload, idempotencyKey) {
@@ -401,6 +418,23 @@ export async function apiUpdateAdminProductApproval(productId, { approvalStatus,
   })
   if (response.ok) invalidatePublicApiCache('/products')
   return response
+}
+
+export function apiGetAdminShops(options = {}) {
+  return apiRequest('/admin/shops', options)
+}
+
+export async function apiUpdateAdminShopApproval(shopId, { approvalStatus, approvalVersion, rejectionReason }) {
+  const response = await apiRequest(`/admin/shops/${encodeURIComponent(shopId)}/approval`, {
+    method: 'PATCH',
+    body: { approvalStatus, approvalVersion, rejectionReason },
+  })
+  if (response.ok) invalidatePublicApiCache('/shops')
+  return response
+}
+
+export function apiGetAdminShopApprovalEvents(shopId, options = {}) {
+  return apiRequest(`/admin/shops/${encodeURIComponent(shopId)}/approval-events`, options)
 }
 
 export function apiRetryViolationEmail(violationId) {

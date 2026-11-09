@@ -23,7 +23,7 @@ export function readImageAsDataUrl(file, maxSize = 1200) {
   })
 }
 
-export default function AvatarPicker({ value = {}, onChange, title = 'Ảnh đại diện', note = '' }) {
+export default function AvatarPicker({ value = {}, onChange, title = 'Ảnh đại diện', note = '', purpose = 'avatar' }) {
   const fileRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -40,7 +40,7 @@ export default function AvatarPicker({ value = {}, onChange, title = 'Ảnh đ�
     setError('')
     try {
       const dataUrl = await readImageAsDataUrl(file)
-      const response = await apiUploadSellerImage(dataUrl)
+      const response = await apiUploadSellerImage(dataUrl, purpose)
       const result = await response.json().catch(() => null)
       if (!response.ok || !result?.success || !result?.data?.url) {
         throw new Error(result?.message || `Không thể tải ảnh lên (HTTP ${response.status}).`)

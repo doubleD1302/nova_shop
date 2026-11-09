@@ -391,7 +391,7 @@ export function AuthProvider({ children }) {
       fullName: patch.fullName ?? current.fullName,
       email: patch.email ?? current.email,
       phone: patch.phone ?? current.phone,
-      avatarUrl: patch.avatarUrl === undefined ? current.avatarUrl : patch.avatarUrl,
+      ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),
       ...(patch.address === undefined ? {} : { address: patch.address }),
     }
     try {
