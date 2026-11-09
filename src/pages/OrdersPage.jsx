@@ -109,6 +109,14 @@ export default function OrdersPage() {
                         Đã nhận được hàng
                       </button>
                     ) : null}
+                    {order.status === 'delivered' && order.items?.[0] ? (
+                      <Link
+                        to={`/san-pham/${order.items[0].slug || order.items[0].productId}#danh-gia`}
+                        className="rounded-sm bg-brand px-3 py-1.5 text-[13px] font-medium text-white transition hover:brightness-105"
+                      >
+                        Đánh giá sản phẩm
+                      </Link>
+                    ) : null}
                     <Link
                       to={`/don-hang/${order.id}`}
                       className="rounded-sm border border-line px-3 py-1.5 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"

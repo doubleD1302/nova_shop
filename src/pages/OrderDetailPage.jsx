@@ -124,6 +124,14 @@ export default function OrderDetailPage() {
                 </span>
                 <Price value={item.price} size="sm" className="text-ink-soft" />
                 <Price value={item.price * item.qty} size="md" className="w-[110px] text-right text-brand" />
+                {order.status === 'delivered' ? (
+                  <Link
+                    to={`/san-pham/${item.slug || item.productId}#danh-gia`}
+                    className="rounded-sm border border-brand px-3 py-1 text-[12px] font-medium text-brand transition hover:bg-brand hover:text-white"
+                  >
+                    Đánh giá
+                  </Link>
+                ) : null}
               </div>
             ))}
           </div>
