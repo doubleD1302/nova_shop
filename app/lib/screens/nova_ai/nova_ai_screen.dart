@@ -96,10 +96,10 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       id: 'init_${DateTime.now().millisecondsSinceEpoch}',
       isUser: false,
       text:
-          'Xin chào! Mình là Nova AI ✨ – Trợ lý mua sắm thông minh có bộ não tự học (AI Brain). Mình có thể ghi nhớ gu thẩm mỹ, kích cỡ, ngân sách quen thuộc và lịch sử tìm kiếm của bạn để ngày càng hiểu bạn hơn. Bạn cần mình tư vấn gì hôm nay?',
+          'Xin chào! Mình là Nova AI ✨ – Trợ lý mua sắm thông minh của ShopNova. Mình có thể hỗ trợ tìm kiếm sản phẩm, tư vấn phong cách, gợi ý deal hot và giải đáp thắc mắc của bạn. Bạn cần mình tư vấn gì hôm nay?',
       time: 'Vừa xong',
       intentTitle: 'Trợ lý Nova AI',
-      intentMatch: 'AI Brain Kích Hoạt 100%',
+      intentMatch: 'Trực tuyến 24/7',
       suggestions: _quickPrompts,
     );
   }
@@ -534,184 +534,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     }
   }
 
-  /// Modal xem chi tiết Bộ Não Nova AI (khớp 100% với showBrainModal trên Website NovaAiCopilot.jsx)
-  void _showAiBrainInspectorModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Row(
-                    children: [
-                      Text('🧠', style: TextStyle(fontSize: 24)),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Bộ Não Nova AI Của Bạn',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Dữ liệu tự học qua các cuộc trò chuyện',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF8B7566)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            const Text(
-              '📌 NHỮNG ĐIỀU AI ĐÃ GHI NHỚ VỀ BẠN:',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF80513B),
-                letterSpacing: 0.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_learnedFacts.isNotEmpty)
-              ..._learnedFacts.map(
-                (fact) => Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFEF3C7)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('✓ ', style: TextStyle(color: Color(0xFF059669), fontWeight: FontWeight.bold)),
-                      Expanded(
-                        child: Text(
-                          fact,
-                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF49352D)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: Text(
-                  'Chưa có dữ liệu. Hãy trò chuyện về gu phối đồ, ngân sách, size của bạn để AI ghi nhớ nhé!',
-                  style: TextStyle(fontSize: 12.5, fontStyle: FontStyle.italic, color: Colors.grey),
-                ),
-              ),
-            if (_preferredStyles.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text(
-                '👗 GU THỜI TRANG ƯA THÍCH:',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF80513B),
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: _preferredStyles
-                    .map(
-                      (s) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5E7D4),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          s,
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colorPrimary),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFF3F4F6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '📊 Thống kê tương tác:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF374151)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('• Tổng lượt trao đổi: $_totalInteractions', style: const TextStyle(fontSize: 12)),
-                  Text('• Gợi ý đã được chấp nhận: $_acceptedRecommendations', style: const TextStyle(fontSize: 12)),
-                  if (_learnedLocation != null && _learnedLocation!.isNotEmpty)
-                    Text('• Khu vực nhận hàng: $_learnedLocation', style: const TextStyle(fontSize: 12)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -845,7 +668,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       body: Column(
         children: [
           _buildAiStatusHeader(),
-          if (_learnedFacts.isNotEmpty) _buildMemoryTagBar(),
           _buildQuickPromptsBar(),
           Expanded(
             child: ListView.builder(
@@ -870,7 +692,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     );
   }
 
-  /// Header trạng thái Nova AI + nút "🧠 Trí nhớ AI" và "Làm mới"
+  /// Header trạng thái Nova AI
   Widget _buildAiStatusHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -879,140 +701,71 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         border: Border(bottom: BorderSide(color: Color(0xFFE6D5C2))),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colorPrimary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Center(
+              child: Text('✨', style: TextStyle(fontSize: 20)),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: colorPrimary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Center(
-                    child: Text('✨', style: TextStyle(fontSize: 20)),
-                  ),
+                Row(
+                  children: [
+                    const Flexible(
+                      child: Text(
+                        'Nova AI',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF49352D)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorPrimary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '24/7',
+                        style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Flexible(
-                            child: Text(
-                              'Nova AI',
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF49352D)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colorPrimary,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'AI BRAIN',
-                              style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          const Flexible(
-                            child: Text(
-                              'Ghi nhớ sở thích & học hỏi theo bạn',
-                              style: TextStyle(color: Color(0xFF8B7566), fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 5),
+                    const Flexible(
+                      child: Text(
+                        'Trực tuyến • Trợ lý mua sắm ShopNova',
+                        style: TextStyle(color: Color(0xFF8B7566), fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          InkWell(
-            onTap: _showAiBrainInspectorModal,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE6D5C2)),
-              ),
-              child: const Row(
-                children: [
-                  Text('🧠', style: TextStyle(fontSize: 13)),
-                  SizedBox(width: 4),
-                  Text(
-                    'Trí nhớ AI',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: colorPrimary),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  /// Dải ký ức nhanh (Memory Tag Bar) đồng bộ với Website
-  Widget _buildMemoryTagBar() {
-    final recentFacts = _learnedFacts.length > 3 ? _learnedFacts.sublist(_learnedFacts.length - 3) : _learnedFacts;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFBF3E8),
-        border: Border(bottom: BorderSide(color: Color(0xFFE6D5C2))),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Text(
-              '🧠 Đã học:',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF80513B)),
-            ),
-            const SizedBox(width: 6),
-            ...recentFacts.map(
-              (fact) => Container(
-                margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE6D5C2)),
-                ),
-                child: Text(
-                  fact,
-                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF80513B)),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1585,7 +1338,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                   SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      'Nova AI đang lục tìm trí nhớ & lựa chọn theo gu của bạn...',
+                      'Nova AI đang suy nghĩ & tìm kiếm sản phẩm phù hợp...',
                       style: TextStyle(fontSize: 12, color: Color(0xFF8B7566)),
                     ),
                   ),

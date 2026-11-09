@@ -311,26 +311,17 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[15px] font-black text-[#49352D]">Nova AI</span>
-                  <span className="rounded bg-[#BD6E49] px-1.5 py-0.2 text-[10px] font-bold text-white">AI BRAIN</span>
+                  <span className="rounded bg-[#BD6E49] px-1.5 py-0.2 text-[10px] font-bold text-white">24/7</span>
                 </div>
                 <p className="text-[11px] text-[#8B7566] flex items-center gap-1">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Ghi nhớ sở thích & học hỏi theo bạn
+                  Trực tuyến • Trợ lý mua sắm ShopNova
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
-              {/* Nút Xem Bộ Não AI */}
-              <button
-                type="button"
-                onClick={() => setShowBrainModal(true)}
-                title="Xem bộ não và những gì AI đã học về bạn"
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-[#BD6E49] hover:bg-[#E6D5C2] transition"
-              >
-                <span>🧠</span>
-                <span className="hidden sm:inline">Trí nhớ AI</span>
-              </button>
+              
 
               {!fullPage && (
                 <>
@@ -359,18 +350,6 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
             </div>
           </div>
 
-          {/* Dải ký ức nhanh (Memory Tag Bar) */}
-          {brainMemory.learnedFacts.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto bg-[#FBF3E8] px-3.5 py-1.5 border-b border-[#E6D5C2] text-[11px] text-[#80513B] scrollbar-none">
-              <span className="font-bold shrink-0">🧠 Đã học:</span>
-              {brainMemory.learnedFacts.slice(-3).map((fact, idx) => (
-                <span key={idx} className="shrink-0 rounded-full bg-white px-2 py-0.5 border border-[#E6D5C2] font-medium">
-                  {fact}
-                </span>
-              ))}
-            </div>
-          )}
-
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-[#FAF4EB]">
             {renderChatMessages()}
@@ -382,80 +361,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
       )}
 
       {/* 3. MODAL XEM CHI TIẾT BỘ NÃO AI (AI BRAIN INSPECTOR) */}
-      {showBrainModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-[#E6D5C2] bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🧠</span>
-                <div>
-                  <h3 className="font-bold text-[#49352D] text-base">Bộ Não Nova AI Của Bạn</h3>
-                  <p className="text-xs text-[#8B7566]">Dữ liệu tự học qua các cuộc trò chuyện</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowBrainModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-lg font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3 max-h-[380px] overflow-y-auto text-xs">
-              <div>
-                <p className="font-bold text-[#80513B] uppercase tracking-wider mb-1.5">
-                  📌 Những điều AI đã ghi nhớ về bạn:
-                </p>
-                {brainMemory.learnedFacts.length > 0 ? (
-                  <ul className="space-y-1.5">
-                    {brainMemory.learnedFacts.map((fact, i) => (
-                      <li key={i} className="flex items-start gap-1.5 rounded-lg bg-amber-50/70 p-2 text-[#49352D] border border-amber-100">
-                        <span className="text-emerald-600 font-bold">✓</span>
-                        <span>{fact}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-400 italic">Chưa có dữ liệu. Hãy trò chuyện về gu phối đồ, ngân sách, size của bạn để AI ghi nhớ nhé!</p>
-                )}
-              </div>
-
-              {brainMemory.preferredStyles.length > 0 && (
-                <div>
-                  <p className="font-bold text-[#80513B] uppercase tracking-wider mb-1">
-                    👗 Gu thời trang ưa thích:
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {brainMemory.preferredStyles.map((s, idx) => (
-                      <span key={idx} className="rounded-full bg-[#F5E7D4] px-2.5 py-1 text-[#BD6E49] font-bold">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-xl bg-gray-50 p-3 border border-gray-100 text-[11px] text-gray-600">
-                <p className="font-bold text-gray-700 mb-1">📊 Thống kê tương tác:</p>
-                <p>• Tổng lượt trao đổi: <strong>{brainMemory.stats?.totalInteractions || 0}</strong></p>
-                <p>• Gợi ý đã được chấp nhận: <strong>{brainMemory.stats?.acceptedRecommendations || 0}</strong></p>
-              </div>
-            </div>
-
-            <div className="mt-5 border-t border-gray-100 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowBrainModal(false)}
-                className="w-full rounded-lg bg-[#BD6E49] py-2 text-xs font-bold text-white hover:bg-[#A95532] transition"
-              >
-                Đã hiểu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      </>
   )
 
   function renderChatMessages() {
@@ -651,7 +557,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#BD6E49] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#BD6E49]"></span>
             </span>
-            <span className="font-medium animate-pulse">Nova AI đang lục tìm trí nhớ & lựa chọn theo gu của bạn...</span>
+            <span className="font-medium animate-pulse">Nova AI đang suy nghĩ & tìm kiếm sản phẩm phù hợp...</span>
           </div>
         )}
 

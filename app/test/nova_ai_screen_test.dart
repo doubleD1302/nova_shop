@@ -124,7 +124,7 @@ void main() {
     NovaAIScreen.resetSession();
   });
 
-  testWidgets('NovaAIScreen renders AI Brain header, quick prompts, and opens Brain modal', (WidgetTester tester) async {
+  testWidgets('NovaAIScreen renders header, quick prompts, and chat input without AI brain/memory elements', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -139,9 +139,10 @@ void main() {
 
     // Verify AI Header
     expect(find.text('Nova AI'), findsOneWidget);
-    expect(find.text('AI BRAIN'), findsOneWidget);
-    expect(find.text('Ghi nhớ sở thích & học hỏi theo bạn'), findsOneWidget);
-    expect(find.text('Trí nhớ AI'), findsOneWidget);
+    expect(find.text('24/7'), findsOneWidget);
+    expect(find.text('Trực tuyến • Trợ lý mua sắm ShopNova'), findsOneWidget);
+    expect(find.text('Trí nhớ AI'), findsNothing);
+    expect(find.text('AI BRAIN'), findsNothing);
 
     // Verify Quick Prompts Bar
     expect(find.text('Gợi ý:'), findsOneWidget);
@@ -149,14 +150,6 @@ void main() {
 
     // Verify Input Panel
     expect(find.text('Nhập: size của mình là M, thích màu pastel...'), findsOneWidget);
-
-    // Open Brain Modal
-    await tester.tap(find.text('Trí nhớ AI'));
-    await tester.pumpAndSettle();
-    expect(find.text('Bộ Não Nova AI Của Bạn'), findsOneWidget);
-    expect(find.text('📌 NHỮNG ĐIỀU AI ĐÃ GHI NHỚ VỀ BẠN:'), findsOneWidget);
-    expect(find.text('Đã hiểu'), findsOneWidget);
-    expect(find.text('Xóa ký ức AI'), findsNothing);
   });
 
   testWidgets('NovaAIScreen renders clean intelligent greeting by default without static mock data', (WidgetTester tester) async {
@@ -174,7 +167,8 @@ void main() {
 
     expect(find.text('Nova AI'), findsOneWidget);
     expect(find.text('Trợ lý Nova AI'), findsOneWidget);
-    expect(find.text('AI Brain Kích Hoạt 100%'), findsOneWidget);
+    expect(find.text('Trực tuyến 24/7'), findsOneWidget);
+    expect(find.text('Trí nhớ AI'), findsNothing);
     // Ensure static mock prompt does NOT appear by default
     expect(find.textContaining('Tìm giúp mình set đồ dạo phố mùa hè'), findsNothing);
     expect(find.text('Ướm thử ảo'), findsNothing);
