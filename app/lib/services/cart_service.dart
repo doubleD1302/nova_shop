@@ -107,10 +107,7 @@ class CartService extends ChangeNotifier {
               .map((e) => CartItemModel.fromJson(e as Map<String, dynamic>))
               .toList();
 
-          // SMART MERGE: Tránh việc server trả về rỗng (hoặc chưa kịp sync xong)
-          // xóa mất sản phẩm mà người dùng vừa chọn ở trang chi tiết sản phẩm!
           if (serverList.isNotEmpty) {
-            // Giữ lại các item local mà server chưa kịp có
             for (final localItem in _items) {
               final existsInServer = serverList.any((s) =>
                   s.variantId == localItem.variantId ||
@@ -123,8 +120,6 @@ class CartService extends ChangeNotifier {
             _items.clear();
             _items.addAll(serverList);
           } else {
-            // Server trả về rỗng nhưng local đang có sản phẩm:
-            // TUYỆT ĐỐI KHÔNG XÓA _items, giữ nguyên toàn bộ sản phẩm local để không bao giờ bị biến mất sau 1 giây!
             debugPrint('[CartService] Server cart is empty, keeping ${_items.length} local items.');
           }
           await _saveToPrefs();
@@ -158,19 +153,14 @@ class CartService extends ChangeNotifier {
         : (productSlug != null && productSlug.trim().isNotEmpty ? productSlug.trim() : '1');
     final cleanVariantName = variantName.trim().isNotEmpty ? variantName.trim() : 'Mặc định';
 
-    // Tạo ID biến thể đặc trưng kết hợp mã sản phẩm & phân loại nếu variantId bị trống hoặc bằng '1'
     final effectiveVariantId = (variantId != null && variantId.trim().isNotEmpty && variantId.trim() != '1')
         ? variantId.trim()
         : '${cleanProductId}_${cleanVariantName.replaceAll(RegExp(r'\s+'), '_')}';
 
-    // Sản phẩm CHỈ được gộp số lượng khi:
-    // CÙNG mã sản phẩm VÀ CÙNG phân loại (biến thể)
     final index = _items.indexWhere((i) {
-      // 1. Trùng chính xác variantId hiệu dụng
       if (i.variantId == effectiveVariantId) {
         return true;
       }
-      // 2. Cùng sản phẩm VÀ cùng tên phân loại
       final isSameProduct = (i.productId.isNotEmpty && i.productId == cleanProductId) ||
           (i.productSlug.isNotEmpty && i.productSlug == (productSlug ?? cleanProductId));
       final isSameVariant = cleanVariantName.isNotEmpty &&
@@ -203,12 +193,10 @@ class CartService extends ChangeNotifier {
     notifyListeners();
     await _saveToPrefs();
 
-    // Đồng bộ lên Backend API nếu có token
     final token = AuthService().token;
     if (token != null) {
       try {
         final currentQty = _items.firstWhere((i) => i.variantId == effectiveVariantId).qty;
-        // Trích xuất số nguyên dương hợp lệ cho variantId theo chuẩn backend DB
         int? numVariantId = int.tryParse(effectiveVariantId);
         if (numVariantId == null || numVariantId <= 0) {
           numVariantId = int.tryParse(cleanProductId);
@@ -319,6 +307,7 @@ class CartService extends ChangeNotifier {
     }
     notifyListeners();
     _saveToPrefs();
+    updateCartSelection(selected: selected);
   }
 
   /// Xóa các item đã thanh toán khỏi giỏ hàng
@@ -326,6 +315,10 @@ class CartService extends ChangeNotifier {
     _items.removeWhere((i) => i.selected);
     notifyListeners();
     _saveToPrefs();
+    final token = AuthService().token;
+    if (token != null) {
+      _client.delete('/api/v1/cart/items?selected=true');
+    }
   }
 
   // --- API Client Direct Methods ---
@@ -334,6 +327,32 @@ class CartService extends ChangeNotifier {
   /// GET /api/v1/cart
   Future<ApiResponse> getCart() async {
     return await _client.get('/api/v1/cart');
+  }
+
+  /// Đồng bộ toàn bộ danh sách sản phẩm trong giỏ hàng lên Backend
+  /// POST /api/v1/cart/sync
+  Future<ApiResponse> syncCart() async {
+    final payloadItems = _items.map((i) {
+      final numVariantId = int.tryParse(i.variantId) ?? int.tryParse(i.productId) ?? 1;
+      return {
+        'variantId': numVariantId.toString(),
+        'qty': i.qty,
+        'selected': i.selected,
+      };
+    }).toList();
+    return await _client.post('/api/v1/cart/sync', body: {'items': payloadItems});
+  }
+
+  /// Cập nhật trạng thái chọn hàng loạt (toàn bộ giỏ hoặc theo shop)
+  /// PATCH /api/v1/cart/selection
+  Future<ApiResponse> updateCartSelection({required bool selected, String? shopId}) async {
+    return await _client.patch(
+      '/api/v1/cart/selection',
+      body: {
+        'selected': selected,
+        if (shopId != null && shopId.isNotEmpty) 'shopId': shopId,
+      },
+    );
   }
 
   /// Thêm một SKU biến thể vào giỏ hàng qua API Client

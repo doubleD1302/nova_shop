@@ -412,8 +412,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
                                 setModalState(() => isSubmitting = true);
                                 final pId = widget.productId ?? _product?.id ?? '';
+                                final eligibleItems = await _reviewService.getEligibleReviewItems(pId);
+                                final eligibleOrderItemId = eligibleItems.isNotEmpty
+                                    ? (eligibleItems.first['orderItemId'] ?? eligibleItems.first['id'] ?? pId).toString()
+                                    : pId;
                                 final res = await _reviewService.createReview(
-                                  orderItemId: pId,
+                                  productId: pId,
+                                  orderItemId: eligibleOrderItemId,
                                   rating: selectedRating,
                                   comment: text,
                                 );

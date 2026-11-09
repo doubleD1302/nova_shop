@@ -168,14 +168,20 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
 
   Future<void> _loadDashboard() async {
     setState(() => _isLoadingDashboard = true);
-    final response = await _client.get('/api/v1/seller/dashboard');
-    if (response.success && response.data is Map<String, dynamic> && mounted) {
+    final ordersRes = await _orderService.getOrdersWithSummary(limit: 50, offset: 0);
+    final productsList = await _productService.getProducts(limit: 100);
+    if (mounted) {
+      final summary = (ordersRes['summary'] is Map)
+          ? Map<String, dynamic>.from(ordersRes['summary'] as Map)
+          : <String, dynamic>{};
       setState(() {
-        _dashboard = response.data as Map<String, dynamic>;
+        _dashboard = {
+          ...summary,
+          'totalOrders': ordersRes['total'] ?? summary['total'] ?? 0,
+          'totalProducts': productsList.length,
+        };
         _isLoadingDashboard = false;
       });
-    } else if (mounted) {
-      setState(() => _isLoadingDashboard = false);
     }
   }
 
@@ -706,9 +712,8 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                                 );
 
                                 if (!response.success && (response.statusCode == 403 || response.message.contains('gian hàng'))) {
-                                  final regRes = await _client.post('/api/v1/seller/register-shop', body: {
+                                  final regRes = await _client.post('/api/v1/auth/seller-shop', body: {
                                     'shopName': 'Gian hàng $name',
-                                    'province': 'TP. Hồ Chí Minh',
                                   });
                                   if (regRes.success && regRes.data is Map && regRes.data['token'] != null) {
                                     await _client.saveToken(regRes.data['token'].toString());

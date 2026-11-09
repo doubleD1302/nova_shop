@@ -1,8 +1,8 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/user.dart';
-import 'package:shopnova/services/api_config.dart';
+import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/auth_service.dart';
 
 void main() {
@@ -31,7 +31,7 @@ void main() {
       final json = {
         'id': '1',
         'username': 'demo_buyer',
-        'fullName': 'Người mua mẫu',
+        'fullName': 'NgÆ°á»i mua máº«u',
         'email': 'buyer@example.test',
         'phone': '0900000000',
         'avatarUrl': null,
@@ -43,7 +43,7 @@ void main() {
       final user = UserModel.fromJson(json);
       expect(user.id, equals('1'));
       expect(user.username, equals('demo_buyer'));
-      expect(user.fullName, equals('Người mua mẫu'));
+      expect(user.fullName, equals('NgÆ°á»i mua máº«u'));
       expect(user.email, equals('buyer@example.test'));
       expect(user.phone, equals('0900000000'));
       expect(user.avatarUrl, isNull);
@@ -80,7 +80,7 @@ void main() {
       final dummyUser = {
         'id': '99',
         'username': 'buyer_persistent',
-        'fullName': 'Người Dùng Bền Vững',
+        'fullName': 'NgÆ°á»i DÃ¹ng Bá»n Vá»¯ng',
         'role': 'buyer',
         'status': 'active',
       };
@@ -94,9 +94,9 @@ void main() {
       expect(restored, isNotNull);
       expect(restored?.username, equals('buyer_persistent'));
       expect(auth.isAuthenticated, isTrue);
-      expect(auth.currentUser?.fullName, equals('Người Dùng Bền Vững'));
+      expect(auth.currentUser?.fullName, equals('NgÆ°á»i DÃ¹ng Bá»n Vá»¯ng'));
 
-      // Chỉ đăng xuất khi người dùng chủ động nhấn logout()
+      // Chá»‰ Ä‘Äƒng xuáº¥t khi ngÆ°á»i dÃ¹ng chá»§ Ä‘á»™ng nháº¥n logout()
       auth.logout();
       expect(auth.isAuthenticated, isFalse);
       expect(auth.currentUser, isNull);

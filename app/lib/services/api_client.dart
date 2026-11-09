@@ -110,87 +110,72 @@ class ApiClient {
     return headers;
   }
 
+  Future<ApiResponse> _executeWithAutoReconnect(Future<http.Response> Function() doRequest) async {
+    try {
+      final res = await doRequest();
+      return ApiResponse.fromResponse(res);
+    } catch (_) {
+      try {
+        ApiConfig.resetBaseUrl();
+        await ApiConfig.autoDetectBaseUrl();
+        final retryRes = await doRequest();
+        return ApiResponse.fromResponse(retryRes);
+      } on SocketException {
+        return ApiResponse.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng internet.');
+      } on TimeoutException {
+        return ApiResponse.error('Kết nối quá thời gian chờ (Timeout). Vui lòng thử lại sau.');
+      } catch (e) {
+        return ApiResponse.error('Không thể kết nối đến máy chủ API: $e');
+      }
+    }
+  }
+
   /// Gửi HTTP GET
   Future<ApiResponse> get(String endpoint, {Map<String, String>? queryParams, Map<String, String>? headers}) async {
-    try {
+    return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint, queryParams);
       final reqHeaders = await _buildHeaders(headers);
-      final res = await http.get(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-      return ApiResponse.fromResponse(res);
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng internet.');
-    } on TimeoutException {
-      return ApiResponse.error('Kết nối quá thời gian chờ (Timeout). Vui lòng thử lại sau.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi không xác định: $e');
-    }
+      return await http.get(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
+    });
   }
 
   /// Gửi HTTP POST
   Future<ApiResponse> post(String endpoint, {dynamic body, Map<String, String>? headers}) async {
-    try {
+    return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       final jsonBody = body != null ? jsonEncode(body) : null;
-      final res = await http.post(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-      return ApiResponse.fromResponse(res);
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng internet.');
-    } on TimeoutException {
-      return ApiResponse.error('Kết nối quá thời gian chờ (Timeout). Vui lòng thử lại sau.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi không xác định: $e');
-    }
+      return await http.post(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
+    });
   }
 
   /// Gửi HTTP PUT
   Future<ApiResponse> put(String endpoint, {dynamic body, Map<String, String>? headers}) async {
-    try {
+    return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       final jsonBody = body != null ? jsonEncode(body) : null;
-      final res = await http.put(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-      return ApiResponse.fromResponse(res);
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối đến máy chủ.');
-    } on TimeoutException {
-      return ApiResponse.error('Kết nối quá thời gian chờ.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi: $e');
-    }
+      return await http.put(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
+    });
   }
 
   /// Gửi HTTP DELETE
   Future<ApiResponse> delete(String endpoint, {Map<String, String>? headers}) async {
-    try {
+    return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
-      final res = await http.delete(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-      return ApiResponse.fromResponse(res);
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối đến máy chủ.');
-    } on TimeoutException {
-      return ApiResponse.error('Kết nối quá thời gian chờ.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi: $e');
-    }
+      return await http.delete(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
+    });
   }
 
   /// Gửi HTTP PATCH
   Future<ApiResponse> patch(String endpoint, {dynamic body, Map<String, String>? headers}) async {
-    try {
+    return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       final jsonBody = body != null ? jsonEncode(body) : null;
-      final res = await http.patch(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-      return ApiResponse.fromResponse(res);
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối đến máy chủ.');
-    } on TimeoutException {
-      return ApiResponse.error('Kết nối quá thời gian chờ.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi: $e');
-    }
+      return await http.patch(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
+    });
   }
 
   /// Ghép base URL với endpoint và query parameters

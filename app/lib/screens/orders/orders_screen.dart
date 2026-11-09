@@ -61,7 +61,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
     final firstItem = items.first as Map<String, dynamic>;
     final productName = firstItem['productName'] ?? firstItem['product_name'] ?? 'Sản phẩm đã mua';
-    final orderItemId = (firstItem['id'] ?? firstItem['orderItemId'] ?? firstItem['order_item_id'] ?? order['id'] ?? '1').toString();
+    final productId = (firstItem['productId'] ?? firstItem['product_id'] ?? firstItem['id'] ?? '1').toString();
+    final orderItemId = (firstItem['orderItemId'] ?? firstItem['order_item_id'] ?? firstItem['id'] ?? order['id'] ?? '1').toString();
 
     int rating = 5;
     final commentCtrl = TextEditingController();
@@ -241,6 +242,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
                                 setModalState(() => isSubmitting = true);
                                 final res = await ReviewService().createReview(
+                                  productId: productId,
                                   orderItemId: orderItemId,
                                   rating: rating,
                                   comment: comment,

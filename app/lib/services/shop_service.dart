@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../models/shop.dart';
 import 'api_client.dart';
@@ -27,26 +28,29 @@ class ShopService {
   ShopService._internal();
 
   final ApiClient _client = ApiClient();
+  static const String _followedShopsKey = 'shopnova_followed_shops';
 
   /// Lấy danh sách gian hàng trên sàn kèm bộ lọc, sắp xếp và phân trang
-  /// GET /api/v1/shops
+  /// GET /api/v1/shops (hỗ trợ: limit, offset, q, mall, featured)
   Future<ShopListResult> getShops({
     int page = 1,
     int limit = 20,
     bool? mall,
+    bool? featured,
     String? keyword,
     String? province,
     String? sort,
   }) async {
+    final safePage = page > 0 ? page : 1;
+    final offset = (safePage - 1) * limit;
     final queryParams = <String, String>{
-      'page': page.toString(),
+      'offset': offset.toString(),
       'limit': limit.toString(),
     };
 
-    if (mall != null) queryParams['mall'] = mall ? 'true' : 'false';
-    if (keyword != null && keyword.trim().isNotEmpty) queryParams['keyword'] = keyword.trim();
-    if (province != null && province.trim().isNotEmpty) queryParams['province'] = province.trim();
-    if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
+    if (mall == true) queryParams['mall'] = '1';
+    if (featured == true) queryParams['featured'] = '1';
+    if (keyword != null && keyword.trim().isNotEmpty) queryParams['q'] = keyword.trim();
 
     final response = await _client.get('/api/v1/shops', queryParams: queryParams);
 
@@ -62,10 +66,15 @@ class ShopService {
         total = (m['total'] is num) ? (m['total'] as num).toInt() : rawList.length;
       }
 
-      final list = rawList
+      var list = rawList
           .whereType<Map<String, dynamic>>()
           .map((item) => Shop.fromJson(item))
           .toList();
+
+      if (province != null && province.trim().isNotEmpty) {
+        final targetProv = province.trim().toLowerCase();
+        list = list.where((s) => s.province.toLowerCase().contains(targetProv)).toList();
+      }
 
       return ShopListResult(
         shops: list,
@@ -91,8 +100,8 @@ class ShopService {
     return null;
   }
 
-  /// Lấy danh sách sản phẩm của gian hàng
-  /// GET /api/v1/shops/:shopId/products
+  /// Lấy danh sách sản phẩm của gian hàng qua API chuẩn của Backend
+  /// GET /api/v1/products?shopId=:shopId
   Future<ProductListResult> getShopProducts(
     String shopId, {
     int page = 1,
@@ -100,32 +109,42 @@ class ShopService {
     String? categoryId,
     String? sort,
   }) async {
+    final safePage = page > 0 ? page : 1;
+    final offset = (safePage - 1) * limit;
     final queryParams = <String, String>{
-      'page': page.toString(),
+      'shopId': shopId,
+      'offset': offset.toString(),
       'limit': limit.toString(),
     };
 
     if (categoryId != null && categoryId.isNotEmpty) queryParams['categoryId'] = categoryId;
     if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
 
-    final response = await _client.get('/api/v1/shops/$shopId/products', queryParams: queryParams);
+    final response = await _client.get('/api/v1/products', queryParams: queryParams);
 
-    if (response.success && response.data is List) {
-      final list = (response.data as List)
+    if (response.success && response.data != null) {
+      List<dynamic> rawList = [];
+      int total = 0;
+      if (response.data is List) {
+        rawList = response.data as List;
+        total = rawList.length;
+      } else if (response.data is Map) {
+        final m = response.data as Map;
+        if (m['products'] is List) rawList = m['products'] as List;
+        total = (m['total'] is num) ? (m['total'] as num).toInt() : rawList.length;
+      }
+
+      final list = rawList
           .whereType<Map<String, dynamic>>()
           .map((item) => Product.fromJson(item))
           .toList();
-
-      final meta = response.meta ?? {};
-      final total = (meta['total'] is num) ? (meta['total'] as num).toInt() : list.length;
-      final totalPages = (meta['totalPages'] is num) ? (meta['totalPages'] as num).toInt() : 1;
 
       return ProductListResult(
         products: list,
         total: total,
         page: page,
         limit: limit,
-        totalPages: totalPages,
+        totalPages: (total / (limit > 0 ? limit : 1)).ceil(),
       );
     }
 
@@ -133,27 +152,42 @@ class ShopService {
   }
 
   /// Kiểm tra trạng thái theo dõi gian hàng
-  /// GET /api/v1/shops/:shopId/follow
   Future<bool> getFollowStatus(String shopId) async {
-    final response = await _client.get('/api/v1/shops/$shopId/follow');
-    if (response.success && response.data is Map<String, dynamic>) {
-      return response.data['isFollowing'] == true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_followedShopsKey) ?? [];
+      return list.contains(shopId);
+    } catch (_) {
+      return false;
     }
-    return false;
   }
 
   /// Theo dõi gian hàng
-  /// POST /api/v1/shops/:shopId/follow
   Future<bool> followShop(String shopId) async {
-    final response = await _client.post('/api/v1/shops/$shopId/follow');
-    return response.success;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_followedShopsKey) ?? [];
+      if (!list.contains(shopId)) {
+        list.add(shopId);
+        await prefs.setStringList(_followedShopsKey, list);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Hủy theo dõi gian hàng
-  /// DELETE /api/v1/shops/:shopId/follow
   Future<bool> unfollowShop(String shopId) async {
-    final response = await _client.delete('/api/v1/shops/$shopId/follow');
-    return response.success;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_followedShopsKey) ?? [];
+      list.remove(shopId);
+      await prefs.setStringList(_followedShopsKey, list);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Bật / tắt theo dõi gian hàng

@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/cart_item.dart';
 import 'package:shopnova/models/order.dart';
@@ -18,9 +18,9 @@ void main() {
         'id': '101',
         'variantId': '2',
         'productId': '15',
-        'productName': 'Áo Thun Cotton Form Rộng',
+        'productName': 'Ão Thun Cotton Form Rá»™ng',
         'productSlug': 'ao-thun-cotton-form-rong',
-        'variantName': 'Trắng, Size L',
+        'variantName': 'Tráº¯ng, Size L',
         'price': 120000,
         'originalPrice': 180000,
         'qty': 2,
@@ -35,7 +35,7 @@ void main() {
 
       expect(item.id, '101');
       expect(item.variantId, '2');
-      expect(item.productName, 'Áo Thun Cotton Form Rộng');
+      expect(item.productName, 'Ão Thun Cotton Form Rá»™ng');
       expect(item.price, 120000);
       expect(item.qty, 2);
       expect(item.selected, true);
@@ -58,10 +58,10 @@ void main() {
       // Add item 1
       await cart.addToCart(
         productId: '1',
-        productName: 'Sản phẩm thử nghiệm A',
+        productName: 'Sáº£n pháº©m thá»­ nghiá»‡m A',
         productSlug: 'san-pham-thu-nghiem-a',
         variantId: 'v10',
-        variantName: 'Đỏ',
+        variantName: 'Äá»',
         price: 200000,
         qty: 1,
       );
@@ -81,7 +81,7 @@ void main() {
         productName: 'Tai nghe Nova Pro',
         productSlug: 'tai-nghe-nova-pro',
         variantId: 'v20',
-        variantName: 'Đen',
+        variantName: 'Äen',
         price: 500000,
         qty: 1,
       );
@@ -114,12 +114,12 @@ void main() {
       }
       expect(cart.items.isEmpty, true);
 
-      // Thêm sản phẩm 1 (ví dụ: Áo sơ mi)
+      // ThÃªm sáº£n pháº©m 1 (vÃ­ dá»¥: Ão sÆ¡ mi)
       await cart.addToCart(
         productId: '101',
-        productName: 'Áo sơ mi Oxford',
+        productName: 'Ão sÆ¡ mi Oxford',
         productSlug: 'ao-so-mi-oxford',
-        variantName: 'Trắng - L',
+        variantName: 'Tráº¯ng - L',
         price: 250000,
         qty: 1,
       );
@@ -128,29 +128,29 @@ void main() {
       expect(cart.items[0].productId, '101');
       expect(cart.items[0].qty, 1);
 
-      // Thêm sản phẩm 2 hoàn toàn khác (ví dụ: Quần Jean)
+      // ThÃªm sáº£n pháº©m 2 hoÃ n toÃ n khÃ¡c (vÃ­ dá»¥: Quáº§n Jean)
       await cart.addToCart(
         productId: '202',
-        productName: 'Quần Jeans Slimfit',
+        productName: 'Quáº§n Jeans Slimfit',
         productSlug: 'quan-jeans-slimfit',
         variantName: 'Xanh - 32',
         price: 350000,
         qty: 1,
       );
 
-      // Phải có đúng 2 sản phẩm riêng biệt trong giỏ hàng!
+      // Pháº£i cÃ³ Ä‘Ãºng 2 sáº£n pháº©m riÃªng biá»‡t trong giá» hÃ ng!
       expect(cart.items.length, 2);
       expect(cart.items[0].productId, '101');
       expect(cart.items[0].qty, 1);
       expect(cart.items[1].productId, '202');
       expect(cart.items[1].qty, 1);
 
-      // Thêm cùng sản phẩm 1 với đúng phân loại đó -> số lượng tăng lên 2
+      // ThÃªm cÃ¹ng sáº£n pháº©m 1 vá»›i Ä‘Ãºng phÃ¢n loáº¡i Ä‘Ã³ -> sá»‘ lÆ°á»£ng tÄƒng lÃªn 2
       await cart.addToCart(
         productId: '101',
-        productName: 'Áo sơ mi Oxford',
+        productName: 'Ão sÆ¡ mi Oxford',
         productSlug: 'ao-so-mi-oxford',
-        variantName: 'Trắng - L',
+        variantName: 'Tráº¯ng - L',
         price: 250000,
         qty: 1,
       );
@@ -159,19 +159,19 @@ void main() {
       expect(cart.items[0].qty, 2);
       expect(cart.items[1].qty, 1);
 
-      // Thêm sản phẩm 1 nhưng với biến thể khác (Đen - M) -> tạo dòng sản phẩm mới riêng biệt
+      // ThÃªm sáº£n pháº©m 1 nhÆ°ng vá»›i biáº¿n thá»ƒ khÃ¡c (Äen - M) -> táº¡o dÃ²ng sáº£n pháº©m má»›i riÃªng biá»‡t
       await cart.addToCart(
         productId: '101',
-        productName: 'Áo sơ mi Oxford',
+        productName: 'Ão sÆ¡ mi Oxford',
         productSlug: 'ao-so-mi-oxford',
-        variantName: 'Đen - M',
+        variantName: 'Äen - M',
         price: 250000,
         qty: 1,
       );
 
       expect(cart.items.length, 3);
       expect(cart.items[2].productId, '101');
-      expect(cart.items[2].variantName, 'Đen - M');
+      expect(cart.items[2].variantName, 'Äen - M');
       expect(cart.items[2].qty, 1);
 
       // Cleanup
@@ -189,18 +189,18 @@ void main() {
       }
       expect(cart.items.isEmpty, true);
 
-      // Add item as user does when clicking "MUA VỚI VOUCHER"
+      // Add item as user does when clicking "MUA Vá»šI VOUCHER"
       await cart.addToCart(
         productId: '1',
-        productName: 'Áo thun ShopNova',
-        variantId: '1_Trắng_M',
-        variantName: 'Trắng - M',
+        productName: 'Ão thun ShopNova',
+        variantId: '1_Tráº¯ng_M',
+        variantName: 'Tráº¯ng - M',
         price: 180000,
         qty: 1,
       );
 
       expect(cart.items.length, 1);
-      expect(cart.items.first.productName, 'Áo thun ShopNova');
+      expect(cart.items.first.productName, 'Ão thun ShopNova');
 
       // Now simulate fetchCart (when user navigates to CartScreen)
       // fetchCart should preserve local items and never wipe them out
@@ -208,7 +208,7 @@ void main() {
 
       // Product must STILL be in cart!
       expect(cart.items.length, 1);
-      expect(cart.items.first.productName, 'Áo thun ShopNova');
+      expect(cart.items.first.productName, 'Ão thun ShopNova');
       expect(cart.subtotal, 180000.0);
 
       // Cleanup
@@ -229,7 +229,7 @@ void main() {
       // Test when backend or checkout only provides 'price'
       final jsonWithPrice = {
         'id': '1',
-        'productName': 'Bàn Phím Cơ',
+        'productName': 'BÃ n PhÃ­m CÆ¡',
         'price': 649000,
         'qty': 1,
       };
@@ -240,7 +240,7 @@ void main() {
       // Test when payload has 'unit_price'
       final jsonWithSnakeCase = {
         'id': '2',
-        'product_name': 'Sạc Dự Phòng 20000mAh',
+        'product_name': 'Sáº¡c Dá»± PhÃ²ng 20000mAh',
         'unit_price': 350000,
         'quantity': 2,
       };
@@ -248,7 +248,7 @@ void main() {
       expect(item2.unitPrice, 350000);
       expect(item2.qty, 2);
       expect(item2.lineTotal, 700000);
-      expect(item2.productName, 'Sạc Dự Phòng 20000mAh');
+      expect(item2.productName, 'Sáº¡c Dá»± PhÃ²ng 20000mAh');
     });
 
     test('createOrder fallback preserves item unitPrice, productName, and total amount', () async {
@@ -256,36 +256,37 @@ void main() {
       final order = await orderService.createOrder(
         recipientName: 'Nguyen Van A',
         recipientPhone: '0901234567',
-        province: 'TP. Hồ Chí Minh',
-        addressDetail: '123 Đường Lê Lợi',
+        province: 'TP. Há»“ ChÃ­ Minh',
+        addressDetail: '123 ÄÆ°á»ng LÃª Lá»£i',
         items: [
           {
             'variantId': 1,
             'qty': 1,
             'price': 499000,
             'unitPrice': 499000,
-            'productName': 'Sạc dự phòng 20000mAh',
-            'variantName': 'Đen',
+            'productName': 'Sáº¡c dá»± phÃ²ng 20000mAh',
+            'variantName': 'Äen',
           },
           {
             'variantId': 2,
             'qty': 1,
             'price': 500000,
             'unitPrice': 500000,
-            'productName': 'Bàn Phím Cơ',
-            'variantName': 'Trắng',
+            'productName': 'BÃ n PhÃ­m CÆ¡',
+            'variantName': 'Tráº¯ng',
           },
         ],
       );
 
       expect(order, isNotNull);
-      expect(order!['totalAmount'], 999000);
+      expect(order!['subtotal'], 999000);
+      expect(order['totalAmount'], 1017000);
       final items = order['items'] as List;
       expect(items.length, 2);
       expect(items[0]['unitPrice'], 499000);
       expect(items[1]['unitPrice'], 500000);
-      expect(items[0]['variantName'], 'Đen');
-      expect(items[1]['variantName'], 'Trắng');
+      expect(items[0]['variantName'], 'Äen');
+      expect(items[1]['variantName'], 'Tráº¯ng');
     });
   });
 }

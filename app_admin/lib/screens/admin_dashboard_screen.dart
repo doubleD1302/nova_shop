@@ -198,7 +198,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: {
         'approvalStatus': isApproved ? 'approved' : 'rejected',
         'approvalVersion': approvalVersion,
-        'comment': comment ?? (isApproved ? 'Hồ sơ KYC đã được Admin phê duyệt' : 'Hồ sơ chưa đạt tiêu chuẩn sàn'),
+        if (!isApproved) 'rejectionReason': comment ?? 'Hồ sơ chưa đạt tiêu chuẩn sàn',
       },
     );
     if (!mounted) return;
@@ -263,7 +263,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _toggleFlashSale(String productId, bool isFlashSale) async {
     final res = await _client.patch(
       '/api/v1/admin/products/$productId/flash-sale',
-      body: {'isFlashSale': isFlashSale},
+      body: {'enabled': isFlashSale},
     );
     if (!mounted) return;
     if (res.success) {
@@ -316,9 +316,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // 8. Hủy đơn hàng từ phía Admin
   Future<void> _adminCancelOrder(String orderId) async {
-    final res = await _client.patch(
+    final res = await _client.post(
       '/api/v1/orders/' + orderId + '/cancel',
-      body: {'reason': 'Quản trị viên sàn hủy đơn do vi phạm quy chế.'},
+      body: {},
     );
     if (!mounted) return;
     if (res.success) {

@@ -72,24 +72,64 @@ class SellerProductService {
   final ApiClient _client = ApiClient();
 
   /// Lấy danh sách sản phẩm thuộc gian hàng của seller
-  /// GET /api/v1/seller/products?status=...&page=...&limit=...
-  Future<List<SellerProductItem>> getProducts({String? status, int page = 1, int limit = 20}) async {
+  /// GET /api/v1/seller/products?limit=...&offset=...
+  Future<List<SellerProductItem>> getProducts({String? status, int page = 1, int limit = 50}) async {
+    final safePage = page > 0 ? page : 1;
+    final offset = (safePage - 1) * limit;
     final queryParams = <String, String>{
-      'page': page.toString(),
+      'offset': offset.toString(),
       'limit': limit.toString(),
     };
-    if (status != null && status.isNotEmpty) queryParams['status'] = status;
 
     final response = await _client.get('/api/v1/seller/products', queryParams: queryParams);
 
-    if (response.success && response.data is List) {
-      return (response.data as List)
+    if (response.success && response.data != null) {
+      List<dynamic> rawList = [];
+      if (response.data is List) {
+        rawList = response.data as List;
+      } else if (response.data is Map && response.data['products'] is List) {
+        rawList = response.data['products'] as List;
+      }
+
+      var list = rawList
           .whereType<Map<String, dynamic>>()
           .map((item) => SellerProductItem.fromJson(item))
           .toList();
+
+      if (status != null && status.isNotEmpty) {
+        list = list.where((p) => p.status == status || p.approvalStatus == status).toList();
+      }
+      return list;
     }
 
     return [];
+  }
+
+  /// Tìm kiếm ảnh minh họa sản phẩm từ kho ảnh sàn
+  /// GET /api/v1/seller/images/search?q=...
+  Future<List<Map<String, dynamic>>> searchProductImages(String query) async {
+    final response = await _client.get(
+      '/api/v1/seller/images/search',
+      queryParams: {'q': query.trim()},
+    );
+    if (response.success && response.data != null) {
+      if (response.data is Map && response.data['images'] is List) {
+        return (response.data['images'] as List).whereType<Map<String, dynamic>>().toList();
+      } else if (response.data is List) {
+        return (response.data as List).whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
+  }
+
+  /// Lấy thông số thuộc tính danh mục của sản phẩm thuộc gian hàng
+  /// GET /api/v1/seller/products/:id/category-attributes
+  Future<Map<String, dynamic>?> getSellerProductCategoryAttributes(String productId) async {
+    final response = await _client.get('/api/v1/seller/products/$productId/category-attributes');
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return null;
   }
 
   /// Tạo mới sản phẩm cho gian hàng

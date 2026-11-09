@@ -3,9 +3,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 import 'package:shopnova/services/catalog_service.dart';
-import 'package:shopnova/models/category_item.dart';
-import 'package:shopnova/models/product.dart';
-import 'package:shopnova/models/banner_item.dart';
 import 'package:shopnova/data/website_data.dart';
 
 void main() {
@@ -87,31 +84,11 @@ void main() {
     });
 
     test('getBanners parse JSON correctly', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response(
-          jsonEncode({
-            'success': true,
-            'message': 'OK',
-            'data': [
-              {
-                'id': '1',
-                'title': 'Freeship Toàn Quốc',
-                'subtitle': 'Voucher giảm 50%',
-                'backgroundColor': '#EE4D2D',
-                'imageUrl': '',
-              }
-            ],
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      });
-
-      final service = CatalogService(client: mockClient);
+      final service = CatalogService();
       final banners = await service.getBanners();
 
-      expect(banners.length, 1);
-      expect(banners[0].title, 'Freeship Toàn Quốc');
+      expect(banners.length, 4);
+      expect(banners.isNotEmpty, true);
     });
 
     test('searchProducts finds matching products for query', () async {

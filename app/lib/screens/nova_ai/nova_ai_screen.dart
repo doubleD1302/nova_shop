@@ -143,6 +143,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       _sessionOwner = _currentOwner;
     }
     AuthService().addListener(_onAuthChanged);
+    _loadBrainProfile();
 
     if (widget.loadDemoIfEmpty && _sessionMessages.isEmpty) {
       // Dành cho chế độ kiểm thử mẫu
@@ -194,6 +195,44 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBrainProfile() async {
+    final token = AuthService().token;
+    if (token == null) return;
+    try {
+      final res = await http.get(
+        Uri.parse(ApiConfig.aiBrainProfileUrl),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200 && mounted) {
+        final decoded = jsonDecode(res.body);
+        final facts = decoded['data']?['learnedFacts'] as List<dynamic>?;
+        if (facts != null && facts.isNotEmpty) {
+          setState(() {
+            _activeContextText = '🧠 Nova AI đã học: ${facts.take(3).join(' • ')}';
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _resetBrainProfile() async {
+    final token = AuthService().token;
+    if (token == null) return;
+    try {
+      await http.post(
+        Uri.parse(ApiConfig.aiBrainResetUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({}),
+      ).timeout(const Duration(seconds: 6));
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -1002,6 +1041,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           Row(
             children: [
               _buildHeaderCircleBtn(Icons.refresh, 'Làm mới phiên chat', () {
+                _resetBrainProfile();
                 setState(() {
                   _sessionMessages.clear();
                   _sessionMessages.add(

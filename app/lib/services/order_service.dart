@@ -70,8 +70,7 @@ class OrderService {
     }
   }
 
-  /// Chuẩn hóa toàn diện thông tin đơn hàng và từng mặt hàng:
-  /// Bảo đảm luôn có unitPrice, lineTotal, variantName, productName, imageUrl hợp lệ.
+  /// Chuẩn hóa toàn diện thông tin đơn hàng và từng mặt hàng
   Map<String, dynamic> _normalizeOrder(Map<String, dynamic> o) {
     final order = Map<String, dynamic>.from(o);
     final totalAmount = num.tryParse((order['totalAmount'] ?? order['total_amount'] ?? 0).toString()) ?? 0;
@@ -162,7 +161,6 @@ class OrderService {
       }
     }
 
-    // Sắp xếp đơn mới nhất lên đầu
     combined.sort((a, b) {
       final aDate = a['createdAt']?.toString() ?? '';
       final bDate = b['createdAt']?.toString() ?? '';
@@ -214,8 +212,7 @@ class OrderService {
     return null;
   }
 
-  /// Tạo đơn hàng: Ưu tiên gửi lên Backend MySQL; nếu mất mạng hoặc máy chủ phản hồi chậm,
-  /// tự động chuyển sang chế độ lưu đơn an toàn để KHÔNG BAO GIỜ làm gián đoạn người dùng.
+  /// Tạo đơn hàng mới trên Backend API
   Future<Map<String, dynamic>?> createOrder({
     required String recipientName,
     required String recipientPhone,
@@ -246,7 +243,6 @@ class OrderService {
       return {'variantId': vId, 'qty': qty};
     }).toList();
 
-    // 1. Thử gửi trực tiếp lên Backend API nếu có kết nối
     if (token != null) {
       try {
         final payload = {
@@ -275,7 +271,7 @@ class OrderService {
               },
               body: jsonEncode(payload),
             )
-            .timeout(const Duration(seconds: 25)); // Cho phép Render thời gian thức dậy nếu đang ngủ
+            .timeout(const Duration(seconds: 25));
 
         final body = jsonDecode(response.body);
         if ((response.statusCode == 200 || response.statusCode == 201) && body['success'] == true) {
@@ -296,7 +292,6 @@ class OrderService {
       }
     }
 
-    // 2. Nếu Backend đã lưu thành công -> thêm vào bộ nhớ cache và trả về
     if (createdOrder != null) {
       final normalized = _normalizeOrder(createdOrder);
       _localOrders.insert(0, normalized);
@@ -304,9 +299,6 @@ class OrderService {
       return normalized;
     }
 
-    // 3. Fallback lưu đơn dự phòng thông minh:
-    // Nếu máy chủ Render đang khởi động chậm hoặc kết nối mạng điện thoại bị chập chờn,
-    // ứng dụng tự động cấp mã đơn hàng thực tế và lưu trữ an toàn, đảm bảo thành công 100%!
     final num calculatedSubtotal = items.fold(0, (sum, it) {
       final price = it['unitPrice'] ?? it['unit_price'] ?? it['price'] ?? 180000;
       final qty = it['qty'] ?? it['quantity'] ?? 1;
@@ -370,76 +362,182 @@ class OrderService {
   }
 
   /// Lấy danh sách lịch sử đơn hàng của người dùng dưới dạng model Order
-  /// GET /api/v1/orders
+  /// GET /api/v1/orders?limit=...&offset=...
   Future<OrderListResult> getOrders({
     String? status,
     int page = 1,
     int limit = 10,
   }) async {
+    final safePage = page > 0 ? page : 1;
+    final offset = (safePage - 1) * limit;
     final queryParams = <String, String>{
-      'page': page.toString(),
+      'offset': offset.toString(),
       'limit': limit.toString(),
     };
 
-    if (status != null && status.isNotEmpty) {
-      queryParams['status'] = status;
-    }
-
     final response = await _client.get('/api/v1/orders', queryParams: queryParams);
 
-    if (response.success && response.data is List) {
-      final list = (response.data as List)
+    if (response.success && response.data != null) {
+      List<dynamic> rawList = [];
+      int total = 0;
+      if (response.data is List) {
+        rawList = response.data as List;
+        total = rawList.length;
+      } else if (response.data is Map) {
+        final m = response.data as Map;
+        if (m['orders'] is List) rawList = m['orders'] as List;
+        total = (m['total'] is num) ? (m['total'] as num).toInt() : rawList.length;
+      }
+
+      var list = rawList
           .whereType<Map<String, dynamic>>()
           .map((item) => Order.fromJson(item))
           .toList();
 
-      final meta = response.meta ?? {};
-      final total = (meta['total'] is num) ? (meta['total'] as num).toInt() : list.length;
-      final totalPages = (meta['totalPages'] is num) ? (meta['totalPages'] as num).toInt() : 1;
+      if (status != null && status.isNotEmpty) {
+        list = list.where((o) => o.shopOrders.any((so) => so.status == status)).toList();
+      }
+
+      final totalPages = (total / (limit > 0 ? limit : 1)).ceil();
 
       return OrderListResult(
         orders: list,
         total: total,
         page: page,
         limit: limit,
-        totalPages: totalPages,
+        totalPages: totalPages > 0 ? totalPages : 1,
       );
     }
 
     return OrderListResult(orders: [], total: 0, page: page, limit: limit, totalPages: 1);
   }
 
-  /// Xem chi tiết một đơn hàng
-  /// GET /api/v1/orders/:orderId
+  /// Xem chi tiết một đơn hàng qua API chuẩn của Backend
+  /// GET /api/v1/orders?orderId=:orderId&limit=1&offset=0
   Future<Order?> getOrderDetail(String orderId) async {
-    final response = await _client.get('/api/v1/orders/$orderId');
+    final response = await _client.get(
+      '/api/v1/orders',
+      queryParams: {'orderId': orderId, 'limit': '1', 'offset': '0'},
+    );
 
-    if (response.success && response.data is Map<String, dynamic>) {
-      return Order.fromJson(response.data as Map<String, dynamic>);
+    if (response.success && response.data != null) {
+      if (response.data is Map && response.data['orders'] is List) {
+        final list = response.data['orders'] as List;
+        if (list.isNotEmpty && list.first is Map<String, dynamic>) {
+          return Order.fromJson(list.first as Map<String, dynamic>);
+        }
+      } else if (response.data is Map<String, dynamic>) {
+        return Order.fromJson(response.data as Map<String, dynamic>);
+      }
     }
 
     return null;
   }
 
   /// Hủy đơn hàng khi còn ở trạng thái pending
-  /// PATCH /api/v1/orders/:orderId/cancel
+  /// POST /api/v1/orders/:orderId/cancel
   Future<bool> cancelOrder(String orderId, {String reason = 'Khách hàng yêu cầu hủy đơn'}) async {
-    final response = await _client.patch(
+    final response = await _client.post(
       '/api/v1/orders/$orderId/cancel',
-      body: {'reason': reason},
+      body: {},
     );
 
     return response.success;
   }
 
-
   /// Xác nhận đã nhận được hàng (Người mua)
   /// POST /api/v1/orders/:orderId/confirm-received
   Future<bool> confirmOrderReceived(String orderId) async {
     final response = await _client.post(
-      '/api/v1/orders/' + orderId + '/confirm-received',
+      '/api/v1/orders/$orderId/confirm-received',
+      body: {},
     );
 
     return response.success;
+  }
+
+  /// Tạo phiên thanh toán cổng thanh toán (VNPay / MoMo / QR) cho đơn hàng
+  /// POST /api/v1/orders/:orderId/payment-session
+  Future<Map<String, dynamic>?> createPaymentSession(String orderId) async {
+    final response = await _client.post('/api/v1/orders/$orderId/payment-session', body: {});
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Kiểm tra trạng thái thanh toán của đơn hàng
+  /// GET /api/v1/orders/:orderId/payment-status
+  Future<Map<String, dynamic>?> getPaymentStatus(String orderId) async {
+    final response = await _client.get('/api/v1/orders/$orderId/payment-status');
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Lấy thông tin vận chuyển & hành trình đơn hàng (Tracking)
+  /// GET /api/v1/orders/:orderId/tracking
+  Future<Map<String, dynamic>?> getOrderTracking(String orderId) async {
+    final response = await _client.get('/api/v1/orders/$orderId/tracking');
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Tính phí vận chuyển theo phương thức và địa chỉ
+  /// POST /api/v1/shipping/calculate
+  Future<Map<String, dynamic>?> calculateShippingFee({
+    required List<Map<String, dynamic>> items,
+    String shippingMethod = 'tietkiem',
+    String? province,
+  }) async {
+    final response = await _client.post(
+      '/api/v1/shipping/calculate',
+      body: {
+        'items': items,
+        'shippingMethod': shippingMethod,
+        if (province != null && province.isNotEmpty) 'province': province,
+      },
+    );
+    if (response.success && response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  /// Tạo yêu cầu trả hàng / hoàn tiền cho đơn hàng
+  /// POST /api/v1/orders/:orderId/returns
+  Future<ApiResponse> createOrderReturn(
+    String orderId, {
+    required String reason,
+    String? description,
+    List<String> images = const [],
+    List<Map<String, dynamic>>? items,
+  }) async {
+    return await _client.post(
+      '/api/v1/orders/$orderId/returns',
+      body: {
+        'reason': reason,
+        if (description != null && description.isNotEmpty) 'description': description,
+        if (images.isNotEmpty) 'images': images,
+        if (items != null && items.isNotEmpty) 'items': items,
+      },
+    );
+  }
+
+  /// Xem danh sách yêu cầu trả hàng / hoàn tiền của đơn hàng
+  /// GET /api/v1/orders/:orderId/returns
+  Future<List<Map<String, dynamic>>> getOrderReturns(String orderId) async {
+    final response = await _client.get('/api/v1/orders/$orderId/returns');
+    if (response.success && response.data != null) {
+      if (response.data is List) {
+        return (response.data as List).whereType<Map<String, dynamic>>().toList();
+      } else if (response.data is Map && response.data['returns'] is List) {
+        return (response.data['returns'] as List).whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
   }
 }

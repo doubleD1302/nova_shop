@@ -25,6 +25,7 @@ export function getLocalDatabase() {
     const idx = items.findIndex((x) => String(x) === strVal)
     return idx === -1 ? 0 : idx + 1
   })
+  db.function('IF', { varargs: true }, (cond, tVal, fVal) => (cond ? tVal : fVal))
   db.function('UTC_TIMESTAMP', { varargs: true }, () => new Date().toISOString())
   db.function('NOW', { varargs: true }, () => new Date().toISOString())
   db.function('DATABASE', () => 'shopnova_dev')
@@ -37,7 +38,7 @@ export function getLocalDatabase() {
     return JSON.stringify(obj)
   })
 
-  // Khởi tạo bảng dữ liệu
+  // Khởi tạo bảng dữ liệu khớp 100% với database/schema.sql
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,9 +92,11 @@ export function getLocalDatabase() {
       address_detail TEXT,
       is_mall INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active',
+      suspension_reason TEXT,
+      suspended_by INTEGER,
+      suspended_at TEXT,
       approval_version INTEGER DEFAULT 1,
       rejection_reason TEXT,
-      suspension_reason TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -108,10 +111,36 @@ export function getLocalDatabase() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS shop_follows (
+      user_id INTEGER NOT NULL,
+      shop_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, shop_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS shop_violations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_id INTEGER NOT NULL,
+      report_id INTEGER,
+      violation_number INTEGER DEFAULT 1,
+      violation_type TEXT DEFAULT 'counterfeit',
+      reason TEXT NOT NULL,
+      action_taken TEXT NOT NULL,
+      admin_id INTEGER NOT NULL,
+      email_sent_to TEXT,
+      email_status TEXT DEFAULT 'not_configured',
+      email_sent_at TEXT,
+      email_error TEXT,
+      email_content TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER,
       slug TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
+      image_url TEXT,
       sort_order INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
@@ -126,6 +155,14 @@ export function getLocalDatabase() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS product_category_attributes (
+      product_id INTEGER PRIMARY KEY,
+      category_id INTEGER NOT NULL,
+      definition_version INTEGER DEFAULT 1,
+      attribute_values TEXT DEFAULT '{}',
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_id INTEGER NOT NULL,
@@ -133,16 +170,25 @@ export function getLocalDatabase() {
       slug TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
-      specs TEXT,
-      badges TEXT,
+      specs TEXT DEFAULT '{}',
+      badges TEXT DEFAULT '[]',
       status TEXT DEFAULT 'active',
+      approval_status TEXT DEFAULT 'approved',
+      rejection_reason TEXT,
+      reviewed_by INTEGER,
+      reviewed_at TEXT,
       is_featured INTEGER DEFAULT 1,
       is_flash_sale INTEGER DEFAULT 1,
       free_shipping INTEGER DEFAULT 1,
-      approval_status TEXT DEFAULT 'approved',
-      rejection_reason TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS product_favorites (
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, product_id)
     );
 
     CREATE TABLE IF NOT EXISTS product_variants (
@@ -151,7 +197,7 @@ export function getLocalDatabase() {
       sku TEXT,
       variant_key TEXT DEFAULT 'default',
       name TEXT NOT NULL,
-      attributes TEXT,
+      attributes TEXT DEFAULT '{}',
       price REAL NOT NULL,
       original_price REAL,
       stock_qty INTEGER DEFAULT 50,
@@ -164,8 +210,60 @@ export function getLocalDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       product_id INTEGER NOT NULL,
       url TEXT NOT NULL,
+      alt_text TEXT,
       sort_order INTEGER DEFAULT 0,
       is_primary INTEGER DEFAULT 0,
+      source_page_url TEXT,
+      author TEXT,
+      license_name TEXT,
+      license_url TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS cart_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER DEFAULT 1,
+      variant_id INTEGER NOT NULL,
+      qty INTEGER DEFAULT 1,
+      quantity INTEGER DEFAULT 1,
+      selected INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE (user_id, variant_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS vouchers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      discount_amount REAL NOT NULL,
+      min_subtotal REAL DEFAULT 0,
+      starts_at TEXT DEFAULT '2026-01-01T00:00:00.000Z',
+      ends_at TEXT DEFAULT '2028-12-31T23:59:59.000Z',
+      usage_limit INTEGER DEFAULT 1000,
+      per_user_limit INTEGER DEFAULT 1,
+      used_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS voucher_wallet (
+      user_id INTEGER NOT NULL,
+      voucher_id INTEGER NOT NULL,
+      saved_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, voucher_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS voucher_uses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voucher_id INTEGER NOT NULL,
+      order_id INTEGER NOT NULL,
+      buyer_id INTEGER NOT NULL,
+      discount_amount REAL NOT NULL,
+      state TEXT DEFAULT 'applied',
+      released_at TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -173,8 +271,8 @@ export function getLocalDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       code TEXT UNIQUE NOT NULL,
       buyer_id INTEGER NOT NULL,
-      total_amount REAL NOT NULL,
-      payment_method TEXT DEFAULT 'cod',
+      idempotency_key TEXT DEFAULT '',
+      request_hash TEXT DEFAULT '',
       recipient_name TEXT NOT NULL,
       recipient_phone TEXT NOT NULL,
       address_detail TEXT NOT NULL,
@@ -182,6 +280,12 @@ export function getLocalDatabase() {
       district TEXT,
       ward TEXT,
       note TEXT,
+      voucher_code TEXT,
+      payment_method TEXT DEFAULT 'cod',
+      subtotal REAL DEFAULT 0,
+      shipping_fee REAL DEFAULT 0,
+      discount_amount REAL DEFAULT 0,
+      total_amount REAL NOT NULL,
       status TEXT DEFAULT 'delivered',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -192,10 +296,17 @@ export function getLocalDatabase() {
       order_id INTEGER NOT NULL,
       shop_id INTEGER NOT NULL,
       shop_name TEXT NOT NULL,
-      total_amount REAL NOT NULL,
-      shipping_fee REAL DEFAULT 0,
       status TEXT DEFAULT 'delivered',
+      subtotal REAL DEFAULT 0,
+      shipping_fee REAL DEFAULT 0,
+      discount_amount REAL DEFAULT 0,
+      total_amount REAL NOT NULL,
+      shipping_method TEXT DEFAULT 'tietkiem',
+      shipping_name TEXT DEFAULT 'Tiết kiệm',
       tracking_code TEXT,
+      cancel_reason TEXT,
+      cancelled_at TEXT,
+      delivered_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -203,24 +314,125 @@ export function getLocalDatabase() {
     CREATE TABLE IF NOT EXISTS order_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_order_id INTEGER NOT NULL,
+      shop_id INTEGER DEFAULT 1,
       product_id INTEGER NOT NULL,
-      variant_id INTEGER,
+      variant_id INTEGER DEFAULT 1,
       product_name TEXT NOT NULL,
-      variant_name TEXT,
-      price REAL NOT NULL,
+      product_slug TEXT DEFAULT 'san-pham',
+      variant_name TEXT DEFAULT 'Tiêu chuẩn',
+      variant_attributes TEXT DEFAULT '{}',
+      sku TEXT DEFAULT 'SKU-1',
+      image_url TEXT,
+      unit_price REAL DEFAULT 180000,
+      original_price REAL,
+      price REAL DEFAULT 180000,
       qty INTEGER DEFAULT 1,
+      line_total REAL DEFAULT 180000,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS order_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_order_id INTEGER NOT NULL,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      actor_id INTEGER,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_order_id INTEGER UNIQUE NOT NULL,
+      method TEXT DEFAULT 'cod',
+      status TEXT DEFAULT 'unpaid',
+      amount REAL DEFAULT 0,
+      paid_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      reference TEXT UNIQUE NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT DEFAULT 'pending',
+      provider_transaction_id TEXT,
+      result_code TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      processed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_moves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      variant_id INTEGER NOT NULL,
+      order_item_id INTEGER,
+      reason TEXT NOT NULL,
+      delta_qty INTEGER NOT NULL,
+      actor_id INTEGER,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS order_returns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      shop_order_id INTEGER NOT NULL,
+      buyer_id INTEGER NOT NULL,
+      shop_id INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      detail TEXT,
+      images TEXT DEFAULT '[]',
+      refund_amount REAL DEFAULT 0,
+      status TEXT DEFAULT 'requested',
+      seller_note TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS shipment_trackings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_order_id INTEGER NOT NULL,
+      tracking_code TEXT NOT NULL,
+      carrier TEXT NOT NULL,
+      status TEXT NOT NULL,
+      location TEXT,
+      description TEXT NOT NULL,
+      event_time TEXT DEFAULT (datetime('now')),
       created_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS reviews (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_item_id INTEGER DEFAULT 1,
       product_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
       rating INTEGER NOT NULL,
       comment TEXT,
       status TEXT DEFAULT 'visible',
+      seller_reply TEXT,
+      replied_by INTEGER,
+      replied_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS review_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL,
+      url TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS review_likes (
+      review_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (review_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS abuse_reports (
@@ -231,32 +443,10 @@ export function getLocalDatabase() {
       shop_id INTEGER,
       reason TEXT NOT NULL,
       details TEXT,
+      evidence_url TEXT,
       status TEXT DEFAULT 'investigating',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS vouchers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      discount_amount REAL NOT NULL,
-      min_subtotal REAL DEFAULT 0,
-      starts_at TEXT,
-      ends_at TEXT,
-      usage_limit INTEGER DEFAULT 1000,
-      per_user_limit INTEGER DEFAULT 1,
-      is_active INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS cart_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
-      variant_id INTEGER NOT NULL,
-      quantity INTEGER DEFAULT 1,
-      selected INTEGER DEFAULT 1,
+      resolved_by INTEGER,
+      resolved_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -264,15 +454,17 @@ export function getLocalDatabase() {
     CREATE TABLE IF NOT EXISTS demo_seller_payouts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_id INTEGER UNIQUE NOT NULL,
-      balance REAL DEFAULT 35000000,
-      pending_balance REAL DEFAULT 2500000,
-      total_withdrawn REAL DEFAULT 12000000,
+      balance REAL DEFAULT 1000000,
+      pending_balance REAL DEFAULT 250000,
+      total_withdrawn REAL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS demo_payout_withdrawals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_id INTEGER NOT NULL,
+      request_key TEXT DEFAULT 'req_1',
       amount REAL NOT NULL,
       balance_after REAL NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
@@ -283,6 +475,7 @@ export function getLocalDatabase() {
       shop_id INTEGER NOT NULL,
       buyer_id INTEGER NOT NULL,
       last_message TEXT,
+      last_message_at TEXT DEFAULT (datetime('now')),
       buyer_unread_count INTEGER DEFAULT 0,
       seller_unread_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
@@ -295,6 +488,8 @@ export function getLocalDatabase() {
       sender_id INTEGER NOT NULL,
       sender_role TEXT NOT NULL,
       message TEXT NOT NULL,
+      attachments TEXT,
+      is_read INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
   `)
@@ -310,36 +505,36 @@ function seedInitialData(db) {
   const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get()?.c || 0
   if (userCount > 0) return
 
-  const hashAdmin = bcrypt.hashSync('Admin@123', 10)
-  const hashSeller = bcrypt.hashSync('Seller@123', 10)
-  const hashBuyer = bcrypt.hashSync('Buyer@123', 10)
+  const hashAdmin = bcrypt.hashSync('DemoAdmin2026', 10)
+  const hashSeller = bcrypt.hashSync('DemoSeller2026', 10)
+  const hashBuyer = bcrypt.hashSync('DemoBuyer2026', 10)
 
-  // 1. Users
+  // 1. Users (bao gồm cả tài khoản demo mới & cũ)
   const userStmt = db.prepare(`
     INSERT INTO users (id, username, password_hash, full_name, email, phone, role, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  userStmt.run(99, 'admin', hashAdmin, 'ShopNova Quản Trị Viên', 'admin@shopnova.vn', '0900000099', 'admin', 'active')
-  userStmt.run(2, 'demo_seller_a', hashSeller, 'Shop Nova Seller A', 'seller-a@example.test', '0912345678', 'seller', 'active')
+  userStmt.run(1, 'demo_buyer_guest', hashBuyer, 'DEMO - Khách Mua Minh Họa', 'demo-buyer@shopnova.local', '0900000101', 'buyer', 'active')
+  userStmt.run(2, 'demo_seller_guest', hashSeller, 'DEMO - Người Bán Minh Họa', 'demo-seller@shopnova.local', '0900000102', 'seller', 'active')
   userStmt.run(3, 'demo_seller_b', hashSeller, 'Shop Nova Seller B', 'seller-b@example.test', '0912345679', 'seller', 'active')
-  userStmt.run(1, 'demo_buyer', hashBuyer, 'Người mua mẫu', 'buyer@example.test', '0900000000', 'buyer', 'active')
+  userStmt.run(99, 'demo_admin_guest', hashAdmin, 'DEMO - Quản Trị Minh Họa', 'demo-admin@shopnova.local', '0900000103', 'admin', 'active')
 
   // 2. Addresses
   const addrStmt = db.prepare(`
     INSERT INTO addresses (id, user_id, recipient_name, phone, province, district, ward, detail, is_default)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  addrStmt.run(1, 1, 'Người mua mẫu', '0900000000', 'TP. Hồ Chí Minh', 'Quận 1', 'Bến Nghé', 'Địa chỉ minh họa', 1)
-  addrStmt.run(2, 2, 'Shop Nova Seller A', '0912345678', 'TP. Hồ Chí Minh', 'Quận 3', 'Phường Võ Thị Sáu', '123 Lê Lợi', 1)
-  addrStmt.run(3, 99, 'Quản Trị Viên', '0900000099', 'Hà Nội', 'Ba Đình', 'Điện Biên', '1 Hùng Vương', 1)
+  addrStmt.run(1, 1, 'DEMO - Khách Mua Minh Họa', '0900000101', 'TP. Hồ Chí Minh', 'Quận 1', 'Phường Bến Nghé', 'Số 10 Nguyễn Huệ', 1)
+  addrStmt.run(2, 2, 'DEMO - Người Bán Minh Họa', '0900000102', 'TP. Hồ Chí Minh', 'Quận 3', 'Phường Võ Thị Sáu', '123 Lê Lợi', 1)
+  addrStmt.run(3, 99, 'DEMO - Quản Trị Minh Họa', '0900000103', 'Hà Nội', 'Quận Ba Đình', 'Phường Điện Biên', 'Số 1 Độc Lập', 1)
 
   // 3. Shops
   const shopStmt = db.prepare(`
-    INSERT INTO shops (id, owner_id, slug, name, tagline, description, province, status, is_mall)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO shops (id, owner_id, slug, name, tagline, description, province, address_detail, status, is_mall)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  shopStmt.run(1, 2, 'shop-mau-a', 'DEMO - Shop mẫu A', 'DỮ LIỆU THẬT', 'Gian hàng người bán chính thức', 'TP. Hồ Chí Minh', 'active', 1)
-  shopStmt.run(2, 3, 'shop-mau-b', 'DEMO - Shop mẫu B', 'DỮ LIỆU THẬT', 'Gian hàng người bán B', 'Hà Nội', 'active', 0)
+  shopStmt.run(1, 2, 'demo-gian-hang-minh-hoa', 'DEMO - Gian Hàng Minh Họa', 'DỮ LIỆU MẪU MINH HỌA', 'Gian hàng người bán chính thức trên ShopNova', 'TP. Hồ Chí Minh', 'Số 20 Lê Lợi, Quận 1', 'active', 1)
+  shopStmt.run(2, 3, 'shop-mau-b', 'DEMO - Shop mẫu B', 'DỮ LIỆU THẬT', 'Gian hàng người bán B', 'Hà Nội', 'Số 15 Hàng Bài, Hoàn Kiếm', 'active', 0)
 
   // 4. Categories
   const catStmt = db.prepare(`INSERT INTO categories (id, slug, name, sort_order) VALUES (?, ?, ?, ?)`)
@@ -352,7 +547,7 @@ function seedInitialData(db) {
   catStmt.run(7, 'nha-cua-doi-song', 'Nhà cửa & đời sống', 7)
   catStmt.run(8, 'phu-kien-cong-nghe', 'Phụ kiện công nghệ', 8)
 
-  // 5. Products & Variants
+  // 5. Products & Variants (Mỗi sản phẩm có đủ 4 ảnh theo chuẩn Backend)
   const prodStmt = db.prepare(`
     INSERT INTO products (id, shop_id, category_id, slug, name, description, specs, badges, status, is_featured, is_flash_sale, free_shipping, approval_status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -377,33 +572,40 @@ function seedInitialData(db) {
   for (const p of productsData) {
     prodStmt.run(p.id, p.shopId, p.catId, p.slug, p.name, `${p.name} chính hãng chất lượng cao.`, '{}', '[]', 'active', 1, 1, 1, 'approved')
     variantStmt.run(p.id, p.id, `SKU-${p.id}`, 'default', 'Tiêu chuẩn', '{}', p.price, p.orig, 50)
-    imgStmt.run(p.id, p.img, 0, 1)
+    for (let idx = 0; idx < 4; idx++) {
+      imgStmt.run(p.id, p.img, idx, idx === 0 ? 1 : 0)
+    }
   }
 
   // 6. Orders
   db.prepare(`
-    INSERT INTO orders (id, code, buyer_id, total_amount, payment_method, recipient_name, recipient_phone, address_detail, province, status)
-    VALUES (1, 'ORD-2026-001', 1, 180000, 'cod', 'Người mua mẫu', '0900000000', '123 Lê Lợi', 'TP. Hồ Chí Minh', 'delivered')
+    INSERT INTO orders (id, code, buyer_id, idempotency_key, request_hash, subtotal, shipping_fee, discount_amount, total_amount, payment_method, recipient_name, recipient_phone, address_detail, province, status)
+    VALUES (1, 'ORD-2026-001', 1, 'init_seed_order_0001', 'hash_0001', 180000, 0, 0, 180000, 'cod', 'DEMO - Khách Mua Minh Họa', '0900000101', 'Số 10 Nguyễn Huệ', 'TP. Hồ Chí Minh', 'delivered')
   `).run()
 
   db.prepare(`
-    INSERT INTO shop_orders (id, order_id, shop_id, shop_name, total_amount, status)
-    VALUES (1, 1, 1, 'DEMO - Shop mẫu A', 180000, 'delivered')
+    INSERT INTO shop_orders (id, order_id, shop_id, shop_name, subtotal, shipping_fee, discount_amount, total_amount, shipping_method, shipping_name, status)
+    VALUES (1, 1, 1, 'DEMO - Gian Hàng Minh Họa', 180000, 0, 0, 180000, 'tietkiem', 'Tiết kiệm', 'delivered')
   `).run()
 
   db.prepare(`
-    INSERT INTO order_items (id, shop_order_id, product_id, variant_id, product_name, price, qty)
-    VALUES (1, 1, 1, 1, 'DEMO - Áo thun nam Cotton Compact', 180000, 1)
+    INSERT INTO order_items (id, shop_order_id, shop_id, product_id, variant_id, product_name, product_slug, variant_name, variant_attributes, sku, image_url, unit_price, price, qty, line_total)
+    VALUES (1, 1, 1, 1, 1, 'DEMO - Áo thun nam Cotton Compact', 'demo-ao-thun-mau', 'Tiêu chuẩn', '{}', 'SKU-1', 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80', 180000, 180000, 1, 180000)
+  `).run()
+
+  db.prepare(`
+    INSERT INTO payments (id, shop_order_id, method, status, amount)
+    VALUES (1, 1, 'cod', 'paid', 180000)
   `).run()
 
   // 7. Payouts
-  db.prepare(`INSERT INTO demo_seller_payouts (shop_id, balance, pending_balance, total_withdrawn) VALUES (1, 35000000, 2500000, 12000000)`).run()
-  db.prepare(`INSERT INTO demo_seller_payouts (shop_id, balance, pending_balance, total_withdrawn) VALUES (2, 18500000, 1200000, 5000000)`).run()
+  db.prepare(`INSERT INTO demo_seller_payouts (shop_id, balance, pending_balance, total_withdrawn) VALUES (1, 1000000, 250000, 0)`).run()
+  db.prepare(`INSERT INTO demo_seller_payouts (shop_id, balance, pending_balance, total_withdrawn) VALUES (2, 1000000, 120000, 0)`).run()
 
   // 8. Vouchers
   db.prepare(`
     INSERT INTO vouchers (id, code, name, discount_amount, min_subtotal, starts_at, ends_at, usage_limit, per_user_limit)
-    VALUES (1, 'NOVA20K', 'Voucher giảm 20.000₫ cho đơn từ 200k', 20000, 200000, '2026-01-01', '2028-12-31', 1000, 1)
+    VALUES (1, 'NOVA20K', 'Voucher giảm 20.000₫ cho đơn từ 200k', 20000, 200000, '2026-01-01T00:00:00.000Z', '2028-12-31T23:59:59.000Z', 1000, 1)
   `).run()
 }
 
@@ -427,14 +629,21 @@ export function executeLocalQuery(sql, values = []) {
     return []
   }
 
+  const normalizedValues = values.map((v) => {
+    if (v instanceof Date) return v.toISOString()
+    if (typeof v === 'boolean') return v ? 1 : 0
+    if (v === undefined) return null
+    return v
+  })
+
   const isSelect = /^SELECT\b/i.test(cleanSql)
 
   try {
     const stmt = db.prepare(cleanSql)
     if (isSelect) {
-      return stmt.all(...values)
+      return stmt.all(...normalizedValues)
     } else {
-      const res = stmt.run(...values)
+      const res = stmt.run(...normalizedValues)
       return {
         insertId: Number(res.lastInsertRowid),
         affectedRows: res.changes,

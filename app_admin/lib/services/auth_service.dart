@@ -59,6 +59,22 @@ class AuthService extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
 
   static const String _userKey = 'shopnova_admin_user_profile';
+  static const String _refreshTokenKey = 'shopnova_admin_refresh_token';
+
+  /// Lấy danh sách tài khoản demo từ Backend API
+  /// GET /api/v1/auth/demo-accounts
+  Future<List<Map<String, dynamic>>> fetchDemoAccounts() async {
+    try {
+      final res = await _api.get('/api/v1/auth/demo-accounts');
+      if (res.success && res.data is Map) {
+        final accounts = res.data['accounts'];
+        if (accounts is List) {
+          return accounts.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
 
   Future<void> restoreSession() async {
     final token = await _api.getToken();
@@ -78,10 +94,11 @@ class AuthService extends ChangeNotifier {
         await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
         notifyListeners();
       } else if (res.statusCode == 401) {
-        // Token hết hạn -> đăng xuất tự động để người dùng đăng nhập lại nhận dữ liệu mới
-        await logout();
+        final refreshed = await refreshSession();
+        if (!refreshed) {
+          await logout();
+        }
       } else {
-        // Có thể server đang offline tạm thời nhưng có profile cũ
         final prefs = await SharedPreferences.getInstance();
         final userJson = prefs.getString(_userKey);
         if (userJson != null) {
@@ -103,16 +120,40 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<bool> refreshSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rt = prefs.getString(_refreshTokenKey);
+      if (rt == null || rt.isEmpty) return false;
+      final res = await _api.post('/api/v1/auth/refresh', body: {'refreshToken': rt});
+      if (res.success && res.data is Map) {
+        final token = res.data['token'];
+        if (token != null) await _api.saveToken(token.toString());
+        if (res.data['refreshToken'] != null) {
+          await prefs.setString(_refreshTokenKey, res.data['refreshToken'].toString());
+        }
+        if (res.data['user'] is Map<String, dynamic>) {
+          _currentUser = AdminUser.fromJson(res.data['user'] as Map<String, dynamic>);
+          _isAuthenticated = true;
+          await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
+          notifyListeners();
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Future<ApiResponse> login(String usernameOrEmail, String password) async {
     try {
       final res = await _api.post('/api/v1/auth/login', body: {
         'username': usernameOrEmail.trim(),
-        'usernameOrEmail': usernameOrEmail.trim(),
         'password': password,
       });
 
       if (res.success && res.data != null) {
         final token = res.data['accessToken'] ?? res.data['token'];
+        final refreshToken = res.data['refreshToken'];
         final userData = res.data['user'] ?? res.data;
         if (token != null) {
           await _api.saveToken(token.toString());
@@ -122,6 +163,9 @@ class AuthService extends ChangeNotifier {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
+        if (refreshToken != null) {
+          await prefs.setString(_refreshTokenKey, refreshToken.toString());
+        }
 
         notifyListeners();
         return res;
@@ -134,14 +178,17 @@ class AuthService extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _api.post('/api/v1/auth/logout');
+      final prefs = await SharedPreferences.getInstance();
+      final rt = prefs.getString(_refreshTokenKey);
+      await _api.post('/api/v1/auth/logout', body: {
+        if (rt != null && rt.isNotEmpty) 'refreshToken': rt,
+      });
+      await prefs.remove(_refreshTokenKey);
+      await prefs.remove(_userKey);
     } catch (_) {}
     await _api.clearToken();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
     _currentUser = null;
     _isAuthenticated = false;
     notifyListeners();
   }
 }
-

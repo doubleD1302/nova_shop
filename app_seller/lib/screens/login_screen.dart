@@ -12,16 +12,37 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController(text: 'demo_seller_a');
-  final _passwordController = TextEditingController(text: 'Seller@123');
+  final _usernameController = TextEditingController(text: 'demo_seller_guest');
+  final _passwordController = TextEditingController(text: 'DemoSeller2026');
   bool _isLoading = false;
   bool _showPassword = false;
   String? _errorMessage;
+  String _demoUsername = 'demo_seller_guest';
+  String _demoPassword = 'DemoSeller2026';
+  String _serverStatus = 'Đang kết nối máy chủ...';
 
   @override
   void initState() {
     super.initState();
-    ApiConfig.autoDetectBaseUrl();
+    _initBackendAndDemo();
+  }
+
+  Future<void> _initBackendAndDemo() async {
+    final detected = await ApiConfig.autoDetectBaseUrl();
+    final accounts = await AuthService().fetchDemoAccounts();
+    if (!mounted) return;
+    setState(() {
+      _serverStatus = 'Máy chủ: $detected';
+      for (final acc in accounts) {
+        if (acc['role'] == 'seller') {
+          _demoUsername = acc['username']?.toString() ?? _demoUsername;
+          _demoPassword = acc['password']?.toString() ?? _demoPassword;
+          _usernameController.text = _demoUsername;
+          _passwordController.text = _demoPassword;
+          break;
+        }
+      }
+    });
   }
 
   Future<void> _handleLogin() async {
@@ -63,6 +84,63 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = res.message.isNotEmpty ? res.message : 'Tài khoản hoặc mật khẩu không chính xác.';
       });
     }
+  }
+
+  void _showServerDialog() {
+    final ctrl = TextEditingController(text: ApiConfig.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cấu hình máy chủ API', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(
+              spacing: 6,
+              children: [
+                ActionChip(
+                  label: const Text('USB 127.0.0.1', style: TextStyle(fontSize: 11)),
+                  onPressed: () => ctrl.text = ApiConfig.usbLoopbackUrl,
+                ),
+                ActionChip(
+                  label: const Text('LAN Wi-Fi', style: TextStyle(fontSize: 11)),
+                  onPressed: () => ctrl.text = ApiConfig.lanHostUrl,
+                ),
+                ActionChip(
+                  label: const Text('Render Cloud', style: TextStyle(fontSize: 11)),
+                  onPressed: () => ctrl.text = ApiConfig.productionUrl,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ApiConfig.resetBaseUrl();
+              Navigator.pop(ctx);
+              _initBackendAndDemo();
+            },
+            child: const Text('Tự động dò'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) {
+                ApiConfig.setBaseUrl(ctrl.text.trim());
+              }
+              Navigator.pop(ctx);
+              _initBackendAndDemo();
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -116,7 +194,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _showServerDialog,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.dns_outlined, size: 14, color: primaryColor),
+                      const SizedBox(width: 4),
+                      Text(_serverStatus, style: const TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.settings_outlined, size: 14, color: primaryColor),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
 
                 if (_errorMessage != null)
                   Container(
@@ -193,7 +285,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // GỢI Ý TÀI KHOẢN THỰC TẾ
+                // GỢI Ý TÀI KHOẢN THỰC TẾ ĐỒNG BỘ TỪ /api/v1/auth/demo-accounts
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -214,11 +306,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('demo_seller_a / Seller@123', style: TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              '$_demoUsername / $_demoPassword',
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                           TextButton(
                             onPressed: () {
-                              _usernameController.text = 'demo_seller_a';
-                              _passwordController.text = 'Seller@123';
+                              _usernameController.text = _demoUsername;
+                              _passwordController.text = _demoPassword;
                             },
                             child: const Text('Tự động điền', style: TextStyle(fontSize: 11, color: primaryColor)),
                           ),

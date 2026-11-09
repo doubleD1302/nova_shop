@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -163,13 +162,18 @@ class ApiClient {
   Future<ApiResponse> _sendRequest(Future<ApiResponse> Function() requestFn) async {
     try {
       return await requestFn();
-    } on SocketException {
-      return ApiResponse.error('Không thể kết nối tới máy chủ ShopNova. Vui lòng kiểm tra mạng.');
-    } on TimeoutException {
-      return ApiResponse.error('Yêu cầu hết thời gian chờ (Timeout). Vui lòng thử lại.');
-    } catch (e) {
-      return ApiResponse.error('Đã xảy ra lỗi kết nối: $e');
+    } catch (_) {
+      try {
+        ApiConfig.resetBaseUrl();
+        await ApiConfig.autoDetectBaseUrl();
+        return await requestFn();
+      } on SocketException {
+        return ApiResponse.error('Không thể kết nối tới máy chủ ShopNova. Vui lòng kiểm tra mạng.');
+      } on TimeoutException {
+        return ApiResponse.error('Yêu cầu hết thời gian chờ (Timeout). Vui lòng thử lại.');
+      } catch (e) {
+        return ApiResponse.error('Không thể kết nối đến máy chủ API: $e');
+      }
     }
   }
 }
-

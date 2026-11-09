@@ -17,6 +17,7 @@ class AuthService extends ChangeNotifier {
   final ApiClient _client = ApiClient();
   static const String _userKey = 'novashop_current_user';
   static const String _savedCredsKey = 'novashop_saved_credentials';
+  static const String _refreshTokenKey = 'novashop_refresh_token';
   static const String _userKeyId = 'novashop_user_id';
   static const String _userKeyUsername = 'novashop_user_username';
   static const String _userKeyFullName = 'novashop_user_fullname';
@@ -29,18 +30,86 @@ class AuthService extends ChangeNotifier {
   static const String _userKeyIsLoggedIn = 'novashop_is_logged_in';
 
   String? _token;
+  String? _refreshToken;
   User? _currentUser;
   bool _isLoading = false;
   String? _lastError;
   String? _sellerShopStatus;
 
   String? get token => _token;
+  String? get refreshToken => _refreshToken;
   User? get currentUser => _currentUser;
   User? get user => _currentUser;
   bool get isLoading => _isLoading;
   String? get lastError => _lastError;
   String? get sellerShopStatus => _sellerShopStatus;
   bool get isAuthenticated => _currentUser != null;
+
+  /// Lấy danh sách tài khoản demo từ Backend API
+  /// GET /api/v1/auth/demo-accounts
+  Future<List<Map<String, dynamic>>> fetchDemoAccounts() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(ApiConfig.demoAccountsUrl),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true && body['data'] is Map) {
+          final accounts = body['data']['accounts'];
+          if (accounts is List) {
+            return accounts.whereType<Map<String, dynamic>>().toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthService] fetchDemoAccounts error: $e');
+    }
+    return [];
+  }
+
+  /// Làm mới phiên đăng nhập qua refresh token
+  /// POST /api/v1/auth/refresh
+  Future<bool> refreshSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rt = _refreshToken ?? prefs.getString(_refreshTokenKey);
+      if (rt == null || rt.isEmpty) return false;
+
+      final response = await http
+          .post(
+            Uri.parse(ApiConfig.refreshUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refreshToken': rt}),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      final Map<String, dynamic> body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true && body['data'] is Map<String, dynamic>) {
+        final data = body['data'] as Map<String, dynamic>;
+        _token = data['token'] as String?;
+        if (_token != null) {
+          await _client.saveToken(_token!);
+        }
+        if (data['refreshToken'] != null) {
+          _refreshToken = data['refreshToken'].toString();
+          await prefs.setString(_refreshTokenKey, _refreshToken!);
+        }
+        if (data['user'] is Map<String, dynamic>) {
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[AuthService] refreshSession error: $e');
+    }
+    return false;
+  }
 
   /// Kiểm tra trạng thái đã đăng nhập
   Future<bool> isLoggedIn() async {
@@ -127,7 +196,6 @@ class AuthService extends ChangeNotifier {
           'message': body['message'] ?? 'Máy chủ và cơ sở dữ liệu đã sẵn sàng.',
         };
       } else {
-        // Backend vẫn phản hồi nhưng Data API hoặc Database gặp sự cố
         try {
           final body = jsonDecode(response.body);
           final isDbIssue = body['error']?['code'] == 'DATABASE_UNAVAILABLE';
@@ -156,7 +224,6 @@ class AuthService extends ChangeNotifier {
       }
     } catch (e) {
       sw.stop();
-      // Nếu readyUrl timeout hoặc lỗi, thử kiểm tra health xem backend liveness có phản hồi không
       try {
         final healthRes = await http
             .get(Uri.parse(ApiConfig.healthUrl))
@@ -195,16 +262,32 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.loginUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'username': username.trim(),
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
+      http.Response response;
+      try {
+        response = await http
+            .post(
+              Uri.parse(ApiConfig.loginUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'username': username.trim(),
+                'password': password,
+              }),
+            )
+            .timeout(const Duration(seconds: 6));
+      } catch (_) {
+        ApiConfig.resetBaseUrl();
+        await ApiConfig.autoDetectBaseUrl();
+        response = await http
+            .post(
+              Uri.parse(ApiConfig.loginUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'username': username.trim(),
+                'password': password,
+              }),
+            )
+            .timeout(const Duration(seconds: 10));
+      }
 
       final Map<String, dynamic> body = jsonDecode(response.body);
 
@@ -214,12 +297,18 @@ class AuthService extends ChangeNotifier {
         if (_token != null) {
           await _client.saveToken(_token!);
         }
+        if (data['refreshToken'] != null) {
+          _refreshToken = data['refreshToken'].toString();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_refreshTokenKey, _refreshToken!);
+          } catch (_) {}
+        }
         if (data['user'] != null) {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
         }
 
-        // Lưu thông tin đăng nhập tự động nếu người dùng ghi nhớ
         try {
           final prefs = await SharedPreferences.getInstance();
           if (rememberMe) {
@@ -273,6 +362,13 @@ class AuthService extends ChangeNotifier {
         _token = data['token'] as String?;
         if (_token != null) {
           await _client.saveToken(_token!);
+        }
+        if (data['refreshToken'] != null) {
+          _refreshToken = data['refreshToken'].toString();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_refreshTokenKey, _refreshToken!);
+          } catch (_) {}
         }
         if (data['user'] != null) {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
@@ -334,6 +430,13 @@ class AuthService extends ChangeNotifier {
         if (_token != null) {
           await _client.saveToken(_token!);
         }
+        if (data['refreshToken'] != null) {
+          _refreshToken = data['refreshToken'].toString();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_refreshTokenKey, _refreshToken!);
+          } catch (_) {}
+        }
         if (data['user'] != null) {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
@@ -367,7 +470,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Đăng ký mở gian hàng đối tác người bán (Seller Shop)
-  /// Gọi API: POST /api/v1/seller/register-shop
+  /// Gọi API mới của Backend: POST /api/v1/auth/seller-shop
   Future<bool> registerSellerShop({
     required String shopName,
     String province = 'TP. Hồ Chí Minh',
@@ -379,11 +482,9 @@ class AuthService extends ChangeNotifier {
 
     try {
       final response = await _client.post(
-        '/api/v1/seller/register-shop',
+        '/api/v1/auth/seller-shop',
         body: {
           'shopName': shopName.trim(),
-          'province': province.trim(),
-          if (tagline != null && tagline.trim().isNotEmpty) 'tagline': tagline.trim(),
         },
       );
 
@@ -391,26 +492,47 @@ class AuthService extends ChangeNotifier {
         final data = response.data as Map<String, dynamic>;
         _sellerShopStatus = data['shopStatus']?.toString() ?? 'pending';
 
-        // 1. Cập nhật JWT Token mới mang quyền seller
+        // 1. Cập nhật JWT Token & RefreshToken mới mang quyền seller
         if (data['token'] != null) {
           _token = data['token'].toString();
           await _client.saveToken(_token!);
         }
+        if (data['refreshToken'] != null) {
+          _refreshToken = data['refreshToken'].toString();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_refreshTokenKey, _refreshToken!);
+          } catch (_) {}
+        }
 
-        // 2. Cập nhật User hiện tại sang role seller và shopId
+        // 2. Cập nhật thông tin gian hàng chi tiết (tỉnh/thành, tagline) nếu có truyền vào
+        if ((tagline != null && tagline.trim().isNotEmpty) || province.trim().isNotEmpty) {
+          try {
+            await _client.put(
+              '/api/v1/seller/shop',
+              body: {
+                'name': shopName.trim(),
+                'province': province.trim(),
+                if (tagline != null && tagline.trim().isNotEmpty) 'tagline': tagline.trim(),
+              },
+            );
+          } catch (_) {}
+        }
+
+        // 3. Cập nhật User hiện tại sang role seller và shopId
         final shopObj = data['shop'];
         final newShopId = (shopObj is Map && shopObj['shopId'] != null)
             ? shopObj['shopId'].toString()
             : (data['user']?['shopId']?.toString() ?? '');
 
-        if (_currentUser != null) {
+        if (data['user'] is Map<String, dynamic>) {
+          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
+          await _saveUserToLocal(_currentUser!);
+        } else if (_currentUser != null) {
           _currentUser = _currentUser!.copyWith(
             role: 'seller',
             shopId: newShopId.isNotEmpty ? newShopId : _currentUser!.shopId,
           );
-          await _saveUserToLocal(_currentUser!);
-        } else if (data['user'] != null) {
-          _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
         }
 
@@ -470,7 +592,7 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  /// Khôi phục thông tin user tức thì từ bộ nhớ máy (Offline-first, 0ms, không bao giờ tự đăng xuất)
+  /// Khôi phục thông tin user tức thì từ bộ nhớ máy
   Future<User?> restoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -478,13 +600,12 @@ class AuthService extends ChangeNotifier {
         await prefs.reload();
       } catch (_) {}
 
-      // 1. Nạp token JWT đã lưu
       final t = await _client.getToken();
       if (t != null && t.isNotEmpty) {
         _token = t;
       }
+      _refreshToken = prefs.getString(_refreshTokenKey);
 
-      // 2. Nạp User từ JSON cache
       final userJsonStr = prefs.getString(_userKey);
       if (userJsonStr != null && userJsonStr.isNotEmpty) {
         try {
@@ -492,7 +613,6 @@ class AuthService extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // 3. Dự phòng đa tầng: Khôi phục từ các trường riêng biệt nếu JSON bị mất
       if (_currentUser == null) {
         final isLoggedIn = prefs.getBool(_userKeyIsLoggedIn) ?? false;
         final savedUsername = prefs.getString(_userKeyUsername);
@@ -511,12 +631,10 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      // 4. Báo UI ngay lập tức không để màn hình bị chớp hay lag
       if (_currentUser != null) {
         notifyListeners();
       }
 
-      // 5. Đồng bộ dữ liệu nền ngầm (Non-blocking): không await để app mở tức thì
       _syncSessionInBackground(prefs);
     } catch (e) {
       debugPrint('[AuthService] restoreSession error: $e');
@@ -525,7 +643,7 @@ class AuthService extends ChangeNotifier {
     return _currentUser;
   }
 
-  /// Đồng bộ phiên đăng nhập ngầm trong nền (tự làm mới token nếu cần, không bao giờ null hóa tài khoản)
+  /// Đồng bộ phiên đăng nhập ngầm trong nền
   void _syncSessionInBackground(SharedPreferences prefs) async {
     try {
       if (_token != null && _token!.isNotEmpty) {
@@ -538,8 +656,9 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      // Nếu token hết hạn (15 phút) hoặc chưa lấy được profile mới:
-      // Tự động đăng nhập ngầm bằng credentials đã lưu để gia hạn token mới
+      final refreshed = await refreshSession();
+      if (refreshed) return;
+
       final credsStr = prefs.getString(_savedCredsKey);
       if (credsStr != null) {
         final creds = jsonDecode(credsStr) as Map<String, dynamic>;
@@ -553,13 +672,9 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[AuthService] _syncSessionInBackground error: $e');
     }
-    // Dù mạng lỗi, server offline hay token cũ: TUYỆT ĐỐI GIỮ NGUYÊN _currentUser, không tự đăng xuất!
   }
 
   /// Cập nhật thông tin hồ sơ tài khoản
-  /// [clearAvatar]: Nếu true, gửi null để chủ động xóa avatar trên server
-  /// [avatarUrl]: Nếu truyền chuỗi URL, cập nhật sang ảnh đại diện mới
-  /// Nếu cả hai đều không chỉ định, không gửi trường avatarUrl để Backend giữ nguyên avatar cũ
   Future<bool> updateProfile({
     String? fullName,
     String? phone,
@@ -642,6 +757,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Đổi mật khẩu tài khoản
+  /// POST /api/v1/auth/change-password
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -658,7 +774,7 @@ class AuthService extends ChangeNotifier {
 
     try {
       final response = await http
-          .put(
+          .post(
             Uri.parse(ApiConfig.changePasswordUrl),
             headers: {
               'Content-Type': 'application/json',
@@ -673,7 +789,20 @@ class AuthService extends ChangeNotifier {
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200 && body['success'] == true) {
-        // Cập nhật lại mật khẩu mới vào bộ nhớ đăng nhập tự động
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          if (data['token'] != null) {
+            _token = data['token'].toString();
+            await _client.saveToken(_token!);
+          }
+          if (data['refreshToken'] != null) {
+            _refreshToken = data['refreshToken'].toString();
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString(_refreshTokenKey, _refreshToken!);
+            } catch (_) {}
+          }
+        }
         try {
           final prefs = await SharedPreferences.getInstance();
           final credsStr = prefs.getString(_savedCredsKey);
@@ -687,11 +816,6 @@ class AuthService extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
         return true;
-      } else if (response.statusCode == 404) {
-        _lastError = 'Chưa có API đổi mật khẩu trên máy chủ Backend hoặc máy chủ đang cập nhật.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
       } else {
         _lastError = body['message'] as String? ?? 'Đổi mật khẩu thất bại.';
         _isLoading = false;
@@ -707,41 +831,84 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Lấy thống kê tài khoản (số đơn hàng, tổng chi tiêu)
+  /// Lấy thống kê tài khoản thực tế từ API đơn hàng và ví voucher
+  /// (GET /api/v1/orders & GET /api/v1/vouchers/wallet)
   Future<Map<String, dynamic>?> fetchUserStats() async {
     final t = _token ?? await _client.getToken();
     if (t == null) return null;
 
     try {
-      final response = await http.get(
-        Uri.parse(ApiConfig.userStatsUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $t',
-        },
-      ).timeout(const Duration(seconds: 5));
+      final ordersRes = await _client.get('/api/v1/orders', queryParams: {'limit': '50', 'offset': '0'});
+      final walletRes = await _client.get('/api/v1/vouchers/wallet', queryParams: {'page': '1'});
 
-      final body = jsonDecode(response.body);
-      if (response.statusCode == 200 && body['success'] == true) {
-        return body['data'] as Map<String, dynamic>?;
+      int orderCount = 0;
+      double totalSpent = 0;
+      if (ordersRes.success && ordersRes.data != null) {
+        List<dynamic> list = [];
+        if (ordersRes.data is Map && ordersRes.data['orders'] is List) {
+          list = ordersRes.data['orders'] as List;
+          orderCount = (ordersRes.data['total'] as num?)?.toInt() ?? list.length;
+        } else if (ordersRes.data is List) {
+          list = ordersRes.data as List;
+          orderCount = list.length;
+        }
+        for (final o in list) {
+          if (o is Map && o['status']?.toString() != 'cancelled') {
+            final amt = num.tryParse((o['totalAmount'] ?? o['total_amount'] ?? 0).toString()) ?? 0;
+            totalSpent += amt.toDouble();
+          }
+        }
       }
+
+      int voucherCount = 0;
+      if (walletRes.success && walletRes.data != null) {
+        if (walletRes.data is Map && walletRes.data['items'] is List) {
+          voucherCount = (walletRes.data['items'] as List).length;
+        } else if (walletRes.data is List) {
+          voucherCount = (walletRes.data as List).length;
+        }
+      }
+
+      return {
+        'orderCount': orderCount,
+        'totalSpent': totalSpent,
+        'voucherCount': voucherCount,
+      };
     } catch (e) {
       debugPrint('[AuthService] fetchUserStats error: $e');
     }
     return null;
   }
 
-  /// Đăng xuất tài khoản (chỉ khi người dùng chủ động nhấn nút Đăng xuất)
+  /// Đăng xuất tài khoản (gọi POST /api/v1/auth/logout và xóa phiên lưu trữ)
   void logout() {
+    final oldToken = _token;
+    final oldRefreshToken = _refreshToken;
     _token = null;
+    _refreshToken = null;
     _currentUser = null;
     _lastError = null;
+    try {
+      if (oldToken != null) {
+        http.post(
+          Uri.parse(ApiConfig.logoutUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $oldToken',
+          },
+          body: jsonEncode({
+            if (oldRefreshToken != null) 'refreshToken': oldRefreshToken,
+          }),
+        ).catchError((_) => http.Response('', 500));
+      }
+    } catch (_) {}
     try {
       _client.clearToken().catchError((_) {});
     } catch (_) {}
     try {
       SharedPreferences.getInstance().then((prefs) {
         prefs.remove(_userKey);
+        prefs.remove(_refreshTokenKey);
         prefs.remove(_userKeyId);
         prefs.remove(_userKeyUsername);
         prefs.remove(_userKeyFullName);
