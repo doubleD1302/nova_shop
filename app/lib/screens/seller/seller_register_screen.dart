@@ -1,26 +1,89 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/common/nova_logo.dart';
+import '../auth/login_screen.dart';
 
-const List<String> kVietnamProvinces = [
-  'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
-  'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu',
-  'Bắc Ninh', 'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước',
-  'Bình Thuận', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Đắk Nông',
-  'Điện Biên', 'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Giang',
-  'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang', 'Hòa Bình',
-  'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
-  'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định',
-  'Nghệ An', 'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên',
-  'Quảng Bình', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị',
-  'Sóc Trăng', 'Sơn La', 'Tây Ninh', 'Thái Bình', 'Thái Nguyên',
-  'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang', 'Trà Vinh', 'Tuyên Quang',
-  'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái',
+/// Danh sách 63 Tỉnh/Thành phố kèm Vùng miền chuẩn Website src/data/locations.js
+const List<Map<String, String>> kVietnamProvincesWithRegion = [
+  // ---------------- Miền Bắc ----------------
+  {'name': 'Hà Nội', 'region': 'Miền Bắc'},
+  {'name': 'Hải Phòng', 'region': 'Miền Bắc'},
+  {'name': 'Quảng Ninh', 'region': 'Miền Bắc'},
+  {'name': 'Hải Dương', 'region': 'Miền Bắc'},
+  {'name': 'Hưng Yên', 'region': 'Miền Bắc'},
+  {'name': 'Thái Bình', 'region': 'Miền Bắc'},
+  {'name': 'Nam Định', 'region': 'Miền Bắc'},
+  {'name': 'Ninh Bình', 'region': 'Miền Bắc'},
+  {'name': 'Hà Nam', 'region': 'Miền Bắc'},
+  {'name': 'Vĩnh Phúc', 'region': 'Miền Bắc'},
+  {'name': 'Bắc Ninh', 'region': 'Miền Bắc'},
+  {'name': 'Bắc Giang', 'region': 'Miền Bắc'},
+  {'name': 'Thái Nguyên', 'region': 'Miền Bắc'},
+  {'name': 'Phú Thọ', 'region': 'Miền Bắc'},
+  {'name': 'Tuyên Quang', 'region': 'Miền Bắc'},
+  {'name': 'Yên Bái', 'region': 'Miền Bắc'},
+  {'name': 'Lào Cai', 'region': 'Miền Bắc'},
+  {'name': 'Hà Giang', 'region': 'Miền Bắc'},
+  {'name': 'Cao Bằng', 'region': 'Miền Bắc'},
+  {'name': 'Bắc Kạn', 'region': 'Miền Bắc'},
+  {'name': 'Lạng Sơn', 'region': 'Miền Bắc'},
+  {'name': 'Điện Biên', 'region': 'Miền Bắc'},
+  {'name': 'Lai Châu', 'region': 'Miền Bắc'},
+  {'name': 'Sơn La', 'region': 'Miền Bắc'},
+  {'name': 'Hòa Bình', 'region': 'Miền Bắc'},
+
+  // ---------------- Miền Trung ----------------
+  {'name': 'Thanh Hóa', 'region': 'Miền Trung'},
+  {'name': 'Nghệ An', 'region': 'Miền Trung'},
+  {'name': 'Hà Tĩnh', 'region': 'Miền Trung'},
+  {'name': 'Quảng Bình', 'region': 'Miền Trung'},
+  {'name': 'Quảng Trị', 'region': 'Miền Trung'},
+  {'name': 'Thừa Thiên Huế', 'region': 'Miền Trung'},
+  {'name': 'Đà Nẵng', 'region': 'Miền Trung'},
+  {'name': 'Quảng Nam', 'region': 'Miền Trung'},
+  {'name': 'Quảng Ngãi', 'region': 'Miền Trung'},
+  {'name': 'Bình Định', 'region': 'Miền Trung'},
+  {'name': 'Phú Yên', 'region': 'Miền Trung'},
+  {'name': 'Khánh Hòa', 'region': 'Miền Trung'},
+  {'name': 'Ninh Thuận', 'region': 'Miền Trung'},
+  {'name': 'Bình Thuận', 'region': 'Miền Trung'},
+  {'name': 'Kon Tum', 'region': 'Miền Trung'},
+  {'name': 'Gia Lai', 'region': 'Miền Trung'},
+  {'name': 'Đắk Lắk', 'region': 'Miền Trung'},
+  {'name': 'Đắk Nông', 'region': 'Miền Trung'},
+  {'name': 'Lâm Đồng', 'region': 'Miền Trung'},
+
+  // ---------------- Miền Nam ----------------
+  {'name': 'TP. Hồ Chí Minh', 'region': 'Miền Nam'},
+  {'name': 'Bà Rịa - Vũng Tàu', 'region': 'Miền Nam'},
+  {'name': 'Bình Dương', 'region': 'Miền Nam'},
+  {'name': 'Bình Phước', 'region': 'Miền Nam'},
+  {'name': 'Đồng Nai', 'region': 'Miền Nam'},
+  {'name': 'Tây Ninh', 'region': 'Miền Nam'},
+  {'name': 'Long An', 'region': 'Miền Nam'},
+  {'name': 'Tiền Giang', 'region': 'Miền Nam'},
+  {'name': 'Bến Tre', 'region': 'Miền Nam'},
+  {'name': 'Trà Vinh', 'region': 'Miền Nam'},
+  {'name': 'Vĩnh Long', 'region': 'Miền Nam'},
+  {'name': 'Đồng Tháp', 'region': 'Miền Nam'},
+  {'name': 'An Giang', 'region': 'Miền Nam'},
+  {'name': 'Kiên Giang', 'region': 'Miền Nam'},
+  {'name': 'Cần Thơ', 'region': 'Miền Nam'},
+  {'name': 'Hậu Giang', 'region': 'Miền Nam'},
+  {'name': 'Sóc Trăng', 'region': 'Miền Nam'},
+  {'name': 'Bạc Liêu', 'region': 'Miền Nam'},
+  {'name': 'Cà Mau', 'region': 'Miền Nam'},
 ];
 
-/// Màn hình Đăng Ký Kênh Người Bán ShopNova chuẩn Shopee Seller Centre:
-/// 1. Màn hình Chào mừng (Welcome)
+final List<String> kVietnamProvinces =
+    kVietnamProvincesWithRegion.map((e) => e['name']!).toList();
+
+/// Màn hình Đăng Ký Kênh Người Bán ShopNova đồng bộ 100% với Website (SellerRegistrationWizard.jsx)
+/// 1. Màn hình Chào mừng (Welcome) & Trạng thái hồ sơ hiện có (nếu đã nộp KYC)
 /// 2. Stepper 5 bước: Thông tin Shop -> Cài đặt vận chuyển -> Thông tin định danh -> Thông tin thuế -> Hoàn tất
+/// 3. Kết nối đầy đủ API Backend: POST /auth/register, POST /auth/seller-shop,
+///    GET/PUT /seller/shop/registration, POST /seller/shop/resubmit
 class SellerRegisterScreen extends StatefulWidget {
   const SellerRegisterScreen({super.key});
 
@@ -34,7 +97,12 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // currentStep: 0 = Màn hình Welcome, 1..5 = Các bước Stepper
   int _currentStep = 0;
   bool _submitting = false;
+  bool _loadingExisting = false;
   String? _errorMessage;
+
+  // Dữ liệu gian hàng & hồ sơ đã đăng ký trước đó (nếu user đã mở shop & đang chờ duyệt / bị từ chối)
+  Map<String, dynamic>? _existingShop;
+  String? _maskedIdLast4;
 
   // Controllers Bước 1: Thông tin Shop
   final TextEditingController _shopNameController = TextEditingController();
@@ -52,6 +120,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
 
   // Địa chỉ lấy hàng
   String _pickupAddress = '';
+  String _pickupDetailDraft = '';
   String _selectedProvince = 'TP. Hồ Chí Minh';
 
   // Bước 2: Cài đặt vận chuyển
@@ -67,23 +136,121 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // Bước 4: Thông tin thuế
   final TextEditingController _taxCodeController = TextEditingController();
   final TextEditingController _invoiceEmailController = TextEditingController();
-  bool _agreeTerms = true;
+  bool _agreeTerms = false; // Mặc định false giống Website SellerRegistrationWizard.jsx
+
+  bool get _hasExistingEditableRegistration =>
+      _existingShop != null &&
+      ['pending', 'rejected'].contains(_existingShop!['status']?.toString());
+
+  bool get _hasActiveExistingShop =>
+      _existingShop != null && _existingShop!['status']?.toString() == 'active';
+
+  bool get _hasSuspendedExistingShop =>
+      _existingShop != null && _existingShop!['status']?.toString() == 'suspended';
+
+  bool get _isEmailLockedFromUser {
+    final email = _authService.currentUser?.email;
+    return email != null && email.trim().isNotEmpty;
+  }
 
   @override
   void initState() {
     super.initState();
+    _prefillFromUser();
+    _loadExistingRegistration();
+  }
+
+  void _prefillFromUser() {
     final user = _authService.currentUser;
     if (user != null) {
       if (user.email != null && user.email!.isNotEmpty) {
         _emailController.text = user.email!;
-        _invoiceEmailController.text = user.email!;
+        if (_invoiceEmailController.text.isEmpty) {
+          _invoiceEmailController.text = user.email!;
+        }
       }
       if (user.phone != null && user.phone!.isNotEmpty) {
-        _phoneController.text = user.phone!.replaceAll('+84', '');
+        _phoneController.text = user.phone!.replaceFirst(RegExp(r'^\+84'), '');
       }
       _fullNameController.text = user.fullName;
-      _ownerNameController.text = user.fullName;
+      if (_ownerNameController.text.isEmpty) {
+        _ownerNameController.text = user.fullName;
+      }
     }
+  }
+
+  Future<void> _loadExistingRegistration() async {
+    final user = _authService.currentUser;
+    if (user == null || (!user.isSeller && (user.shopId == null || user.shopId!.isEmpty))) {
+      return;
+    }
+
+    setState(() => _loadingExisting = true);
+    final shop = await _authService.getSellerShop();
+    final reg = await _authService.getSellerRegistration();
+    if (!mounted) return;
+
+    setState(() {
+      _existingShop = shop;
+      _loadingExisting = false;
+
+      if (shop != null) {
+        if ((shop['name']?.toString() ?? '').isNotEmpty) {
+          _shopNameController.text = shop['name'].toString();
+        }
+        if ((shop['tagline']?.toString() ?? '').isNotEmpty) {
+          _shopTaglineController.text = shop['tagline'].toString();
+        }
+        final prov = shop['province']?.toString() ?? '';
+        if (kVietnamProvinces.contains(prov)) {
+          _selectedProvince = prov;
+        }
+        if ((shop['address']?.toString() ?? '').isNotEmpty) {
+          _pickupAddress = shop['address'].toString();
+        }
+      }
+
+      if (reg != null) {
+        final addr = reg['pickupAddress']?.toString() ?? '';
+        if (addr.isNotEmpty) _pickupAddress = addr;
+
+        final prov = reg['province']?.toString() ?? '';
+        if (kVietnamProvinces.contains(prov)) _selectedProvince = prov;
+
+        final contactEmail = reg['contactEmail']?.toString() ?? '';
+        if (contactEmail.isNotEmpty && _emailController.text.isEmpty) {
+          _emailController.text = contactEmail;
+        }
+
+        final contactPhone = reg['contactPhone']?.toString() ?? '';
+        if (contactPhone.isNotEmpty) {
+          _phoneController.text = contactPhone.replaceFirst(RegExp(r'^\+84'), '');
+        }
+
+        if (reg['shippingMethods'] is List) {
+          final methods = (reg['shippingMethods'] as List).map((e) => e.toString()).toList();
+          _shippingNhanh = methods.contains('nhanh');
+          _shippingTietKiem = methods.contains('tietkiem');
+          _shippingHoaToc = methods.contains('hoatoc');
+        }
+
+        final bType = reg['businessType']?.toString() ?? '';
+        if (['personal', 'household', 'enterprise'].contains(bType)) {
+          _businessType = bType;
+        }
+
+        final ownerName = reg['ownerName']?.toString() ?? '';
+        if (ownerName.isNotEmpty) _ownerNameController.text = ownerName;
+
+        _maskedIdLast4 = reg['identityLast4']?.toString();
+
+        final tax = reg['taxCode']?.toString() ?? '';
+        if (tax.isNotEmpty) _taxCodeController.text = tax;
+
+        final invEmail = reg['invoiceEmail']?.toString() ?? '';
+        if (invEmail.isNotEmpty) _invoiceEmailController.text = invEmail;
+      }
+    });
   }
 
   @override
@@ -107,102 +274,151 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.trim());
   }
 
+  // Modal Thiết lập Địa chỉ lấy hàng (đồng bộ modal của Website)
   void _showAddressModal() {
     String modalProvince = _selectedProvince;
-    final detailController = TextEditingController(
-      text: _pickupAddress.contains(',')
-          ? _pickupAddress.substring(0, _pickupAddress.lastIndexOf(',')).trim()
-          : _pickupAddress,
-    );
+    String initialDetail = _pickupDetailDraft;
+    if (initialDetail.isEmpty && _pickupAddress.isNotEmpty) {
+      final suffix = ', $_selectedProvince';
+      initialDetail = _pickupAddress.endsWith(suffix)
+          ? _pickupAddress.substring(0, _pickupAddress.length - suffix.length)
+          : _pickupAddress;
+    }
+    final TextEditingController detailCtrl = TextEditingController(text: initialDetail);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFFCF7),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        builder: (ctx, setModalState) => Dialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppColors.border),
           ),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Địa chỉ lấy hàng của Shop',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF8B7566)),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const Divider(color: Color(0xFFE6D5C2)),
-              const SizedBox(height: 12),
-              const Text('Tỉnh / Thành phố', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: modalProvince,
-                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
-                items: kVietnamProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
-                onChanged: (val) {
-                  if (val != null) setModalState(() => modalProvince = val);
-                },
-              ),
-              const SizedBox(height: 14),
-              const Text('Địa chỉ chi tiết (Số nhà, tên đường, phường/xã)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
-              const SizedBox(height: 6),
-              TextField(
-                controller: detailController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Ví dụ: 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1...',
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Địa chỉ lấy hàng của Shop',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEE4D2D),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const Divider(color: AppColors.border, height: 22),
+
+                const Text('Tỉnh / Thành phố', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: kVietnamProvinces.contains(modalProvince) ? modalProvince : 'TP. Hồ Chí Minh',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEE4D2D))),
                   ),
-                  onPressed: () {
-                    final detail = detailController.text.trim();
-                    if (detail.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Vui lòng nhập địa chỉ chi tiết.'), backgroundColor: Colors.red),
-                      );
-                      return;
-                    }
-                    setState(() {
-                      _selectedProvince = modalProvince;
-                      _pickupAddress = '$detail, $modalProvince';
-                      _errorMessage = null;
-                    });
-                    Navigator.pop(ctx);
+                  items: kVietnamProvincesWithRegion
+                      .map((p) => DropdownMenuItem(
+                            value: p['name'],
+                            child: Text('${p['name']} (${p['region']})', style: const TextStyle(fontSize: 13)),
+                          ))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setModalState(() => modalProvince = val);
                   },
-                  child: const Text('Lưu địa chỉ lấy hàng', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+
+                const Text('Địa chỉ chi tiết (Số nhà, tên đường, phường/xã)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: detailCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Ví dụ: 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1...',
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEE4D2D))),
+                  ),
+                ),
+                const Divider(color: AppColors.border, height: 24),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Hủy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEE4D2D),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        final detail = detailCtrl.text.trim();
+                        if (detail.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng nhập địa chỉ chi tiết (số nhà, tên đường, phường/xã).'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          _pickupDetailDraft = detail;
+                          _selectedProvince = modalProvince;
+                          _pickupAddress = '$detail, $modalProvince';
+                          _errorMessage = null;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Lưu địa chỉ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  String _formatPhoneForApi(String rawInput) {
+    final trimmed = rawInput.trim().replaceFirst(RegExp(r'^\+84'), '').trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('0')) return trimmed;
+    return '0$trimmed';
   }
 
   void _handleNextStep() async {
@@ -220,7 +436,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         return;
       }
       if (_pickupAddress.isEmpty) {
-        setState(() => _errorMessage = 'Vui lòng bấm "+ Thêm địa chỉ" để thiết lập địa chỉ lấy hàng của Shop.');
+        setState(() => _errorMessage = 'Vui lòng bấm "+ Thêm" để thiết lập địa chỉ lấy hàng của Shop.');
         return;
       }
       final email = _emailController.text.trim();
@@ -228,9 +444,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         setState(() => _errorMessage = 'Vui lòng nhập email hợp lệ để nhận thông báo đơn hàng.');
         return;
       }
-      final phone = _phoneController.text.trim();
-      if (phone.isEmpty || !RegExp(r'^[+()\d .-]{8,20}$').hasMatch(phone)) {
-        setState(() => _errorMessage = 'Vui lòng nhập số điện thoại liên hệ hợp lệ.');
+      final formattedPhone = _formatPhoneForApi(_phoneController.text);
+      if (formattedPhone.isEmpty || !RegExp(r'^[+()\d .-]{8,20}$').hasMatch(formattedPhone)) {
+        setState(() => _errorMessage = 'Vui lòng nhập số điện thoại hợp lệ.');
         return;
       }
 
@@ -253,9 +469,16 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           setState(() => _errorMessage = 'Mật khẩu phải có ít nhất 8 ký tự.');
           return;
         }
+        if (password.length > 72) {
+          setState(() => _errorMessage = 'Mật khẩu tối đa 72 ký tự.');
+          return;
+        }
         if (password != confirm) {
           setState(() => _errorMessage = 'Mật khẩu nhập lại không khớp.');
           return;
+        }
+        if (_ownerNameController.text.trim().isEmpty) {
+          _ownerNameController.text = fullName;
         }
       }
 
@@ -281,7 +504,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         return;
       }
       final idCard = _idCardController.text.trim();
-      if (idCard.isEmpty || !RegExp(r'^\d{9,12}$').hasMatch(idCard)) {
+      if (idCard.isEmpty) {
+        setState(() => _errorMessage = 'Vui lòng nhập số CMND / CCCD / Hộ chiếu của chủ Shop.');
+        return;
+      }
+      if (!RegExp(r'^\d{9,12}$').hasMatch(idCard)) {
         setState(() => _errorMessage = 'Số CMND / CCCD hợp lệ phải có từ 9 đến 12 chữ số.');
         return;
       }
@@ -314,21 +541,21 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         if (_shippingHoaToc) 'hoatoc',
       ];
 
-      final phone = _phoneController.text.trim();
-      final fullPhone = phone.startsWith('+84') ? phone : (phone.startsWith('0') ? '+84${phone.substring(1)}' : '+84$phone');
+      final formattedPhone = _formatPhoneForApi(_phoneController.text);
 
+      // Cấu trúc sellerProfile đồng bộ 100% với SellerRegistrationWizard.jsx & prepareSellerProfile() ở backend
       final sellerProfile = {
         'pickupAddress': _pickupAddress,
         'province': _selectedProvince,
         'contactEmail': _emailController.text.trim().toLowerCase(),
-        'contactPhone': fullPhone,
+        'contactPhone': formattedPhone,
         'shippingMethods': shippingMethods,
         'businessType': _businessType,
         'ownerName': _ownerNameController.text.trim(),
         'idCard': _idCardController.text.trim(),
-        if (taxCode.isNotEmpty) 'taxCode': taxCode,
-        if (invoiceEmail.isNotEmpty) 'invoiceEmail': invoiceEmail.toLowerCase(),
-        'agreeTerms': true,
+        'taxCode': taxCode,
+        'invoiceEmail': invoiceEmail.toLowerCase(),
+        'agreeTerms': _agreeTerms,
       };
 
       setState(() {
@@ -341,34 +568,70 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       final shopTagline = _shopTaglineController.text.trim();
 
       bool success = false;
-      if (user != null) {
+      String? apiError;
+
+      if (_hasExistingEditableRegistration) {
+        // Cập nhật hồ sơ đăng ký hiện có qua PUT /api/v1/seller/shop/registration
+        final updateRes = await _authService.updateSellerRegistration(sellerProfile);
+        if (updateRes.success) {
+          if (_existingShop?['status']?.toString() == 'rejected') {
+            final resubmitRes = await _authService.resubmitSellerShop();
+            success = resubmitRes.success;
+            if (!success) {
+              apiError = resubmitRes.message;
+            }
+          } else {
+            success = true;
+          }
+        } else {
+          apiError = updateRes.message;
+        }
+      } else if (user != null) {
+        // User đã đăng nhập: gọi POST /api/v1/auth/seller-shop
         success = await _authService.registerSellerShop(
           shopName: shopName,
+          province: _selectedProvince,
           tagline: shopTagline.isNotEmpty ? shopTagline : null,
           sellerProfile: sellerProfile,
         );
+        if (!success) apiError = _authService.lastError;
       } else {
+        // Khách mới: tạo tài khoản + shop qua POST /api/v1/auth/register (role: seller)
+        final fullName = _fullNameController.text.trim().isNotEmpty
+            ? _fullNameController.text.trim()
+            : _ownerNameController.text.trim();
         success = await _authService.register(
           username: _usernameController.text.trim().toLowerCase(),
           password: _passwordController.text,
-          fullName: _fullNameController.text.trim(),
+          fullName: fullName,
           email: _emailController.text.trim().toLowerCase(),
-          phone: fullPhone,
+          phone: formattedPhone,
           role: 'seller',
           shopName: shopName,
           shopTagline: shopTagline.isNotEmpty ? shopTagline : null,
           sellerProfile: sellerProfile,
         );
+        if (!success) apiError = _authService.lastError;
       }
 
       if (!mounted) return;
       setState(() => _submitting = false);
 
       if (success) {
+        await _authService.getSellerShop();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đăng ký mở gian hàng thành công! Hồ sơ đang chờ Ban Quản Trị duyệt.'),
+            backgroundColor: Color(0xFF00BFA5),
+          ),
+        );
         setState(() => _currentStep = 5);
       } else {
         setState(() {
-          _errorMessage = _authService.lastError ?? 'Đăng ký gian hàng thất bại. Vui lòng kiểm tra lại.';
+          _errorMessage = (apiError != null && apiError.isNotEmpty)
+              ? apiError
+              : 'Có lỗi xảy ra khi tạo gian hàng. Vui lòng thử lại.';
         });
       }
     }
@@ -376,6 +639,17 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingExisting) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFBF3E8),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFFEE4D2D))),
+      );
+    }
+
+    if (_hasActiveExistingShop || _hasSuspendedExistingShop) {
+      return _buildExistingShopStatusScreen();
+    }
+
     if (_currentStep == 0) {
       return _buildWelcomeScreen();
     }
@@ -386,13 +660,19 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         title: const Text('Đăng Ký Kênh Người Bán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D))),
         backgroundColor: const Color(0xFFFFFCF7),
         elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFE6D5C2), height: 1),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF49352D)),
           onPressed: () {
-            if (_currentStep > 1) {
+            if (_currentStep > 1 && _currentStep < 5) {
               setState(() => _currentStep--);
-            } else {
+            } else if (_currentStep == 1) {
               setState(() => _currentStep = 0);
+            } else {
+              Navigator.pop(context);
             }
           },
         ),
@@ -400,7 +680,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Stepper Header 5 bước
+            // Stepper Header 5 bước kèm đường nối tiến trình
             _buildStepperHeader(),
 
             // Nội dung theo bước
@@ -413,6 +693,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                     if (_errorMessage != null) ...[
                       _buildErrorBanner(_errorMessage!),
                       const SizedBox(height: 16),
+                    ],
+
+                    if (_hasExistingEditableRegistration && _currentStep < 5) ...[
+                      _buildExistingRegistrationNoticeBanner(),
+                      const SizedBox(height: 14),
                     ],
 
                     if (_currentStep == 1) _buildStep1ShopInfo(),
@@ -436,27 +721,179 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     );
   }
 
-  // =========================================================================
-  // GIAO DIỆN 0: MÀN HÌNH CHÀO MỪNG (THEO ẢNH MINH HỌA SHOPEE WELCOME)
-  // =========================================================================
-  Widget _buildWelcomeScreen() {
+  /// Hiển thị khi gian hàng đã hoạt động (active) hoặc tạm khóa (suspended) -> điều hướng qua app ShopNova Seller
+  Widget _buildExistingShopStatusScreen() {
+    final isSuspended = _hasSuspendedExistingShop;
+    final shopName = _existingShop?['name']?.toString() ?? 'Gian hàng của bạn';
+    final reason = _existingShop?['suspensionReason']?.toString() ?? 'Vi phạm chính sách sàn.';
+
     return Scaffold(
       backgroundColor: const Color(0xFFFBF3E8),
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFFCF7),
         elevation: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: const Color(0xFFEE4D2D), borderRadius: BorderRadius.circular(6)),
-              child: const Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.white),
-            ),
-            const SizedBox(width: 8),
-            const Text('ShopNova Seller', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D))),
-          ],
+        title: const NovaLogo(size: 30, fontSize: 17, subtitle: 'Kênh Người Bán'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
         ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFCF7),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE6D5C2)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: isSuspended ? Colors.red.shade50 : const Color(0xFFEDF4ED),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSuspended ? Icons.block_rounded : Icons.storefront_rounded,
+                    size: 44,
+                    color: isSuspended ? Colors.red : const Color(0xFF547653),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  isSuspended ? 'Gian hàng đang tạm khóa' : 'Gian hàng đã được kích hoạt!',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isSuspended
+                      ? 'Gian hàng "$shopName" hiện đang tạm khóa.\nLý do: $reason'
+                      : 'Tài khoản của bạn đã sở hữu gian hàng "$shopName" trên sàn NovaShop.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF8B7566), height: 1.45),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2F1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.phone_android_rounded, color: Color(0xFF00796B), size: 22),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Để đăng bán sản phẩm, xử lý đơn hàng và rút doanh thu, vui lòng mở ứng dụng riêng biệt ShopNova Seller.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF004D40), height: 1.4, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEE4D2D),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Quay lại Trang Cá Nhân', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExistingRegistrationNoticeBanner() {
+    final isRejected = _existingShop?['status']?.toString() == 'rejected';
+    final version = _existingShop?['approvalVersion'] ?? 1;
+    final reason = _existingShop?['rejectionReason']?.toString() ?? 'Vui lòng rà soát lại thông tin và CCCD.';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isRejected ? Colors.red.shade50 : Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isRejected ? Colors.red.shade200 : Colors.amber.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isRejected ? Icons.cancel_outlined : Icons.hourglass_bottom_rounded,
+                size: 18,
+                color: isRejected ? Colors.red.shade800 : Colors.amber.shade900,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isRejected
+                      ? 'Hồ sơ bị từ chối kiểm duyệt (v$version)'
+                      : 'Hồ sơ đăng ký đang chờ phê duyệt (v$version)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isRejected ? Colors.red.shade900 : Colors.amber.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isRejected
+                ? 'Lý do: $reason\nBạn có thể chỉnh sửa lại hồ sơ bên dưới và gửi xét duyệt lại.'
+                : 'Hồ sơ đã đồng bộ từ máy chủ. Bạn có thể cập nhật chỉnh sửa trong lúc chờ duyệt.',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: isRejected ? Colors.red.shade800 : Colors.amber.shade900,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // GIAO DIỆN 0: MÀN HÌNH CHÀO MỪNG (ĐỒNG BỘ 100% WEBSITE WELCOME)
+  // =========================================================================
+  Widget _buildWelcomeScreen() {
+    final user = _authService.currentUser;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF3E8),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFFCF7),
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFE6D5C2), height: 1),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF49352D)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const NovaLogo(size: 30, fontSize: 17, subtitle: 'Kênh Người Bán'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -471,17 +908,22 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 border: Border.all(color: const Color(0xFFE6D5C2)),
                 boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_hasExistingEditableRegistration) ...[
+                    _buildExistingRegistrationNoticeBanner(),
+                    const SizedBox(height: 20),
+                  ],
+
                   Container(
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFEFE7),
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFBD6E49).withOpacity(0.3), width: 2),
+                      border: Border.all(color: const Color(0xFFBD6E49).withValues(alpha: 0.3), width: 2),
                     ),
                     child: const Center(
                       child: Icon(Icons.storefront_rounded, size: 64, color: Color(0xFFBD6E49)),
@@ -497,11 +939,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   const SizedBox(height: 12),
 
                   const Text(
-                    'Vui lòng cung cấp thông tin để thành lập tài khoản người bán trên NovaShop.',
+                    'Vui lòng cung cấp thông tin để thành lập tài khoản người bán trên NovaShop',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13.5, color: Color(0xFF8B7566), height: 1.4),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   SizedBox(
                     width: double.infinity,
@@ -514,14 +956,41 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                         elevation: 2,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Bắt đầu đăng ký', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        _hasExistingEditableRegistration ? 'Cập nhật hồ sơ đăng ký' : 'Bắt đầu đăng ký',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
 
+                  if (user == null) ...[
+                    const SizedBox(height: 14),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text('Đã có tài khoản? ', style: TextStyle(fontSize: 13, color: Color(0xFF8B7566))),
+                        GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                            if (mounted) {
+                              _prefillFromUser();
+                              _loadExistingRegistration();
+                            }
+                          },
+                          child: const Text(
+                            'Đăng nhập ngay',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFBD6E49)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('← Quay lại trang trước', style: TextStyle(fontSize: 13, color: Color(0xFF8B7566))),
+                    child: const Text('← Quay lại trang chủ mua sắm', style: TextStyle(fontSize: 12.5, color: Color(0xFF8B7566))),
                   ),
                 ],
               ),
@@ -533,7 +1002,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   }
 
   // =========================================================================
-  // THANH STEPPER TRÊN ĐẦU
+  // THANH STEPPER TRÊN ĐẦU (CÓ ĐƯỜNG TIẾN TRÌNH GIỐNG WEBSITE)
   // =========================================================================
   Widget _buildStepperHeader() {
     final steps = [
@@ -544,57 +1013,97 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       {'id': 5, 'title': 'Hoàn tất'},
     ];
 
+    final progressRatio = ((_currentStep.clamp(1, 5) - 1) / (steps.length - 1)).clamp(0.0, 1.0);
+
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFFFFFCF7),
         border: Border(bottom: BorderSide(color: Color(0xFFE6D5C2))),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: steps.map((st) {
-          final id = st['id'] as int;
-          final isCurrent = _currentStep == id;
-          final isCompleted = _currentStep > id;
-
-          Color badgeColor;
-          Widget badgeContent;
-          if (isCompleted) {
-            badgeColor = const Color(0xFFEE4D2D);
-            badgeContent = const Icon(Icons.check, size: 12, color: Colors.white);
-          } else if (isCurrent) {
-            badgeColor = const Color(0xFFEE4D2D);
-            badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white));
-          } else {
-            badgeColor = const Color(0xFFE6D5C2);
-            badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B7566)));
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trackMargin = constraints.maxWidth / (steps.length * 2);
+          return Stack(
+            alignment: Alignment.topCenter,
             children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  shape: BoxShape.circle,
-                  boxShadow: isCurrent ? [BoxShadow(color: const Color(0xFFEE4D2D).withOpacity(0.3), blurRadius: 6)] : null,
-                ),
-                child: Center(child: badgeContent),
+              // Đường nền xám kem nối giữa các nút
+              Positioned(
+                top: 11,
+                left: trackMargin,
+                right: trackMargin,
+                child: Container(height: 2, color: const Color(0xFFE6D5C2)),
               ),
-              const SizedBox(height: 4),
-              Text(
-                st['title'] as String,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                  color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
+              // Đường tiến trình cam #EE4D2D
+              Positioned(
+                top: 11,
+                left: trackMargin,
+                right: trackMargin,
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progressRatio,
+                  child: Container(height: 2, color: const Color(0xFFEE4D2D)),
                 ),
+              ),
+              Row(
+                children: steps.map((st) {
+                  final id = st['id'] as int;
+                  final isCurrent = _currentStep == id;
+                  final isCompleted = _currentStep > id;
+
+                  Color badgeColor;
+                  Widget badgeContent;
+                  if (isCompleted) {
+                    badgeColor = const Color(0xFFEE4D2D);
+                    badgeContent = const Icon(Icons.check, size: 12, color: Colors.white);
+                  } else if (isCurrent) {
+                    badgeColor = const Color(0xFFEE4D2D);
+                    badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white));
+                  } else {
+                    badgeColor = const Color(0xFFE6D5C2);
+                    badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B7566)));
+                  }
+
+                  return Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            shape: BoxShape.circle,
+                            boxShadow: isCurrent
+                                ? [BoxShadow(color: const Color(0xFFEE4D2D).withValues(alpha: 0.28), blurRadius: 6, spreadRadius: 1)]
+                                : null,
+                          ),
+                          child: Center(child: badgeContent),
+                        ),
+                        const SizedBox(height: 5),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              st['title'] as String,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           );
-        }).toList(),
+        },
       ),
     );
   }
@@ -622,6 +1131,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // =========================================================================
   Widget _buildStep1ShopInfo() {
     final user = _authService.currentUser;
+    final emailLocked = _isEmailLockedFromUser;
 
     return Container(
       decoration: BoxDecoration(
@@ -639,11 +1149,14 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _shopNameController,
             maxLength: 30,
+            enabled: !_hasExistingEditableRegistration,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Tên Shop *',
-              hintText: 'Nhập tên gian hàng...',
+              hintText: 'Nhập tên Shop của bạn...',
               counterText: '${_shopNameController.text.length}/30',
+              filled: _hasExistingEditableRegistration,
+              fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
             ),
           ),
           const SizedBox(height: 12),
@@ -651,9 +1164,12 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _shopTaglineController,
             maxLength: 100,
-            decoration: const InputDecoration(
+            enabled: !_hasExistingEditableRegistration,
+            decoration: InputDecoration(
               labelText: 'Slogan gian hàng',
-              hintText: 'Ví dụ: Hàng chính hãng, Giao hàng siêu tốc...',
+              hintText: 'Ví dụ: Thời trang thiết kế chính hãng, Giao hàng siêu tốc...',
+              filled: _hasExistingEditableRegistration,
+              fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
             ),
           ),
           const SizedBox(height: 12),
@@ -686,11 +1202,13 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             OutlinedButton.icon(
               onPressed: _showAddressModal,
               icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-              label: const Text('+ Thêm địa chỉ lấy hàng'),
+              label: const Text('+ Thêm địa chỉ'),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFEE4D2D), style: BorderStyle.solid),
+                backgroundColor: const Color(0xFFFFEFE7),
+                side: const BorderSide(color: Color(0xFFEE4D2D)),
                 foregroundColor: const Color(0xFFEE4D2D),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           const SizedBox(height: 14),
@@ -698,20 +1216,49 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
+            enabled: !emailLocked,
+            decoration: InputDecoration(
               labelText: 'Email liên hệ nhận đơn *',
               hintText: 'email@example.com',
+              filled: emailLocked,
+              fillColor: emailLocked ? Colors.grey.shade100 : null,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Số điện thoại *',
-              hintText: '0901234567',
-              prefixText: '+84 ',
+          const Text('Số điện thoại *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFCF7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6D5C2)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFBF3E8),
+                    border: Border(right: BorderSide(color: Color(0xFFE6D5C2))),
+                  ),
+                  child: const Text('+84', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      hintText: 'Nhập số điện thoại...',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -719,9 +1266,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             const SizedBox(height: 20),
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFFFEFE7).withOpacity(0.5),
+                color: const Color(0xFFFFEFE7).withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEE4D2D).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFFEE4D2D).withValues(alpha: 0.4)),
               ),
               padding: const EdgeInsets.all(14),
               child: Column(
@@ -729,9 +1276,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.person_add_alt_1_outlined, color: Color(0xFFEE4D2D), size: 18),
+                      Icon(Icons.storefront_outlined, color: Color(0xFFEE4D2D), size: 18),
                       SizedBox(width: 8),
-                      Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                      Expanded(
+                        child: Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -806,7 +1355,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   children: [
                     Icon(Icons.local_shipping_outlined, color: Color(0xFFEE4D2D), size: 18),
                     SizedBox(width: 8),
-                    Text('Phương thức vận chuyển đối tác', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF49352D))),
+                    Expanded(
+                      child: Text('Cài đặt phương thức vận chuyển cho Shop', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF49352D))),
+                    ),
                   ],
                 ),
                 SizedBox(height: 4),
@@ -838,7 +1389,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
 
           _buildShippingMethodTile(
             title: '🚀 Vận chuyển Hỏa Tốc',
-            subtitle: 'Ahamove, GrabExpress. Giao siêu tốc trong 1–2 giờ (nội thành cùng tỉnh/thành phố).',
+            subtitle: 'Ahamove, GrabExpress. Giao siêu tốc trong 1–2 giờ (áp dụng nội thành cùng tỉnh/thành phố).',
             value: _shippingHoaToc,
             onChanged: (val) => setState(() => _shippingHoaToc = val),
           ),
@@ -847,9 +1398,15 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           const Text('Tỉnh / Thành phố kho gửi hàng:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            value: _selectedProvince,
+            initialValue: kVietnamProvinces.contains(_selectedProvince) ? _selectedProvince : 'TP. Hồ Chí Minh',
+            isExpanded: true,
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
-            items: kVietnamProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
+            items: kVietnamProvincesWithRegion
+                .map((p) => DropdownMenuItem(
+                      value: p['name'],
+                      child: Text('${p['name']} (${p['region']})', style: const TextStyle(fontSize: 13)),
+                    ))
+                .toList(),
             onChanged: (val) {
               if (val != null) setState(() => _selectedProvince = val);
             },
@@ -879,7 +1436,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           title: Row(
             children: [
-              Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+              Flexible(
+                child: Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+              ),
               if (badge != null) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -915,7 +1474,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Loại hình kinh doanh *', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+          const Text('Loại hình kinh doanh:', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
           const SizedBox(height: 10),
 
           Row(
@@ -933,7 +1492,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             controller: _ownerNameController,
             decoration: const InputDecoration(
               labelText: 'Họ và tên chủ sở hữu / Người đại diện *',
-              hintText: 'Họ tên đúng trên CMND/CCCD...',
+              hintText: 'Họ và tên trên giấy tờ...',
             ),
           ),
           const SizedBox(height: 12),
@@ -942,9 +1501,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             controller: _idCardController,
             keyboardType: TextInputType.number,
             maxLength: 12,
-            decoration: const InputDecoration(
-              labelText: 'Số CMND / CCCD / Hộ chiếu (9–12 số) *',
-              hintText: 'Ví dụ: 001201012345',
+            decoration: InputDecoration(
+              labelText: 'Số CMND / CCCD / Hộ chiếu (9 - 12 chữ số) *',
+              hintText: _maskedIdLast4 != null && _maskedIdLast4!.isNotEmpty
+                  ? 'Đã lưu ******$_maskedIdLast4 (nhập lại đầy đủ 9–12 số)'
+                  : 'Ví dụ: 001201012345',
             ),
           ),
         ],
@@ -1039,11 +1600,21 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             child: CheckboxListTile(
               activeColor: const Color(0xFFEE4D2D),
               contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
               value: _agreeTerms,
               onChanged: (val) => setState(() => _agreeTerms = val ?? false),
-              title: const Text(
-                'Tôi cam kết mọi thông tin khai báo trên là chính xác, không vi phạm bản quyền thương hiệu và đồng ý tuân thủ Quy chế hoạt động sàn TMĐT NovaShop.',
-                style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF49352D)),
+              title: const Text.rich(
+                TextSpan(
+                  style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF49352D)),
+                  children: [
+                    TextSpan(text: 'Tôi cam kết mọi thông tin khai báo trên là chính xác, không vi phạm bản quyền thương hiệu và đồng ý tuân thủ '),
+                    TextSpan(
+                      text: 'Quy chế hoạt động sàn TMĐT NovaShop',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D)),
+                    ),
+                    TextSpan(text: '.'),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1080,15 +1651,17 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             ),
             const SizedBox(height: 20),
 
-            const Text(
-              'Đăng ký mở gian hàng thành công!',
+            Text(
+              _hasExistingEditableRegistration
+                  ? 'Cập nhật hồ sơ gian hàng thành công!'
+                  : 'Đăng ký mở gian hàng thành công!',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
             ),
             const SizedBox(height: 8),
 
             Text(
-              'Hồ sơ gian hàng "$shopName" của bạn đã được khởi tạo và gửi lên Ban Quản Trị NovaShop.',
+              'Hồ sơ gian hàng "$shopName" của bạn đã được ghi nhận và gửi lên Ban Quản Trị NovaShop.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: Color(0xFF8B7566)),
             ),
@@ -1113,7 +1686,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ban Quản Trị sẽ xét duyệt hồ sơ trong thời gian sớm nhất. Bạn đã có thể bắt đầu mở ứng dụng ShopNova Seller để đăng bán và quản lý sản phẩm.',
+                    'Ban Quản Trị sẽ xét duyệt hồ sơ trong thời gian sớm nhất. Bạn đã có thể mở ứng dụng ShopNova Seller để đăng bán và quản lý gian hàng.',
                     style: TextStyle(fontSize: 11.5, color: Colors.amber.shade900),
                   ),
                 ],
@@ -1130,6 +1703,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEE4D2D),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Hoàn Tất & Về Trang Cá Nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1154,39 +1728,50 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          OutlinedButton(
-            onPressed: _submitting
-                ? null
-                : () {
-                    if (_currentStep > 1) {
-                      setState(() => _currentStep--);
-                    } else {
-                      setState(() => _currentStep = 0);
-                    }
-                  },
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              side: const BorderSide(color: Color(0xFFE6D5C2)),
-            ),
-            child: Text(
-              _currentStep > 1 ? 'Quay lại' : 'Hủy',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B7566)),
+          Flexible(
+            child: OutlinedButton(
+              onPressed: _submitting
+                  ? null
+                  : () {
+                      if (_currentStep > 1) {
+                        setState(() => _currentStep--);
+                      } else {
+                        setState(() => _currentStep = 0);
+                      }
+                    },
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                side: const BorderSide(color: Color(0xFFE6D5C2)),
+              ),
+              child: Text(
+                _currentStep > 1 ? 'Quay lại' : 'Hủy',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B7566)),
+              ),
             ),
           ),
-          ElevatedButton(
-            onPressed: _submitting ? null : _handleNextStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEE4D2D),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _handleNextStep,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: const Color(0xFFEE4D2D),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: _submitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(
+                      _currentStep == 4
+                          ? (_hasExistingEditableRegistration ? 'Lưu & Gửi duyệt lại' : 'Hoàn tất & Gửi duyệt')
+                          : 'Tiếp theo',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
-            child: _submitting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text(
-                    _currentStep == 4 ? 'Hoàn tất & Gửi duyệt' : 'Tiếp theo',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
           ),
         ],
       ),

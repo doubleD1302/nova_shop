@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -383,7 +383,7 @@ class AuthService extends ChangeNotifier {
     return false;
   }
 
-  /// Đăng ký tài khoản người dùng mới
+  /// Đăng ký tài khoản người dùng mới (Buyer hoặc Seller kèm sellerProfile)
   Future<bool> register({
     required String username,
     required String password,
@@ -411,27 +411,19 @@ class AuthService extends ChangeNotifier {
       if (role == 'seller' && shopName != null && shopName.trim().isNotEmpty) {
         payload['shopName'] = shopName.trim();
       }
-      if (role == 'seller' && shopTagline != null && shopTagline.trim().isNotEmpty) {
+      if (role == 'seller' && shopTagline != null) {
         payload['shopTagline'] = shopTagline.trim();
       }
       if (role == 'seller' && sellerProfile != null) {
         payload['sellerProfile'] = sellerProfile;
       }
 
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.registerUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await _client.post('/api/v1/auth/register', body: payload);
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
-
-      if ((response.statusCode == 200 || response.statusCode == 201) && body['success'] == true) {
-        final data = body['data'] as Map<String, dynamic>;
-        _token = data['token'] as String?;
-        if (_token != null) {
+      if (response.success && response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        _token = data['token']?.toString();
+        if (_token != null && _token!.isNotEmpty) {
           await _client.saveToken(_token!);
         }
         if (data['refreshToken'] != null) {
@@ -441,7 +433,7 @@ class AuthService extends ChangeNotifier {
             await prefs.setString(_refreshTokenKey, _refreshToken!);
           } catch (_) {}
         }
-        if (data['user'] != null) {
+        if (data['user'] is Map<String, dynamic>) {
           _currentUser = User.fromJson(data['user'] as Map<String, dynamic>);
           await _saveUserToLocal(_currentUser!);
         }
@@ -459,7 +451,7 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _lastError = body['message'] as String? ?? 'Đăng ký không thành công.';
+        _lastError = response.message.isNotEmpty ? response.message : 'Đăng ký không thành công.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -473,11 +465,11 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Đăng ký mở gian hàng đối tác người bán (Seller Shop)
-  /// Gọi API mới của Backend: POST /api/v1/auth/seller-shop
+  /// Đăng ký mở gian hàng đối tác người bán cho tài khoản đang đăng nhập
+  /// Gọi đúng API Website: POST /api/v1/auth/seller-shop
   Future<bool> registerSellerShop({
     required String shopName,
-    String province = 'TP. Hồ Chí Minh',
+    String? province,
     String? tagline,
     Map<String, dynamic>? sellerProfile,
   }) async {
@@ -490,7 +482,7 @@ class AuthService extends ChangeNotifier {
         '/api/v1/auth/seller-shop',
         body: {
           'shopName': shopName.trim(),
-          if (tagline != null && tagline.trim().isNotEmpty) 'shopTagline': tagline.trim(),
+          'shopTagline': (tagline ?? '').trim(),
           if (sellerProfile != null) 'sellerProfile': sellerProfile,
         },
       );
@@ -512,21 +504,7 @@ class AuthService extends ChangeNotifier {
           } catch (_) {}
         }
 
-        // 2. Cập nhật thông tin gian hàng chi tiết (tỉnh/thành, tagline) nếu có truyền vào
-        if ((tagline != null && tagline.trim().isNotEmpty) || province.trim().isNotEmpty) {
-          try {
-            await _client.put(
-              '/api/v1/seller/shop',
-              body: {
-                'name': shopName.trim(),
-                'province': province.trim(),
-                if (tagline != null && tagline.trim().isNotEmpty) 'tagline': tagline.trim(),
-              },
-            );
-          } catch (_) {}
-        }
-
-        // 3. Cập nhật User hiện tại sang role seller và shopId
+        // 2. Cập nhật User hiện tại sang role seller và shopId
         final shopObj = data['shop'];
         final newShopId = (shopObj is Map && shopObj['shopId'] != null)
             ? shopObj['shopId'].toString()
@@ -561,6 +539,23 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Lấy hồ sơ đăng ký KYC hiện tại của gian hàng: GET /api/v1/seller/shop/registration
+  Future<Map<String, dynamic>?> getSellerRegistration() async {
+    final res = await _client.get('/api/v1/seller/shop/registration');
+    if (res.success && res.data is Map<String, dynamic>) {
+      final data = res.data as Map<String, dynamic>;
+      if (data['profile'] is Map<String, dynamic>) {
+        return data['profile'] as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  /// Cập nhật hồ sơ đăng ký KYC khi shop đang pending hoặc rejected: PUT /api/v1/seller/shop/registration
+  Future<ApiResponse> updateSellerRegistration(Map<String, dynamic> sellerProfile) async {
+    return await _client.put('/api/v1/seller/shop/registration', body: sellerProfile);
   }
 
   /// Lấy thông tin tài khoản hiện tại từ Backend qua JWT token
