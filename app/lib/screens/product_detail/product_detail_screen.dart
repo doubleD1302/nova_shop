@@ -411,28 +411,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                                 }
 
                                 setModalState(() => isSubmitting = true);
-                                final pId = widget.productId ?? _product?.id ?? '';
-                                final eligibleItems = await _reviewService.getEligibleReviewItems(pId);
-                                final eligibleOrderItemId = eligibleItems.isNotEmpty
-                                    ? (eligibleItems.first['orderItemId'] ?? eligibleItems.first['id'] ?? pId).toString()
-                                    : pId;
-                                final res = await _reviewService.createReview(
-                                  productId: pId,
-                                  orderItemId: eligibleOrderItemId,
-                                  rating: selectedRating,
-                                  comment: text,
-                                );
-                                setModalState(() => isSubmitting = false);
-
-                                if (mounted) {
-                                  Navigator.pop(ctx);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(res.success ? 'Cảm ơn bạn đã gửi đánh giá!' : (res.message.isNotEmpty ? res.message : 'Đánh giá đã được ghi nhận!')),
-                                      backgroundColor: Colors.green,
-                                    ),
+                                try {
+                                  final pId = widget.productId ?? _product?.id ?? '';
+                                  final eligibleItems = await _reviewService.getEligibleReviewItems(pId);
+                                  if (eligibleItems.isEmpty) throw Exception('Chỉ người mua đã nhận sản phẩm mới được đánh giá.');
+                                  final itemId = eligibleItems.first['orderItemId'];
+                                  if (itemId == null) throw Exception('Không nhận được mã sản phẩm đã mua.');
+                                  final res = await _reviewService.createReview(
+                                    productId: pId, orderItemId: itemId.toString(), rating: selectedRating, comment: text,
                                   );
-                                  _loadReviewsAndSocial(pId);
+                                  if (!res.success) throw Exception(res.message.isNotEmpty ? res.message : 'Không thể gửi đánh giá.');
+                                  if (mounted && ctx.mounted) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cảm ơn bạn đã gửi đánh giá!')));
+                                    _loadReviewsAndSocial(pId);
+                                  }
+                                } catch (error) {
+                                  if (mounted) {
+                                    final message = error.toString().replaceFirst('Exception: ', '');
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                                  }
+                                } finally {
+                                  if (ctx.mounted) setModalState(() => isSubmitting = false);
                                 }
                               },
                         style: ElevatedButton.styleFrom(

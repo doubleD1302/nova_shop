@@ -119,7 +119,7 @@ class ReviewService {
         return (response.data as List).whereType<Map<String, dynamic>>().toList();
       }
     }
-    return [];
+    throw Exception(response.message.isEmpty ? 'Không thể kiểm tra quyền đánh giá.' : response.message);
   }
 
   /// Gửi đánh giá cho sản phẩm đã nhận hàng
@@ -136,6 +136,7 @@ class ReviewService {
         : orderItemId.trim();
     return await _client.post(
       '/api/v1/products/$targetProductId/reviews',
+      retryOnFailure: false,
       body: {
         'orderItemId': int.tryParse(orderItemId) ?? orderItemId,
         'rating': rating,

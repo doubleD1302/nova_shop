@@ -1,5 +1,6 @@
 ﻿import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/user.dart';
 import 'package:shopnova/config/api_config.dart';
@@ -7,6 +8,8 @@ import 'package:shopnova/services/auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  FlutterSecureStorage.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({});
 
   group('ApiConfig Tests', () {
     test('Default endpoints are formatted correctly', () {

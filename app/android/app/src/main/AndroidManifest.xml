@@ -3,6 +3,7 @@
     <application
         android:label="shopnova"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <activity

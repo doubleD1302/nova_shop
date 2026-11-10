@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/address_service.dart';
@@ -11,6 +12,7 @@ void main() {
   test('Sổ địa chỉ dùng API và gửi token của tài khoản', () async {
     HttpOverrides.global = null;
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     ApiConfig.setBaseUrl('http://127.0.0.1:${server.port}');
     await ApiClient().saveToken('test-token');

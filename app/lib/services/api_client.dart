@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'session_store.dart';
 import '../config/api_config.dart';
 
 /// Kết quả phản hồi chuẩn từ Backend ShopNova
@@ -33,7 +35,9 @@ class ApiResponse {
           message: decoded['message']?.toString() ?? '',
           data: decoded['data'],
           error: decoded['error'],
-          meta: decoded['meta'] is Map<String, dynamic> ? decoded['meta'] as Map<String, dynamic> : null,
+          meta: decoded['meta'] is Map<String, dynamic>
+              ? decoded['meta'] as Map<String, dynamic>
+              : null,
         );
       }
     } catch (_) {}
@@ -48,7 +52,11 @@ class ApiResponse {
     );
   }
 
-  factory ApiResponse.error(String message, {int statusCode = 500, dynamic error}) {
+  factory ApiResponse.error(
+    String message, {
+    int statusCode = 500,
+    dynamic error,
+  }) {
     return ApiResponse(
       success: false,
       statusCode: statusCode,
@@ -64,41 +72,70 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  static const String _tokenKey = 'novashop_jwt_token';
+  final SessionStore _sessionStore = SessionStore();
   String? _cachedToken;
+  Future<bool> Function()? sessionRefresher;
+  Future<bool>? _refreshing;
+  int _sessionEpoch = 0;
+  int _tokenVersion = 0;
+  bool _tokenLoaded = false;
 
-  /// Lấy access token hiện tại
+  // Invalidate requests immediately, before asynchronous logout cleanup finishes.
+  void invalidateSession({bool clearToken = true}) {
+    _sessionEpoch++;
+    _tokenVersion++;
+    if (clearToken) {
+      _cachedToken = null;
+      _tokenLoaded = true;
+    }
+    _refreshing = null;
+  }
+
   Future<String?> getToken() async {
-    if (_cachedToken != null) return _cachedToken;
-    final prefs = await SharedPreferences.getInstance();
-    _cachedToken = prefs.getString(_tokenKey);
+    if (_tokenLoaded) return _cachedToken;
+    final version = _tokenVersion;
+    final token = await _sessionStore.read(SessionStore.accessKey);
+    if (version == _tokenVersion) {
+      _cachedToken = token;
+      _tokenLoaded = true;
+    }
     return _cachedToken;
   }
 
-  /// Lưu access token mới
   Future<void> saveToken(String token) async {
-    _cachedToken = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    final version = ++_tokenVersion;
+    _tokenLoaded = true;
+    await _sessionStore.write(SessionStore.accessKey, token);
+    if (version == _tokenVersion) _cachedToken = token;
   }
 
-  /// Xóa token khi đăng xuất
-  Future<void> clearToken() async {
-    _cachedToken = null;
+  Future<void> clearToken({bool invalidate = true}) async {
+    if (invalidate) invalidateSession();
+    await _sessionStore.delete(SessionStore.accessKey);
+  }
+
+  Future<bool> _refreshOnce() async {
+    if (sessionRefresher == null) return false;
+    if (_refreshing != null) return _refreshing!;
+    final pending = sessionRefresher!();
+    _refreshing = pending;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_tokenKey);
-    } catch (_) {}
+      return await pending;
+    } finally {
+      if (identical(_refreshing, pending)) _refreshing = null;
+    }
   }
 
   /// Tạo headers mặc định kèm Bearer token (nếu có)
-  Future<Map<String, String>> _buildHeaders([Map<String, String>? customHeaders]) async {
+  Map<String, String> _buildHeaders(
+    String? token,
+    Map<String, String>? customHeaders,
+  ) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
 
-    final token = await getToken();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -110,23 +147,86 @@ class ApiClient {
     return headers;
   }
 
-  Future<ApiResponse> _executeWithAutoReconnect(Future<http.Response> Function() doRequest, {bool retryOnFailure = true}) async {
+  Future<ApiResponse> _executeWithAutoReconnect(
+    Future<http.Response> Function(Map<String, String> headers, String baseUrl)
+    doRequest, {
+    Map<String, String>? headers,
+    bool retryOnFailure = true,
+  }) async {
+    final epoch = _sessionEpoch;
+    final baseUrl = ApiConfig.baseUrl;
+    String? sentToken;
+    final customAuth =
+        headers?.keys.any((key) => key.toLowerCase() == 'authorization') ??
+        false;
+    ApiResponse sessionChanged() => ApiResponse.error(
+      'Phiên đăng nhập đã thay đổi. Vui lòng thử lại.',
+      statusCode: 401,
+    );
     try {
-      final res = await doRequest();
-      return ApiResponse.fromResponse(res);
+      sentToken = await getToken();
+      if (epoch != _sessionEpoch) return sessionChanged();
+      final res = await doRequest(_buildHeaders(sentToken, headers), baseUrl);
+      if (epoch != _sessionEpoch || baseUrl != ApiConfig.baseUrl) {
+        return sessionChanged();
+      }
+      final result = ApiResponse.fromResponse(res);
+      final code = result.error is Map ? result.error['code'] : null;
+      if (!customAuth &&
+          sentToken != null &&
+          res.statusCode == 401 &&
+          (code == 'AUTH_EXPIRED' || code == 'AUTH_INVALID')) {
+        // A late 401 may arrive after another request already refreshed this session.
+        if (sentToken == await getToken() && !await _refreshOnce()) {
+          return result;
+        }
+        if (epoch != _sessionEpoch || baseUrl != ApiConfig.baseUrl) {
+          return sessionChanged();
+        }
+        final token = await getToken();
+        if (token != null && token != sentToken) {
+          final retried = await doRequest(
+            _buildHeaders(token, headers),
+            baseUrl,
+          );
+          if (epoch != _sessionEpoch || baseUrl != ApiConfig.baseUrl) {
+            return sessionChanged();
+          }
+          return ApiResponse.fromResponse(retried);
+        }
+      }
+      return result;
     } catch (_) {
-      if (!retryOnFailure) {
-        return ApiResponse.error('Không nhận được phản hồi. Hãy kiểm tra lại kết quả trước khi thử lại.');
+      // Không gửi token của phiên sang một Backend khác khi dò lại máy chủ.
+      if (!retryOnFailure ||
+          sentToken != null ||
+          customAuth ||
+          epoch != _sessionEpoch ||
+          !_tokenLoaded ||
+          _cachedToken != null) {
+        return ApiResponse.error(
+          'Không nhận được phản hồi. Hãy kiểm tra lại kết quả trước khi thử lại.',
+        );
       }
       try {
         ApiConfig.resetBaseUrl();
         await ApiConfig.autoDetectBaseUrl();
-        final retryRes = await doRequest();
+        if (epoch != _sessionEpoch || await getToken() != null) {
+          return sessionChanged();
+        }
+        final retryRes = await doRequest(
+          _buildHeaders(null, headers),
+          ApiConfig.baseUrl,
+        );
         return ApiResponse.fromResponse(retryRes);
       } on SocketException {
-        return ApiResponse.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng internet.');
+        return ApiResponse.error(
+          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng internet.',
+        );
       } on TimeoutException {
-        return ApiResponse.error('Kết nối quá thời gian chờ (Timeout). Vui lòng thử lại sau.');
+        return ApiResponse.error(
+          'Kết nối quá thời gian chờ (Timeout). Vui lòng thử lại sau.',
+        );
       } catch (e) {
         return ApiResponse.error('Không thể kết nối đến máy chủ API: $e');
       }
@@ -134,61 +234,110 @@ class ApiClient {
   }
 
   /// Gửi HTTP GET
-  Future<ApiResponse> get(String endpoint, {Map<String, String>? queryParams, Map<String, String>? headers, bool retryOnFailure = true}) async {
-    return _executeWithAutoReconnect(() async {
-      final uri = _buildUri(endpoint, queryParams);
-      final reqHeaders = await _buildHeaders(headers);
-      return await http.get(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-    }, retryOnFailure: retryOnFailure);
+  Future<ApiResponse> get(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+    bool retryOnFailure = true,
+  }) async {
+    return _executeWithAutoReconnect(
+      (reqHeaders, baseUrl) async {
+        final uri = _buildUri(baseUrl, endpoint, queryParams);
+        return await http
+            .get(uri, headers: reqHeaders)
+            .timeout(ApiConfig.timeout);
+      },
+      headers: headers,
+      retryOnFailure: retryOnFailure,
+    );
   }
 
   /// Gửi HTTP POST
-  Future<ApiResponse> post(String endpoint, {dynamic body, Map<String, String>? headers, bool retryOnFailure = true}) async {
-    return _executeWithAutoReconnect(() async {
-      final uri = _buildUri(endpoint);
-      final reqHeaders = await _buildHeaders(headers);
-      final jsonBody = body != null ? jsonEncode(body) : null;
-      return await http.post(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-    }, retryOnFailure: retryOnFailure);
+  Future<ApiResponse> post(
+    String endpoint, {
+    dynamic body,
+    Map<String, String>? headers,
+    bool retryOnFailure = true,
+  }) async {
+    return _executeWithAutoReconnect(
+      (reqHeaders, baseUrl) async {
+        final uri = _buildUri(baseUrl, endpoint);
+        final jsonBody = body != null ? jsonEncode(body) : null;
+        return await http
+            .post(uri, headers: reqHeaders, body: jsonBody)
+            .timeout(ApiConfig.timeout);
+      },
+      headers: headers,
+      retryOnFailure: retryOnFailure,
+    );
   }
 
   /// Gửi HTTP PUT
-  Future<ApiResponse> put(String endpoint, {dynamic body, Map<String, String>? headers}) async {
-    return _executeWithAutoReconnect(() async {
-      final uri = _buildUri(endpoint);
-      final reqHeaders = await _buildHeaders(headers);
+  Future<ApiResponse> put(
+    String endpoint, {
+    dynamic body,
+    Map<String, String>? headers,
+  }) async {
+    return _executeWithAutoReconnect((reqHeaders, baseUrl) async {
+      final uri = _buildUri(baseUrl, endpoint);
       final jsonBody = body != null ? jsonEncode(body) : null;
-      return await http.put(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-    });
+      return await http
+          .put(uri, headers: reqHeaders, body: jsonBody)
+          .timeout(ApiConfig.timeout);
+    }, headers: headers);
   }
 
   /// Gửi HTTP DELETE
-  Future<ApiResponse> delete(String endpoint, {Map<String, String>? headers, bool retryOnFailure = true}) async {
-    return _executeWithAutoReconnect(() async {
-      final uri = _buildUri(endpoint);
-      final reqHeaders = await _buildHeaders(headers);
-      return await http.delete(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-    }, retryOnFailure: retryOnFailure);
+  Future<ApiResponse> delete(
+    String endpoint, {
+    Map<String, String>? headers,
+    bool retryOnFailure = true,
+  }) async {
+    return _executeWithAutoReconnect(
+      (reqHeaders, baseUrl) async {
+        final uri = _buildUri(baseUrl, endpoint);
+        return await http
+            .delete(uri, headers: reqHeaders)
+            .timeout(ApiConfig.timeout);
+      },
+      headers: headers,
+      retryOnFailure: retryOnFailure,
+    );
   }
 
   /// Gửi HTTP PATCH
-  Future<ApiResponse> patch(String endpoint, {dynamic body, Map<String, String>? headers, bool retryOnFailure = true}) async {
-    return _executeWithAutoReconnect(() async {
-      final uri = _buildUri(endpoint);
-      final reqHeaders = await _buildHeaders(headers);
-      final jsonBody = body != null ? jsonEncode(body) : null;
-      return await http.patch(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-    }, retryOnFailure: retryOnFailure);
+  Future<ApiResponse> patch(
+    String endpoint, {
+    dynamic body,
+    Map<String, String>? headers,
+    bool retryOnFailure = true,
+  }) async {
+    return _executeWithAutoReconnect(
+      (reqHeaders, baseUrl) async {
+        final uri = _buildUri(baseUrl, endpoint);
+        final jsonBody = body != null ? jsonEncode(body) : null;
+        return await http
+            .patch(uri, headers: reqHeaders, body: jsonBody)
+            .timeout(ApiConfig.timeout);
+      },
+      headers: headers,
+      retryOnFailure: retryOnFailure,
+    );
   }
 
   /// Ghép base URL với endpoint và query parameters
-  Uri _buildUri(String endpoint, [Map<String, String>? queryParams]) {
+  Uri _buildUri(
+    String baseUrl,
+    String endpoint, [
+    Map<String, String>? queryParams,
+  ]) {
     final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-    final fullUrl = '${ApiConfig.baseUrl}$cleanEndpoint';
+    final fullUrl = '$baseUrl$cleanEndpoint';
     final parsed = Uri.parse(fullUrl);
 
     if (queryParams != null && queryParams.isNotEmpty) {
-      final merged = Map<String, String>.from(parsed.queryParameters)..addAll(queryParams);
+      final merged = Map<String, String>.from(parsed.queryParameters)
+        ..addAll(queryParams);
       return parsed.replace(queryParameters: merged);
     }
 
