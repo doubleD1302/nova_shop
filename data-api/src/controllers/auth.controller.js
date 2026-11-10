@@ -832,6 +832,12 @@ export async function refreshSession(req, res, next) {
     const normalizedNewHash = newRefreshTokenHash.toLowerCase()
 
     const result = await executeTransaction(async (query) => {
+      // Đồng bộ cùng thứ tự khóa user → session với luồng đổi mật khẩu. Tra cứu
+      // không khóa trước để xác định chủ phiên; sau đó kiểm tra lại phiên có khóa.
+      const owners = await query('SELECT user_id FROM sessions WHERE token_hash = ?', [normalizedTokenHash])
+      if (!owners.length) return { error: 'SESSION_NOT_FOUND' }
+      const users = await query('SELECT id FROM users WHERE id = ? FOR UPDATE', [owners[0].user_id])
+      if (!users.length) return { error: 'SESSION_NOT_FOUND' }
       const rows = await query(
         `SELECT s.id, s.user_id, s.expires_at, s.revoked_at,
                 u.id AS user_id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
@@ -851,6 +857,7 @@ export async function refreshSession(req, res, next) {
       }
 
       const session = rows[0]
+      if (String(session.user_id) !== String(owners[0].user_id)) return { error: 'SESSION_NOT_FOUND' }
       if (session.revoked_at) {
         return { error: 'SESSION_REVOKED' }
       }

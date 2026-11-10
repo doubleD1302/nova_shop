@@ -2,6 +2,9 @@ import { env } from '../config/env.js'
 import { decryptIdentity, encryptIdentity } from '../utils/seller-profile.js'
 
 export async function rotateSellerIdentities({ query, transaction, mode }) {
+  if (!['check', 'apply'].includes(mode) || !env.sellerIdentityKey) {
+    throw new Error('INVALID_IDENTITY_ROTATION_CONFIG')
+  }
   let lastId = '0'
   let scanned = 0
   let oldCount = 0

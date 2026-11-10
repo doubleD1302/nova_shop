@@ -27,6 +27,10 @@ app.use(helmet())
 
 // 2. Phân tích cú pháp dữ liệu JSON từ body request (giới hạn tối đa 1MB)
 app.use(express.json({ limit: '1mb' }))
+app.use(['/internal/v1/admin/shops/:shopId/identity-access', '/internal/v1/admin/shops/:shopId/identity-access-events'], (req, res, next) => {
+  res.set('Cache-Control', 'no-store')
+  next()
+})
 
 // 3. Khai báo các API routes nội bộ với tiền tố /internal/v1
 // Bắt buộc xác thực dịch vụ bằng header x-service-key cho toàn bộ route /internal/v1/*

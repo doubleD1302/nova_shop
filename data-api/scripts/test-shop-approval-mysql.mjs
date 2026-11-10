@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -13,7 +15,12 @@ const mysql = requireData('mysql2/promise')
 const dbName = `shopnova_test_approval_${Date.now()}`
 const port = Number(process.env.SHOP_APPROVAL_DB_PORT)
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Cần SHOP_APPROVAL_DB_PORT của MySQL thử nghiệm riêng.')
+const isolatedRoot = fs.realpathSync(process.env.SHOP_APPROVAL_TEST_ROOT || '.')
+const tmpRoot = fs.realpathSync(os.tmpdir())
+if (path.dirname(isolatedRoot).toLowerCase() !== tmpRoot.toLowerCase() || !path.basename(isolatedRoot).startsWith('shopnova-approval-db-') || !fs.existsSync(path.join(isolatedRoot, '.shopnova-approval-isolated'))) throw new Error('Cần thư mục dữ liệu test cô lập có marker.')
 const db = await mysql.createConnection({ host: '127.0.0.1', port, user: process.env.SHOP_APPROVAL_DB_USER || 'root', password: process.env.SHOP_APPROVAL_DB_PASSWORD, multipleStatements: true })
+const [[serverInfo]] = await db.query('SELECT @@datadir AS datadir')
+if (fs.realpathSync(serverInfo.datadir).toLowerCase() !== fs.realpathSync(path.join(isolatedRoot, 'data')).toLowerCase()) { await db.end(); throw new Error('MySQL không dùng thư mục dữ liệu test cô lập.') }
 let dataServer, backendServer, closeDatabase
 const listen = (app) => new Promise((resolve) => { const server = app.listen(0, '127.0.0.1', () => resolve(server)) })
 try {
@@ -31,11 +38,12 @@ try {
   const [[fresh]] = await db.query('SELECT status FROM shops WHERE id = 4')
   assert.equal(fresh.status, 'pending')
   await db.query('DROP TABLE shop_approval_events; DROP TABLE shops; DROP TABLE users')
-  // Mô phỏng những cột đã có từ migration trước, dùng schema/seed dự án mới.
+  // Sau probe migration legacy, dùng schema/seed hiện tại cho HTTP regression.
   await db.query(fs.readFileSync(path.join(root, 'database/schema.sql'), 'utf8'))
   await db.query(fs.readFileSync(path.join(root, 'database/seed.sql'), 'utf8'))
-  await db.query("ALTER TABLE shops ADD COLUMN suspension_reason VARCHAR(1000) NULL, ADD COLUMN suspended_by BIGINT UNSIGNED NULL, ADD COLUMN suspended_at DATETIME(3) NULL; ALTER TABLE products ADD COLUMN approval_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending', ADD COLUMN rejection_reason VARCHAR(1000) NULL, ADD COLUMN reviewed_by BIGINT UNSIGNED NULL, ADD COLUMN reviewed_at DATETIME(3) NULL; CREATE TABLE shop_violations (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, shop_id BIGINT UNSIGNED NOT NULL, action_taken VARCHAR(30), email_status VARCHAR(30))")
   const [admin] = await db.query("INSERT INTO users(username,password_hash,full_name,role) VALUES ('test_admin','test','Admin','admin')")
+  process.env.SELLER_IDENTITY_KEY = randomBytes(32).toString('base64')
+  process.env.ALLOW_LOCAL_DB_FALLBACK = 'false'
   Object.assign(process.env, { DOTENV_CONFIG_PATH: path.join(root, 'nonexistent-shop-test.env'), NODE_ENV: 'test', DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_USER: process.env.SHOP_APPROVAL_DB_USER || 'root', DB_PASSWORD: process.env.SHOP_APPROVAL_DB_PASSWORD, DB_NAME: dbName, DB_SSL_ENABLED: 'false', DATA_API_KEY: 'shop-approval-isolated-test-key', JWT_SECRET: 'shop-approval-test-jwt-secret-long-1234567890', DB_READINESS_TIMEOUT_MS: '4500' })
   const dataApp = (await import(pathToFileURL(path.join(root, 'data-api/src/app.js')))).default
   ;({ closeDatabase } = await import(pathToFileURL(path.join(root, 'data-api/src/config/database.js'))))
@@ -73,7 +81,7 @@ try {
   assert.equal(stock.stock_qty, 5)
   r = await call('POST', '/cart/items', { variantId: String(variant.insertId), qty: 1 }, token); assert.equal(r.status, 400, JSON.stringify(r))
   assert.equal((await call('POST', '/chat/conversations', { shopId: shop.id }, token)).status, 404)
-  const productInput = { name: 'Test product', categoryId: 'thoi-trang-nam', description: 'Mô tả', price: 100, stock: 5, images: [1,2,3,4].map((n) => ({ url: `/uploads/test${n}.jpg` })) }
+  const productInput = { name: 'Test product', categoryId: 'thoi-trang-nam', description: 'Mô tả', price: 100, stock: 5, images: [1,2,3,4].map((n) => ({ url: `https://upload.wikimedia.org/wikipedia/commons/fixture-${n}.jpg`, sourcePageUrl: `https://commons.wikimedia.org/wiki/File:Fixture-${n}.jpg`, author: 'Validation fixture', licenseName: 'CC0', licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/' })) }
   r = await call('POST', '/seller/products', productInput, token); assert.equal(r.error.code, 'SHOP_INACTIVE', JSON.stringify(r))
   r = await call('PUT', `/seller/products/${product.insertId}`, productInput, token); assert.equal(r.error.code, 'SHOP_INACTIVE', JSON.stringify(r))
   assert.equal((await call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 1 }, token)).status, 403)
@@ -96,14 +104,19 @@ try {
   assert.equal(r.error.code, 'SHOP_REQUIRES_APPROVAL', JSON.stringify(r))
   r = await call('PUT', '/seller/shop', { ...profile, name: 'Shop edited' }, token); assert.equal(r.status, 200); assert.equal(r.data.shop.approvalVersion, 3)
   r = await call('POST', '/seller/shop/resubmit', {}, token); assert.equal(r.status, 200); assert.equal(r.data.approvalVersion, 4)
-  const results = await Promise.all([call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 4 }, adminToken), call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 4 }, adminToken)])
+  r = await call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 4 }, adminToken)
+  assert.equal(r.error.code, 'SHOP_PROFILE_REQUIRED')
+  const registration = { pickupAddress: '123 Test', province: 'Test', contactEmail: 'owner@example.test', contactPhone: '0900000000', shippingMethods: ['nhanh', 'tietkiem'], businessType: 'personal', ownerName: 'Seller', idCard: '123456789012', agreeTerms: true }
+  r = await call('PUT', '/seller/shop/registration', registration, token)
+  assert.equal(r.status, 200, JSON.stringify(r))
+  const results = await Promise.all([call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 5 }, adminToken), call('PATCH', `/admin/shops/${shop.id}/approval`, { approvalStatus: 'approved', approvalVersion: 5 }, adminToken)])
   assert.deepEqual(results.map((x) => x.status).sort(), [200, 409], JSON.stringify(results)); assert.equal((await call('GET', `/shops/${shop.id}`)).status, 200)
   assert.equal((await call('POST', '/seller/shop/resubmit', {}, token)).status, 409)
   r = await call('POST', '/orders/preview', previewBody, token); assert.equal(r.status, 200, JSON.stringify(r))
   r = await call('GET', '/products?limit=100'); assert.ok(r.data.products.some((p) => p.id === String(product.insertId)))
   const [events] = await db.query('SELECT action,profile_version,reason FROM shop_approval_events WHERE shop_id = ? ORDER BY id', [shop.id])
   assert.deepEqual(events.map((e) => e.action), ['submitted', 'rejected', 'submitted', 'approved'])
-  assert.deepEqual(events.map((e) => e.profile_version), [1, 2, 4, 4]); assert.equal(events[1].reason, 'Thiếu thông tin')
+  assert.deepEqual(events.map((e) => e.profile_version), [1, 2, 4, 5]); assert.equal(events[1].reason, 'Thiếu thông tin')
   r = await call('GET', `/admin/shops/${shop.id}/approval-events`, undefined, adminToken); assert.equal(r.status, 200, JSON.stringify(r)); assert.equal(r.data.events.length, 4)
   r = await call('POST', '/auth/register', { username: 'seller_new', password: 'Only-Test-123', fullName: 'Seller', email: 'seller@example.test', role: 'seller', shopName: 'New seller shop' })
   assert.equal(r.status, 201, JSON.stringify(r)); const newToken = r.data.token

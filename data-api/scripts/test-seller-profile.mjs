@@ -122,6 +122,14 @@ try {
   assert.equal(denied.body.error.code, 'SHOP_PROFILE_REQUIRED')
   assert.equal((await request(`/users/${legacy.body.data.user.id}/seller-shop/registration`, 'PUT', profile)).status, 200)
   assert.equal((await request(`/admin/shops/${legacyShop}/approval`, 'PATCH', { userId: '99', approvalStatus: 'approved', approvalVersion: 2 })).status, 200)
+  const rejected = await request('/auth/register', 'POST', { username: 'rejected_legacy', fullName: 'Rejected Seller', email: 'rejected@example.test', password: 'TestPassword1', role: 'seller', shopName: 'Rejected Shop' })
+  assert.equal(rejected.status, 201)
+  const rejectedShop = rejected.body.data.user.shopId
+  assert.equal((await request(`/admin/shops/${rejectedShop}/approval`, 'PATCH', { userId: '99', approvalStatus: 'rejected', approvalVersion: 1, rejectionReason: 'Hồ sơ chưa đầy đủ' })).status, 200)
+  assert.equal((await request(`/users/${rejected.body.data.user.id}/seller-shop/registration`, 'PUT', profile)).status, 200)
+  assert.equal((await request(`/users/${rejected.body.data.user.id}/seller-shop/resubmit`, 'POST', {})).status, 200)
+  assert.equal((await request(`/admin/shops/${rejectedShop}/approval`, 'PATCH', { userId: '99', approvalStatus: 'approved', approvalVersion: 3 })).status, 200)
+
 
   // Thiếu bảng audit phải từ chối tiết lộ thông tin.
   db.exec('DROP TABLE seller_identity_access_events')

@@ -16,4 +16,4 @@ Tính năng này không xác minh giấy tờ hay thuế với cơ quan/đối t
 4. Khi các điều kiện trên được thỏa mãn, chạy `node scripts/rotate-seller-identity.mjs --apply`. Mỗi hồ sơ được khóa và chuyển trong transaction riêng; lỗi dừng đợt, các hồ sơ đã chuyển vẫn đọc được bằng cấu hình hai khóa và có thể chạy lại.
 5. Khi không còn instance dùng khóa cũ, kiểm tra lại bằng `--check` trong khoảng không có ghi đồng thời. Chỉ gỡ khóa cũ khỏi cấu hình chạy khi `oldCount` bằng 0 và đã kiểm tra backup/khôi phục. Giữ khóa cũ an toàn cho các bản sao lưu trước khi xoay.
 
-Chưa áp dụng migration này, chưa xoay khóa thật, chưa kiểm thử đồng thời trên MySQL/TiDB hoặc thực hiện trên Render. Kiểm thử hiện tại dùng SQLite và khóa giả cô lập.
+Migration này chưa được áp dụng lên TiDB hoặc Render. `node scripts/test-seller-security-mariadb.mjs` chạy trên MariaDB cục bộ cô lập (Windows, cần binary MariaDB) với dữ liệu và khóa giả; test kiểm tra phân quyền, audit, xoay khóa, đồng thời và sao lưu/khôi phục. Đây không thay thế kiểm thử MySQL 8/TiDB hoặc kiểm tra vận hành Render. Test MySQL 8 riêng yêu cầu thư mục tạm có marker và xác minh datadir trước khi tạo database thử nghiệm.
