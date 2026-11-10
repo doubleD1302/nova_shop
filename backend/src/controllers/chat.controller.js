@@ -1,4 +1,5 @@
 import { callDataApi } from '../clients/data.client.js'
+import { broadcastToUser } from '../services/chat-ws.service.js'
 
 const validShopId = (value) => (typeof value === 'string' || typeof value === 'number' && Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value))
 const validAttachments = (value) => value == null || (Array.isArray(value) && value.length <= 10 && Buffer.byteLength(JSON.stringify(value), 'utf8') <= 65535)
@@ -106,6 +107,15 @@ export async function sendConversationMessage(req, res, next) {
         },
       },
     )
+
+    // Nếu người nhận đang kết nối WebSocket thì phát trực tiếp tin nhắn mới
+    if (result && result.recipientId) {
+      broadcastToUser(result.recipientId, {
+        type: 'new_message',
+        conversationId: String(conversationId),
+        message: result,
+      })
+    }
 
     return res.status(201).json({
       success: true,

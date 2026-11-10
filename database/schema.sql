@@ -95,36 +95,6 @@ CREATE TABLE shops (
   CONSTRAINT ck_shops_mall CHECK (is_mall IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Gian hàng thuộc một seller';
 
-CREATE TABLE seller_registration_profiles (
-  shop_id BIGINT UNSIGNED NOT NULL,
-  pickup_address VARCHAR(255) NOT NULL,
-  province VARCHAR(120) NOT NULL,
-  contact_email VARCHAR(254) NOT NULL,
-  contact_phone VARCHAR(20) NOT NULL,
-  shipping_methods TEXT NOT NULL,
-  business_type VARCHAR(20) NOT NULL,
-  owner_name VARCHAR(120) NOT NULL,
-  identity_encrypted TEXT NOT NULL,
-  identity_last4 CHAR(4) NOT NULL,
-  tax_code VARCHAR(20) NULL,
-  invoice_email VARCHAR(254) NULL,
-  agreed_at DATETIME(3) NOT NULL,
-  PRIMARY KEY (shop_id),
-  CONSTRAINT fk_seller_registration_shop FOREIGN KEY (shop_id) REFERENCES shops (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE seller_identity_access_events (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  shop_id BIGINT UNSIGNED NOT NULL,
-  admin_id BIGINT UNSIGNED NOT NULL,
-  reason VARCHAR(500) NOT NULL,
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (id),
-  KEY ix_seller_identity_events_shop (shop_id, id),
-  CONSTRAINT fk_seller_identity_events_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
-  CONSTRAINT fk_seller_identity_events_admin FOREIGN KEY (admin_id) REFERENCES users (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
 CREATE TABLE shop_approval_events (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   shop_id BIGINT UNSIGNED NOT NULL,
@@ -289,9 +259,10 @@ CREATE TABLE cart_items (
   CONSTRAINT ck_cart_items_selected CHECK (selected IN (0,1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Giỏ theo user, một dòng cho mỗi SKU';
 
--- Voucher toàn sàn giảm một số tiền VND cố định
+-- Voucher giảm một số tiền VND cố định (toàn sàn hoặc theo shop)
 CREATE TABLE vouchers (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Khóa chính',
+  shop_id BIGINT UNSIGNED NULL COMMENT 'Khóa ngoại trỏ shops; NULL nếu là voucher toàn sàn',
   code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'Mã chuẩn hóa chữ hoa',
   name VARCHAR(120) NOT NULL COMMENT 'Tên chương trình',
   discount_amount DECIMAL(15,0) NOT NULL COMMENT 'Số tiền giảm cố định',
@@ -306,6 +277,8 @@ CREATE TABLE vouchers (
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật, UTC',
   PRIMARY KEY (id),
   UNIQUE KEY uq_vouchers_code (code),
+  KEY ix_vouchers_shop (shop_id, is_active),
+  CONSTRAINT fk_vouchers_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
   CONSTRAINT ck_vouchers_amount CHECK (discount_amount > 0 AND min_subtotal >= 0),
   CONSTRAINT ck_vouchers_dates CHECK (ends_at > starts_at),
   CONSTRAINT ck_vouchers_limits CHECK (per_user_limit > 0 AND (usage_limit IS NULL OR usage_limit > 0) AND (usage_limit IS NULL OR used_count <= usage_limit)),
@@ -338,7 +311,7 @@ CREATE TABLE orders (
   address_detail VARCHAR(255) NOT NULL COMMENT 'Snapshot địa chỉ chi tiết',
   note VARCHAR(500) NULL COMMENT 'Ghi chú giao hàng',
   voucher_code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Snapshot mã voucher; NULL nếu không dùng',
-  payment_method ENUM('cod','bank','momo','vnpay','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Phương thức thanh toán đã chọn',
+  payment_method ENUM('cod','bank','momo','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Lựa chọn thanh toán; MVP chỉ bật COD',
   subtotal DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng tiền hàng ban đầu',
   shipping_fee DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng phí ship ban đầu',
   discount_amount DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tổng giảm voucher ban đầu',
@@ -433,11 +406,11 @@ CREATE TABLE order_events (
   CONSTRAINT fk_order_events_actor FOREIGN KEY (actor_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Lịch sử chuyển trạng thái đơn con';
 
--- Ghi nhận trạng thái thanh toán theo từng đơn con
+-- Ghi nhận tiền COD theo từng đơn con
 CREATE TABLE payments (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID thanh toán',
   shop_order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn con thu tiền',
-  method ENUM('cod','bank','momo','vnpay','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'Phương thức thanh toán',
+  method ENUM('cod','bank','momo','zalopay','card') NOT NULL DEFAULT 'cod' COMMENT 'MVP sử dụng cod',
   status ENUM('unpaid','paid','void') NOT NULL DEFAULT 'unpaid' COMMENT 'Chưa thu, đã thu hoặc hủy yêu cầu thu',
   amount DECIMAL(15,0) NOT NULL COMMENT 'Số tiền phải thu của đơn con',
   paid_at DATETIME(3) NULL COMMENT 'Thời điểm xác nhận thực nhận tiền',
@@ -448,27 +421,7 @@ CREATE TABLE payments (
   CONSTRAINT fk_payments_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_orders (id),
   CONSTRAINT ck_payments_amount CHECK (amount >= 0),
   CONSTRAINT ck_payments_paid_at CHECK ((status = 'paid' AND paid_at IS NOT NULL) OR (status <> 'paid' AND paid_at IS NULL))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Ghi nhận tiền theo từng đơn con';
-
-CREATE TABLE payment_attempts (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  order_id BIGINT UNSIGNED NOT NULL,
-  provider ENUM('momo','vnpay') NOT NULL,
-  reference VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-  amount DECIMAL(15,0) NOT NULL,
-  status ENUM('pending','paid','failed','review') NOT NULL DEFAULT 'pending',
-  provider_transaction_id VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NULL,
-  result_code VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  expires_at DATETIME(3) NOT NULL,
-  processed_at DATETIME(3) NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_payment_attempts_reference (reference),
-  UNIQUE KEY uq_payment_attempts_provider_transaction (provider, provider_transaction_id),
-  KEY ix_payment_attempts_order_created (order_id, created_at, id),
-  CONSTRAINT fk_payment_attempts_order FOREIGN KEY (order_id) REFERENCES orders (id),
-  CONSTRAINT ck_payment_attempts_amount CHECK (amount >= 0)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Ghi nhận tiền COD theo từng đơn con';
 
 -- Lượt dùng voucher và việc hoàn trả lượt
 CREATE TABLE voucher_uses (
@@ -706,3 +659,64 @@ CREATE TABLE chat_messages (
   CONSTRAINT fk_chat_msg_conv FOREIGN KEY (conversation_id) REFERENCES chat_conversations (id) ON DELETE CASCADE,
   CONSTRAINT fk_chat_msg_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Chi tiết tin nhắn trong cuộc trò chuyện';
+
+-- Cấu hình hệ thống runtime (bảo trì, tỷ lệ hoa hồng, phí sàn)
+CREATE TABLE system_settings (
+  setting_key VARCHAR(64) NOT NULL COMMENT 'Khóa cấu hình',
+  setting_value TEXT NOT NULL COMMENT 'Giá trị cấu hình (chuỗi hoặc JSON)',
+  description VARCHAR(255) NULL COMMENT 'Mô tả mục đích cấu hình',
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật cuối',
+  PRIMARY KEY (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Cấu hình hệ thống runtime';
+
+-- Chiến dịch marketing và flash sale
+CREATE TABLE marketing_campaigns (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Khóa chính',
+  name VARCHAR(150) NOT NULL COMMENT 'Tên chiến dịch',
+  type ENUM('flash_sale', 'mega_sale', 'category_day') NOT NULL DEFAULT 'flash_sale' COMMENT 'Loại chiến dịch',
+  description TEXT NULL COMMENT 'Mô tả chiến dịch',
+  starts_at DATETIME(3) NOT NULL COMMENT 'Thời điểm bắt đầu',
+  ends_at DATETIME(3) NOT NULL COMMENT 'Thời điểm kết thúc',
+  banner_url VARCHAR(500) NULL COMMENT 'Banner chiến dịch',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Bật chiến dịch',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_campaigns_dates (is_active, starts_at, ends_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Chiến dịch marketing và flash sale';
+
+-- Đăng ký tham gia chiến dịch marketing của người bán
+CREATE TABLE campaign_registrations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Khóa chính',
+  campaign_id BIGINT UNSIGNED NOT NULL COMMENT 'ID chiến dịch',
+  shop_id BIGINT UNSIGNED NOT NULL COMMENT 'ID shop tham gia',
+  product_id BIGINT UNSIGNED NOT NULL COMMENT 'Sản phẩm đăng ký',
+  discount_price DECIMAL(15,0) NOT NULL COMMENT 'Giá khuyến mãi cam kết',
+  status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' COMMENT 'Trạng thái duyệt',
+  note VARCHAR(255) NULL COMMENT 'Ghi chú duyệt hoặc từ chối',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_campaign_product (campaign_id, product_id),
+  KEY ix_camp_reg_shop (shop_id, status),
+  CONSTRAINT fk_camp_reg_campaign FOREIGN KEY (campaign_id) REFERENCES marketing_campaigns (id),
+  CONSTRAINT fk_camp_reg_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
+  CONSTRAINT fk_camp_reg_product FOREIGN KEY (product_id) REFERENCES products (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Đăng ký chiến dịch marketing của người bán';
+
+-- Gói đẩy sản phẩm / quảng cáo của seller
+CREATE TABLE product_boosts (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Khóa chính',
+  shop_id BIGINT UNSIGNED NOT NULL COMMENT 'ID shop sở hữu',
+  product_id BIGINT UNSIGNED NOT NULL COMMENT 'Sản phẩm đẩy',
+  package_type ENUM('basic_1d', 'standard_3d', 'premium_7d') NOT NULL COMMENT 'Gói đẩy sản phẩm',
+  starts_at DATETIME(3) NOT NULL COMMENT 'Thời gian bắt đầu đẩy',
+  ends_at DATETIME(3) NOT NULL COMMENT 'Thời gian kết thúc đẩy',
+  status ENUM('active', 'expired') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái gói',
+  cost_vnd DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Phí mua gói đẩy',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY ix_product_boosts_status (product_id, status, ends_at),
+  CONSTRAINT fk_product_boosts_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
+  CONSTRAINT fk_product_boosts_product FOREIGN KEY (product_id) REFERENCES products (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Gói đẩy sản phẩm / quảng cáo của seller';

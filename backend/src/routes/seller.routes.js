@@ -1,10 +1,28 @@
-import { callDataApi } from '../clients/data.client.js'
 import { getDemoPayout, setupDemoPayout, createDemoWithdrawal } from '../controllers/demo-payout.controller.js'
 import { Router } from 'express'
 import { listSellerOrders, updateSellerOrderStatus } from '../controllers/orders.controller.js'
 import { archiveSellerProduct, listSellerProducts, saveSellerProduct, getSellerCategoryAttributes } from '../controllers/products.controller.js'
 import { getSellerShop, resubmitSellerShop, updateSellerShop } from '../controllers/shops.controller.js'
 import { searchProductImages } from '../controllers/image-search.controller.js'
+import {
+  listSellerVouchers,
+  createSellerVoucher,
+  updateSellerVoucherStatus,
+  deleteSellerVoucher,
+} from '../controllers/vouchers.controller.js'
+import {
+  listSellerCampaigns,
+  registerSellerCampaign,
+  listSellerCampaignRegistrations,
+  buySellerProductBoost,
+  listSellerProductBoosts,
+} from '../controllers/marketing.controller.js'
+import {
+  getSellerRevenueData,
+  exportSellerRevenueExcel,
+  getSellerInventoryData,
+  exportSellerInventoryExcel,
+} from '../controllers/reports.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
@@ -13,18 +31,6 @@ router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)
 router.post('/demo-payout/withdrawals', createDemoWithdrawal)
 router.get('/shop', getSellerShop)
-router.get('/shop/registration', async (req, res, next) => {
-  try {
-    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`)
-    return res.json({ success: true, data })
-  } catch (err) { return next(err) }
-})
-router.put('/shop/registration', async (req, res, next) => {
-  try {
-    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`, { method: 'PUT', body: req.body })
-    return res.json({ success: true, data })
-  } catch (err) { return next(err) }
-})
 router.put('/shop', updateSellerShop)
 router.post('/shop/resubmit', resubmitSellerShop)
 router.get('/images/search', searchProductImages)
@@ -35,5 +41,24 @@ router.put('/products/:productId', saveSellerProduct)
 router.delete('/products/:productId', archiveSellerProduct)
 router.get('/orders', listSellerOrders)
 router.patch('/orders/:shopOrderId/status', updateSellerOrderStatus)
+
+// Quản lý mã giảm giá riêng của gian hàng
+router.get('/vouchers', listSellerVouchers)
+router.post('/vouchers', createSellerVoucher)
+router.patch('/vouchers/:id/status', updateSellerVoucherStatus)
+router.delete('/vouchers/:id', deleteSellerVoucher)
+
+// Quảng cáo & Chiến dịch Marketing / Flash Sale
+router.get('/marketing/campaigns', listSellerCampaigns)
+router.post('/marketing/campaigns/register', registerSellerCampaign)
+router.get('/marketing/registrations', listSellerCampaignRegistrations)
+router.post('/marketing/boost', buySellerProductBoost)
+router.get('/marketing/boosts', listSellerProductBoosts)
+
+// Báo cáo & Thống kê nâng cao (JSON & Xuất Excel)
+router.get('/reports/revenue', getSellerRevenueData)
+router.get('/reports/revenue/export', exportSellerRevenueExcel)
+router.get('/reports/inventory', getSellerInventoryData)
+router.get('/reports/inventory/export', exportSellerInventoryExcel)
 
 export default router

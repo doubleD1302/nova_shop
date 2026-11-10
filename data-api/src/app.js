@@ -14,6 +14,9 @@ import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
 import chatRouter from './routes/chat.routes.js'
 import paymentsRouter from './routes/payments.routes.js'
+import settingsRouter from './routes/settings.routes.js'
+import marketingRouter from './routes/marketing.routes.js'
+import reportsRouter from './routes/reports.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
@@ -43,6 +46,7 @@ app.use(
   addressesRouter,
   productsRouter,
   ordersRouter,
+  settingsRouter,
   shopsRouter,
   adminRouter,
   vouchersRouter,
@@ -52,6 +56,8 @@ app.use(
   shippingRouter,
   chatRouter,
   paymentsRouter,
+  marketingRouter,
+  reportsRouter,
 )
 
 // 4. Middleware xử lý khi client gọi route không tồn tại (404)

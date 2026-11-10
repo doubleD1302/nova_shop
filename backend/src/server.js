@@ -1,6 +1,7 @@
 import app from './app.js'
 import { env } from './config/env.js'
 import { closeObjectStorage } from './services/object-storage.js'
+import { initChatWebSocket } from './services/chat-ws.service.js'
 
 /**
  * Khởi động máy chủ HTTP trên cổng đã cấu hình
@@ -11,10 +12,14 @@ const server = app.listen(env.port, () => {
   console.log(`[ShopNova Backend] Môi trường: ${env.nodeEnv}`)
   console.log(`[ShopNova Backend] Health check: http://localhost:${env.port}/api/v1/health`)
   console.log(`[ShopNova Backend] Readiness check: http://localhost:${env.port}/api/v1/ready`)
+  console.log(`[ShopNova Backend] WebSocket Chat: ws://localhost:${env.port}/ws/chat`)
 })
 
 server.keepAliveTimeout = 65000
 server.headersTimeout = 66000
+
+// Khởi tạo cổng WebSocket Live Chat
+initChatWebSocket(server)
 
 /**
  * Xử lý lỗi khi khởi động server

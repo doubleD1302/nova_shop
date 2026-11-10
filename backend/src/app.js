@@ -11,6 +11,7 @@ import sellerRouter from './routes/seller.routes.js'
 import shopsRouter from './routes/shops.routes.js'
 import uploadsRouter from './routes/uploads.routes.js'
 import { serveUploadedImage } from './controllers/uploads.controller.js'
+import settingsRouter from './routes/settings.routes.js'
 import adminRouter from './routes/admin.routes.js'
 import aiRouter from './routes/ai.routes.js'
 import vouchersRouter from './routes/vouchers.routes.js'
@@ -66,6 +67,7 @@ if (env.uploadStorage === 's3') {
 
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
+app.use('/api/v1', settingsRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/addresses', addressesRouter)
 app.use('/api/v1', shopsRouter)

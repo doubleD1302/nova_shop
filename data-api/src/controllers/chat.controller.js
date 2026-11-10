@@ -364,6 +364,7 @@ export async function sendConversationMessage(req, res, next) {
           conversationId: String(conversationId),
           senderId: String(senderId),
           senderRole,
+          recipientId: String(senderRole === 'buyer' ? conv.shop_owner_id : conv.buyer_id),
           message: cleanMsg,
           attachments: cleanAttachments ? JSON.parse(cleanAttachments) : [],
           isRead: false,

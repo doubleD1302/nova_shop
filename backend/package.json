@@ -18,17 +18,20 @@
     "test:cart": "node scripts/test-cart-integration.mjs",
     "test:refresh-password": "node scripts/test-refresh-token-and-change-password.mjs",
     "test:new-modules": "node scripts/test-post-sales-shipping-chat.mjs",
-    "test:ai": "node scripts/test-ai-consultant.mjs"
+    "test:ai": "node scripts/test-ai-consultant.mjs",
+    "test:5-features": "node scripts/test-all-5-new-features.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "express": "^5.0.1",
     "firebase-admin": "^14.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^10.3.0",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "ws": "^8.22.2"
   }
 }
