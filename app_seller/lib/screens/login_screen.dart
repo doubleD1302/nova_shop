@@ -33,14 +33,21 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       _serverStatus = 'Máy chủ: $detected';
-      for (final acc in accounts) {
-        if (acc['role'] == 'seller') {
-          _demoUsername = acc['username']?.toString() ?? _demoUsername;
-          _demoPassword = acc['password']?.toString() ?? _demoPassword;
-          _usernameController.text = _demoUsername;
-          _passwordController.text = _demoPassword;
-          break;
+      if (accounts.isNotEmpty) {
+        for (final acc in accounts) {
+          if (acc['role'] == 'seller') {
+            _demoUsername = acc['username']?.toString() ?? _demoUsername;
+            _demoPassword = acc['password']?.toString() ?? _demoPassword;
+            _usernameController.text = _demoUsername;
+            _passwordController.text = _demoPassword;
+            break;
+          }
         }
+      } else if (detected.contains('onrender.com')) {
+        _demoUsername = 'demo_seller_test';
+        _demoPassword = 'Seller@123456';
+        _usernameController.text = _demoUsername;
+        _passwordController.text = _demoPassword;
       }
     });
   }

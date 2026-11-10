@@ -5,18 +5,18 @@ class ApiConfig {
   static String? _customBaseUrl;
   static const String _overrideBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-  static const String usbLoopbackUrl = 'http://127.0.0.1:3000';
-  static const String lanHostUrl = 'http://192.168.1.9:3000';
-  static const String altLanHostUrl = 'http://192.168.1.11:3000';
-  static const String emulatorUrl = 'http://10.0.2.2:3000';
   static const String productionUrl = 'https://novashop-api-952u.onrender.com';
+  static const String usbLoopbackUrl = 'http://127.0.0.1:3000';
+  static const String lanHostUrl = 'http://10.39.18.75:3000';
+  static const String altLanHostUrl = 'http://192.168.1.9:3000';
+  static const String emulatorUrl = 'http://10.0.2.2:3000';
   static const String localHostUrl = 'http://localhost:3000';
 
   static String get defaultBaseUrl {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl.replaceAll(RegExp(r'/+$'), '');
     }
-    return usbLoopbackUrl;
+    return productionUrl;
   }
 
   static String get baseUrl => _customBaseUrl ?? defaultBaseUrl;
@@ -38,16 +38,16 @@ class ApiConfig {
     if (_customBaseUrl != null) return _customBaseUrl!;
 
     final candidates = [
+      productionUrl,
       usbLoopbackUrl,
       lanHostUrl,
       altLanHostUrl,
       emulatorUrl,
-      productionUrl,
     ];
 
     for (final candidate in candidates) {
       try {
-        final timeoutMs = candidate == productionUrl ? 3500 : 800;
+        final timeoutMs = candidate == productionUrl ? 3000 : 800;
         final res = await http
             .get(Uri.parse('$candidate/api/v1/health'))
             .timeout(Duration(milliseconds: timeoutMs));
