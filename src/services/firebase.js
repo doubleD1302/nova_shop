@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app'
 import {
   getAuth,
   GoogleAuthProvider,
+  FacebookAuthProvider,
   signInWithPopup,
   signOut as fbSignOut,
   onAuthStateChanged,
@@ -57,6 +58,7 @@ export function isFirebaseConfigured() {
 let app = null
 let auth = null
 let googleProvider = null
+let facebookProvider = null
 
 if (isFirebaseConfigured()) {
   try {
@@ -65,6 +67,10 @@ if (isFirebaseConfigured()) {
     googleProvider = new GoogleAuthProvider()
     googleProvider.setCustomParameters({
       prompt: 'select_account',
+    })
+    facebookProvider = new FacebookAuthProvider()
+    facebookProvider.setCustomParameters({
+      display: 'popup',
     })
   } catch (error) {
     console.warn('[Firebase] Không thể khởi tạo Firebase Auth:', error)
@@ -78,7 +84,7 @@ export function getFirebaseErrorMessage(error) {
   const code = error?.code || ''
   switch (code) {
     case 'auth/popup-closed-by-user':
-      return 'Bạn đã đóng cửa sổ đăng nhập Google trước khi hoàn tất.'
+      return 'Bạn đã đóng cửa sổ đăng nhập trước khi hoàn tất.'
     case 'auth/cancelled-popup-request':
       return 'Cửa sổ đăng nhập đã bị hủy do có yêu cầu mới.'
     case 'auth/popup-blocked':
@@ -86,17 +92,19 @@ export function getFirebaseErrorMessage(error) {
     case 'auth/unauthorized-domain':
       return 'Tên miền hiện tại chưa được cấp phép trong Firebase Console. Vui lòng thêm localhost hoặc tên miền của bạn vào Authentication > Settings > Authorized domains.'
     case 'auth/network-request-failed':
-      return 'Lỗi kết nối mạng khi liên hệ với dịch vụ Google. Vui lòng kiểm tra lại đường truyền internet.'
+      return 'Lỗi kết nối mạng khi liên hệ với dịch vụ xác thực. Vui lòng kiểm tra lại đường truyền internet.'
     case 'auth/operation-not-allowed':
-      return 'Phương thức đăng nhập bằng Google chưa được bật trong Firebase Console (Authentication > Sign-in method > Google).'
+      return 'Phương thức đăng nhập này chưa được bật trong Firebase Console (Authentication > Sign-in method).'
     case 'auth/account-exists-with-different-credential':
-      return 'Tài khoản email này đã được sử dụng với phương thức đăng nhập khác.'
+      return 'Email của tài khoản này đã được liên kết với phương thức đăng nhập khác (ví dụ: Google hoặc tài khoản thường).'
+    case 'auth/facebook-auth-canceled':
+      return 'Bạn đã hủy quá trình đăng nhập bằng Facebook.'
     case 'auth/invalid-api-key':
       return 'Firebase API Key không hợp lệ. Vui lòng kiểm tra lại biến VITE_FIREBASE_API_KEY trong file .env.'
     case 'auth/invalid-auth-domain':
       return 'Firebase Auth Domain không hợp lệ. Hãy kiểm tra VITE_FIREBASE_AUTH_DOMAIN trong cấu hình Web App.'
     default:
-      return error?.message || 'Đã xảy ra lỗi khi xác thực tài khoản Google. Vui lòng thử lại sau.'
+      return error?.message || 'Đã xảy ra lỗi khi xác thực tài khoản. Vui lòng thử lại sau.'
   }
 }
 
@@ -140,6 +148,54 @@ export async function signInWithGooglePopup() {
     }
   } catch (error) {
     console.error('[Firebase] Lỗi đăng nhập Google:', error)
+    return {
+      ok: false,
+      error: getFirebaseErrorMessage(error),
+      code: error.code,
+    }
+  }
+}
+
+/**
+ * Đăng nhập bằng Facebook thông qua popup của Firebase Authentication.
+ * Trả về { ok: true, user, idToken } hoặc { ok: false, error }.
+ */
+export async function signInWithFacebookPopup() {
+  const configError = getFirebaseConfigError()
+  if (configError) {
+    return {
+      ok: false,
+      error: configError,
+    }
+  }
+
+  if (!auth || !facebookProvider) {
+    try {
+      if (!app) {
+        app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+      }
+      auth = getAuth(app)
+      facebookProvider = new FacebookAuthProvider()
+      facebookProvider.setCustomParameters({ display: 'popup' })
+    } catch (err) {
+      return {
+        ok: false,
+        error: `Không thể khởi tạo Firebase Auth: ${getFirebaseErrorMessage(err)}`,
+      }
+    }
+  }
+
+  try {
+    const result = await signInWithPopup(auth, facebookProvider)
+    const user = result.user
+    const idToken = await user.getIdToken()
+    return {
+      ok: true,
+      user,
+      idToken,
+    }
+  } catch (error) {
+    console.error('[Firebase] Lỗi đăng nhập Facebook:', error)
     return {
       ok: false,
       error: getFirebaseErrorMessage(error),

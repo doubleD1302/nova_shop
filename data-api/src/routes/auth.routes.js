@@ -3,6 +3,7 @@ import { Router } from 'express'
 import {
   verifyCredentials,
   loginWithGoogle,
+  loginWithFacebook,
   getUserAuthProfile,
   registerUser,
   updateUserProfile,
@@ -20,6 +21,7 @@ const router = Router()
 // POST /internal/v1/auth/verify-credentials - Xác minh thông tin đăng nhập
 router.post('/auth/verify-credentials', verifyCredentials)
 router.post('/auth/google', loginWithGoogle)
+router.post('/auth/facebook', loginWithFacebook)
 router.post('/auth/register', registerUser)
 
 // Quản lý phiên đăng nhập và refresh token

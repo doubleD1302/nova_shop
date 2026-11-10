@@ -3,15 +3,15 @@ import { getAuth } from 'firebase-admin/auth'
 import { env } from '../config/env.js'
 
 export class FirebaseAdminNotConfiguredError extends Error {
-  constructor() {
-    super('Đăng nhập Google chưa được cấu hình trên Backend.')
+  constructor(provider = 'Google') {
+    super(`Đăng nhập ${provider} chưa được cấu hình trên Backend.`)
     this.name = 'FirebaseAdminNotConfiguredError'
   }
 }
 
 export class InvalidFirebaseIdTokenError extends Error {
-  constructor() {
-    super('Token đăng nhập Google không hợp lệ hoặc email chưa được xác minh.')
+  constructor(provider = 'Google') {
+    super(`Token đăng nhập ${provider} không hợp lệ hoặc tài khoản chưa được xác minh.`)
     this.name = 'InvalidFirebaseIdTokenError'
   }
 }
@@ -40,7 +40,7 @@ function getFirebaseAdminAuth() {
   return { auth: getAuth(app), hasServiceAccount: Boolean(serviceAccount) }
 }
 
-export async function verifyFirebaseIdToken(idToken) {
+export async function verifyFirebaseIdToken(idToken, providerName = 'Google') {
   const { auth: firebaseAuth, hasServiceAccount } = getFirebaseAdminAuth()
   let decodedToken
 
@@ -55,28 +55,37 @@ export async function verifyFirebaseIdToken(idToken) {
       'auth/id-token-revoked',
       'auth/user-disabled',
     ].includes(error?.code)) {
-      throw new InvalidFirebaseIdTokenError()
+      throw new InvalidFirebaseIdTokenError(providerName)
     }
     throw error
   }
 
   const email = typeof decodedToken.email === 'string' ? decodedToken.email.trim().toLowerCase() : ''
-  const emailValid = email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const emailValid = email ? (email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) : true
+  const signInProvider = decodedToken.firebase?.sign_in_provider
+  const isGoogle = signInProvider === 'google.com'
+  const isFacebook = signInProvider === 'facebook.com'
+
   if (
     typeof decodedToken.uid !== 'string' ||
     !decodedToken.uid.trim() ||
     decodedToken.uid.length > 128 ||
-    (decodedToken.firebase?.sign_in_provider !== 'google.com' && !decodedToken.email_verified) ||
+    (!isGoogle && !isFacebook && !decodedToken.email_verified) ||
     !emailValid
   ) {
-    throw new InvalidFirebaseIdTokenError()
+    throw new InvalidFirebaseIdTokenError(providerName)
+  }
+
+  if (providerName.toLowerCase() === 'google' && !email) {
+    throw new InvalidFirebaseIdTokenError(providerName)
   }
 
   return {
     firebaseUid: decodedToken.uid,
-    email,
+    email: email || null,
     fullName: typeof decodedToken.name === 'string' ? decodedToken.name.trim() : '',
     phone: typeof decodedToken.phone_number === 'string' ? decodedToken.phone_number.trim() : '',
     avatarUrl: typeof decodedToken.picture === 'string' ? decodedToken.picture.trim() : null,
+    provider: signInProvider || providerName.toLowerCase(),
   }
 }

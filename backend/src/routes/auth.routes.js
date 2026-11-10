@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   login,
   loginWithGoogle,
+  loginWithFacebook,
   getMe,
   register,
   updateProfile,
@@ -20,6 +21,7 @@ router.get('/demo-accounts', loginRateLimiter, listDemoAccounts)
 // POST /api/v1/auth/login - Đăng nhập tài khoản với giới hạn thử tần suất (Rate Limiter)
 router.post('/login', loginRateLimiter, login)
 router.post('/google', loginRateLimiter, loginWithGoogle)
+router.post('/facebook', loginRateLimiter, loginWithFacebook)
 router.post('/register', loginRateLimiter, register)
 
 // Làm mới phiên đăng nhập và đăng xuất

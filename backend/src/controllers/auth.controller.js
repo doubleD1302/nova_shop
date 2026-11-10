@@ -217,6 +217,50 @@ export async function loginWithGoogle(req, res, next) {
   }
 }
 
+export async function loginWithFacebook(req, res, next) {
+  const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken.trim() : ''
+  if (!idToken || idToken.length > 16384) {
+    return res.status(400).json({
+      success: false,
+      message: 'Token đăng nhập Facebook không hợp lệ.',
+      error: { code: 'VALIDATION_ERROR' },
+    })
+  }
+
+  try {
+    const identity = await verifyFirebaseIdToken(idToken, 'Facebook')
+    const result = await callDataApi('/internal/v1/auth/facebook', {
+      method: 'POST',
+      body: identity,
+    })
+    const refreshToken = await createSessionForUser(result.user.id)
+    return res.status(200).json(authResponse(result.user, 'Đăng nhập Facebook thành công.', refreshToken))
+  } catch (err) {
+    if (err instanceof FirebaseAdminNotConfiguredError) {
+      return res.status(503).json({
+        success: false,
+        message: err.message,
+        error: { code: 'FACEBOOK_AUTH_NOT_CONFIGURED' },
+      })
+    }
+    if (err instanceof InvalidFirebaseIdTokenError) {
+      return res.status(401).json({
+        success: false,
+        message: err.message,
+        error: { code: 'FACEBOOK_TOKEN_INVALID' },
+      })
+    }
+    if (err instanceof DataApiClientError && err.code === 'EMAIL_ACCOUNT_EXISTS') {
+      return res.status(409).json({
+        success: false,
+        message: err.message,
+        error: { code: 'EMAIL_ACCOUNT_EXISTS' },
+      })
+    }
+    return next(err)
+  }
+}
+
 export async function register(req, res, next) {
   const body = req.body || {}
   const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : ''

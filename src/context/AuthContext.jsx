@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { shopAvatar } from '../utils/image'
-import { apiChangePassword, apiCreateSellerShop, apiGetMe, apiGoogleLogin, apiLogin, apiLogout, apiRegister, apiUpdateProfile, REFRESH_TOKEN_KEY, refreshAccessToken } from '../utils/api'
+import { apiChangePassword, apiCreateSellerShop, apiFacebookLogin, apiGetMe, apiGoogleLogin, apiLogin, apiLogout, apiRegister, apiUpdateProfile, REFRESH_TOKEN_KEY, refreshAccessToken } from '../utils/api'
 import {
   getFirebaseConfigError,
   isFirebaseConfigured,
   signInWithGooglePopup,
+  signInWithFacebookPopup,
   firebaseSignOut,
   subscribeToFirebaseAuthState,
 } from '../services/firebase'
@@ -69,6 +70,7 @@ export function AuthProvider({ children }) {
   const authVersionRef = useRef(0)
   const restoreAbortRef = useRef(null)
   const googleLoginInProgressRef = useRef(false)
+  const facebookLoginInProgressRef = useRef(false)
 
   // Khôi phục phiên từ sessionStorage khi khởi tạo
   useEffect(() => {
@@ -159,7 +161,7 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Lắng nghe trạng thái đăng nhập Firebase (khi người dùng đăng nhập bằng Google)
+  // Lắng nghe trạng thái đăng nhập Firebase (khi người dùng đăng nhập bằng Google hoặc Facebook)
   useEffect(() => {
     if (!isFirebaseConfigured()) return
     let isMounted = true
@@ -167,9 +169,13 @@ export function AuthProvider({ children }) {
     const unsubscribe = subscribeToFirebaseAuthState((firebaseUser) => {
       const token = sessionStorage.getItem(TOKEN_KEY)
       if (token) return
-      if (googleLoginInProgressRef.current) return
+      if (googleLoginInProgressRef.current || facebookLoginInProgressRef.current) return
 
       if (firebaseUser) {
+        const isFacebook = firebaseUser.providerData?.some((p) => p?.providerId === 'facebook.com')
+        const providerName = isFacebook ? 'facebook' : 'google'
+        const apiCall = isFacebook ? apiFacebookLogin : apiGoogleLogin
+
         const version = ++authVersionRef.current
         restoreAbortRef.current?.abort()
         const controller = new AbortController()
@@ -179,7 +185,7 @@ export function AuthProvider({ children }) {
 
         Promise.resolve()
           .then(() => firebaseUser.getIdToken())
-          .then((idToken) => apiGoogleLogin(idToken, { signal: controller.signal }))
+          .then((idToken) => apiCall(idToken, { signal: controller.signal }))
           .then(async (res) => {
             const data = await res.json().catch(() => null)
             if (!isMounted || authVersionRef.current !== version || sessionStorage.getItem(TOKEN_KEY)) return
@@ -189,7 +195,7 @@ export function AuthProvider({ children }) {
               return
             }
             sessionStorage.setItem(TOKEN_KEY, data.data.token)
-            sessionStorage.setItem(AUTH_PROVIDER_KEY, 'google')
+            sessionStorage.setItem(AUTH_PROVIDER_KEY, providerName)
             setUser(normalizeUser(data.data.user))
           })
           .catch(async (error) => {
@@ -202,7 +208,7 @@ export function AuthProvider({ children }) {
           })
       } else {
         const currentProvider = sessionStorage.getItem(AUTH_PROVIDER_KEY)
-        if (currentProvider === 'google') {
+        if (currentProvider === 'google' || currentProvider === 'facebook') {
           sessionStorage.removeItem(AUTH_PROVIDER_KEY)
           setUser(null)
         }
@@ -384,6 +390,64 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  /**
+   * Đăng nhập bằng Facebook qua Firebase Authentication.
+   */
+  const loginWithFacebook = useCallback(async () => {
+    const configError = getFirebaseConfigError()
+    if (configError) {
+      return {
+        ok: false,
+        error: configError,
+      }
+    }
+
+    facebookLoginInProgressRef.current = true
+    restoreAbortRef.current?.abort()
+    const version = ++authVersionRef.current
+    setAuthError('')
+
+    try {
+      const res = await signInWithFacebookPopup()
+      if (!res.ok) {
+        return res
+      }
+
+      const response = await apiFacebookLogin(res.idToken)
+      const data = await response.json().catch(() => null)
+      if (authVersionRef.current !== version) {
+        return { ok: false, error: 'Yêu cầu đăng nhập Facebook đã bị hủy.' }
+      }
+      if (!response.ok || !data?.success || !data?.data?.token || !data?.data?.user) {
+        return {
+          ok: false,
+          error: data?.message || 'Backend không thể xác thực và lưu tài khoản Facebook.',
+        }
+      }
+
+      sessionStorage.setItem(TOKEN_KEY, data.data.token)
+      if (data.data.refreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.data.refreshToken)
+      }
+      sessionStorage.setItem(AUTH_PROVIDER_KEY, 'facebook')
+      const normalized = normalizeUser(data.data.user)
+      setUser(normalized)
+      setAuthError('')
+      return { ok: true, user: normalized }
+    } catch (err) {
+      return {
+        ok: false,
+        error: err?.name === 'TypeError'
+          ? 'Không thể kết nối Backend. Hãy khởi động Backend API rồi thử lại.'
+          : err?.message || 'Không thể hoàn tất đăng nhập Facebook. Vui lòng thử lại.',
+      }
+    } finally {
+      facebookLoginInProgressRef.current = false
+      if (authVersionRef.current === version) setIsInitializing(false)
+    }
+  }, [])
+
   const updateProfile = useCallback(async (patch) => {
     const current = user
     if (!current) return { ok: false, error: 'Vui lòng đăng nhập để cập nhật hồ sơ.' }
@@ -502,6 +566,7 @@ export function AuthProvider({ children }) {
         : '',
       login,
       loginWithGoogle,
+      loginWithFacebook,
       loginAs,
       register,
       openSellerShop,
@@ -509,7 +574,7 @@ export function AuthProvider({ children }) {
       logout,
       updateProfile,
     }),
-    [user, isInitializing, authError, login, loginWithGoogle, loginAs, register, openSellerShop, logout, updateProfile, changePassword],
+    [user, isInitializing, authError, login, loginWithGoogle, loginWithFacebook, loginAs, register, openSellerShop, logout, updateProfile, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

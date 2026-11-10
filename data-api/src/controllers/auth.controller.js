@@ -269,6 +269,127 @@ export async function loginWithGoogle(req, res, next) {
 }
 
 /**
+ * POST /internal/v1/auth/facebook
+ * Create or load the MySQL account for a Facebook identity verified by Backend.
+ */
+export async function loginWithFacebook(req, res, next) {
+  const body = req.body || {}
+  const firebaseUid = typeof body.firebaseUid === 'string' ? body.firebaseUid.trim() : ''
+  const email = typeof body.email === 'string' && body.email.trim() ? body.email.trim().toLowerCase() : null
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
+  const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() : ''
+
+  if (
+    !firebaseUid ||
+    firebaseUid.length > 128 ||
+    (email && !validEmail(email)) ||
+    (fullName && fullName.length > 120) ||
+    (avatarUrl && avatarUrl.length > 1024)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: 'Thông tin tài khoản Facebook không hợp lệ.',
+      error: { code: 'VALIDATION_ERROR' },
+    })
+  }
+
+  const findByFirebaseUid = () => executeQuery(
+    `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.avatar_url, u.role, u.status,
+            s.id AS shop_id, a.recipient_name, a.phone AS address_phone, a.province, a.district, a.ward, a.detail
+     FROM users u
+     LEFT JOIN shops s ON s.owner_id = u.id
+     LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = 1 AND a.deleted_at IS NULL
+     WHERE u.firebase_uid = ?
+     LIMIT 1`,
+    [firebaseUid],
+  )
+
+  const respondWithUser = (user) => {
+    if (user.status === 'blocked') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản đang bị khóa.',
+        error: { code: 'ACCOUNT_BLOCKED' },
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đăng nhập Facebook thành công.',
+      data: {
+        user: {
+          id: String(user.id),
+          username: user.username,
+          fullName: user.full_name,
+          email: user.email,
+          phone: user.phone,
+          avatarUrl: user.avatar_url,
+          role: user.role,
+          status: user.status,
+          shopId: user.shop_id === null || user.shop_id === undefined ? null : String(user.shop_id),
+          address: user.recipient_name ? {
+            fullName: user.recipient_name,
+            phone: user.address_phone,
+            province: user.province,
+            district: user.district || '',
+            ward: user.ward || '',
+            detail: user.detail,
+          } : null,
+        },
+      },
+    })
+  }
+
+  try {
+    const existingUsers = await findByFirebaseUid()
+    if (existingUsers.length) return respondWithUser(existingUsers[0])
+
+    if (email) {
+      const emailUsers = await executeQuery('SELECT id, status FROM users WHERE email = ? LIMIT 1', [email])
+      if (emailUsers.length) {
+        await executeQuery(
+          'UPDATE users SET firebase_uid = ?, avatar_url = COALESCE(avatar_url, ?) WHERE id = ?',
+          [firebaseUid, avatarUrl || null, emailUsers[0].id],
+        )
+        const linkedUsers = await findByFirebaseUid()
+        if (linkedUsers.length) return respondWithUser(linkedUsers[0])
+      }
+    }
+
+    const username = `fb_${crypto.createHash('sha256').update(firebaseUid).digest('hex').slice(0, 32)}`
+    const fullNameValue = fullName || (email ? email.split('@')[0] : 'Người dùng Facebook')
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(48).toString('base64url'), 12)
+
+    await executeQuery(
+      `INSERT INTO users (username, password_hash, firebase_uid, full_name, email, avatar_url, role, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'buyer', 'active')`,
+      [username, passwordHash, firebaseUid, fullNameValue, email, avatarUrl || null],
+    )
+
+    const createdUsers = await findByFirebaseUid()
+    if (!createdUsers.length) {
+      throw new Error('Facebook account insert completed without a readable user record.')
+    }
+    return respondWithUser(createdUsers[0])
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      try {
+        const users = await findByFirebaseUid()
+        if (users.length) return respondWithUser(users[0])
+      } catch (lookupError) {
+        return next(lookupError)
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Email này đã thuộc một tài khoản Nova Shop. Hãy đăng nhập bằng tài khoản hiện có.',
+        error: { code: 'EMAIL_ACCOUNT_EXISTS' },
+      })
+    }
+    return next(err)
+  }
+}
+
+/**
  * GET /internal/v1/users/:userId/auth-profile
  * Lấy hồ sơ xác thực tài khoản phục vụ kiểm tra token và phân quyền.
  */

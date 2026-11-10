@@ -8,7 +8,7 @@ import { apiDemoAccounts } from '../utils/api'
 
 /** TRANG ĐĂNG NHẬP - Thiết kế theo phong cách Terracotta + Cream */
 export default function LoginPage() {
-  const { login, loginWithGoogle, user, authError } = useAuth()
+  const { login, loginWithGoogle, loginWithFacebook, user, authError, isFirebaseConfigured } = useAuth()
   const { pushToast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [facebookLoading, setFacebookLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [demoAccounts, setDemoAccounts] = useState([])
   const [demoRole, setDemoRole] = useState('')
@@ -46,7 +47,7 @@ export default function LoginPage() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (loading || googleLoading) return
+    if (loading || googleLoading || facebookLoading) return
     setError('')
 
     const username = form.username.trim()
@@ -77,13 +78,21 @@ export default function LoginPage() {
   }
 
   const handleGoogleClick = async () => {
-    if (loading || googleLoading) return
+    if (loading || googleLoading || facebookLoading) return
+    if (!isFirebaseConfigured) {
+      pushToast('Đăng nhập Google hiện yêu cầu cấu hình Firebase trong file .env. Vui lòng đăng nhập bằng tên tài khoản hoặc email của bạn.', 'info')
+      return
+    }
     setError('')
     setGoogleLoading(true)
     try {
       const res = await loginWithGoogle()
       if (!res.ok) {
-        setError(res.error)
+        if (res.error?.includes('Firebase')) {
+          pushToast(res.error, 'info')
+        } else {
+          setError(res.error)
+        }
         return
       }
       pushToast(`Xin chào ${res.user.fullName || res.user.username}! Đăng nhập Google thành công.`, 'success')
@@ -98,8 +107,34 @@ export default function LoginPage() {
     }
   }
 
-  const handleFacebookClick = () => {
-    pushToast('Chức năng đăng nhập Facebook chưa được hỗ trợ ở bước này. Vui lòng đăng nhập bằng Google hoặc tài khoản Nova Shop.', 'info')
+  const handleFacebookClick = async () => {
+    if (loading || googleLoading || facebookLoading) return
+    if (!isFirebaseConfigured) {
+      pushToast('Đăng nhập Facebook hiện yêu cầu cấu hình Firebase trong file .env. Vui lòng đăng nhập bằng tên tài khoản hoặc email của bạn.', 'info')
+      return
+    }
+    setError('')
+    setFacebookLoading(true)
+    try {
+      const res = await loginWithFacebook()
+      if (!res.ok) {
+        if (res.error?.includes('Firebase')) {
+          pushToast(res.error, 'info')
+        } else {
+          setError(res.error)
+        }
+        return
+      }
+      pushToast(`Xin chào ${res.user.fullName || res.user.username}! Đăng nhập Facebook thành công.`, 'success')
+      const returnTo = typeof location.state?.from === 'string' && location.state.from.startsWith('/')
+        ? location.state.from
+        : null
+      navigate(returnTo || (res.user.role === 'admin' ? '/admin' : res.user.role === 'seller' ? '/nguoi-ban' : '/'), { replace: true })
+    } catch (err) {
+      setError('Đã xảy ra lỗi khi xác thực tài khoản Facebook.')
+    } finally {
+      setFacebookLoading(false)
+    }
   }
 
   return (
@@ -118,7 +153,7 @@ export default function LoginPage() {
                 key={account.role}
                 type="button"
                 aria-pressed={demoRole === account.role}
-                disabled={loading || googleLoading}
+                disabled={loading || googleLoading || facebookLoading}
                 onClick={() => fillDemoAccount(account)}
                 className={`rounded-lg border px-2 py-2.5 text-xs font-semibold transition disabled:opacity-50 ${demoRole === account.role ? 'border-[#BD6E49] bg-[#BD6E49] text-white' : 'border-[#E6D5C2] bg-[#FFFCF7] text-[#80513B] hover:border-[#BD6E49]'}`}
               >
@@ -193,7 +228,7 @@ export default function LoginPage() {
         {/* Nút Đăng Nhập phong cách Terracotta */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || googleLoading || facebookLoading}
           className="w-full rounded-xl bg-[#BD6E49] hover:bg-[#A95532] active:scale-[0.99] py-3 text-[15px] font-semibold text-[#FFFCF7] shadow-2xs transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {loading ? 'Đang Đăng Nhập...' : 'Đăng Nhập'}
@@ -230,7 +265,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={handleGoogleClick}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || facebookLoading}
           className="flex items-center justify-center gap-2 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] py-2.5 px-3 text-[13px] font-medium text-[#49352D] shadow-2xs transition hover:bg-[#F5E7D4] hover:border-[#BD6E49] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {googleLoading ? (
@@ -261,17 +296,24 @@ export default function LoginPage() {
           <span className="truncate">{googleLoading ? 'Đang kết nối...' : 'Tiếp tục với Google'}</span>
         </button>
 
-        {/* Nút Facebook */}
+        {/* Nút Facebook kết nối Firebase Authentication */}
         <button
           type="button"
           onClick={handleFacebookClick}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || facebookLoading}
           className="flex items-center justify-center gap-2 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] py-2.5 px-3 text-[13px] font-medium text-[#49352D] shadow-2xs transition hover:bg-[#F5E7D4] hover:border-[#BD6E49] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
-          <svg className="h-4.5 w-4.5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-          </svg>
-          <span className="truncate">Tiếp tục với Facebook</span>
+          {facebookLoading ? (
+            <svg className="h-4.5 w-4.5 animate-spin text-[#1877F2]" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          ) : (
+            <svg className="h-4.5 w-4.5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+          )}
+          <span className="truncate">{facebookLoading ? 'Đang kết nối...' : 'Tiếp tục với Facebook'}</span>
         </button>
       </div>
 

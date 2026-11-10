@@ -192,6 +192,14 @@ export function apiGoogleLogin(idToken, options = {}) {
   })
 }
 
+export function apiFacebookLogin(idToken, options = {}) {
+  return apiRequest('/auth/facebook', {
+    method: 'POST',
+    body: { idToken },
+    signal: options.signal,
+  })
+}
+
 /**
  * Gọi GET /api/v1/auth/me để lấy thông tin hồ sơ tài khoản từ JWT token.
  * @param {string} token Access token dạng Bearer JWT
