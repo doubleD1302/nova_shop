@@ -101,6 +101,16 @@ export function getLocalDatabase() {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS seller_registration_profiles (
+      shop_id INTEGER PRIMARY KEY,
+      pickup_address TEXT NOT NULL, province TEXT NOT NULL,
+      contact_email TEXT NOT NULL, contact_phone TEXT NOT NULL,
+      shipping_methods TEXT NOT NULL, business_type TEXT NOT NULL,
+      owner_name TEXT NOT NULL, identity_encrypted TEXT NOT NULL, identity_last4 TEXT NOT NULL,
+      tax_code TEXT, invoice_email TEXT, agreed_at TEXT NOT NULL,
+      FOREIGN KEY (shop_id) REFERENCES shops(id)
+    );
+
     CREATE TABLE IF NOT EXISTS shop_approval_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_id INTEGER NOT NULL,

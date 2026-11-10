@@ -262,6 +262,7 @@ export async function register(req, res, next) {
         role,
         shopName: role === 'seller' ? body.shopName.trim() : undefined,
         shopTagline: typeof body.shopTagline === 'string' ? body.shopTagline.trim() : '',
+        ...(body.sellerProfile !== undefined ? { sellerProfile: body.sellerProfile } : {}),
       },
     })
     const refreshToken = await createSessionForUser(result.user.id)
@@ -293,7 +294,8 @@ export async function updateProfile(req, res, next) {
 
 export async function createSellerShop(req, res, next) {
   const shopName = req.body?.shopName
-  if (typeof shopName !== 'string' || !shopName.trim() || shopName.trim().length > 160) {
+  if (typeof shopName !== 'string' || !shopName.trim() || shopName.trim().length > 160 ||
+    (req.body?.shopTagline != null && (typeof req.body.shopTagline !== 'string' || req.body.shopTagline.trim().length > 255))) {
     return res.status(400).json({
       success: false,
       message: 'Tên gian hàng là bắt buộc (tối đa 160 ký tự).',
@@ -303,7 +305,7 @@ export async function createSellerShop(req, res, next) {
   try {
     const result = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop`, {
       method: 'POST',
-      body: { shopName: shopName.trim() },
+      body: { shopName: shopName.trim(), shopTagline: req.body?.shopTagline?.trim() || '', ...(req.body?.sellerProfile !== undefined ? { sellerProfile: req.body.sellerProfile } : {}) },
     })
     const refreshToken = await createSessionForUser(result.user.id)
     return res.status(200).json({

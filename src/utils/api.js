@@ -244,8 +244,8 @@ export function apiUpdateProfile(payload) {
   return apiRequest('/auth/profile', { method: 'PUT', body: payload })
 }
 
-export function apiCreateSellerShop(shopName) {
-  return apiRequest('/auth/seller-shop', { method: 'POST', body: { shopName } })
+export function apiCreateSellerShop(shopName, sellerProfile, shopTagline) {
+  return apiRequest('/auth/seller-shop', { method: 'POST', body: { shopName, sellerProfile, shopTagline } })
 }
 
 export function apiGetProducts(options = {}) {

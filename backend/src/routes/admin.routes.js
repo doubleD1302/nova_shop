@@ -1,3 +1,4 @@
+import { callDataApi } from '../clients/data.client.js'
 import { Router } from 'express'
 import {
   createContentReport,
@@ -17,6 +18,12 @@ const router = Router()
 router.post('/reports', authenticate, createContentReport)
 router.use('/admin', authenticate, requireRole('admin'))
 router.get('/admin/email-status', getEmailStatus)
+router.get('/admin/shops/:shopId/registration', async (req, res, next) => {
+  try {
+    const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(req.params.shopId)}/registration?userId=${encodeURIComponent(req.user.id)}`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+})
 router.get('/admin/shops/:shopId/violations', listShopViolations)
 router.get('/admin/shops/:id/approval-events', listAdminShopApprovalEvents)
 router.post('/admin/violations/:id/retry-email', retryViolationEmail)

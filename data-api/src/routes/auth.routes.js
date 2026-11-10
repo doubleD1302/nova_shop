@@ -1,3 +1,4 @@
+import { getSellerRegistration, updateSellerRegistration } from '../controllers/seller-registration.controller.js'
 import { Router } from 'express'
 import {
   verifyCredentials,
@@ -33,6 +34,9 @@ router.put('/users/:userId/profile', updateUserProfile)
 router.post('/users/:userId/change-password', changePassword)
 router.post('/users/:userId/seller-shop', createSellerShop)
 router.get('/users/:userId/seller-shop', getSellerShop)
+router.get('/users/:userId/seller-shop/registration', getSellerRegistration)
+router.put('/users/:userId/seller-shop/registration', updateSellerRegistration)
+router.get('/admin/shops/:shopId/registration', getSellerRegistration)
 router.post('/users/:userId/seller-shop/resubmit', resubmitSellerShop)
 router.put('/users/:userId/seller-shop', (req, res, next) => {
   req.body = { ...(req.body || {}), userId: req.params.userId }

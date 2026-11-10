@@ -193,7 +193,13 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
     fail('[Lỗi cấu hình] ALLOW_LOCAL_DB_FALLBACK chỉ được bật có chủ đích ngoài production.')
   }
 
+  const rawIdentityKey = (sourceEnv.SELLER_IDENTITY_KEY || '').trim()
+  if (rawIdentityKey && (!/^[A-Za-z0-9+/]{43}=$/.test(rawIdentityKey) || Buffer.from(rawIdentityKey, 'base64').length !== 32)) {
+    fail('[Lỗi cấu hình] SELLER_IDENTITY_KEY phải là khóa 32 byte mã hóa base64.')
+  }
+
   return Object.freeze({
+    sellerIdentityKey: rawIdentityKey ? Buffer.from(rawIdentityKey, 'base64') : null,
     allowLocalDbFallback: rawLocalFallback === 'true',
     host,
     port,

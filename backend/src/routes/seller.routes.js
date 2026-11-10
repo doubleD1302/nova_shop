@@ -1,3 +1,4 @@
+import { callDataApi } from '../clients/data.client.js'
 import { getDemoPayout, setupDemoPayout, createDemoWithdrawal } from '../controllers/demo-payout.controller.js'
 import { Router } from 'express'
 import { listSellerOrders, updateSellerOrderStatus } from '../controllers/orders.controller.js'
@@ -12,6 +13,18 @@ router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)
 router.post('/demo-payout/withdrawals', createDemoWithdrawal)
 router.get('/shop', getSellerShop)
+router.get('/shop/registration', async (req, res, next) => {
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+})
+router.put('/shop/registration', async (req, res, next) => {
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`, { method: 'PUT', body: req.body })
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+})
 router.put('/shop', updateSellerShop)
 router.post('/shop/resubmit', resubmitSellerShop)
 router.get('/images/search', searchProductImages)

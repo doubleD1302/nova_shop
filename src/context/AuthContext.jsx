@@ -409,10 +409,10 @@ export function AuthProvider({ children }) {
     }
   }, [user])
 
-  const openSellerShop = useCallback(async (shopName) => {
+  const openSellerShop = useCallback(async (shopName, sellerProfile, shopTagline) => {
     if (!user) return { ok: false, error: 'Vui lòng đăng nhập để mở gian hàng.' }
     try {
-      const res = await apiCreateSellerShop(shopName)
+      const res = await apiCreateSellerShop(shopName, sellerProfile, shopTagline)
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.success || !data?.data?.user) {
         if (res.status === 401 || data?.error?.code === 'AUTH_EXPIRED') {

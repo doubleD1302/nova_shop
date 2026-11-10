@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { vietnamProvinces } from '../../data/locations'
 import { isValidEmail, normalizeEmail } from '../../utils/validation'
-import { apiUpdateSellerShop } from '../../utils/api'
 import { IconCheck, IconClose, IconStore, IconTruck } from '../ui/Icons'
 
 /**
@@ -60,7 +59,7 @@ export default function SellerRegistrationWizard({
     // Bước 4: Thông tin thuế
     taxCode: '',
     invoiceEmail: user?.email || '',
-    agreeTerms: true,
+    agreeTerms: false,
   })
 
   const setField = (key) => (e) => {
@@ -173,6 +172,21 @@ export default function SellerRegistrationWizard({
         return
       }
 
+      if (form.taxCode.trim() && !/^\d{10}(?:-\d{3})?$/.test(form.taxCode.trim())) {
+        setError('Mã số thuế không hợp lệ.')
+        return
+      }
+      if (form.invoiceEmail.trim() && !isValidEmail(form.invoiceEmail.trim())) {
+        setError('Email nhận hóa đơn không hợp lệ.')
+        return
+      }
+      const sellerProfile = {
+        pickupAddress: form.pickupAddress, province: form.province,
+        contactEmail: normalizeEmail(form.email), contactPhone: form.phone.trim(),
+        shippingMethods: [form.shippingNhanh && 'nhanh', form.shippingTietKiem && 'tietkiem', form.shippingHoaToc && 'hoatoc'].filter(Boolean),
+        businessType: form.businessType, ownerName: form.ownerName.trim(), idCard: form.idCard.trim(),
+        taxCode: form.taxCode.trim(), invoiceEmail: form.invoiceEmail.trim(), agreeTerms: form.agreeTerms,
+      }
       setSubmitting(true)
       try {
         if (!user) {
@@ -186,25 +200,17 @@ export default function SellerRegistrationWizard({
             role: 'seller',
             shopName: form.shopName.trim(),
             shopTagline: form.shopTagline.trim(),
+            sellerProfile,
           })
           if (!res.ok) {
             throw new Error(res.error || 'Không thể tạo tài khoản người bán.')
           }
         } else {
           // Người dùng đã đăng nhập: Mở gian hàng
-          const res = await openSellerShop(form.shopName.trim())
+          const res = await openSellerShop(form.shopName.trim(), sellerProfile, form.shopTagline.trim())
           if (!res.ok) {
             throw new Error(res.error || 'Không thể mở gian hàng.')
           }
-          // Cập nhật địa chỉ kho và slogan nếu có
-          try {
-            await apiUpdateSellerShop({
-              name: form.shopName.trim(),
-              tagline: form.shopTagline.trim(),
-              address: form.pickupAddress,
-              province: form.province,
-            })
-          } catch {}
         }
 
         // Tải lại thông tin gian hàng người bán
