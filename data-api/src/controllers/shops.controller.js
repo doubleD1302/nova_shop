@@ -175,36 +175,43 @@ export async function updateSellerShop(req, res, next) {
   try {
     const userId = String(req.body?.userId || '')
     const body = req.body || {}
-    const name = typeof body.name === 'string' ? body.name.trim() : ''
-    const tagline = typeof body.tagline === 'string' ? body.tagline.trim() : ''
-    const description = typeof body.description === 'string' ? body.description.trim() : ''
-    const province = typeof body.province === 'string' ? body.province.trim() : ''
-    const address = typeof body.address === 'string' ? body.address.trim() : ''
-    if (
-      !/^[1-9]\d{0,19}$/.test(userId) || !name || name.length > 160 ||
-      ['tagline', 'description', 'address'].some((field) => body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string') ||
-      tagline.length > 255 || description.length > 5000 || !province || province.length > 120 ||
-      address.length > 255 || !imageUrlIsAllowed(body.logoUrl) || !imageUrlIsAllowed(body.bannerUrl)
-    ) {
+    const fields = ['name', 'tagline', 'description', 'province', 'address', 'logoUrl', 'bannerUrl']
+    if (!/^[1-9]\d{0,19}$/.test(userId) || !fields.some((field) => body[field] !== undefined) ||
+      fields.some((field) => body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string')) {
       return res.status(400).json({ success: false, message: 'Thông tin gian hàng chưa hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
 
     const select = await getShopSelect()
     const shop = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT id FROM shops WHERE owner_id = ? AND status IN ('pending', 'rejected', 'active') FOR UPDATE`,
+        `SELECT id, name, tagline, description, province, address_detail, logo_url, banner_url
+         FROM shops WHERE owner_id = ? AND status IN ('pending', 'rejected', 'active') FOR UPDATE`,
         [userId],
       )
       if (!rows.length) return null
+      const current = rows[0]
+      const value = (field, previous) => body[field] === undefined ? previous : body[field]?.trim() || null
+      const name = value('name', current.name)
+      const tagline = value('tagline', current.tagline)
+      const description = value('description', current.description)
+      const province = value('province', current.province)
+      const address = value('address', current.address_detail)
+      const logoUrl = value('logoUrl', current.logo_url)
+      const bannerUrl = value('bannerUrl', current.banner_url)
+      if (!name || name.length > 160 || !province || province.length > 120 ||
+        (tagline?.length || 0) > 255 || (description?.length || 0) > 5000 ||
+        (address?.length || 0) > 255 || !imageUrlIsAllowed(logoUrl) || !imageUrlIsAllowed(bannerUrl)) {
+        return { invalid: true }
+      }
       await query(
         `UPDATE shops SET name = ?, tagline = ?, description = ?, province = ?, address_detail = ?,
            logo_url = ?, banner_url = ?, approval_version = approval_version + IF(status IN ('pending', 'rejected'), 1, 0) WHERE id = ? AND owner_id = ?`,
-        [name, tagline || null, description || null, province, address || null,
-          body.logoUrl || null, body.bannerUrl || null, rows[0].id, userId],
+        [name, tagline, description, province, address, logoUrl, bannerUrl, current.id, userId],
       )
       const updated = await query(`${select} WHERE s.id = ? AND s.owner_id = ? LIMIT 1`, [rows[0].id, userId])
       return updated[0] || null
     })
+    if (shop?.invalid) return res.status(400).json({ success: false, message: 'Thông tin gian hàng chưa hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     if (!shop) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng thuộc tài khoản này.', error: { code: 'SHOP_NOT_FOUND' } })
     }
