@@ -1,7 +1,7 @@
 import { env } from '../config/env.js'
 import { CONSULTANT_KNOWLEDGE_BASE } from './consultant-knowledge.js'
 
-const GEMINI_MODEL = 'gemini-3.1-flash-lite'
+const GEMINI_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash']
 
 /**
  * Gọi Google Gemini AI đóng vai trò Chuyên Viên Tư Vấn Bán Hàng Cấp Cao của NovaShop:
@@ -101,9 +101,11 @@ ${productContext.length ? JSON.stringify(productContext) : 'Không có dữ li�
 Dựa trên lịch sử trao đổi và kiến thức chuyên môn, hãy tư duy logic và đưa ra câu trả lời ngắn gọn, chuẩn xác và đúng nhu cầu của khách ngay bây giờ:`
 
   // Mỗi lần thử giữ nguyên ngữ cảnh; khóa chỉ được gửi trong header.
+  // Khi một model bị quá tải (503/429) hoặc tạm thời không khả dụng, tự động chuyển sang model dự phòng.
   const deadline = Date.now() + 25000
-  for (const apiKey of apiKeys.slice(0, 5)) {
-      const model = GEMINI_MODEL
+  for (const model of GEMINI_MODELS) {
+    if (Date.now() >= deadline) return null
+    for (const apiKey of apiKeys.slice(0, 5)) {
       if (Date.now() >= deadline) return null
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
       const controller = new AbortController()
@@ -120,7 +122,14 @@ Dựa trên lịch sử trao đổi và kiến thức chuyên môn, hãy tư duy
           redirect: 'error',
           signal: controller.signal,
         })
-        if (response.status === 401 || response.status === 403 || response.status === 429) continue
+        if (response.status === 401 || response.status === 403 || response.status === 429) {
+          // Lỗi hạn ngạch hoặc khóa cá nhân -> tiếp tục thử khóa tiếp theo
+          continue
+        }
+        if (response.status === 503 || response.status === 500 || response.status === 404) {
+          // Model bị quá tải từ hệ thống nhà cung cấp (503 High Demand) hoặc không tìm thấy -> chuyển sang model tiếp theo
+          break
+        }
         if (!response.ok) continue
         const data = await response.json()
         const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text
@@ -132,6 +141,7 @@ Dựa trên lịch sử trao đổi và kiến thức chuyên môn, hãy tư duy
       } finally {
         clearTimeout(timer)
       }
+    }
   }
 
   return null

@@ -417,7 +417,7 @@ Sau khi hoàn thành BE-003A (đăng nhập, lấy thông tin cá nhân và phâ
 
 ## Nova AI
 
-Nova AI sử dụng duy nhất `gemini-3.1-flash-lite` và nhận khóa từ biến `GEMINI_API_KEY` ở Backend. Web và app gọi `POST /api/v1/ai/chat`; không đặt khóa vào frontend. Khi Gemini không phản hồi, endpoint trả lỗi 503 `AI_UNAVAILABLE`.
+Nova AI ưu tiên `gemini-3.1-flash-lite` (tự động chuyển sang các model dự phòng `gemini-3.5-flash-lite`, `gemini-3.8-flash` khi quá tải) và nhận khóa từ biến `GEMINI_API_KEY` ở Backend. Web và app gọi `POST /api/v1/ai/chat`; không đặt khóa vào frontend. Khi Gemini không phản hồi, endpoint trả lỗi 503 `AI_UNAVAILABLE`.
 
 Câu hỏi mua sắm sử dụng tối đa ba từ khóa để tìm qua Data API, mỗi từ năm sản phẩm mỗi trang, gộp và chuyển tối đa 15 sản phẩm vào ngữ cảnh. Có thể yêu cầu `trang 2`, `trang 3` để truy vấn trang tiếp theo. Kết quả có thể trùng giữa các trang theo từng từ khóa; tìm kiếm từ khóa vẫn có thể bỏ sót cách diễn đạt khác. Khi mọi truy vấn dữ liệu sản phẩm thất bại, Backend trả 503 `DATA_API_UNAVAILABLE`; nếu chỉ một phần thất bại, phản hồi đánh dấu `catalogPartial`. Không dựng sản phẩm mẫu.
 

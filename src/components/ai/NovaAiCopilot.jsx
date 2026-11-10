@@ -9,13 +9,7 @@ import {
   apiSendAiMessage,
 } from '../../utils/api'
 
-const QUICK_PROMPTS = [
-  '👗 Phối đồ đi tiệc < 500k',
-  '📦 Tra cứu đơn hàng của tôi',
-  '⚡ Săn deal hỏa tốc hôm nay',
-  '🎧 So sánh tai nghe chống ồn',
-  '🎁 Gợi ý quà sinh nhật bạn gái',
-]
+const QUICK_PROMPTS = []
 
 const INITIAL_MESSAGES = [
   {
