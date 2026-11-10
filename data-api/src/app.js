@@ -1,3 +1,4 @@
+import addressesRouter from './routes/addresses.routes.js'
 import express from 'express'
 import helmet from 'helmet'
 import systemRouter from './routes/system.routes.js'
@@ -35,6 +36,7 @@ app.use(
   validateQuery,
   systemRouter,
   authRouter,
+  addressesRouter,
   productsRouter,
   ordersRouter,
   shopsRouter,

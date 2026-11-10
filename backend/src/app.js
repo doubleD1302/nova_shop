@@ -1,3 +1,4 @@
+import addressesRouter from './routes/addresses.routes.js'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -63,6 +64,7 @@ if (env.uploadStorage === 's3') {
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/addresses', addressesRouter)
 app.use('/api/v1', shopsRouter)
 app.use('/api/v1', uploadsRouter)
 app.use('/api/v1', paymentsRouter)
