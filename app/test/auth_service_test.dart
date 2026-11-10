@@ -1,9 +1,11 @@
-﻿import 'dart:convert';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/user.dart';
 import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/auth_service.dart';
+import 'package:shopnova/screens/auth/login_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +32,8 @@ void main() {
     test('UserModel parses backend JSON response correctly', () {
       final json = {
         'id': '1',
-        'username': 'demo_buyer',
-        'fullName': 'NgÆ°á»i mua máº«u',
+        'username': 'buyer_account',
+        'fullName': 'Nguyễn Văn An',
         'email': 'buyer@example.test',
         'phone': '0900000000',
         'avatarUrl': null,
@@ -42,8 +44,8 @@ void main() {
 
       final user = UserModel.fromJson(json);
       expect(user.id, equals('1'));
-      expect(user.username, equals('demo_buyer'));
-      expect(user.fullName, equals('NgÆ°á»i mua máº«u'));
+      expect(user.username, equals('buyer_account'));
+      expect(user.fullName, equals('Nguyễn Văn An'));
       expect(user.email, equals('buyer@example.test'));
       expect(user.phone, equals('0900000000'));
       expect(user.avatarUrl, isNull);
@@ -80,7 +82,7 @@ void main() {
       final dummyUser = {
         'id': '99',
         'username': 'buyer_persistent',
-        'fullName': 'NgÆ°á»i DÃ¹ng Bá»n Vá»¯ng',
+        'fullName': 'Người Dùng Bền Vững',
         'role': 'buyer',
         'status': 'active',
       };
@@ -94,12 +96,25 @@ void main() {
       expect(restored, isNotNull);
       expect(restored?.username, equals('buyer_persistent'));
       expect(auth.isAuthenticated, isTrue);
-      expect(auth.currentUser?.fullName, equals('NgÆ°á»i DÃ¹ng Bá»n Vá»¯ng'));
+      expect(auth.currentUser?.fullName, equals('Người Dùng Bền Vững'));
 
-      // Chá»‰ Ä‘Äƒng xuáº¥t khi ngÆ°á»i dÃ¹ng chá»§ Ä‘á»™ng nháº¥n logout()
+      // Chỉ đăng xuất khi người dùng chủ động nhấn logout()
       auth.logout();
       expect(auth.isAuthenticated, isFalse);
       expect(auth.currentUser, isNull);
+    });
+  });
+
+  group('LoginScreen Widget Tests', () {
+    testWidgets('LoginScreen does not render sample or demo account quick picker', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+      await tester.pump();
+
+      expect(find.textContaining('Dùng thử nhanh bằng tài khoản mẫu'), findsNothing);
+      expect(find.textContaining('demo_buyer'), findsNothing);
+      expect(find.textContaining('demo_seller'), findsNothing);
+      expect(find.textContaining('demo_admin'), findsNothing);
+      expect(find.text('Đăng Nhập Ngay'), findsOneWidget);
     });
   });
 }

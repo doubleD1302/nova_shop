@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shopnova/screens/orders/orders_screen.dart';
 import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
@@ -27,9 +27,6 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _notificationEnabled = true;
   bool _twoFactorEnabled = false;
 
-  String _receiverName = '';
-  String _receiverPhone = '';
-  String _receiverAddress = 'Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh';
   bool _isCheckingServer = false;
   Map<String, dynamic>? _serverStatus;
   List<Voucher> _apiVouchers = [];
@@ -1057,14 +1054,7 @@ class _AccountScreenState extends State<AccountScreen> {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          final vouchers = _apiVouchers.isNotEmpty
-              ? _apiVouchers
-              : [
-                  Voucher(id: 1, code: 'NOVA20K', name: 'Giảm 20.000₫ cho đơn từ 200k', discountAmount: 20000, minSubtotal: 200000),
-                  Voucher(id: 2, code: 'FREESHIPMAX', name: 'Giảm 30.000₫ phí vận chuyển đơn từ 99k', discountAmount: 30000, minSubtotal: 99000),
-                  Voucher(id: 3, code: 'CHAOBANMOI', name: 'Giảm 50.000₫ cho đơn từ 150k', discountAmount: 50000, minSubtotal: 150000),
-                  Voucher(id: 4, code: 'NOVAMEGA50', name: 'Giảm 50.000₫ cho đơn từ 350k', discountAmount: 50000, minSubtotal: 350000),
-                ];
+          final vouchers = _apiVouchers;
 
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
@@ -1123,7 +1113,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             controller: codeInputController,
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(
-                              hintText: 'Nhập mã giảm giá (VD: NOVA20K)',
+                              hintText: 'Nhập mã giảm giá',
                               hintStyle: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                               isDense: true,
                               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1176,6 +1166,21 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (vouchers.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAFAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFEEEEF0)),
+                      ),
+                      child: const Text(
+                        'Hiện chưa có mã giảm giá nào khả dụng từ hệ thống.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: Color(0xFF8F90A6)),
+                      ),
+                    ),
                   ...vouchers.map((v) {
                     final isSaved = _savedVouchers.contains(v.code);
                     return Container(
@@ -1347,7 +1352,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildStatsBar(BuildContext context) {
     final orderCount = _backendStats?['orderCount'] ?? 0;
     final totalSpent = _backendStats?['totalSpent'] ?? 0;
-    final voucherCount = _backendStats?['voucherCount'] ?? (_apiVouchers.isNotEmpty ? _apiVouchers.length : 4);
+    final voucherCount = _backendStats?['voucherCount'] ?? _apiVouchers.length;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -1525,14 +1530,7 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildVouchersSection(BuildContext context) {
-    final vouchers = _apiVouchers.isNotEmpty
-        ? _apiVouchers
-        : [
-            Voucher(id: 1, code: 'NOVA20K', name: 'Giảm 20.000₫ cho đơn từ 200k', discountAmount: 20000, minSubtotal: 200000),
-            Voucher(id: 2, code: 'FREESHIPMAX', name: 'Giảm 30.000₫ phí vận chuyển đơn từ 99k', discountAmount: 30000, minSubtotal: 99000),
-            Voucher(id: 3, code: 'CHAOBANMOI', name: 'Giảm 50.000₫ cho đơn từ 150k', discountAmount: 50000, minSubtotal: 150000),
-            Voucher(id: 4, code: 'NOVAMEGA50', name: 'Giảm 50.000₫ cho đơn từ 350k', discountAmount: 50000, minSubtotal: 350000),
-          ];
+    final vouchers = _apiVouchers;
 
     final colors = [
       const Color(0xFF00BFA5),
@@ -1583,11 +1581,27 @@ class _AccountScreenState extends State<AccountScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 115,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: vouchers.length,
+          if (vouchers.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFEEEEF0)),
+              ),
+              child: const Text(
+                'Chưa có mã giảm giá nào khả dụng.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
+              ),
+            )
+          else
+            SizedBox(
+              height: 115,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: vouchers.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, idx) {
                 final v = vouchers[idx];
@@ -1666,9 +1680,9 @@ class _AccountScreenState extends State<AccountScreen> {
                     ],
                   ),
                 );
-              },
+                },
+              ),
             ),
-          ),
         ],
       ),
     );

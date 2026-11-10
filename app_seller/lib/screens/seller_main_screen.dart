@@ -2859,16 +2859,34 @@ class _TrendChartPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    // 7 điểm giả lập từ đơn hàng
-    final points = <Offset>[
-      Offset(size.width * 0.05, size.height * 0.8),
-      Offset(size.width * 0.20, size.height * 0.65),
-      Offset(size.width * 0.35, size.height * 0.75),
-      Offset(size.width * 0.50, size.height * 0.45),
-      Offset(size.width * 0.65, size.height * 0.55),
-      Offset(size.width * 0.80, size.height * 0.30),
-      Offset(size.width * 0.95, size.height * 0.20),
-    ];
+    // Tính tổng doanh thu 7 ngày gần nhất từ dữ liệu đơn hàng thực tế
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dailyTotals = List<double>.filled(7, 0.0);
+
+    for (final o in orders) {
+      final status = (o['status']?.toString() ?? '').toLowerCase();
+      if (status == 'cancelled') continue;
+      final rawDate = o['createdAt'] ?? o['created_at'];
+      if (rawDate == null) continue;
+      final parsed = DateTime.tryParse(rawDate.toString())?.toLocal();
+      if (parsed == null) continue;
+      final orderDay = DateTime(parsed.year, parsed.month, parsed.day);
+      final diffDays = today.difference(orderDay).inDays;
+      if (diffDays >= 0 && diffDays < 7) {
+        final bucketIndex = 6 - diffDays;
+        final amount = double.tryParse((o['totalAmount'] ?? o['total_amount'] ?? o['subtotal'] ?? 0).toString()) ?? 0.0;
+        dailyTotals[bucketIndex] += amount;
+      }
+    }
+
+    final maxTotal = dailyTotals.fold<double>(0.0, (m, v) => v > m ? v : m);
+    final points = <Offset>[];
+    for (int i = 0; i < 7; i++) {
+      final xRatio = 0.05 + (i * 0.15);
+      final yRatio = maxTotal > 0 ? (0.85 - (dailyTotals[i] / maxTotal) * 0.70) : 0.90;
+      points.add(Offset(size.width * xRatio, size.height * yRatio));
+    }
 
     final path = Path()..moveTo(points[0].dx, points[0].dy);
     for (int i = 1; i < points.length; i++) {

@@ -5,7 +5,6 @@ import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/favorite_service.dart';
 import '../../theme/app_colors.dart';
-import '../../utils/product_image_resolver.dart';
 
 class ProductCard extends StatefulWidget {
   final Product product;
@@ -344,7 +343,7 @@ class _ProductCardState extends State<ProductCard> {
                             ),
                           ),
                           Text(
-                            product.location.isNotEmpty ? product.location.replaceAll('TP. ', '') : 'HCM',
+                            product.location.isNotEmpty ? product.location.replaceAll('TP. ', '') : '',
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 9.5,
@@ -367,6 +366,9 @@ class _ProductCardState extends State<ProductCard> {
 
   Widget _buildThumbnail(Product p) {
     final imgUrl = p.effectiveImageUrl;
+    if (imgUrl.isEmpty) {
+      return _buildEmojiFallback(p);
+    }
     return Image.network(
       imgUrl,
       fit: BoxFit.cover,
@@ -389,15 +391,6 @@ class _ProductCardState extends State<ProductCard> {
           ),
         );
       },
-      errorBuilder: (_, __, ___) => _buildFallbackImage(p),
-    );
-  }
-
-  Widget _buildFallbackImage(Product p) {
-    final fallbackUrl = ProductImageResolver.resolve(categoryId: p.categoryId, name: p.name);
-    return Image.network(
-      fallbackUrl,
-      fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => _buildEmojiFallback(p),
     );
   }

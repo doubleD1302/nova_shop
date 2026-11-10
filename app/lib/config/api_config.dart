@@ -106,7 +106,6 @@ class ApiConfig {
   static String get readyUrl => '$baseUrl/api/v1/ready';
   static String get loginUrl => '$baseUrl/api/v1/auth/login';
   static String get googleLoginUrl => '$baseUrl/api/v1/auth/google';
-  static String get demoAccountsUrl => '$baseUrl/api/v1/auth/demo-accounts';
   static String get registerUrl => '$baseUrl/api/v1/auth/register';
   static String get refreshUrl => '$baseUrl/api/v1/auth/refresh';
   static String get logoutUrl => '$baseUrl/api/v1/auth/logout';

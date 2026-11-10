@@ -12,38 +12,6 @@ class VoucherService {
   final ApiClient _api = ApiClient();
   static const String _savedVouchersKey = 'saved_voucher_codes';
 
-  /// Fallback danh sách voucher tiêu chuẩn nếu chưa kết nối mạng
-  static final List<Voucher> _fallbackVouchers = [
-    Voucher(
-      id: 1,
-      code: 'NOVA20K',
-      name: 'Voucher ShopNova - Giảm 20.000₫',
-      discountAmount: 20000,
-      minSubtotal: 200000,
-    ),
-    Voucher(
-      id: 2,
-      code: 'FREESHIPMAX',
-      name: 'Freeship Max - Giảm 30.000₫ phí vận chuyển',
-      discountAmount: 30000,
-      minSubtotal: 99000,
-    ),
-    Voucher(
-      id: 3,
-      code: 'CHAOBANMOI',
-      name: 'Chào bạn mới - Giảm 50.000₫ cho đơn từ 150k',
-      discountAmount: 50000,
-      minSubtotal: 150000,
-    ),
-    Voucher(
-      id: 4,
-      code: 'NOVAMEGA50',
-      name: 'Nova Mega Sale - Giảm 50.000₫ cho đơn từ 350k',
-      discountAmount: 50000,
-      minSubtotal: 350000,
-    ),
-  ];
-
   /// Lấy toàn bộ danh sách voucher công khai từ API Backend
   /// GET /api/v1/vouchers
   Future<List<Voucher>> getActiveVouchers() async {
@@ -56,27 +24,23 @@ class VoucherService {
         } else if (res.data is Map && res.data['vouchers'] is List) {
           list = res.data['vouchers'] as List;
         }
-        final vouchers = list
+        return list
             .whereType<Map<String, dynamic>>()
             .map((item) => Voucher.fromJson(item))
             .where((v) => v.isActive)
             .toList();
-        if (vouchers.isNotEmpty) return vouchers;
       }
     } catch (e) {
       debugPrint('[VoucherService] Lỗi tải voucher từ API: $e');
     }
-    return _fallbackVouchers;
+    return [];
   }
 
   /// Lấy danh sách voucher trong ví của người dùng đã đăng nhập từ API Backend
   /// GET /api/v1/vouchers/wallet?page=1
   Future<List<Voucher>> getWalletVouchers({int page = 1}) async {
     if (!AuthService().isAuthenticated) {
-      // Nếu chưa đăng nhập, trả về voucher đã lưu trong SharedPreferences cục bộ
-      final savedCodes = await getSavedVoucherCodes();
-      final allVouchers = await getActiveVouchers();
-      return allVouchers.where((v) => savedCodes.contains(v.code)).toList();
+      return [];
     }
 
     try {
@@ -97,31 +61,26 @@ class VoucherService {
       debugPrint('[VoucherService] Lỗi tải ví voucher từ API: $e');
     }
 
-    // Fallback: nếu lỗi API, lấy từ bộ nhớ máy
-    final savedCodes = await getSavedVoucherCodes();
-    final allVouchers = await getActiveVouchers();
-    return allVouchers.where((v) => savedCodes.contains(v.code)).toList();
+    return [];
   }
 
-  /// Lưu voucher vào ví cá nhân trên API Backend và bộ nhớ máy
+  /// Lưu voucher vào ví cá nhân trên API Backend
   /// POST /api/v1/vouchers/wallet
   Future<Map<String, dynamic>> saveVoucherToWallet(String code) async {
     final upperCode = code.trim().toUpperCase();
 
-    // Luôn lưu vào SharedPreferences cục bộ để offline vẫn dùng được
-    await saveVoucher(upperCode);
-
     if (!AuthService().isAuthenticated) {
       return {
-        'success': true,
-        'saved': true,
-        'message': 'Đã lưu voucher $upperCode vào ví thiết bị.',
+        'success': false,
+        'saved': false,
+        'message': 'Vui lòng đăng nhập để lưu voucher vào ví.',
       };
     }
 
     try {
       final res = await _api.post('/api/v1/vouchers/wallet', body: {'code': upperCode});
       if (res.success) {
+        await saveVoucher(upperCode);
         final data = res.data is Map<String, dynamic> ? res.data as Map<String, dynamic> : {};
         final saved = data['saved'] == true;
         return {
@@ -133,15 +92,17 @@ class VoucherService {
         return {
           'success': false,
           'saved': false,
-          'message': res.message ?? 'Không thể lưu mã voucher này (có thể đã hết hạn hoặc hết lượt).',
+          'message': res.message.isNotEmpty
+              ? res.message
+              : 'Không thể lưu mã voucher này (có thể đã hết hạn hoặc hết lượt).',
         };
       }
     } catch (e) {
       debugPrint('[VoucherService] Lỗi gọi API lưu voucher: $e');
       return {
-        'success': true,
-        'saved': true,
-        'message': 'Đã lưu mã $upperCode vào ví.',
+        'success': false,
+        'saved': false,
+        'message': 'Không thể kết nối máy chủ để lưu mã voucher.',
       };
     }
   }

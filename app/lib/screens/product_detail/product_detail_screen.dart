@@ -42,7 +42,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   bool _isFavorite = false;
   bool _isFollowing = false;
   bool _isLoadingReviews = false;
-  double _avgRating = 5.0;
+  double _avgRating = 0.0;
   int _totalReviews = 0;
   List<ProductReview> _reviews = [];
   int _selectedStarFilter = 0; // 0 = all
@@ -75,6 +75,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     _product = widget.initialProduct;
 
     if (_product != null) {
+      _avgRating = _product!.rating;
       _initDynamicVariants(_product!);
     }
 
@@ -129,38 +130,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       }
     }
 
-    // 3. Fallback thông minh dựa trên ngành hàng thực tế của sản phẩm
-    if (g1.isEmpty) {
-      final cId = p.categoryId.toLowerCase();
-      if (cId.contains('thoi-trang') || cId.contains('ao') || cId.contains('quan')) {
-        g1.addAll(['Trắng Basic', 'Đen Classic', 'Be Vintage', 'Xanh Sage']);
-      } else if (cId.contains('dien-thoai') || cId.contains('may-tinh')) {
-        g1.addAll(['Titan Tự Nhiên', 'Đen Midnight', 'Bạc Sang Trọng']);
-      } else if (cId.contains('sac-dep')) {
-        g1.addAll(['Hương Dịu Nhẹ', 'Da Nhạy Cảm', 'Dưỡng Sâu']);
-      } else {
-        g1.addAll(['Phiên bản Tiêu Chuẩn', 'Phiên bản Nâng Cấp Pro']);
-      }
-    }
-
-    if (g2.isEmpty) {
-      final cId = p.categoryId.toLowerCase();
-      if (cId.contains('thoi-trang') || cId.contains('ao') || cId.contains('quan')) {
-        g2.addAll(['Size S', 'Size M', 'Size L (55-65kg)', 'Size XL']);
-      } else if (cId.contains('dien-thoai') || cId.contains('may-tinh')) {
-        g2.addAll(['128GB', '256GB', '512GB']);
-      } else if (cId.contains('sac-dep')) {
-        g2.addAll(['Dung tích 50ml', 'Dung tích 100ml']);
-      }
-    }
-
     setState(() {
       _optionGroup1 = g1.toList();
       _optionGroup2 = g2.toList();
-      if (_optionGroup1.isNotEmpty && (_selectedOption1.isEmpty || !_optionGroup1.contains(_selectedOption1))) {
+      if (_optionGroup1.isEmpty) {
+        _selectedOption1 = '';
+      } else if (_selectedOption1.isEmpty || !_optionGroup1.contains(_selectedOption1)) {
         _selectedOption1 = _optionGroup1.first;
       }
-      if (_optionGroup2.isNotEmpty && (_selectedOption2.isEmpty || !_optionGroup2.contains(_selectedOption2))) {
+      if (_optionGroup2.isEmpty) {
+        _selectedOption2 = '';
+      } else if (_selectedOption2.isEmpty || !_optionGroup2.contains(_selectedOption2)) {
         _selectedOption2 = _optionGroup2.first;
       }
     });
@@ -217,7 +197,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       if (mounted) {
         setState(() {
           _reviews = res.reviews;
-          _avgRating = res.averageRating > 0 ? res.averageRating : (_product?.rating ?? 4.9);
+          _avgRating = res.averageRating > 0 ? res.averageRating : (_product?.rating ?? 0.0);
           _totalReviews = res.totalReviews > 0 ? res.totalReviews : _reviews.length;
           _isLoadingReviews = false;
         });

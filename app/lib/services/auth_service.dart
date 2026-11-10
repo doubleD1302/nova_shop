@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,32 +44,6 @@ class AuthService extends ChangeNotifier {
   String? get lastError => _lastError;
   String? get sellerShopStatus => _sellerShopStatus;
   bool get isAuthenticated => _currentUser != null;
-
-  /// Lấy danh sách tài khoản demo từ Backend API
-  /// GET /api/v1/auth/demo-accounts
-  Future<List<Map<String, dynamic>>> fetchDemoAccounts() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.demoAccountsUrl),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 6));
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        if (body['success'] == true && body['data'] is Map) {
-          final accounts = body['data']['accounts'];
-          if (accounts is List) {
-            return accounts.whereType<Map<String, dynamic>>().toList();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[AuthService] fetchDemoAccounts error: $e');
-    }
-    return [];
-  }
 
   /// Làm mới phiên đăng nhập qua refresh token
   /// POST /api/v1/auth/refresh

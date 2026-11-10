@@ -20,8 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isCheckingBackend = false;
   bool _backendOnline = false;
   String _backendStatusText = 'Đang kiểm tra kết nối...';
-  List<Map<String, dynamic>> _demoAccounts = [];
-  String _selectedDemoRole = '';
 
   @override
   void initState() {
@@ -42,16 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     await ApiConfig.autoDetectBaseUrl();
     final status = await AuthService().checkFullConnectionStatus();
-    final accounts = await AuthService().fetchDemoAccounts();
     if (!mounted) return;
     final isOnline = status['isOnline'] == true;
     final isReady = status['isReady'] == true;
     setState(() {
       _isCheckingBackend = false;
       _backendOnline = isOnline;
-      if (accounts.isNotEmpty) {
-        _demoAccounts = accounts;
-      }
       if (isReady) {
         _backendStatusText = 'Máy chủ & CSDL sẵn sàng (${status['latencyMs']}ms)';
       } else if (isOnline) {
@@ -59,14 +53,6 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         _backendStatusText = 'Không thể kết nối máy chủ API';
       }
-    });
-  }
-
-  void _fillDemoAccount(Map<String, dynamic> account) {
-    setState(() {
-      _selectedDemoRole = account['role']?.toString() ?? '';
-      _usernameController.text = account['username']?.toString() ?? '';
-      _passwordController.text = account['password']?.toString() ?? '';
     });
   }
 
@@ -384,113 +370,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildDemoPicker() {
-    final accounts = _demoAccounts.isNotEmpty
-        ? _demoAccounts
-        : [
-            {
-              'role': 'buyer',
-              'label': 'Người mua',
-              'hint': 'Xem đơn hàng mẫu, giỏ hàng và đánh giá sản phẩm',
-              'username': 'demo_buyer_guest',
-              'password': 'DemoBuyer2026',
-            },
-            {
-              'role': 'seller',
-              'label': 'Người bán',
-              'hint': 'Quản lý gian hàng mẫu, tồn kho và đơn bán',
-              'username': 'demo_seller_guest',
-              'password': 'DemoSeller2026',
-            },
-            {
-              'role': 'admin',
-              'label': 'Quản trị viên',
-              'hint': 'Duyệt shop, sản phẩm, báo cáo và vận hành sàn',
-              'username': 'demo_admin_guest',
-              'password': 'DemoAdmin2026',
-            },
-          ];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primary),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Dùng thử nhanh bằng tài khoản mẫu:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Chạm vào vai trò để tự điền tài khoản và mật khẩu demo từ Backend.',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: accounts.map((acc) {
-              final role = acc['role']?.toString() ?? '';
-              final isSelected = _selectedDemoRole == role;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => _fillDemoAccount(acc),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.border,
-                          width: isSelected ? 1.4 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            acc['label']?.toString() ?? role,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            acc['username']?.toString() ?? '',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLoginForm() {
     final auth = AuthService();
     return AnimatedBuilder(
@@ -510,7 +389,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildDemoPicker(),
               const Text('Tên đăng nhập hoặc Số điện thoại', style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               Container(
@@ -556,7 +434,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Chạm vào nút Người mua ở trên để tự động điền tài khoản mẫu!'),
+                          content: Text('Vui lòng liên hệ hỗ trợ để được hướng dẫn khôi phục tài khoản.'),
                           backgroundColor: AppColors.primary,
                         ),
                       );

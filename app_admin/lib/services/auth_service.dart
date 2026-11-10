@@ -61,21 +61,6 @@ class AuthService extends ChangeNotifier {
   static const String _userKey = 'shopnova_admin_user_profile';
   static const String _refreshTokenKey = 'shopnova_admin_refresh_token';
 
-  /// Lấy danh sách tài khoản demo từ Backend API
-  /// GET /api/v1/auth/demo-accounts
-  Future<List<Map<String, dynamic>>> fetchDemoAccounts() async {
-    try {
-      final res = await _api.get('/api/v1/auth/demo-accounts');
-      if (res.success && res.data is Map) {
-        final accounts = res.data['accounts'];
-        if (accounts is List) {
-          return accounts.whereType<Map<String, dynamic>>().toList();
-        }
-      }
-    } catch (_) {}
-    return [];
-  }
-
   Future<void> restoreSession() async {
     final token = await _api.getToken();
     if (token == null || token.isEmpty) {

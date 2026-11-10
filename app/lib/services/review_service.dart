@@ -76,12 +76,12 @@ class ReviewService {
 
     if (response.success && response.data != null) {
       List<dynamic> rawList = [];
-      double avg = 5.0;
+      double avg = 0.0;
       int total = 0;
       if (response.data is Map<String, dynamic>) {
         final map = response.data as Map<String, dynamic>;
         rawList = map['reviews'] as List? ?? [];
-        avg = (map['averageRating'] as num?)?.toDouble() ?? 5.0;
+        avg = (map['averageRating'] as num?)?.toDouble() ?? 0.0;
         total = (map['totalReviews'] as num?)?.toInt() ?? rawList.length;
       } else if (response.data is List) {
         rawList = response.data as List;
@@ -93,7 +93,7 @@ class ReviewService {
           .map((item) => ProductReview.fromJson(item))
           .toList();
 
-      if (reviews.isNotEmpty && avg == 5.0) {
+      if (reviews.isNotEmpty && avg <= 0) {
         final sum = reviews.fold<int>(0, (s, r) => s + r.rating);
         avg = sum / reviews.length;
       }
@@ -105,7 +105,7 @@ class ReviewService {
       );
     }
 
-    return ProductReviewResult(averageRating: 5.0, totalReviews: 0, reviews: []);
+    return ProductReviewResult(averageRating: 0.0, totalReviews: 0, reviews: []);
   }
 
   /// Lấy danh sách các orderItem đủ điều kiện đánh giá của sản phẩm

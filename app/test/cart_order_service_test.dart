@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/models/cart_item.dart';
 import 'package:shopnova/models/order.dart';
@@ -251,43 +251,28 @@ void main() {
       expect(item2.productName, 'Sáº¡c Dá»± PhÃ²ng 20000mAh');
     });
 
-    test('createOrder fallback preserves item unitPrice, productName, and total amount', () async {
+    test('createOrder returns null when unauthenticated instead of creating fake offline order', () async {
       final orderService = OrderService();
       final order = await orderService.createOrder(
         recipientName: 'Nguyen Van A',
         recipientPhone: '0901234567',
-        province: 'TP. Há»“ ChÃ­ Minh',
-        addressDetail: '123 ÄÆ°á»ng LÃª Lá»£i',
+        province: 'TP. Hồ Chí Minh',
+        addressDetail: '123 Đường Lê Lợi',
         items: [
           {
             'variantId': 1,
             'qty': 1,
             'price': 499000,
             'unitPrice': 499000,
-            'productName': 'Sáº¡c dá»± phÃ²ng 20000mAh',
-            'variantName': 'Äen',
-          },
-          {
-            'variantId': 2,
-            'qty': 1,
-            'price': 500000,
-            'unitPrice': 500000,
-            'productName': 'BÃ n PhÃ­m CÆ¡',
-            'variantName': 'Tráº¯ng',
+            'productName': 'Sạc dự phòng 20000mAh',
+            'variantName': 'Đen',
           },
         ],
       );
 
-      expect(order, isNotNull);
-      expect(order!['subtotal'], 999000);
-      expect(order['totalAmount'], 1017000);
-      final items = order['items'] as List;
-      expect(items.length, 2);
-      expect(items[0]['unitPrice'], 499000);
-      expect(items[1]['unitPrice'], 500000);
-      expect(items[0]['variantName'], 'Äen');
-      expect(items[1]['variantName'], 'Tráº¯ng');
+      expect(order, isNull);
+      expect(orderService.lastError, isNotNull);
+      expect(await orderService.fetchOrders(), isEmpty);
     });
   });
 }
-

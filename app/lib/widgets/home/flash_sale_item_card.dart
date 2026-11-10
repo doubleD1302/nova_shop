@@ -1,9 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
 import 'package:shopnova/theme/app_colors.dart';
-import '../../utils/product_image_resolver.dart';
 
 class FlashSaleItemCard extends StatelessWidget {
   final FlashSaleItem item;
@@ -63,34 +62,32 @@ class FlashSaleItemCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
-                          child: Image.network(
-                            item.effectiveImageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return Container(
-                                color: AppColors.surfaceAlt,
-                                child: const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          child: item.effectiveImageUrl.isEmpty
+                              ? Center(
+                                  child: Text(item.emoji, style: const TextStyle(fontSize: 44)),
+                                )
+                              : Image.network(
+                                  item.effectiveImageUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Container(
+                                      color: AppColors.surfaceAlt,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(item.emoji, style: const TextStyle(fontSize: 44)),
                                   ),
                                 ),
-                              );
-                            },
-                            errorBuilder: (_, __, ___) => Image.network(
-                              ProductImageResolver.resolve(id: item.id, name: item.name),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Text(item.emoji, style: const TextStyle(fontSize: 44)),
-                              ),
-                            ),
-                          ),
                         ),
                       ),
                       if (item.discount > 0)
