@@ -7,7 +7,6 @@ import '../../theme/app_colors.dart';
 import '../../screens/product_detail/product_detail_screen.dart';
 import '../../screens/shop/shop_screen.dart';
 import '../../screens/shop/shop_detail_screen.dart';
-import '../../utils/product_image_resolver.dart';
 
 /// Section Gian Hàng Nổi Bật trên Trang Chủ (Kết nối 100% dữ liệu Backend API)
 class FeaturedShopsSection extends StatefulWidget {
@@ -43,39 +42,18 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
   Future<void> _loadShops() async {
     try {
       final res = await _shopService.getShops(limit: 6);
-      if (res.shops.isNotEmpty && mounted) {
+      if (mounted) {
         setState(() {
           _shops = res.shops;
           _isLoading = false;
         });
-        return;
       }
+      return;
     } catch (_) {}
 
-    // Fallback nếu API /api/v1/shops chưa có danh sách, trích xuất gian hàng thực từ danh sách sản phẩm
     if (mounted) {
-      final seen = <String>{};
-      final fallbackShops = <Shop>[];
-
-      for (final p in widget.products) {
-        final sId = p.shopId.isNotEmpty ? p.shopId : '1';
-        if (!seen.contains(sId)) {
-          seen.add(sId);
-          fallbackShops.add(Shop(
-            id: sId,
-            name: p.shopName.isNotEmpty ? p.shopName : 'Shop #$sId',
-            slug: 'shop-$sId',
-            province: p.location.isNotEmpty ? p.location : 'Toàn Quốc',
-            isMall: p.badges.contains('MALL'),
-            rating: p.rating > 0 ? p.rating : 4.9,
-            followersCount: 120,
-            tagline: p.location.isNotEmpty ? p.location : 'Gian hàng chính hãng',
-          ));
-        }
-      }
-
       setState(() {
-        _shops = fallbackShops;
+        _shops = [];
         _isLoading = false;
       });
     }
@@ -369,20 +347,23 @@ class _FeaturedShopsSectionState extends State<FeaturedShopsSection> {
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             clipBehavior: Clip.antiAlias,
-                                            child: Image.network(
-                                              p.effectiveImageUrl,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => Image.network(
-                                                ProductImageResolver.resolve(categoryId: p.categoryId, name: p.name),
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => Center(
-                                                  child: Text(
-                                                    p.emoji.isNotEmpty ? p.emoji : '🛍️',
-                                                    style: const TextStyle(fontSize: 26),
+                                            child: p.effectiveImageUrl.isEmpty
+                                                ? Center(
+                                                    child: Text(
+                                                      p.emoji.isNotEmpty ? p.emoji : '🛍️',
+                                                      style: const TextStyle(fontSize: 26),
+                                                    ),
+                                                  )
+                                                : Image.network(
+                                                    p.effectiveImageUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, __, ___) => Center(
+                                                      child: Text(
+                                                        p.emoji.isNotEmpty ? p.emoji : '🛍️',
+                                                        style: const TextStyle(fontSize: 26),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 4),

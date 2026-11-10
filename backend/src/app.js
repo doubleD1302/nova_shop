@@ -59,6 +59,9 @@ if (env.uploadStorage === 's3') {
   app.get('/uploads/:filename', serveUploadedImage)
 } else {
   app.use('/uploads', express.static(env.uploadDir, { maxAge: '1y', immutable: true }))
+  app.get('/uploads/:filename', (req, res) => {
+    res.redirect(302, `https://novashop-api-952u.onrender.com/uploads/${encodeURIComponent(req.params.filename)}`)
+  })
 }
 
 // 4. Khai báo các API routes với tiền tố /api/v1

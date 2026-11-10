@@ -19,8 +19,8 @@ class ApiConfig {
   static const String productionUrl = 'https://novashop-api-952u.onrender.com';
 
   /// Địa chỉ IP máy tính trong mạng Wi-Fi LAN:
-  static const String lanHostUrl = 'http://192.168.1.9:3000';
-  static const String altLanHostUrl = 'http://192.168.1.11:3000';
+  static const String lanHostUrl = 'http://10.39.18.75:3000';
+  static const String altLanHostUrl = 'http://192.168.1.9:3000';
 
   /// Địa chỉ loopback khi cắm cáp USB và chạy adb reverse:
   static const String usbLoopbackUrl = 'http://127.0.0.1:3000';
@@ -31,12 +31,12 @@ class ApiConfig {
   /// Địa chỉ loopback chuẩn cho desktop / simulator:
   static const String localHostUrl = 'http://localhost:3000';
 
-  /// Cấu hình địa chỉ máy chủ mặc định
+  /// Cấu hình địa chỉ máy chủ mặc định (Mặc định dùng Backend Render Online đồng bộ với Website)
   static String get defaultBaseUrl {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl.replaceAll(RegExp(r'/+$'), '');
     }
-    return usbLoopbackUrl;
+    return productionUrl;
   }
 
   /// Base URL hiện tại đang sử dụng
@@ -64,10 +64,10 @@ class ApiConfig {
   static const Duration timeout = Duration(seconds: 10);
 
   /// Tự động dò tìm địa chỉ máy chủ đang hoạt động:
-  /// - Kiểm tra nhanh kết nối USB nội bộ (nếu đang cắm cáp debug)
-  /// - Kiểm tra nhanh LAN máy tính
-  /// - Backend Online Render (cho phép truy cập độc lập không phụ thuộc máy tính)
-  /// - Máy ảo Android Emulator
+  /// - Ưu tiên 1: Backend Render Online đồng bộ với website
+  /// - Ưu tiên 2: Cáp USB adb reverse (http://127.0.0.1:3000)
+  /// - Ưu tiên 3: Wi-Fi LAN máy tính
+  /// - Ưu tiên 4: Máy ảo Android Emulator
   static Future<String> autoDetectBaseUrl() async {
     if (_customBaseUrl != null) return _customBaseUrl!;
 
@@ -77,16 +77,16 @@ class ApiConfig {
     }
 
     final candidates = [
-      usbLoopbackUrl, // Cáp USB adb reverse (http://127.0.0.1:3000)
-      lanHostUrl,     // Wi-Fi LAN (http://192.168.1.9:3000)
-      altLanHostUrl,  // Wi-Fi LAN phụ (http://192.168.1.11:3000)
+      usbLoopbackUrl, // Cáp USB adb reverse (http://127.0.0.1:3000) ưu tiên khi cắm máy tính
+      productionUrl,  // Backend Render Online (Đồng bộ với Website) khi chạy độc lập
+      lanHostUrl,     // Wi-Fi LAN máy tính (http://10.39.18.75:3000)
+      altLanHostUrl,  // Wi-Fi LAN phụ
       emulatorUrl,    // Máy ảo Android (http://10.0.2.2:3000)
-      productionUrl,  // Backend Render Online
     ];
 
     for (final url in candidates) {
       try {
-        final timeoutMs = url == productionUrl ? 4000 : 1200;
+        final timeoutMs = url == productionUrl ? 5000 : 1500;
         final res = await http
             .get(Uri.parse('$url/api/v1/health'))
             .timeout(Duration(milliseconds: timeoutMs));
@@ -106,7 +106,6 @@ class ApiConfig {
   static String get readyUrl => '$baseUrl/api/v1/ready';
   static String get loginUrl => '$baseUrl/api/v1/auth/login';
   static String get googleLoginUrl => '$baseUrl/api/v1/auth/google';
-  static String get demoAccountsUrl => '$baseUrl/api/v1/auth/demo-accounts';
   static String get registerUrl => '$baseUrl/api/v1/auth/register';
   static String get refreshUrl => '$baseUrl/api/v1/auth/refresh';
   static String get logoutUrl => '$baseUrl/api/v1/auth/logout';

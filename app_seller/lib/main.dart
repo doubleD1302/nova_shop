@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/seller_main_screen.dart';
+import 'theme/seller_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,13 +16,9 @@ class ShopNovaSellerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ShopNova Seller',
+      title: 'ShopNova Seller Centre',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00796B)),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
-      ),
+      theme: SellerTheme.lightTheme,
       home: AuthService().isAuthenticated
           ? const SellerMainScreen()
           : const LoginScreen(),

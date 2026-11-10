@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/cart_item.dart';
 import '../../models/address.dart';
+import '../../models/voucher.dart';
 import '../../services/address_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/order_service.dart';
+import '../../services/voucher_service.dart';
 import '../account/addresses_screen.dart';
 import '../auth/login_screen.dart' as shopnova_auth;
 import '../orders/orders_screen.dart';
@@ -37,6 +39,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isPlacingOrder = false;
 
   // Voucher state
+  List<Voucher> _availableVouchers = [];
   String? _appliedVoucherCode;
   double _appliedVoucherDiscount = 0.0;
   String? _voucherError;
@@ -73,6 +76,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _noteController = TextEditingController();
     _voucherController = TextEditingController();
     _loadSavedAddress();
+    _loadVouchers();
   }
 
   /// Tự động tải địa chỉ đã lưu từ SharedPreferences hoặc AddressService
@@ -123,16 +127,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (_addressController.text.trim().isEmpty && savedAddress != null) {
         _addressController.text = savedAddress;
       }
-      if (_provinceController.text.trim().isEmpty) {
-        _provinceController.text = (savedProvince != null && savedProvince.isNotEmpty) ? savedProvince : 'TP. Hồ Chí Minh';
+      if (_provinceController.text.trim().isEmpty && savedProvince != null && savedProvince.isNotEmpty) {
+        _provinceController.text = savedProvince;
       }
-      if (_districtController.text.trim().isEmpty) {
-        _districtController.text = (savedDistrict != null && savedDistrict.isNotEmpty) ? savedDistrict : 'Quận 1';
+      if (_districtController.text.trim().isEmpty && savedDistrict != null && savedDistrict.isNotEmpty) {
+        _districtController.text = savedDistrict;
       }
-      if (_wardController.text.trim().isEmpty) {
-        _wardController.text = (savedWard != null && savedWard.isNotEmpty) ? savedWard : 'Phường Bến Nghé';
+      if (_wardController.text.trim().isEmpty && savedWard != null && savedWard.isNotEmpty) {
+        _wardController.text = savedWard;
       }
     });
+  }
+
+  Future<void> _loadVouchers() async {
+    final list = await VoucherService().getActiveVouchers();
+    if (mounted) {
+      setState(() => _availableVouchers = list);
+    }
   }
 
   /// Lưu địa chỉ người dùng nhập vào SharedPreferences để dùng lại lần sau
@@ -227,90 +238,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // Danh sách mã ưu đãi chuẩn của sàn ShopNova
-    if (cleanCode == 'NOVA20K') {
-      if (subtotal < 200000) {
-        setState(() {
-          _voucherError = 'Mã NOVA20K áp dụng cho đơn hàng từ 200.000₫.';
-          _appliedVoucherCode = null;
-          _appliedVoucherDiscount = 0.0;
-        });
-        return;
-      }
-      setState(() {
-        _voucherError = null;
-        _appliedVoucherCode = cleanCode;
-        _appliedVoucherDiscount = 20000.0;
-      });
-    } else if (cleanCode == 'FREESHIP' || cleanCode == 'FREESHIPMAX') {
-      if (subtotal < 99000) {
-        setState(() {
-          _voucherError = 'Mã $cleanCode chỉ áp dụng cho đơn hàng từ 99.000₫.';
-          _appliedVoucherCode = null;
-          _appliedVoucherDiscount = 0.0;
-        });
-        return;
-      }
-      final shipDiscount = shippingFee.clamp(0.0, 30000.0);
-      setState(() {
-        _voucherError = null;
-        _appliedVoucherCode = cleanCode;
-        _appliedVoucherDiscount = shipDiscount > 0 ? shipDiscount : 30000.0;
-      });
-    } else if (cleanCode == 'CHAOBANMOI' || cleanCode == 'NOVANEW') {
-      if (subtotal < 150000) {
-        setState(() {
-          _voucherError = 'Mã $cleanCode chỉ áp dụng cho đơn hàng từ 150.000₫.';
-          _appliedVoucherCode = null;
-          _appliedVoucherDiscount = 0.0;
-        });
-        return;
-      }
-      final discount = (subtotal * 0.15).clamp(20000.0, 50000.0);
-      setState(() {
-        _voucherError = null;
-        _appliedVoucherCode = cleanCode;
-        _appliedVoucherDiscount = discount;
-      });
-    } else if (cleanCode == 'NOVAMEGA50') {
-      if (subtotal < 350000) {
-        setState(() {
-          _voucherError = 'Mã NOVAMEGA50 chỉ áp dụng cho đơn hàng từ 350.000₫.';
-          _appliedVoucherCode = null;
-          _appliedVoucherDiscount = 0.0;
-        });
-        return;
-      }
-      setState(() {
-        _voucherError = null;
-        _appliedVoucherCode = cleanCode;
-        _appliedVoucherDiscount = 50000.0;
-      });
-    } else if (cleanCode == 'NOVA50K') {
-      if (subtotal < 1500000) {
-        setState(() {
-          _voucherError = 'Mã NOVA50K chỉ áp dụng cho đơn hàng từ 1.500.000₫.';
-          _appliedVoucherCode = null;
-          _appliedVoucherDiscount = 0.0;
-        });
-        return;
-      }
-      setState(() {
-        _voucherError = null;
-        _appliedVoucherCode = cleanCode;
-        _appliedVoucherDiscount = 50000.0;
-      });
-    } else {
-      _validateVoucherWithBackend(cleanCode, subtotal);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Áp dụng mã $cleanCode thành công! Giảm ${_formatVND(_appliedVoucherDiscount)}'),
-        backgroundColor: const Color(0xFF00BFA5),
-      ),
-    );
+    _validateVoucherWithBackend(cleanCode, subtotal);
   }
 
   Future<void> _validateVoucherWithBackend(String cleanCode, double subtotal) async {
@@ -319,7 +247,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : (_selectedShippingMethod == 'nhanh' ? 'standard' : 'economy');
 
     final items = _getItems().map((it) {
-      final vId = int.tryParse(it.variantId?.toString() ?? '') ?? 1;
+      final vId = int.tryParse(it.variantId) ?? 1;
       return {
         'variantId': vId,
         'qty': it.qty,
@@ -437,23 +365,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       if (!AuthService().isAuthenticated) {
-        final cleanPhone = recipientPhone.replaceAll(RegExp(r'\D'), '');
-        final phoneKey = cleanPhone.isNotEmpty ? cleanPhone : DateTime.now().millisecondsSinceEpoch.toString();
-        final username = 'u_$phoneKey';
-        const defaultPass = 'ShopNova@123';
-
-        bool loggedIn = await AuthService().login(username, defaultPass);
-        if (!loggedIn) {
-          final registered = await AuthService().register(
-            username: username,
-            password: defaultPass,
-            fullName: recipientName,
-            phone: recipientPhone,
-          );
-          if (!registered) {
-            await AuthService().login(username, defaultPass);
-          }
-        }
+        if (!mounted) return;
+        setState(() => _isPlacingOrder = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vui lòng đăng nhập để đặt hàng.'),
+            backgroundColor: const Color(0xFFD0011B),
+            action: SnackBarAction(
+              label: 'Đăng nhập',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const shopnova_auth.LoginScreen()),
+                );
+              },
+            ),
+          ),
+        );
+        return;
       }
 
       final orderItems = items.map((it) {
@@ -485,10 +415,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final order = await OrderService().createOrder(
         recipientName: recipientName,
         recipientPhone: recipientPhone,
-        province: _provinceController.text.trim().isNotEmpty ? _provinceController.text.trim() : 'TP. Hồ Chí Minh',
-        district: _districtController.text.trim().isNotEmpty ? _districtController.text.trim() : 'Quận 1',
-        ward: _wardController.text.trim().isNotEmpty ? _wardController.text.trim() : 'Phường Bến Nghé',
-        addressDetail: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : 'Địa chỉ nhận hàng',
+        province: _provinceController.text.trim(),
+        district: _districtController.text.trim(),
+        ward: _wardController.text.trim(),
+        addressDetail: _addressController.text.trim(),
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         paymentMethod: _selectedPaymentMethod,
         shippingMethod: _selectedShippingMethod,
@@ -504,7 +434,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         final orderCode = order['code'] ?? 'ORD';
         final totalAmount = order['totalAmount'] ?? order['total_amount'] ?? 0;
-        final isOffline = order['isSavedOffline'] == true;
 
         showDialog(
           context: context,
@@ -554,12 +483,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: const TextStyle(color: Color(0xFF1E2022), fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  isOffline
-                      ? 'Đơn hàng đã được lưu an toàn trên ứng dụng và đang chờ người bán xác nhận.'
-                      : 'Đơn hàng của bạn đã được ghi nhận trên hệ thống và người bán đang đóng gói chuẩn bị giao.',
+                const Text(
+                  'Đơn hàng của bạn đã được ghi nhận trên hệ thống và người bán đang đóng gói chuẩn bị giao.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF8F90A6), fontSize: 12, height: 1.4),
+                  style: TextStyle(color: Color(0xFF8F90A6), fontSize: 12, height: 1.4),
                 ),
                 const SizedBox(height: 22),
                 Container(
@@ -764,7 +691,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 10),
           TextField(
             controller: _addressController,
-            decoration: _inputDeco('Địa chỉ chi tiết (Số nhà, tên đường) *', Icons.home_outlined, hintText: 'Ví dụ: 123 Nguyễn Huệ'),
+            decoration: _inputDeco('Địa chỉ chi tiết (Số nhà, tên đường) *', Icons.home_outlined, hintText: 'Nhập số nhà, tên đường'),
           ),
           const SizedBox(height: 10),
           Row(
@@ -772,21 +699,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Expanded(
                 child: TextField(
                   controller: _wardController,
-                  decoration: _inputDeco('Phường / Xã', null, hintText: 'Bến Nghé'),
+                  decoration: _inputDeco('Phường / Xã', null, hintText: 'Nhập phường/xã'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _districtController,
-                  decoration: _inputDeco('Quận / Huyện', null, hintText: 'Quận 1'),
+                  decoration: _inputDeco('Quận / Huyện', null, hintText: 'Nhập quận/huyện'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _provinceController,
-                  decoration: _inputDeco('Tỉnh / TP *', null, hintText: 'TP. Hồ Chí Minh'),
+                  decoration: _inputDeco('Tỉnh / TP *', null, hintText: 'Nhập tỉnh/thành phố'),
                 ),
               ),
             ],
@@ -1032,10 +959,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         onTap: () {
           setState(() {
             _selectedShippingMethod = methodKey;
-            // Nếu đang dùng mã FREESHIP thì tính lại giảm ship
-            if (_appliedVoucherCode == 'FREESHIP') {
-              _appliedVoucherDiscount = fee.clamp(0.0, 30000.0);
-            }
+
           });
         },
         child: Padding(
@@ -1134,7 +1058,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   controller: _voucherController,
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                    hintText: 'Nhập mã (NOVA20K, NOVA50K, FREESHIP)...',
+                    hintText: 'Nhập mã giảm giá...',
                     hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
                     isDense: true,
                     filled: true,
@@ -1216,18 +1140,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          // Gợi ý nhanh các voucher có sẵn
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _buildVoucherChip('NOVA20K', 'Giảm 20K đơn 200K', subtotal, shippingFee),
-              _buildVoucherChip('FREESHIPMAX', 'Freeship đơn 99K', subtotal, shippingFee),
-              _buildVoucherChip('CHAOBANMOI', 'Giảm 50K đơn 150K', subtotal, shippingFee),
-              _buildVoucherChip('NOVAMEGA50', 'Giảm 50K đơn 350K', subtotal, shippingFee),
-            ],
-          ),
+          if (_availableVouchers.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _availableVouchers
+                  .map((v) => _buildVoucherChip(v.code, '${v.discountFormatted} • ${v.minSubtotalFormatted}', subtotal, shippingFee))
+                  .toList(),
+            ),
+          ],
         ],
       ),
     );

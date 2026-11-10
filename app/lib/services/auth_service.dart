@@ -161,32 +161,6 @@ class AuthService extends ChangeNotifier {
     return user;
   });
 
-  /// Lấy danh sách tài khoản demo từ Backend API
-  /// GET /api/v1/auth/demo-accounts
-  Future<List<Map<String, dynamic>>> fetchDemoAccounts() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.demoAccountsUrl),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 6));
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        if (body['success'] == true && body['data'] is Map) {
-          final accounts = body['data']['accounts'];
-          if (accounts is List) {
-            return accounts.whereType<Map<String, dynamic>>().toList();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[AuthService] fetchDemoAccounts error: $e');
-    }
-    return [];
-  }
-
   /// Làm mới phiên đăng nhập qua refresh token
   /// POST /api/v1/auth/refresh
   Future<bool> refreshSession() {
@@ -449,11 +423,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Đăng nhập ngầm trong nền để làm mới token tự động mà không làm gián đoạn người dùng
-  Future<bool> silentLogin(String username, String password) =>
-      login(username, password, rememberMe: false);
-
-  /// Đăng ký tài khoản người dùng mới
+  /// Đăng ký tài khoản người dùng mới (Buyer hoặc Seller kèm sellerProfile)
   Future<bool> register({
     required String username,
     required String password,
@@ -463,6 +433,7 @@ class AuthService extends ChangeNotifier {
     String role = 'buyer',
     String? shopName,
     String? shopTagline,
+    Map<String, dynamic>? sellerProfile,
   }) async {
     final version = _beginSessionChange(clear: true);
     _isLoading = true;
@@ -490,28 +461,21 @@ class AuthService extends ChangeNotifier {
           shopTagline.trim().isNotEmpty) {
         payload['shopTagline'] = shopTagline.trim();
       }
+      if (role == 'seller' && sellerProfile != null) {
+        payload['sellerProfile'] = sellerProfile;
+      }
 
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.registerUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await _client.post('/api/v1/auth/register', body: payload);
 
       if (version != _sessionVersion) return false;
-      final Map<String, dynamic> body = jsonDecode(response.body);
-
-      if ((response.statusCode == 200 || response.statusCode == 201) &&
-          body['success'] == true) {
-        final data = body['data'] as Map<String, dynamic>;
+      if (response.success && response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
         if (!await _acceptSession(data, version)) return false;
-
         _isLoading = false;
         notifyListeners();
         return true;
       } else {
-        _lastError = body['message'] as String? ?? 'Đăng ký không thành công.';
+        _lastError = response.message.isNotEmpty ? response.message : 'Đăng ký không thành công.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -526,12 +490,13 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Đăng ký mở gian hàng đối tác người bán (Seller Shop)
-  /// Gọi API mới của Backend: POST /api/v1/auth/seller-shop
+  /// Đăng ký mở gian hàng đối tác người bán cho tài khoản đang đăng nhập
+  /// Gọi đúng API Website: POST /api/v1/auth/seller-shop
   Future<bool> registerSellerShop({
     required String shopName,
-    String province = 'TP. Hồ Chí Minh',
+    String? province,
     String? tagline,
+    Map<String, dynamic>? sellerProfile,
   }) async {
     final version = _beginSessionChange();
     _isLoading = true;
@@ -541,7 +506,11 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await _client.post(
         '/api/v1/auth/seller-shop',
-        body: {'shopName': shopName.trim()},
+        body: {
+          'shopName': shopName.trim(),
+          'shopTagline': (tagline ?? '').trim(),
+          if (sellerProfile != null) 'sellerProfile': sellerProfile,
+        },
       );
 
       if (response.success && response.data is Map<String, dynamic>) {
@@ -549,22 +518,6 @@ class AuthService extends ChangeNotifier {
         _sellerShopStatus = data['shopStatus']?.toString() ?? 'pending';
 
         if (!await _acceptSession(data, version)) return false;
-
-        // 2. Cập nhật thông tin gian hàng chi tiết (tỉnh/thành, tagline) nếu có truyền vào
-        if ((tagline != null && tagline.trim().isNotEmpty) ||
-            province.trim().isNotEmpty) {
-          try {
-            await _client.put(
-              '/api/v1/seller/shop',
-              body: {
-                'name': shopName.trim(),
-                'province': province.trim(),
-                if (tagline != null && tagline.trim().isNotEmpty)
-                  'tagline': tagline.trim(),
-              },
-            );
-          } catch (_) {}
-        }
 
         if (version != _sessionVersion) return false;
 
@@ -587,6 +540,23 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Lấy hồ sơ đăng ký KYC hiện tại của gian hàng: GET /api/v1/seller/shop/registration
+  Future<Map<String, dynamic>?> getSellerRegistration() async {
+    final res = await _client.get('/api/v1/seller/shop/registration');
+    if (res.success && res.data is Map<String, dynamic>) {
+      final data = res.data as Map<String, dynamic>;
+      if (data['profile'] is Map<String, dynamic>) {
+        return data['profile'] as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  /// Cập nhật hồ sơ đăng ký KYC khi shop đang pending hoặc rejected: PUT /api/v1/seller/shop/registration
+  Future<ApiResponse> updateSellerRegistration(Map<String, dynamic> sellerProfile) async {
+    return await _client.put('/api/v1/seller/shop/registration', body: sellerProfile);
   }
 
   /// Lấy thông tin tài khoản hiện tại từ Backend qua JWT token

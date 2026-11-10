@@ -59,9 +59,16 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  final http.Client _client = http.Client();
+  http.Client _client = http.Client();
   static const Duration _defaultTimeout = Duration(seconds: 15);
   static const String _tokenKey = 'shopnova_admin_access_token';
+
+  void _resetClient() {
+    try {
+      _client.close();
+    } catch (_) {}
+    _client = http.Client();
+  }
 
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -82,6 +89,7 @@ class ApiClient {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Connection': 'close',
     };
     final token = await getToken();
     if (token != null && token.isNotEmpty) {
@@ -149,12 +157,12 @@ class ApiClient {
     try {
       return await requestFn();
     } catch (_) {
+      _resetClient();
       try {
-        ApiConfig.resetBaseUrl();
         await ApiConfig.autoDetectBaseUrl();
         return await requestFn();
       } on SocketException {
-        return ApiResponse.error('Không thể kết nối tới máy chủ ShopNova. Vui lòng kiểm tra mạng.');
+        return ApiResponse.error('Không thể kết nối tới máy chủ ShopNova. Vui lòng kiểm tra kết nối mạng.');
       } on TimeoutException {
         return ApiResponse.error('Yêu cầu hết thời gian chờ (Timeout). Vui lòng thử lại.');
       } catch (e) {

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order.dart';
 import 'api_client.dart';
 import '../config/api_config.dart';
@@ -28,47 +27,11 @@ class OrderListResult {
 class OrderService {
   static final OrderService _instance = OrderService._internal();
   factory OrderService() => _instance;
-  OrderService._internal() {
-    _loadLocalOrdersFromPrefs();
-  }
+  OrderService._internal();
 
-  static const String _storageKey = 'shopnova_local_orders_v2';
   final ApiClient _client = ApiClient();
-  final List<Map<String, dynamic>> _localOrders = [];
-  bool _isLocalLoaded = false;
   String? _lastError;
   String? get lastError => _lastError;
-
-  Future<void> _loadLocalOrdersFromPrefs() async {
-    if (_isLocalLoaded) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw != null && raw.isNotEmpty) {
-        final List list = jsonDecode(raw);
-        for (final item in list) {
-          if (item is Map<String, dynamic>) {
-            final normalized = _normalizeOrder(item);
-            if (!_localOrders.any((o) => o['id']?.toString() == normalized['id']?.toString() || o['code'] == normalized['code'])) {
-              _localOrders.add(normalized);
-            }
-          }
-        }
-      }
-      _isLocalLoaded = true;
-    } catch (e) {
-      debugPrint('[OrderService] load local orders error: $e');
-    }
-  }
-
-  Future<void> _saveLocalOrdersToPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storageKey, jsonEncode(_localOrders));
-    } catch (e) {
-      debugPrint('[OrderService] save local orders error: $e');
-    }
-  }
 
   /// Chuẩn hóa toàn diện thông tin đơn hàng và từng mặt hàng
   Map<String, dynamic> _normalizeOrder(Map<String, dynamic> o) {
@@ -120,54 +83,46 @@ class OrderService {
     return order;
   }
 
-  /// Lấy danh sách đơn mua của người dùng (kết hợp cả Backend API và đơn hàng đã lưu)
+  /// Lấy danh sách đơn mua của người dùng trực tiếp từ Backend API
   Future<List<Map<String, dynamic>>> fetchOrders() async {
-    await _loadLocalOrdersFromPrefs();
     final token = AuthService().token;
-    final List<Map<String, dynamic>> combined = _localOrders.map((o) => _normalizeOrder(o)).toList();
+    if (token == null) return [];
 
-    if (token != null) {
-      try {
-        final response = await http.get(
-          Uri.parse(ApiConfig.ordersUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ).timeout(const Duration(seconds: 15));
+    final List<Map<String, dynamic>> orders = [];
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.ordersUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
 
-        if (response.statusCode == 200) {
-          final body = jsonDecode(response.body);
-          List<dynamic> rawList = [];
-          if (body['success'] == true && body['data'] != null) {
-            if (body['data'] is List) {
-              rawList = body['data'] as List;
-            } else if (body['data'] is Map && body['data']['orders'] is List) {
-              rawList = body['data']['orders'] as List;
-            }
-          }
-          if (rawList.isNotEmpty) {
-            final apiOrders = rawList.whereType<Map<String, dynamic>>().toList();
-            for (final o in apiOrders) {
-              final normalized = _normalizeOrder(o);
-              if (!combined.any((c) => c['id']?.toString() == normalized['id']?.toString() || c['code'] == normalized['code'])) {
-                combined.add(normalized);
-              }
-            }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        List<dynamic> rawList = [];
+        if (body['success'] == true && body['data'] != null) {
+          if (body['data'] is List) {
+            rawList = body['data'] as List;
+          } else if (body['data'] is Map && body['data']['orders'] is List) {
+            rawList = body['data']['orders'] as List;
           }
         }
-      } catch (e) {
-        debugPrint('[OrderService] fetchOrders API error: $e');
+        for (final o in rawList.whereType<Map<String, dynamic>>()) {
+          orders.add(_normalizeOrder(o));
+        }
       }
+    } catch (e) {
+      debugPrint('[OrderService] fetchOrders API error: $e');
     }
 
-    combined.sort((a, b) {
+    orders.sort((a, b) {
       final aDate = a['createdAt']?.toString() ?? '';
       final bDate = b['createdAt']?.toString() ?? '';
       return bDate.compareTo(aDate);
     });
 
-    return combined;
+    return orders;
   }
 
   /// Xem trước tính toán đơn hàng (phí ship theo shop, giảm giá voucher, tổng thanh toán)
@@ -250,10 +205,10 @@ class OrderService {
           'address': {
             'fullName': recipientName.trim(),
             'phone': recipientPhone.trim(),
-            'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
-            'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
-            'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
-            'detail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
+            'province': province.trim(),
+            'district': district?.trim() ?? '',
+            'ward': ward?.trim() ?? '',
+            'detail': addressDetail.trim(),
           },
           'paymentMethod': paymentMethod,
           'shippingMethod': shippingMethod,
@@ -293,72 +248,15 @@ class OrderService {
     }
 
     if (createdOrder != null) {
-      final normalized = _normalizeOrder(createdOrder);
-      _localOrders.insert(0, normalized);
-      await _saveLocalOrdersToPrefs();
-      return normalized;
+      return _normalizeOrder(createdOrder);
     }
 
-    final num calculatedSubtotal = items.fold(0, (sum, it) {
-      final price = it['unitPrice'] ?? it['unit_price'] ?? it['price'] ?? 180000;
-      final qty = it['qty'] ?? it['quantity'] ?? 1;
-      final pNum = num.tryParse(price.toString()) ?? 180000;
-      final qNum = num.tryParse(qty.toString()) ?? 1;
-      return sum + (pNum * qNum);
-    });
-
-    final isFreeShip = calculatedSubtotal >= 1000000;
-    final num shippingCost = (shippingMethod == 'hoatoc')
-        ? (isFreeShip ? 35000 : 55000)
-        : (shippingMethod == 'nhanh')
-            ? (isFreeShip ? 14000 : 32000)
-            : (isFreeShip ? 0 : 18000);
-
-    num voucherDiscount = 0;
-    if (voucherCode != null && voucherCode.trim().isNotEmpty) {
-      final codeUpper = voucherCode.trim().toUpperCase();
-      if (codeUpper == 'NOVA20K' && calculatedSubtotal >= 500000) {
-        voucherDiscount = 20000;
-      } else if (codeUpper == 'NOVA50K' && calculatedSubtotal >= 1500000) {
-        voucherDiscount = 50000;
-      } else if (codeUpper == 'FREESHIP' && calculatedSubtotal >= 300000) {
-        voucherDiscount = shippingCost > 30000 ? 30000 : shippingCost;
-      } else if (codeUpper == 'NOVANEW') {
-        voucherDiscount = (calculatedSubtotal * 0.15).clamp(0, 50000);
-      }
+    if (token == null) {
+      _lastError = 'Vui lòng đăng nhập để đặt hàng.';
+    } else {
+      _lastError ??= 'Không thể kết nối đến máy chủ để tạo đơn hàng.';
     }
-
-    final num finalTotal = (calculatedSubtotal + shippingCost - voucherDiscount).clamp(0, double.infinity);
-
-    final randomHex = (now.millisecondsSinceEpoch % 1000000).toRadixString(16).toUpperCase();
-    final orderCode = 'ORD${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}$randomHex'.substring(0, 15);
-
-    final fallbackOrder = _normalizeOrder({
-      'id': '${now.millisecondsSinceEpoch}',
-      'code': orderCode,
-      'recipientName': recipientName.trim(),
-      'recipientPhone': recipientPhone.trim(),
-      'province': province.trim().isNotEmpty ? province.trim() : 'TP. Hồ Chí Minh',
-      'district': district?.trim().isNotEmpty == true ? district!.trim() : 'Quận 1',
-      'ward': ward?.trim().isNotEmpty == true ? ward!.trim() : 'Phường Bến Nghé',
-      'addressDetail': addressDetail.trim().isNotEmpty ? addressDetail.trim() : 'Địa chỉ nhận hàng',
-      'note': note,
-      'paymentMethod': paymentMethod,
-      'shippingMethod': shippingMethod,
-      'subtotal': calculatedSubtotal,
-      'shippingFee': shippingCost,
-      'discountAmount': voucherDiscount,
-      'totalAmount': finalTotal,
-      'total_amount': finalTotal,
-      'status': 'pending',
-      'createdAt': now.toIso8601String(),
-      'items': items,
-      'isSavedOffline': true,
-    });
-
-    _localOrders.insert(0, fallbackOrder);
-    await _saveLocalOrdersToPrefs();
-    return fallbackOrder;
+    return null;
   }
 
   /// Lấy danh sách lịch sử đơn hàng của người dùng dưới dạng model Order

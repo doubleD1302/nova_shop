@@ -6,7 +6,6 @@ import '../models/product.dart';
 import '../models/banner_item.dart';
 import '../models/flash_sale_item.dart';
 import '../data/website_data.dart';
-import '../utils/product_image_resolver.dart';
 import '../utils/flash_sale_rotator.dart';
 import 'api_client.dart';
 import '../config/api_config.dart';
@@ -39,6 +38,7 @@ class CatalogService {
     }
     return [];
   }
+
   static final CatalogService _instance = CatalogService._internal();
   factory CatalogService({http.Client? client}) {
     if (client != null) {
@@ -48,41 +48,35 @@ class CatalogService {
   }
 
   final http.Client _client;
+  final bool _hasCustomClient;
   final ApiClient _apiClient = ApiClient();
 
-  CatalogService._internal({http.Client? client}) : _client = client ?? http.Client();
+  CatalogService._internal({http.Client? client})
+      : _client = client ?? http.Client(),
+        _hasCustomClient = client != null;
 
-  /// Lấy danh sách danh mục sản phẩm từ Backend API (kết hợp đầy đủ 12 ngành hàng giao diện)
+  /// Lấy danh sách danh mục sản phẩm trực tiếp từ Backend API (không dùng dữ liệu tĩnh)
   Future<List<CategoryItem>> getCategories({bool mergeWebsiteData = false}) async {
-    List<CategoryItem> apiCategories = [];
     try {
       final res = await _client.get(
         Uri.parse(ApiConfig.categoriesUrl),
         headers: {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'categories');
-          apiCategories = list.map((e) => CategoryItem.fromJson(e as Map<String, dynamic>)).toList();
+          return list
+              .whereType<Map<String, dynamic>>()
+              .map((e) => CategoryItem.fromJson(e))
+              .toList();
         }
       }
-    } catch (_) {}
-
-    if (apiCategories.isNotEmpty && !mergeWebsiteData) return apiCategories;
-    if (mergeWebsiteData) {
-      final categoryMap = <String, CategoryItem>{};
-      for (final c in WebsiteData.categories) {
-        categoryMap[c.slug ?? c.id] = c;
-      }
-      for (final c in apiCategories) {
-        categoryMap[c.slug ?? c.id] = c;
-      }
-      return categoryMap.values.toList();
+    } catch (e) {
+      debugPrint('[CatalogService] getCategories error: $e');
     }
-
-    return apiCategories.isNotEmpty ? apiCategories : WebsiteData.categories;
+    return [];
   }
 
   /// Lấy danh sách ngành hàng/danh mục dạng thô từ Backend
@@ -96,7 +90,7 @@ class CatalogService {
     return [];
   }
 
-  /// Lấy danh sách sản phẩm từ Backend API
+  /// Lấy danh sách sản phẩm trực tiếp từ Backend API (không dùng dữ liệu tĩnh)
   Future<List<Product>> getProducts({
     String? categoryId,
     bool? isFlashSale,
@@ -104,41 +98,32 @@ class CatalogService {
     String? filterTab,
     bool mergeWebsiteData = false,
   }) async {
-    List<Product> allProducts = [];
+    List<Product> result = [];
 
     try {
       final uri = Uri.parse(ApiConfig.productsUrl).replace(queryParameters: {
         if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
-        if (isFlashSale != null && isFlashSale) 'flash': '1',
+        if (isFlashSale == true) 'flash': '1',
         'limit': '100',
       });
 
       final res = await _client.get(
         uri,
         headers: {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'products');
-          allProducts = list.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
+          result = list
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Product.fromJson(e))
+              .toList();
         }
       }
-    } catch (_) {}
-
-    List<Product> result;
-    if (allProducts.isNotEmpty) {
-      if (mergeWebsiteData) {
-        final productMap = <String, Product>{};
-        for (final p in WebsiteData.products) productMap[p.id] = p;
-        for (final p in allProducts) productMap[p.id] = p;
-        result = productMap.values.toList();
-      } else {
-        result = allProducts;
-      }
-    } else {
-      result = List<Product>.from(WebsiteData.products);
+    } catch (e) {
+      debugPrint('[CatalogService] getProducts error: $e');
     }
 
     if (categoryId != null && categoryId.isNotEmpty) {
@@ -160,7 +145,7 @@ class CatalogService {
       } else if (filterTab == 'newest') {
         result = result.reversed.toList();
       } else if (filterTab == 'hot_deal') {
-        result = result.where((p) => p.discount >= 40).toList();
+        result = result.where((p) => p.discount > 0).toList();
       } else if (filterTab == 'outlet') {
         result = List<Product>.from(result)..sort((a, b) => a.price.compareTo(b.price));
       }
@@ -201,25 +186,51 @@ class CatalogService {
     if (mall == true) queryParams['mall'] = '1';
     if (freeship == true) queryParams['freeship'] = '1';
 
-    final response = await _apiClient.get('/api/v1/products', queryParams: queryParams);
+    dynamic responseData;
+    Map<String, dynamic>? responseMeta;
+    bool isSuccess = false;
 
-    if (response.success && response.data != null) {
-      final list = _extractList(response.data, 'products')
+    if (_hasCustomClient) {
+      try {
+        final uri = Uri.parse(ApiConfig.productsUrl).replace(queryParameters: queryParams);
+        final res = await _client.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 8));
+        if (res.statusCode == 200) {
+          final body = jsonDecode(res.body);
+          if (body is Map<String, dynamic> && body['success'] == true) {
+            isSuccess = true;
+            responseData = body['data'];
+            if (body['meta'] is Map<String, dynamic>) {
+              responseMeta = body['meta'] as Map<String, dynamic>;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[CatalogService] getProductsPaginated error: $e');
+      }
+    } else {
+      final response = await _apiClient.get('/api/v1/products', queryParams: queryParams);
+      isSuccess = response.success;
+      responseData = response.data;
+      responseMeta = response.meta;
+    }
+
+    if (isSuccess && responseData != null) {
+      final list = _extractList(responseData, 'products')
           .whereType<Map<String, dynamic>>()
           .map((item) => Product.fromJson(item))
           .toList();
 
       int total = list.length;
-      if (response.data is Map && response.data['total'] is num) {
-        total = (response.data['total'] as num).toInt();
-      } else if (response.meta?['total'] is num) {
-        total = (response.meta!['total'] as num).toInt();
+      if (responseData is Map && responseData['total'] is num) {
+        total = (responseData['total'] as num).toInt();
+      } else if (responseMeta?['total'] is num) {
+        total = (responseMeta!['total'] as num).toInt();
       }
 
       return ProductListResult(
         products: list,
-        page: (response.meta?['page'] as num?)?.toInt() ?? page,
-        limit: (response.meta?['limit'] as num?)?.toInt() ?? limit,
+        page: (responseMeta?['page'] as num?)?.toInt() ?? page,
+        limit: (responseMeta?['limit'] as num?)?.toInt() ?? limit,
         total: total,
         totalPages: (total / (limit > 0 ? limit : 1)).ceil(),
       );
@@ -228,12 +239,12 @@ class CatalogService {
     return ProductListResult(products: [], page: page, limit: limit, total: 0, totalPages: 0);
   }
 
-  /// Lấy danh sách banner khuyến mãi chuẩn của sàn ShopNova
+  /// Lấy danh sách banner điều hướng giao diện chuẩn của Website
   Future<List<BannerItem>> getBanners() async {
     return WebsiteData.banners;
   }
 
-  /// Lấy danh sách sản phẩm Flash Sale xoay tua thông minh theo khung giờ & sự kiện
+  /// Lấy danh sách sản phẩm Flash Sale từ sản phẩm thật trên Backend API
   Future<List<FlashSaleItem>> getFlashSaleItems() async {
     try {
       final apiProducts = await getProducts();
@@ -243,16 +254,16 @@ class CatalogService {
     } catch (e) {
       debugPrint('[CatalogService] getFlashSaleItems error: $e');
     }
-    return FlashSaleRotator.rotateItems(count: 6);
+    return [];
   }
 
-  /// Lấy chi tiết sản phẩm từ Backend API (kèm fallback thông minh theo WebsiteData)
+  /// Lấy chi tiết sản phẩm trực tiếp từ Backend API (không fallback dữ liệu tĩnh)
   Future<Product?> getProductDetail(String id) async {
     try {
       final res = await _client.get(
         Uri.parse('${ApiConfig.productsUrl}/$id'),
         headers: {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
@@ -260,47 +271,31 @@ class CatalogService {
           return Product.fromJson(body['data'] as Map<String, dynamic>);
         }
       }
-    } catch (_) {}
-
-    try {
-      final cleanId = id.trim().toLowerCase();
-      final p = WebsiteData.products.firstWhere(
-        (prod) => prod.id.toLowerCase() == cleanId || prod.id.replaceAll('p', '') == cleanId.replaceAll('p', ''),
-      );
-      return p;
-    } catch (_) {}
-
+    } catch (e) {
+      debugPrint('[CatalogService] getProductDetail error: $e');
+    }
     return null;
   }
 
-  /// Lấy danh sách gian hàng từ Backend API
+  /// Lấy danh sách gian hàng trực tiếp từ Backend API
   Future<List<Map<String, dynamic>>> getShops({bool mergeWebsiteData = false}) async {
     try {
       final res = await _client.get(
         Uri.parse(ApiConfig.shopsUrl),
         headers: {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
         final Map<String, dynamic> body = jsonDecode(res.body);
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'shops');
-          final apiShops = list.whereType<Map<String, dynamic>>().toList();
-          if (apiShops.isNotEmpty) return apiShops;
+          return list.whereType<Map<String, dynamic>>().toList();
         }
       }
-    } catch (_) {}
-
-    return mergeWebsiteData ? WebsiteData.shops.map((s) => {
-      'id': s.id,
-      'name': s.name,
-      'isMall': s.isMall,
-      'rating': s.rating,
-      'followers': s.followers,
-      'location': s.location,
-      'tagline': s.tagline,
-      'emoji': s.emoji,
-    }).toList() : [];
+    } catch (e) {
+      debugPrint('[CatalogService] getShops error: $e');
+    }
+    return [];
   }
 
   /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ
@@ -323,12 +318,12 @@ class CatalogService {
     return WebsiteData.quickLinks;
   }
 
-  /// Lấy 4 cam kết chất lượng như trên Website
+  /// Lấy 4 thông tin sàn (Commitments) như trên Website
   List<CommitmentItem> getCommitments() {
     return WebsiteData.commitments;
   }
 
-  /// So khớp sản phẩm với ngành hàng / danh mục một cách thông minh và linh hoạt
+  /// So khớp sản phẩm với ngành hàng / danh mục
   static bool matchesCategory(Product p, String categoryTarget) {
     final target = categoryTarget.trim().toLowerCase();
     if (target.isEmpty) return true;
@@ -337,77 +332,12 @@ class CatalogService {
     final pCatName = p.categoryName.trim().toLowerCase();
 
     if (pCatId == target || pCatName == target) return true;
-
-    final Map<String, List<String>> aliases = {
-      'thoi-trang-nam': [
-        'thoi-trang-nam', 'thoi trang nam', 'thoitrangnam', 'nam', 'ao nam', 'quan nam', '1'
-      ],
-      'thoi-trang-nu': [
-        'thoi-trang-nu', 'thoi trang nu', 'thoitrangnu', 'nu', 'áo nữ', 'váy', 'đầm', 'túi xách', '2'
-      ],
-      'dien-thoai': [
-        'dien-thoai', 'điện thoại & phụ kiện', 'điện thoại và phụ kiện', 'điện thoại', 'phụ kiện',
-        'dienthoai', 'tai nghe', 'sạc', 'cáp', 'pin dự phòng', '3'
-      ],
-      'may-tinh': [
-        'may-tinh', 'máy tính & laptop', 'máy tính và laptop', 'máy tính', 'laptop', 'maytinh',
-        'bàn phím', 'chuột', 'màn hình', 'pc', '4'
-      ],
-      'thiet-bi-gia-dung': [
-        'thiet-bi-gia-dung', 'thiết bị gia dụng', 'gia dụng', 'thietbigiadung', 'gia-dung',
-        'robot hút bụi', 'nồi chiên', 'ấm đun', 'máy lọc không khí', '5'
-      ],
-      'sac-dep': [
-        'sac-dep', 'sắc đẹp & chăm sóc da', 'sắc đẹp và chăm sóc da', 'sắc đẹp', 'chăm sóc da',
-        'mỹ phẩm', 'sacdep', 'son', 'serum', 'tẩy trang', 'sữa rửa mặt', '6'
-      ],
-      'nha-cua': [
-        'nha-cua', 'nhà cửa & đời sống', 'nhà cửa và đời sống', 'nhà cửa', 'đời sống',
-        'nhacua', 'chảo', 'nồi', 'gối', 'đèn', 'kệ', 'nến', 'thảm', 'dép', 'ghế', '7'
-      ],
-      'me-be': [
-        'me-be', 'mẹ & bé yêu', 'mẹ & bé', 'mẹ và bé yêu', 'mẹ và bé', 'mebe',
-        'xe đẩy', 'bỉm', 'tã', 'ghế ăn dặm', '8'
-      ],
-      'bach-hoa': [
-        'bach-hoa', 'bách hóa online', 'bách hóa', 'bachhoa', 'thực phẩm', 'cà phê', 'trà', 'tiêu dùng', '9'
-      ],
-      'the-thao': [
-        'the-thao', 'thể thao & du lịch', 'thể thao và du lịch', 'thể thao', 'thethao',
-        'xe đạp', 'bóng đá', 'du lịch', '10'
-      ],
-      'o-to-xe-may': [
-        'o-to-xe-may', 'ô tô & xe máy', 'ô tô và xe máy', 'ô tô', 'xe máy', 'otoxemay',
-        'mũ bảo hiểm', 'bơm lốp', 'phụ tùng', '11'
-      ],
-      'may-anh': [
-        'may-anh', 'máy ảnh & máy quay', 'máy ảnh và máy quay', 'máy ảnh', 'máy quay',
-        'mayanh', 'camera', 'ống kính', '12'
-      ],
-    };
-
-    String? matchedCanonicalKey;
-    for (final entry in aliases.entries) {
-      if (entry.key == target || entry.value.any((alias) => alias == target || target.contains(alias) || alias.contains(target))) {
-        matchedCanonicalKey = entry.key;
-        break;
-      }
-    }
-
-    if (matchedCanonicalKey != null) {
-      if (pCatId == matchedCanonicalKey) return true;
-      final group = aliases[matchedCanonicalKey]!;
-      if (group.any((a) => pCatId == a || pCatName == a || pCatName.contains(a))) {
-        return true;
-      }
-    }
-
     if (pCatName.contains(target) || target.contains(pCatName)) return true;
 
     return false;
   }
 
-  /// Tìm kiếm sản phẩm thông minh và lấy danh sách sản phẩm liên quan
+  /// Tìm kiếm sản phẩm trực tiếp qua Backend API (không fallback dữ liệu tĩnh)
   Future<SearchResult> searchProducts(
     String query, {
     String? sort,
@@ -415,95 +345,26 @@ class CatalogService {
     bool? freeship,
     String? categoryId,
   }) async {
-    final q = query.trim().toLowerCase();
-    List<Product> results = [];
-    bool isExact = true;
+    final q = query.trim();
+    try {
+      final apiResult = await getProductsPaginated(
+        q: q.isNotEmpty ? q : null,
+        sort: sort,
+        mall: mall,
+        freeship: freeship,
+        categoryId: categoryId,
+        limit: 60,
+      );
 
-    if (q.isNotEmpty || (categoryId != null && categoryId.isNotEmpty)) {
-      try {
-        final apiResult = await getProductsPaginated(
-          q: q.isNotEmpty ? query.trim() : null,
-          sort: sort,
-          mall: mall,
-          freeship: freeship,
-          categoryId: categoryId,
-          limit: 60,
-        );
-        if (apiResult.products.isNotEmpty) {
-          results = apiResult.products;
-          isExact = true;
-        }
-      } catch (_) {}
+      return SearchResult(
+        products: apiResult.products,
+        isExactMatch: true,
+        query: query,
+      );
+    } catch (e) {
+      debugPrint('[CatalogService] searchProducts error: $e');
+      return SearchResult(products: [], isExactMatch: true, query: query);
     }
-
-    if (results.isEmpty) {
-      final all = WebsiteData.products;
-      if (q.isEmpty) {
-        results = List<Product>.from(all);
-        isExact = true;
-      } else {
-        final exact = all.where((p) {
-          final name = p.name.toLowerCase();
-          final cat = p.categoryName.toLowerCase();
-          final desc = p.description.toLowerCase();
-          final shop = p.shopName.toLowerCase();
-          return name.contains(q) || cat.contains(q) || desc.contains(q) || shop.contains(q);
-        }).toList();
-
-        if (exact.isNotEmpty) {
-          results = exact;
-          isExact = true;
-        } else {
-          final words = q.split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
-          final fuzzy = all.where((p) {
-            final name = p.name.toLowerCase();
-            final cat = p.categoryName.toLowerCase();
-            final desc = p.description.toLowerCase();
-            return words.any((w) => name.contains(w) || cat.contains(w) || desc.contains(w));
-          }).toList();
-
-          if (fuzzy.isNotEmpty) {
-            results = fuzzy;
-            isExact = true;
-          } else {
-            results = List<Product>.from(all)..sort((a, b) => b.rating.compareTo(a.rating));
-            results = results.take(16).toList();
-            isExact = false;
-          }
-        }
-      }
-    }
-
-    if (mall == true) {
-      results = results.where((p) => p.badges.any((b) => b.toUpperCase().contains('MALL'))).toList();
-    }
-    if (freeship == true) {
-      results = results.where((p) => p.badges.any((b) => b.toUpperCase().contains('FREESHIP'))).toList();
-    }
-    if (categoryId != null && categoryId.isNotEmpty) {
-      final categoryFiltered = results.where((p) => matchesCategory(p, categoryId)).toList();
-      if (categoryFiltered.isNotEmpty || q.isEmpty) {
-        results = categoryFiltered;
-      }
-    }
-
-    if (sort == 'price_asc') {
-      results.sort((a, b) => a.price.compareTo(b.price));
-    } else if (sort == 'price_desc') {
-      results.sort((a, b) => b.price.compareTo(a.price));
-    } else if (sort == 'rating') {
-      results.sort((a, b) => b.rating.compareTo(a.rating));
-    } else if (sort == 'popular') {
-      results.sort((a, b) => b.soldPercent.compareTo(a.soldPercent));
-    } else if (sort == 'newest') {
-      results = results.reversed.toList();
-    }
-
-    return SearchResult(
-      products: results,
-      isExactMatch: isExact,
-      query: query,
-    );
   }
 
   /// Lấy danh sách định nghĩa thuộc tính ngành hàng từ Backend
