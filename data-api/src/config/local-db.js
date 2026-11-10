@@ -651,9 +651,8 @@ export function executeLocalQuery(sql, values = []) {
       }
     }
   } catch (err) {
-    console.error('[LocalDB Error]', err.message, '| SQL:', cleanSql.slice(0, 100))
-    if (isSelect) return []
-    return { insertId: 0, affectedRows: 0, changedRows: 0 }
+    console.error('[LocalDB Error] Event: QUERY_FAILED')
+    throw err
   }
 }
 
