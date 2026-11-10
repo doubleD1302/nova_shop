@@ -13,12 +13,6 @@ void main() {
     );
   }
 
-  Finder findTextFieldByLabel(String label) {
-    return find.byWidgetPredicate(
-      (w) => w is TextField && w.decoration?.labelText == label,
-    );
-  }
-
   group('SellerRegisterScreen Website Parity Tests', () {
     test('Province list has 63 Vietnam provinces matching Website locations.js', () {
       expect(kVietnamProvincesWithRegion.length, 63);
@@ -71,8 +65,9 @@ void main() {
       expect(find.text('Thông tin thuế'), findsOneWidget);
       expect(find.text('Hoàn tất'), findsOneWidget);
 
-      // Step 1 exact labels & dashed address button & +84 prefix
+      // Step 1 exact labels, counter 0/30, dashed address button & +84 prefix
       expect(find.text('* Tên Shop', findRichText: true), findsOneWidget);
+      expect(find.text('0/30'), findsOneWidget);
       expect(find.text('* Địa chỉ lấy hàng', findRichText: true), findsOneWidget);
       expect(find.text('Thêm địa chỉ'), findsOneWidget);
       expect(find.text('* Email', findRichText: true), findsOneWidget);
@@ -131,19 +126,19 @@ void main() {
       await tester.enterText(findTextFieldByHint('Nhập số điện thoại...'), '0912345678');
 
       // Fill guest seller account fields
-      final fullNameField = findTextFieldByLabel('Họ và tên chủ sở hữu *');
+      final fullNameField = findTextFieldByHint('Nguyễn Văn A');
       await tester.ensureVisible(fullNameField);
       await tester.enterText(fullNameField, 'Nguyễn Văn A');
 
-      final usernameField = findTextFieldByLabel('Tên đăng nhập *');
+      final usernameField = findTextFieldByHint('seller_username');
       await tester.ensureVisible(usernameField);
       await tester.enterText(usernameField, 'nova_seller_01');
 
-      final passwordField = findTextFieldByLabel('Mật khẩu *');
+      final passwordField = findTextFieldByHint('Tối thiểu 8 ký tự');
       await tester.ensureVisible(passwordField);
       await tester.enterText(passwordField, 'Password123!');
 
-      final confirmPasswordField = findTextFieldByLabel('Nhập lại mật khẩu *');
+      final confirmPasswordField = findTextFieldByHint('Khớp với mật khẩu trên');
       await tester.ensureVisible(confirmPasswordField);
       await tester.enterText(confirmPasswordField, 'Password123!');
 

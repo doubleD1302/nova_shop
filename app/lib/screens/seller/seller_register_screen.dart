@@ -328,14 +328,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: kVietnamProvinces.contains(modalProvince) ? modalProvince : 'TP. Hồ Chí Minh',
                   isExpanded: true,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEE4D2D))),
-                  ),
+                  style: _wizardTextStyle(),
+                  decoration: _wizardInputDecoration(),
                   items: kVietnamProvincesWithRegion
                       .map((p) => DropdownMenuItem(
                             value: p['name'],
@@ -348,18 +342,14 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                const Text('Địa chỉ chi tiết (Số nhà, tên đường, phường/xã)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                const Text('Địa chỉ chi tiết (Số nhà, tên đường, phường/xã)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
                 const SizedBox(height: 6),
                 TextField(
                   controller: detailCtrl,
                   maxLines: 3,
-                  decoration: InputDecoration(
+                  style: _wizardTextStyle(),
+                  decoration: _wizardInputDecoration(
                     hintText: 'Ví dụ: 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1...',
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEE4D2D))),
                   ),
                 ),
                 const Divider(color: AppColors.border, height: 24),
@@ -657,7 +647,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFBF3E8),
       appBar: AppBar(
-        title: const Text('Đăng Ký Kênh Người Bán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D))),
+        toolbarHeight: 48,
+        title: const Text('Đăng Ký Kênh Người Bán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5, color: Color(0xFF49352D))),
         backgroundColor: const Color(0xFFFFFCF7),
         elevation: 0,
         bottom: PreferredSize(
@@ -1031,7 +1022,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         color: Color(0xFFFFFCF7),
         border: Border(bottom: BorderSide(color: Color(0xFFE6D5C2))),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final trackMargin = constraints.maxWidth / (steps.length * 2);
@@ -1040,14 +1031,14 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             children: [
               // Đường nền xám kem nối giữa các nút
               Positioned(
-                top: 11,
+                top: 10,
                 left: trackMargin,
                 right: trackMargin,
                 child: Container(height: 2, color: const Color(0xFFE6D5C2)),
               ),
               // Đường tiến trình cam #EE4D2D
               Positioned(
-                top: 11,
+                top: 10,
                 left: trackMargin,
                 right: trackMargin,
                 child: FractionallySizedBox(
@@ -1069,10 +1060,10 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                     badgeContent = const Icon(Icons.check, size: 12, color: Colors.white);
                   } else if (isCurrent) {
                     badgeColor = const Color(0xFFEE4D2D);
-                    badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white));
+                    badgeContent = Text('$id', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white));
                   } else {
                     badgeColor = const Color(0xFFE6D5C2);
-                    badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B7566)));
+                    badgeContent = Text('$id', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF8B7566)));
                   }
 
                   return Expanded(
@@ -1080,13 +1071,13 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 24,
-                          height: 24,
+                          width: 22,
+                          height: 22,
                           decoration: BoxDecoration(
                             color: badgeColor,
                             shape: BoxShape.circle,
                             boxShadow: isCurrent
-                                ? [BoxShadow(color: const Color(0xFFEE4D2D).withValues(alpha: 0.28), blurRadius: 6, spreadRadius: 1)]
+                                ? [BoxShadow(color: const Color(0xFFEE4D2D).withValues(alpha: 0.25), blurRadius: 5, spreadRadius: 1)]
                                 : null,
                           ),
                           child: Center(child: badgeContent),
@@ -1100,8 +1091,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 10,
-                              height: 1.25,
+                              fontSize: 9.8,
+                              height: 1.2,
                               fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
                               color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
                             ),
@@ -1140,12 +1131,12 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // =========================================================================
   // BƯỚC 1: THÔNG TIN SHOP
   // =========================================================================
-  Widget _buildFieldLabel(String label, {bool required = false}) {
+  Widget _buildFieldLabel(String label, {bool required = false, bool trailingRequired = false, double fontSize = 13}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text.rich(
         TextSpan(
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF49352D)),
+          style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600, color: const Color(0xFF49352D)),
           children: [
             if (required)
               const TextSpan(
@@ -1153,15 +1144,54 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 style: TextStyle(color: Color(0xFFF43F5E), fontWeight: FontWeight.bold),
               ),
             TextSpan(text: label),
+            if (trailingRequired)
+              const TextSpan(
+                text: ' *',
+                style: TextStyle(color: Color(0xFFF43F5E), fontWeight: FontWeight.bold),
+              ),
           ],
         ),
       ),
     );
   }
 
+  TextStyle _wizardTextStyle({bool disabled = false}) {
+    return TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: disabled ? const Color(0xFF6B7280) : const Color(0xFF49352D),
+    );
+  }
+
+  InputDecoration _wizardInputDecoration({
+    String? hintText,
+    bool disabled = false,
+    Widget? suffixIcon,
+    String? counterText,
+  }) {
+    const borderSide = BorderSide(color: Color(0xFFE6D5C2), width: 1);
+    const focusedSide = BorderSide(color: Color(0xFFEE4D2D), width: 1.5);
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400, color: Color(0xFF8B7566)),
+      counterText: counterText,
+      isDense: true,
+      filled: true,
+      fillColor: disabled ? const Color(0xFFF3F4F6) : const Color(0xFFFFFCF7),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: borderSide),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: borderSide),
+      disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: borderSide),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: focusedSide),
+      suffixIcon: suffixIcon,
+      suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+    );
+  }
+
   Widget _buildStep1ShopInfo() {
     final user = _authService.currentUser;
     final emailLocked = _isEmailLockedFromUser;
+    final shopLocked = _hasExistingEditableRegistration;
 
     return Container(
       decoration: BoxDecoration(
@@ -1177,15 +1207,20 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _shopNameController,
             maxLength: 30,
-            enabled: !_hasExistingEditableRegistration,
+            enabled: !shopLocked,
+            style: _wizardTextStyle(disabled: shopLocked),
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
+            decoration: _wizardInputDecoration(
               hintText: 'Nhập tên Shop của bạn...',
+              disabled: shopLocked,
               counterText: '',
-              suffixText: '${_shopNameController.text.length}/30',
-              suffixStyle: const TextStyle(fontSize: 12, color: Color(0xFF8B7566)),
-              filled: _hasExistingEditableRegistration,
-              fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  '${_shopNameController.text.length}/30',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Color(0xFF8B7566)),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -1194,12 +1229,12 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _shopTaglineController,
             maxLength: 100,
-            enabled: !_hasExistingEditableRegistration,
-            decoration: InputDecoration(
+            enabled: !shopLocked,
+            style: _wizardTextStyle(disabled: shopLocked),
+            decoration: _wizardInputDecoration(
               hintText: 'Ví dụ: Thời trang thiết kế chính hãng, Giao hàng siêu tốc...',
+              disabled: shopLocked,
               counterText: '',
-              filled: _hasExistingEditableRegistration,
-              fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
             ),
           ),
           const SizedBox(height: 14),
@@ -1212,7 +1247,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFE6D5C2)),
               ),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
@@ -1220,6 +1255,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   ),
                   TextButton(
                     onPressed: _showAddressModal,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     child: const Text('Thay đổi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEE4D2D))),
                   ),
                 ],
@@ -1260,16 +1300,17 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             enabled: !emailLocked,
-            decoration: InputDecoration(
+            style: _wizardTextStyle(disabled: emailLocked),
+            decoration: _wizardInputDecoration(
               hintText: 'email@example.com',
-              filled: emailLocked,
-              fillColor: emailLocked ? Colors.grey.shade100 : null,
+              disabled: emailLocked,
             ),
           ),
           const SizedBox(height: 14),
 
           _buildFieldLabel('Số điện thoại', required: true),
           Container(
+            height: 44,
             decoration: BoxDecoration(
               color: const Color(0xFFFFFCF7),
               borderRadius: BorderRadius.circular(12),
@@ -1279,23 +1320,28 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  height: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  alignment: Alignment.center,
                   decoration: const BoxDecoration(
                     color: Color(0xFFFBF3E8),
                     border: Border(right: BorderSide(color: Color(0xFFE6D5C2))),
                   ),
-                  child: const Text('+84', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                  child: const Text('+84', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
                 ),
                 Expanded(
                   child: TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
+                    style: _wizardTextStyle(),
                     decoration: const InputDecoration(
                       hintText: 'Nhập số điện thoại...',
+                      hintStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w400, color: Color(0xFF8B7566)),
+                      isDense: true,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                     ),
                   ),
                 ),
@@ -1304,7 +1350,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           ),
 
           if (user == null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             CustomPaint(
               painter: _DashedRRectPainter(
                 color: const Color(0xFFEE4D2D),
@@ -1317,7 +1363,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   color: const Color(0xFFFFEFE7).withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1326,42 +1372,56 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                         Icon(Icons.storefront_outlined, color: Color(0xFFEE4D2D), size: 18),
                         SizedBox(width: 8),
                         Expanded(
-                          child: Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                          child: Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
+
+                    _buildFieldLabel('Họ và tên chủ sở hữu', trailingRequired: true, fontSize: 12),
                     TextField(
                       controller: _fullNameController,
-                      decoration: const InputDecoration(labelText: 'Họ và tên chủ sở hữu *', hintText: 'Nguyễn Văn A'),
+                      style: _wizardTextStyle(),
+                      decoration: _wizardInputDecoration(hintText: 'Nguyễn Văn A'),
                     ),
                     const SizedBox(height: 10),
+
+                    _buildFieldLabel('Tên đăng nhập', trailingRequired: true, fontSize: 12),
                     TextField(
                       controller: _usernameController,
-                      decoration: const InputDecoration(labelText: 'Tên đăng nhập *', hintText: 'seller_username'),
+                      style: _wizardTextStyle(),
+                      decoration: _wizardInputDecoration(hintText: 'seller_username'),
                     ),
                     const SizedBox(height: 10),
+
+                    _buildFieldLabel('Mật khẩu', trailingRequired: true, fontSize: 12),
                     TextField(
                       controller: _passwordController,
                       obscureText: !_showPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Mật khẩu *',
+                      style: _wizardTextStyle(),
+                      decoration: _wizardInputDecoration(
                         hintText: 'Tối thiểu 8 ký tự',
                         suffixIcon: IconButton(
-                          icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          constraints: const BoxConstraints(),
+                          icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 18, color: const Color(0xFF8B7566)),
                           onPressed: () => setState(() => _showPassword = !_showPassword),
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
+
+                    _buildFieldLabel('Nhập lại mật khẩu', trailingRequired: true, fontSize: 12),
                     TextField(
                       controller: _confirmPasswordController,
                       obscureText: !_showConfirmPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Nhập lại mật khẩu *',
+                      style: _wizardTextStyle(),
+                      decoration: _wizardInputDecoration(
                         hintText: 'Khớp với mật khẩu trên',
                         suffixIcon: IconButton(
-                          icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          constraints: const BoxConstraints(),
+                          icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18, color: const Color(0xFF8B7566)),
                           onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
                         ),
                       ),
@@ -1449,7 +1509,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           DropdownButtonFormField<String>(
             initialValue: kVietnamProvinces.contains(_selectedProvince) ? _selectedProvince : 'TP. Hồ Chí Minh',
             isExpanded: true,
-            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+            style: _wizardTextStyle(),
+            decoration: _wizardInputDecoration(),
             items: kVietnamProvincesWithRegion
                 .map((p) => DropdownMenuItem(
                       value: p['name'],
@@ -1541,7 +1602,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           _buildFieldLabel('Họ và tên chủ sở hữu / Người đại diện', required: true),
           TextField(
             controller: _ownerNameController,
-            decoration: const InputDecoration(
+            style: _wizardTextStyle(),
+            decoration: _wizardInputDecoration(
               hintText: 'Họ và tên trên giấy tờ...',
             ),
           ),
@@ -1552,7 +1614,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             controller: _idCardController,
             keyboardType: TextInputType.number,
             maxLength: 12,
-            decoration: InputDecoration(
+            style: _wizardTextStyle(),
+            decoration: _wizardInputDecoration(
               counterText: '',
               hintText: _maskedIdLast4 != null && _maskedIdLast4!.isNotEmpty
                   ? 'Đã lưu ******$_maskedIdLast4 (nhập lại đầy đủ 9–12 số)'
@@ -1630,7 +1693,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _taxCodeController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
+            style: _wizardTextStyle(),
+            decoration: _wizardInputDecoration(
               hintText: 'Ví dụ: 8012345678',
             ),
           ),
@@ -1640,7 +1704,8 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           TextField(
             controller: _invoiceEmailController,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
+            style: _wizardTextStyle(),
+            decoration: _wizardInputDecoration(
               hintText: 'email@example.com',
             ),
           ),
