@@ -19,8 +19,21 @@ void main() {
     );
   }
 
-  group('SellerRegisterScreen Widget Tests', () {
-    testWidgets('Renders welcome screen with NovaLogo & login link and transitions to Step 1', (tester) async {
+  group('SellerRegisterScreen Website Parity Tests', () {
+    test('Province list has 63 Vietnam provinces matching Website locations.js', () {
+      expect(kVietnamProvincesWithRegion.length, 63);
+      expect(kVietnamProvincesWithRegion.first, {'name': 'Hà Nội', 'region': 'Miền Bắc'});
+      expect(
+        kVietnamProvincesWithRegion.any((p) => p['name'] == 'TP. Hồ Chí Minh' && p['region'] == 'Miền Nam'),
+        isTrue,
+      );
+      expect(
+        kVietnamProvincesWithRegion.any((p) => p['name'] == 'Đà Nẵng' && p['region'] == 'Miền Trung'),
+        isTrue,
+      );
+    });
+
+    testWidgets('Renders Website welcome screen copy, illustration & stepper titles', (tester) async {
       AuthService().logout();
 
       tester.view.physicalSize = const Size(412, 915);
@@ -34,10 +47,15 @@ void main() {
       );
       await tester.pump();
 
-      // Welcome Screen synced with Website
+      // Welcome Screen synced 100% with Website (/nguoi-ban)
       expect(find.byType(NovaLogo), findsOneWidget);
-      expect(find.text('Chào mừng đến với\nKênh Người Bán NovaShop!'), findsOneWidget);
+      expect(find.text('Chào mừng đến với Kênh Người Bán NovaShop!'), findsOneWidget);
+      expect(
+        find.text('Vui lòng cung cấp thông tin để thành lập tài khoản người bán trên NovaShop'),
+        findsOneWidget,
+      );
       expect(find.text('Bắt đầu đăng ký'), findsOneWidget);
+      expect(find.text('Đã có tài khoản người bán? '), findsOneWidget);
       expect(find.text('Đăng nhập ngay'), findsOneWidget);
       expect(find.text('← Quay lại trang chủ mua sắm'), findsOneWidget);
 
@@ -45,23 +63,26 @@ void main() {
       await tester.tap(find.text('Bắt đầu đăng ký'));
       await tester.pumpAndSettle();
 
-      // Check Header & 5-Step Stepper
+      // Exact Website 5-Step Stepper Titles
       expect(find.text('Đăng Ký Kênh Người Bán'), findsOneWidget);
-      expect(find.text('Thông tin'), findsOneWidget);
-      expect(find.text('Vận chuyển'), findsOneWidget);
-      expect(find.text('Định danh'), findsOneWidget);
-      expect(find.text('Thuế'), findsOneWidget);
+      expect(find.text('Thông tin Shop'), findsOneWidget);
+      expect(find.text('Cài đặt vận chuyển'), findsOneWidget);
+      expect(find.text('Thông tin định danh'), findsOneWidget);
+      expect(find.text('Thông tin thuế'), findsOneWidget);
       expect(find.text('Hoàn tất'), findsOneWidget);
 
-      // Check Step 1 Form Labels & Connected +84 Phone Prefix
-      expect(find.text('Thông tin cơ bản Shop'), findsOneWidget);
-      expect(find.text('Địa chỉ lấy hàng *'), findsOneWidget);
+      // Step 1 exact labels & dashed address button & +84 prefix
+      expect(find.text('* Tên Shop', findRichText: true), findsOneWidget);
+      expect(find.text('* Địa chỉ lấy hàng', findRichText: true), findsOneWidget);
+      expect(find.text('Thêm địa chỉ'), findsOneWidget);
+      expect(find.text('* Email', findRichText: true), findsOneWidget);
+      expect(find.text('* Số điện thoại', findRichText: true), findsOneWidget);
       expect(find.text('+84'), findsOneWidget);
       expect(find.text('Thiết lập tài khoản người bán'), findsOneWidget);
       expect(find.text('Tiếp theo'), findsOneWidget);
     });
 
-    testWidgets('Full 4-step wizard validation, Address Modal with regions, and unchecked terms guard', (tester) async {
+    testWidgets('Full 4-step wizard validation, Address Modal, Step 2 regions & unchecked terms guard', (tester) async {
       AuthService().logout();
 
       tester.view.physicalSize = const Size(412, 915);
@@ -84,16 +105,16 @@ void main() {
       expect(find.text('Vui lòng nhập Tên Shop (bắt buộc).'), findsOneWidget);
 
       // Fill Step 1 Shop info
-      await tester.enterText(findTextFieldByLabel('Tên Shop *'), 'Nova Official Store');
+      await tester.enterText(findTextFieldByHint('Nhập tên Shop của bạn...'), 'Nova Official Store');
       await tester.pump();
 
-      // Open Address Modal
-      await tester.ensureVisible(find.text('+ Thêm địa chỉ'));
-      await tester.tap(find.text('+ Thêm địa chỉ'));
+      // Open Address Modal (Website shows plain province names inside Address Modal)
+      await tester.ensureVisible(find.text('Thêm địa chỉ'));
+      await tester.tap(find.text('Thêm địa chỉ'));
       await tester.pumpAndSettle();
 
       expect(find.text('Địa chỉ lấy hàng của Shop'), findsOneWidget);
-      expect(find.text('TP. Hồ Chí Minh (Miền Nam)'), findsOneWidget);
+      expect(find.text('TP. Hồ Chí Minh'), findsOneWidget);
 
       await tester.enterText(
         findTextFieldByHint('Ví dụ: 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1...'),
@@ -106,7 +127,7 @@ void main() {
       expect(find.text('123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh'), findsOneWidget);
 
       // Fill contact email & phone
-      await tester.enterText(findTextFieldByLabel('Email liên hệ nhận đơn *'), 'seller@novashop.vn');
+      await tester.enterText(findTextFieldByHint('email@example.com'), 'seller@novashop.vn');
       await tester.enterText(findTextFieldByHint('Nhập số điện thoại...'), '0912345678');
 
       // Fill guest seller account fields
@@ -132,6 +153,7 @@ void main() {
 
       expect(find.text('Cài đặt phương thức vận chuyển cho Shop'), findsOneWidget);
       expect(find.text('⚡ Vận chuyển Nhanh'), findsOneWidget);
+      expect(find.text('Khuyên dùng'), findsOneWidget);
       expect(find.text('TP. Hồ Chí Minh (Miền Nam)'), findsOneWidget);
 
       // Proceed to Step 3
@@ -149,7 +171,7 @@ void main() {
       expect(find.text('Vui lòng nhập số CMND / CCCD / Hộ chiếu của chủ Shop.'), findsOneWidget);
 
       await tester.enterText(
-        findTextFieldByLabel('Số CMND / CCCD / Hộ chiếu (9 - 12 chữ số) *'),
+        findTextFieldByHint('Ví dụ: 001201012345'),
         '001201012345',
       );
 

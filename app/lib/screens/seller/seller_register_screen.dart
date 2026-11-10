@@ -339,7 +339,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   items: kVietnamProvincesWithRegion
                       .map((p) => DropdownMenuItem(
                             value: p['name'],
-                            child: Text('${p['name']} (${p['region']})', style: const TextStyle(fontSize: 13)),
+                            child: Text(p['name']!, style: const TextStyle(fontSize: 13)),
                           ))
                       .toList(),
                   onChanged: (val) {
@@ -917,22 +917,33 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEFE7),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFBD6E49).withValues(alpha: 0.3), width: 2),
+                  CustomPaint(
+                    painter: _DashedRRectPainter(
+                      color: const Color(0xFFBD6E49).withValues(alpha: 0.3),
+                      radius: 68,
+                      dashWidth: 5,
+                      dashSpace: 4,
+                      strokeWidth: 1.5,
                     ),
-                    child: const Center(
-                      child: Icon(Icons.storefront_rounded, size: 64, color: Color(0xFFBD6E49)),
+                    child: Container(
+                      width: 136,
+                      height: 136,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFEFE7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: CustomPaint(
+                          size: const Size(76, 76),
+                          painter: _NovaWelcomeIllustrationPainter(),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
 
                   const Text(
-                    'Chào mừng đến với\nKênh Người Bán NovaShop!',
+                    'Chào mừng đến với Kênh Người Bán NovaShop!',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Color(0xFF49352D), height: 1.3),
                   ),
@@ -969,7 +980,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Text('Đã có tài khoản? ', style: TextStyle(fontSize: 13, color: Color(0xFF8B7566))),
+                        const Text('Đã có tài khoản người bán? ', style: TextStyle(fontSize: 13, color: Color(0xFF8B7566))),
                         GestureDetector(
                           onTap: () async {
                             await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
@@ -1006,10 +1017,10 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // =========================================================================
   Widget _buildStepperHeader() {
     final steps = [
-      {'id': 1, 'title': 'Thông tin'},
-      {'id': 2, 'title': 'Vận chuyển'},
-      {'id': 3, 'title': 'Định danh'},
-      {'id': 4, 'title': 'Thuế'},
+      {'id': 1, 'title': 'Thông tin Shop'},
+      {'id': 2, 'title': 'Cài đặt vận chuyển'},
+      {'id': 3, 'title': 'Thông tin định danh'},
+      {'id': 4, 'title': 'Thông tin thuế'},
       {'id': 5, 'title': 'Hoàn tất'},
     ];
 
@@ -1083,16 +1094,16 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                         const SizedBox(height: 5),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              st['title'] as String,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
-                              ),
+                          child: Text(
+                            st['title'] as String,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.25,
+                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                              color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
                             ),
                           ),
                         ),
@@ -1129,6 +1140,25 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   // =========================================================================
   // BƯỚC 1: THÔNG TIN SHOP
   // =========================================================================
+  Widget _buildFieldLabel(String label, {bool required = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text.rich(
+        TextSpan(
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF49352D)),
+          children: [
+            if (required)
+              const TextSpan(
+                text: '* ',
+                style: TextStyle(color: Color(0xFFF43F5E), fontWeight: FontWeight.bold),
+              ),
+            TextSpan(text: label),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStep1ShopInfo() {
     final user = _authService.currentUser;
     final emailLocked = _isEmailLockedFromUser;
@@ -1143,39 +1173,38 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Thông tin cơ bản Shop', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
-          const SizedBox(height: 12),
-
+          _buildFieldLabel('Tên Shop', required: true),
           TextField(
             controller: _shopNameController,
             maxLength: 30,
             enabled: !_hasExistingEditableRegistration,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              labelText: 'Tên Shop *',
               hintText: 'Nhập tên Shop của bạn...',
-              counterText: '${_shopNameController.text.length}/30',
+              counterText: '',
+              suffixText: '${_shopNameController.text.length}/30',
+              suffixStyle: const TextStyle(fontSize: 12, color: Color(0xFF8B7566)),
               filled: _hasExistingEditableRegistration,
               fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
+          _buildFieldLabel('Slogan gian hàng'),
           TextField(
             controller: _shopTaglineController,
             maxLength: 100,
             enabled: !_hasExistingEditableRegistration,
             decoration: InputDecoration(
-              labelText: 'Slogan gian hàng',
               hintText: 'Ví dụ: Thời trang thiết kế chính hãng, Giao hàng siêu tốc...',
+              counterText: '',
               filled: _hasExistingEditableRegistration,
               fillColor: _hasExistingEditableRegistration ? Colors.grey.shade100 : null,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          const Text('Địa chỉ lấy hàng *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
-          const SizedBox(height: 6),
+          _buildFieldLabel('Địa chỉ lấy hàng', required: true),
           if (_pickupAddress.isNotEmpty)
             Container(
               decoration: BoxDecoration(
@@ -1186,39 +1215,52 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on_outlined, color: Color(0xFFEE4D2D), size: 20),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(_pickupAddress, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
+                    child: Text(_pickupAddress, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF49352D))),
                   ),
                   TextButton(
                     onPressed: _showAddressModal,
-                    child: const Text('Thay đổi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D))),
+                    child: const Text('Thay đổi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFEE4D2D))),
                   ),
                 ],
               ),
             )
           else
-            OutlinedButton.icon(
-              onPressed: _showAddressModal,
-              icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-              label: const Text('+ Thêm địa chỉ'),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFEFE7),
-                side: const BorderSide(color: Color(0xFFEE4D2D)),
-                foregroundColor: const Color(0xFFEE4D2D),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            InkWell(
+              onTap: _showAddressModal,
+              borderRadius: BorderRadius.circular(12),
+              child: CustomPaint(
+                painter: _DashedRRectPainter(
+                  color: const Color(0xFFEE4D2D),
+                  radius: 12,
+                  dashWidth: 5,
+                  dashSpace: 4,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEFE7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('+', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D))),
+                      SizedBox(width: 6),
+                      Text('Thêm địa chỉ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFEE4D2D))),
+                    ],
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 14),
 
+          _buildFieldLabel('Email', required: true),
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             enabled: !emailLocked,
             decoration: InputDecoration(
-              labelText: 'Email liên hệ nhận đơn *',
               hintText: 'email@example.com',
               filled: emailLocked,
               fillColor: emailLocked ? Colors.grey.shade100 : null,
@@ -1226,8 +1268,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           ),
           const SizedBox(height: 14),
 
-          const Text('Số điện thoại *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
-          const SizedBox(height: 6),
+          _buildFieldLabel('Số điện thoại', required: true),
           Container(
             decoration: BoxDecoration(
               color: const Color(0xFFFFFCF7),
@@ -1264,61 +1305,69 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
 
           if (user == null) ...[
             const SizedBox(height: 20),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEFE7).withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEE4D2D).withValues(alpha: 0.4)),
+            CustomPaint(
+              painter: _DashedRRectPainter(
+                color: const Color(0xFFEE4D2D),
+                radius: 16,
+                dashWidth: 6,
+                dashSpace: 4,
               ),
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.storefront_outlined, color: Color(0xFFEE4D2D), size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _fullNameController,
-                    decoration: const InputDecoration(labelText: 'Họ và tên chủ sở hữu *', hintText: 'Nguyễn Văn A'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(labelText: 'Tên đăng nhập *', hintText: 'seller_username'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: !_showPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Mật khẩu *',
-                      hintText: 'Tối thiểu 8 ký tự',
-                      suffixIcon: IconButton(
-                        icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 18),
-                        onPressed: () => setState(() => _showPassword = !_showPassword),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEFE7).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.storefront_outlined, color: Color(0xFFEE4D2D), size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _fullNameController,
+                      decoration: const InputDecoration(labelText: 'Họ và tên chủ sở hữu *', hintText: 'Nguyễn Văn A'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(labelText: 'Tên đăng nhập *', hintText: 'seller_username'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !_showPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Mật khẩu *',
+                        hintText: 'Tối thiểu 8 ký tự',
+                        suffixIcon: IconButton(
+                          icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          onPressed: () => setState(() => _showPassword = !_showPassword),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _confirmPasswordController,
-                    obscureText: !_showConfirmPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Nhập lại mật khẩu *',
-                      suffixIcon: IconButton(
-                        icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18),
-                        onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _confirmPasswordController,
+                      obscureText: !_showConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Nhập lại mật khẩu *',
+                        hintText: 'Khớp với mật khẩu trên',
+                        suffixIcon: IconButton(
+                          icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                          onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -1433,6 +1482,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
         color: Colors.transparent,
         child: CheckboxListTile(
           activeColor: const Color(0xFFEE4D2D),
+          controlAffinity: ListTileControlAffinity.trailing,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           title: Row(
             children: [
@@ -1442,9 +1492,9 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               if (badge != null) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(6)),
-                  child: Text(badge, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFFD1FAE5), borderRadius: BorderRadius.circular(20)),
+                  child: Text(badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
                 ),
               ],
             ],
@@ -1488,21 +1538,22 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           ),
           const SizedBox(height: 16),
 
+          _buildFieldLabel('Họ và tên chủ sở hữu / Người đại diện', required: true),
           TextField(
             controller: _ownerNameController,
             decoration: const InputDecoration(
-              labelText: 'Họ và tên chủ sở hữu / Người đại diện *',
               hintText: 'Họ và tên trên giấy tờ...',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
+          _buildFieldLabel('Số CMND / CCCD / Hộ chiếu (9 - 12 chữ số)', required: true),
           TextField(
             controller: _idCardController,
             keyboardType: TextInputType.number,
             maxLength: 12,
             decoration: InputDecoration(
-              labelText: 'Số CMND / CCCD / Hộ chiếu (9 - 12 chữ số) *',
+              counterText: '',
               hintText: _maskedIdLast4 != null && _maskedIdLast4!.isNotEmpty
                   ? 'Đã lưu ******$_maskedIdLast4 (nhập lại đầy đủ 9–12 số)'
                   : 'Ví dụ: 001201012345',
@@ -1575,21 +1626,21 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
           ),
           const SizedBox(height: 16),
 
+          _buildFieldLabel('Mã số thuế cá nhân / hộ kinh doanh (tùy chọn)'),
           TextField(
             controller: _taxCodeController,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: 'Mã số thuế cá nhân / hộ kinh doanh (tùy chọn)',
               hintText: 'Ví dụ: 8012345678',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
+          _buildFieldLabel('Email nhận hóa đơn và thông báo thuế'),
           TextField(
             controller: _invoiceEmailController,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              labelText: 'Email nhận hóa đơn và thông báo thuế',
               hintText: 'email@example.com',
             ),
           ),
@@ -1643,11 +1694,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             Container(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
+              decoration: const BoxDecoration(
+                color: Color(0xFFD1FAE5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check, size: 48, color: Colors.green.shade700),
+              child: const Icon(Icons.check, size: 44, color: Color(0xFF059669)),
             ),
             const SizedBox(height: 20),
 
@@ -1661,7 +1712,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
             const SizedBox(height: 8),
 
             Text(
-              'Hồ sơ gian hàng "$shopName" của bạn đã được ghi nhận và gửi lên Ban Quản Trị NovaShop.',
+              'Hồ sơ gian hàng "$shopName" của bạn đã được khởi tạo và gửi lên Ban Quản Trị NovaShop.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: Color(0xFF8B7566)),
             ),
@@ -1721,7 +1772,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
   Widget _buildBottomNavigationBar() {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFFFFCF7),
+        color: Color(0xFFFBF3E8),
         border: Border(top: BorderSide(color: Color(0xFFE6D5C2))),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1740,14 +1791,19 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                       }
                     },
               style: OutlinedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFFCF7),
                 minimumSize: const Size(0, 44),
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 side: const BorderSide(color: Color(0xFFE6D5C2)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
                 _currentStep > 1 ? 'Quay lại' : 'Hủy',
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B7566)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: _currentStep > 1 ? const Color(0xFF49352D) : const Color(0xFF8B7566),
+                ),
               ),
             ),
           ),
@@ -1760,16 +1816,29 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                 backgroundColor: const Color(0xFFEE4D2D),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _submitting
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                        SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Đang gửi hồ sơ...',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    )
                   : Text(
                       _currentStep == 4
                           ? (_hasExistingEditableRegistration ? 'Lưu & Gửi duyệt lại' : 'Hoàn tất & Gửi duyệt')
                           : 'Tiếp theo',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
             ),
           ),
@@ -1777,4 +1846,129 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
       ),
     );
   }
+}
+
+/// Vẽ viền nét đứt giống nút "+ Thêm địa chỉ" và khối tạo tài khoản trên Website
+class _DashedRRectPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double dashWidth;
+  final double dashSpace;
+  final double strokeWidth;
+
+  _DashedRRectPainter({
+    required this.color,
+    required this.radius,
+    this.dashWidth = 5,
+    this.dashSpace = 4,
+    this.strokeWidth = 1.2,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final next = (distance + dashWidth).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.radius != radius ||
+        oldDelegate.strokeWidth != strokeWidth;
+  }
+}
+
+/// Vẽ vector SVG Cửa hàng & Hồ sơ đăng ký khớp 100% với SellerRegistrationWizard.jsx
+class _NovaWelcomeIllustrationPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 64.0;
+    final sy = size.height / 64.0;
+    canvas.save();
+    canvas.scale(sx, sy);
+
+    final creamFill = Paint()..color = const Color(0xFFFFFCF7);
+    final peachFill = Paint()..color = const Color(0xFFFFEFE7);
+    final primaryFill = Paint()..color = const Color(0xFFBD6E49);
+    final darkFill = Paint()..color = const Color(0xFFA95532);
+
+    // Card nền x=12 y=18 w=40 h=32 rx=4
+    final cardRRect = RRect.fromRectAndRadius(const Rect.fromLTWH(12, 18, 40, 32), const Radius.circular(4));
+    canvas.drawRRect(cardRRect, creamFill);
+    canvas.drawRRect(
+      cardRRect,
+      Paint()
+        ..color = const Color(0xFFBD6E49)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Đường kẻ nét đứt ngang y=28 (x=12..52)
+    final dashPaint = Paint()
+      ..color = const Color(0xFFBD6E49)
+      ..strokeWidth = 2;
+    for (double x = 12; x < 52; x += 4) {
+      canvas.drawLine(Offset(x, 28), Offset((x + 2).clamp(12, 52), 28), dashPaint);
+    }
+
+    // Các dòng chữ hồ sơ
+    final linePaint = Paint()
+      ..color = const Color(0xFFBD6E49)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(const Offset(20, 36), const Offset(36, 36), linePaint);
+    canvas.drawLine(const Offset(20, 42), const Offset(28, 42), linePaint);
+
+    // Con dấu tròn cx=44 cy=39 r=4
+    canvas.drawCircle(const Offset(44, 39), 4, peachFill);
+    canvas.drawCircle(
+      const Offset(44, 39),
+      4,
+      Paint()
+        ..color = const Color(0xFFBD6E49)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Mái vòm shop phía trên M8 18 L14 8 H50 L56 18 Z
+    final roofPath = Path()
+      ..moveTo(8, 18)
+      ..lineTo(14, 8)
+      ..lineTo(50, 8)
+      ..lineTo(56, 18)
+      ..close();
+    canvas.drawPath(roofPath, primaryFill);
+
+    // 6 vòm kẻ sọc xen kẽ #A95532 và #BD6E49 từ x=8..56
+    for (int i = 0; i < 6; i++) {
+      final left = 8.0 + i * 8.0;
+      final scallop = Path()
+        ..moveTo(left, 18)
+        ..arcToPoint(Offset(left + 8, 18), radius: const Radius.circular(4), clockwise: false)
+        ..close();
+      canvas.drawPath(scallop, i.isEven ? darkFill : primaryFill);
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
