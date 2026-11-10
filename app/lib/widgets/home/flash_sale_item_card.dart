@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/screens/product_detail/product_detail_screen.dart';
@@ -166,21 +166,27 @@ class FlashSaleItemCard extends StatelessWidget {
                     ),
                   ),
                   Positioned.fill(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.local_fire_department, color: Colors.white, size: 12),
-                        const SizedBox(width: 2),
-                        Text(
-                          item.soldLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 9.5,
-                            letterSpacing: -0.2,
-                          ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.local_fire_department, color: Colors.white, size: 12),
+                            const SizedBox(width: 2),
+                            Text(
+                              item.soldLabel,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 9.5,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/portal_controller.dart';
 import '../../theme/app_colors.dart';
-import 'seller_hub_screen.dart';
 
 const List<String> kVietnamProvinces = [
   'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
@@ -1127,10 +1127,11 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SellerHubScreen()),
-                  );
+                  PortalController().syncFromAuth(forceResetToRole: true);
+                  PortalController().switchToSeller();
+                  if (Navigator.canPop(context)) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEE4D2D),

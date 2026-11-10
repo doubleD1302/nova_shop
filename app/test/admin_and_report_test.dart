@@ -19,7 +19,7 @@ void main() {
 
       expect(find.text('Quản Trị'), findsOneWidget);
       expect(find.text('Tổng quan'), findsOneWidget);
-      expect(find.text('Về Chợ'), findsOneWidget);
+      expect(find.text('Cửa hàng'), findsOneWidget);
 
       // Open drawer to verify all 8 admin modules and return action
       await tester.tap(find.byIcon(Icons.menu_rounded));
@@ -33,7 +33,7 @@ void main() {
       expect(find.text('Doanh thu'), findsOneWidget);
       expect(find.text('Báo cáo vi phạm'), findsOneWidget);
       expect(find.text('Cài đặt hệ thống'), findsOneWidget);
-      expect(find.text('Quay lại Chợ NovaShop'), findsOneWidget);
+      expect(find.text('Về cửa hàng'), findsOneWidget);
     });
 
     testWidgets('ReportContentSheet renders title, options, and submit button', (WidgetTester tester) async {

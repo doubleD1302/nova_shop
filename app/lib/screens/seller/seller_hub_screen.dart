@@ -6,6 +6,7 @@ import '../../config/api_config.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/payout_service.dart';
+import '../../services/portal_controller.dart';
 import '../../services/upload_service.dart';
 import '../../theme/portal_theme.dart';
 import '../../widgets/common/nova_logo.dart';
@@ -942,12 +943,9 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     tileColor: SellerTheme.primary.withValues(alpha: 0.1),
                     leading: const Icon(Icons.shopping_bag_outlined, color: SellerTheme.primary, size: 20),
-                    title: const Text('Quay lại Chợ NovaShop', style: TextStyle(color: SellerTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-                    subtitle: const Text('Chuyển về giao diện Người mua', style: TextStyle(fontSize: 10.5, color: SellerTheme.textSecondary)),
-                    onTap: () {
-                      Navigator.pop(context); // Close Drawer
-                      Navigator.pop(context); // Return to Buyer Main/Account
-                    },
+                    title: const Text('Về trang mua sắm', style: TextStyle(color: SellerTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: const Text('Chuyển sang giao diện Người mua', style: TextStyle(fontSize: 10.5, color: SellerTheme.textSecondary)),
+                    onTap: _switchToBuyerStorefront,
                   ),
                   const SizedBox(height: 8),
                   ListTile(
@@ -1016,6 +1014,13 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
     );
   }
 
+  void _switchToBuyerStorefront() {
+    PortalController().switchToBuyer();
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
   // --- TOP BAR ---
 
   PreferredSizeWidget _buildAppBar() {
@@ -1030,9 +1035,9 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: OutlinedButton.icon(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _switchToBuyerStorefront,
             icon: const Icon(Icons.shopping_bag_outlined, size: 14),
-            label: const Text('Về Chợ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+            label: const Text('Mua sắm', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
               foregroundColor: SellerTheme.primary,
               side: const BorderSide(color: SellerTheme.border),

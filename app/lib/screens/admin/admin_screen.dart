@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../config/api_config.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../services/portal_controller.dart';
 import '../../theme/portal_theme.dart';
 import '../../widgets/common/nova_logo.dart';
 
@@ -1659,12 +1660,9 @@ class _AdminScreenState extends State<AdminScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     tileColor: AdminTheme.primary.withValues(alpha: 0.1),
                     leading: const Icon(Icons.shopping_bag_outlined, color: AdminTheme.primary, size: 20),
-                    title: const Text('Quay lại Chợ NovaShop', style: TextStyle(color: AdminTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-                    subtitle: const Text('Chuyển về giao diện Người mua', style: TextStyle(fontSize: 10.5, color: AdminTheme.textSecondary)),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.pop(context); // Return to Buyer screen
-                    },
+                    title: const Text('Về cửa hàng', style: TextStyle(color: AdminTheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: const Text('Xem giao diện mua sắm NovaShop', style: TextStyle(fontSize: 10.5, color: AdminTheme.textSecondary)),
+                    onTap: _switchToBuyerStorefront,
                   ),
                   const SizedBox(height: 8),
                   ListTile(
@@ -1687,6 +1685,13 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
     );
+  }
+
+  void _switchToBuyerStorefront() {
+    PortalController().switchToBuyer();
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   // --- APP BAR ---
@@ -1722,9 +1727,9 @@ class _AdminScreenState extends State<AdminScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: OutlinedButton.icon(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _switchToBuyerStorefront,
             icon: const Icon(Icons.shopping_bag_outlined, size: 14),
-            label: const Text('Về Chợ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            label: const Text('Cửa hàng', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AdminTheme.primary,
               side: const BorderSide(color: AdminTheme.border),
