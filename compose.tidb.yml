@@ -10,6 +10,7 @@ services:
       NODE_ENV: production
       DATA_API_KEY: "${DATA_API_KEY:?Thiếu DATA_API_KEY}"
       SELLER_IDENTITY_KEY: "${SELLER_IDENTITY_KEY:-}"
+      SELLER_IDENTITY_PREVIOUS_KEYS: "${SELLER_IDENTITY_PREVIOUS_KEYS:-}"
       DB_HOST: "${DB_HOST:?Thiếu DB_HOST TiDB}"
       DB_PORT: "${DB_PORT:-4000}"
       DB_NAME: "${DB_NAME:-shopnova_dev}"

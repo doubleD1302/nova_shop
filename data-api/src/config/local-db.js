@@ -111,6 +111,12 @@ export function getLocalDatabase() {
       FOREIGN KEY (shop_id) REFERENCES shops(id)
     );
 
+    CREATE TABLE IF NOT EXISTS seller_identity_access_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, shop_id INTEGER NOT NULL, admin_id INTEGER NOT NULL,
+      reason TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (shop_id) REFERENCES shops(id), FOREIGN KEY (admin_id) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS shop_approval_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       shop_id INTEGER NOT NULL,

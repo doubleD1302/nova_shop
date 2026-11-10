@@ -1,4 +1,4 @@
-import { prepareSellerProfile, encryptIdentity, saveSellerProfile } from '../utils/seller-profile.js'
+import { prepareSellerProfile, encryptIdentity, decryptIdentity, saveSellerProfile } from '../utils/seller-profile.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
 export async function getSellerRegistration(req, res, next) {
@@ -53,5 +53,52 @@ export async function updateSellerRegistration(req, res, next) {
     if (result === 'missing') return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng.', error: { code: 'SHOP_NOT_FOUND' } })
     if (result === 'locked') return res.status(409).json({ success: false, message: 'Chỉ có thể sửa hồ sơ đang chờ duyệt hoặc bị từ chối.', error: { code: 'SHOP_PROFILE_LOCKED' } })
     return res.json({ success: true, data: {} })
+  } catch (err) { return next(err) }
+}
+
+// Trả giấy tờ chỉ cho admin đang hoạt động và chỉ sau khi ghi nhật ký trong transaction.
+export async function revealSellerIdentity(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const shopId = String(req.params.shopId || '')
+    const adminId = String(req.body?.userId || '')
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
+    if (!/^[1-9]\d{0,19}$/.test(shopId) || !/^[1-9]\d{0,19}$/.test(adminId) || reason.length < 10 || reason.length > 500) {
+      return res.status(400).json({ success: false, message: 'Cần cung cấp lý do kiểm tra từ 10 đến 500 ký tự.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const result = await executeTransaction(async (query) => {
+      const admins = await query("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active' FOR UPDATE", [adminId])
+      if (!admins.length) return { error: 'ADMIN_REQUIRED' }
+      const rows = await query('SELECT identity_encrypted FROM seller_registration_profiles WHERE shop_id = ? FOR UPDATE', [shopId])
+      if (!rows.length) return { error: 'SELLER_PROFILE_NOT_FOUND' }
+      let identity
+      try { identity = decryptIdentity(rows[0].identity_encrypted) } catch { return { error: 'IDENTITY_UNAVAILABLE' } }
+      await query('INSERT INTO seller_identity_access_events (shop_id, admin_id, reason) VALUES (?, ?, ?)', [shopId, adminId, reason])
+      return { identity }
+    })
+    if (result.error) {
+      const status = result.error === 'ADMIN_REQUIRED' ? 403 : result.error === 'SELLER_PROFILE_NOT_FOUND' ? 404 : 503
+      return res.status(status).json({ success: false, message: 'Không thể truy xuất giấy tờ.', error: { code: result.error } })
+    }
+    return res.json({ success: true, data: { idCard: result.identity } })
+  } catch (err) { return next(err) }
+}
+export async function listSellerIdentityAccessEvents(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const shopId = String(req.params.shopId || '')
+    const adminId = String(req.query.userId || '')
+    if (!/^[1-9]\d{0,19}$/.test(shopId) || !/^[1-9]\d{0,19}$/.test(adminId)) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR' } })
+    }
+    const admins = await executeQuery("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active'", [adminId])
+    if (!admins.length) return res.status(403).json({ success: false, error: { code: 'ADMIN_REQUIRED' } })
+    const shops = await executeQuery('SELECT id FROM shops WHERE id = ?', [shopId])
+    if (!shops.length) return res.status(404).json({ success: false, error: { code: 'SHOP_NOT_FOUND' } })
+    const rows = await executeQuery('SELECT id, admin_id, reason, created_at FROM seller_identity_access_events WHERE shop_id = ? ORDER BY id DESC LIMIT 100', [shopId])
+    return res.json({ success: true, data: { events: rows.map((row) => ({
+      id: String(row.id), adminId: String(row.admin_id), reason: row.reason,
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    })) } })
   } catch (err) { return next(err) }
 }

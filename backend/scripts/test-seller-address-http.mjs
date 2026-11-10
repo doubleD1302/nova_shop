@@ -38,7 +38,7 @@ await new Promise((resolve) => server.once('listening', resolve))
 const base = `http://127.0.0.1:${server.address().port}/api/v1`
 async function request(uri, token, method = 'GET', body) {
   const response = await fetch(base + uri, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
-  return { status: response.status, body: await response.json() }
+  return { status: response.status, headers: response.headers, body: await response.json() }
 }
 try {
   const buyer = signAccessToken({ id: '1', role: 'buyer' })
@@ -58,6 +58,14 @@ try {
   assert.equal(reviewed.status, 200)
   assert.equal(reviewed.body.data.profile.identityLast4, '9012')
   assert.equal(JSON.stringify(reviewed.body).includes(profile.idCard), false)
+  assert.equal((await request(`/admin/shops/${shopId}/identity-access`, sellerToken, 'POST', { reason: 'Kiểm tra hồ sơ người bán' })).status, 403)
+  const reveal = await request(`/admin/shops/${shopId}/identity-access`, admin, 'POST', { reason: 'Kiểm tra hồ sơ người bán' })
+  assert.equal(reveal.status, 200)
+  assert.equal(reveal.body.data.idCard, profile.idCard)
+  assert.equal(reveal.headers.get('cache-control'), 'no-store')
+  const accessEvents = await request(`/admin/shops/${shopId}/identity-access-events`, admin)
+  assert.equal(accessEvents.body.data.events.length, 1)
+
   console.log('PASS: Backend → Data API HTTP, auth, địa chỉ và hồ sơ seller trên SQLite tạm')
 } finally {
   server.close(); dataServer.close()

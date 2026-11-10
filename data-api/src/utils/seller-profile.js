@@ -33,6 +33,26 @@ export function encryptIdentity(idCard) {
   return JSON.stringify({ v: 1, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: encrypted.toString('base64') })
 }
 
+// Giải mã lần lượt bằng khóa hiện tại và khóa cũ trong giai đoạn xoay khóa.
+export function decryptIdentity(serialized, keys = [env.sellerIdentityKey, ...env.sellerIdentityPreviousKeys].filter(Boolean)) {
+  let payload
+  try { payload = JSON.parse(serialized) } catch { throw new Error('INVALID_IDENTITY_CIPHERTEXT') }
+  if (!payload || payload.v !== 1 || typeof payload.iv !== 'string' || typeof payload.tag !== 'string' || typeof payload.data !== 'string') throw new Error('INVALID_IDENTITY_CIPHERTEXT')
+  const iv = Buffer.from(payload.iv, 'base64')
+  const tag = Buffer.from(payload.tag, 'base64')
+  const data = Buffer.from(payload.data, 'base64')
+  if (iv.length !== 12 || tag.length !== 16 || data.length < 9 || data.length > 12) throw new Error('INVALID_IDENTITY_CIPHERTEXT')
+  for (const key of keys) {
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
+      decipher.setAuthTag(tag)
+      const identity = Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
+      if (/^\d{9,12}$/.test(identity)) return identity
+    } catch { /* Thử khóa tiếp theo mà không ghi dữ liệu nhạy cảm vào log. */ }
+  }
+  throw new Error('IDENTITY_KEY_UNAVAILABLE')
+}
+
 export async function saveSellerProfile(query, shopId, profile, encryptedIdentity) {
   await query(`INSERT INTO seller_registration_profiles
     (shop_id, pickup_address, province, contact_email, contact_phone, shipping_methods, business_type, owner_name, identity_encrypted, identity_last4, tax_code, invoice_email, agreed_at)

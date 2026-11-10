@@ -9,6 +9,7 @@ const makeQuery = ({ voucher = true, used = 0, stock = 5, minSubtotal = 0, price
   if (sql.includes('FROM product_variants')) {
     return params.filter((id) => id !== '999').map((id) => ({ variant_id: id, price, stock_qty: stock, shop_id: id === '2' ? 2 : 1, free_shipping: 0, shop_name: 'Shop' }))
   }
+  if (sql.includes('FROM seller_registration_profiles')) return []
   if (sql.includes('FROM vouchers')) return voucher ? [{ id: 7, discount_amount: 20000, min_subtotal: minSubtotal, usage_limit: 10, per_user_limit: 1, used_count: 0 }] : []
   if (sql.includes('FROM voucher_uses')) return [{ used }]
   throw new Error('Truy vấn không mong đợi')
@@ -35,6 +36,7 @@ assert.equal(noVoucher.total, 300000 + expectedShipping)
 
 const smallOrderQuery = async (sql, params) => {
   if (sql.includes('FROM product_variants')) return params.map((id) => ({ variant_id: id, price: 1, stock_qty: 1, shop_id: id, free_shipping: 1, shop_name: `Shop ${id}` }))
+  if (sql.includes('FROM seller_registration_profiles')) return []
   if (sql.includes('FROM vouchers')) return [{ id: 7, discount_amount: 2, min_subtotal: 0, usage_limit: 10, per_user_limit: 1, used_count: 0 }]
   if (sql.includes('FROM voucher_uses')) return [{ used: 0 }]
   throw new Error('Truy vấn không mong đợi')

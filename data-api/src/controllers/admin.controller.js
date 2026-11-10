@@ -237,6 +237,11 @@ export async function updateAdminShopApproval(req, res, next) {
       const shops = await query('SELECT id, status, approval_version FROM shops WHERE id = ? FOR UPDATE', [shopId])
       if (!shops.length) return { error: 'SHOP_NOT_FOUND' }
       if (shops[0].status !== 'pending' || Number(shops[0].approval_version) !== approvalVersion) return { error: 'SHOP_APPROVAL_CONFLICT' }
+      // Shop cũ vẫn có thể gửi hồ sơ sau, nhưng không được duyệt khi chưa cung cấp.
+      if (approvalStatus === 'approved') {
+        const profiles = await query('SELECT shop_id FROM seller_registration_profiles WHERE shop_id = ? FOR UPDATE', [shopId])
+        if (!profiles.length) return { error: 'SHOP_PROFILE_REQUIRED' }
+      }
       const status = approvalStatus === 'approved' ? 'active' : 'rejected'
       await query('UPDATE shops SET status = ?, rejection_reason = ? WHERE id = ?', [status, status === 'rejected' ? reason : null, shopId])
       await query('INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version, reason) VALUES (?, ?, ?, ?, ?)',
@@ -245,7 +250,8 @@ export async function updateAdminShopApproval(req, res, next) {
     })
     if (result.error) {
       const status = result.error === 'SHOP_NOT_FOUND' ? 404 : result.error === 'ADMIN_REQUIRED' ? 403 : 409
-      return res.status(status).json({ success: false, message: 'Không thể duyệt gian hàng.', error: { code: result.error } })
+      const message = result.error === 'SHOP_PROFILE_REQUIRED' ? 'Gian hàng cần hoàn thành hồ sơ trước khi được duyệt.' : 'Không thể duyệt gian hàng.'
+      return res.status(status).json({ success: false, message, error: { code: result.error } })
     }
     return res.status(200).json({ success: true, data: result })
   } catch (err) { return next(err) }

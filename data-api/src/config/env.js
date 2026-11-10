@@ -198,7 +198,13 @@ export function parseAndValidateEnv(sourceEnv = process.env, shouldExitOnError =
     fail('[Lỗi cấu hình] SELLER_IDENTITY_KEY phải là khóa 32 byte mã hóa base64.')
   }
 
+  const previousIdentityKeys = (sourceEnv.SELLER_IDENTITY_PREVIOUS_KEYS || '').split(',').map((value) => value.trim()).filter(Boolean)
+  if (previousIdentityKeys.some((value) => !/^[A-Za-z0-9+/]{43}=$/.test(value) || Buffer.from(value, 'base64').length !== 32)) {
+    fail('[Lỗi cấu hình] SELLER_IDENTITY_PREVIOUS_KEYS phải chứa các khóa 32 byte mã hóa base64, phân cách bằng dấu phẩy.')
+  }
+
   return Object.freeze({
+    sellerIdentityPreviousKeys: Object.freeze(previousIdentityKeys.map((value) => Buffer.from(value, 'base64'))),
     sellerIdentityKey: rawIdentityKey ? Buffer.from(rawIdentityKey, 'base64') : null,
     allowLocalDbFallback: rawLocalFallback === 'true',
     host,

@@ -1,3 +1,4 @@
+import { shopSupportsShipping } from '../utils/shop-shipping.js'
 import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
@@ -188,6 +189,7 @@ export async function createOrder(req, res, next) {
       const shipping = calculateShipping(order.shippingMethod, { subtotal: 0 })
       let shippingFee = 0
       for (const group of groups.values()) {
+        if (!(await shopSupportsShipping(query, group.shopId, order.shippingMethod, { lock: true }))) return { error: 'SHOP_SHIPPING_UNAVAILABLE' }
         group.shippingFee = calculateShipping(order.shippingMethod, group).fee
         shippingFee += group.shippingFee
       }
@@ -367,6 +369,7 @@ export async function createOrder(req, res, next) {
         IDEMPOTENCY_CONFLICT: [409, 'IDEMPOTENCY_CONFLICT', 'Yêu cầu đặt hàng đã được sử dụng với thông tin khác.'],
         PRODUCT_UNAVAILABLE: [409, 'PRODUCT_UNAVAILABLE', 'Một sản phẩm trong giỏ không còn được bán.'],
         INSUFFICIENT_STOCK: [409, 'INSUFFICIENT_STOCK', 'Số lượng đặt vượt quá tồn kho hiện tại.'],
+        SHOP_SHIPPING_UNAVAILABLE: [409, 'SHOP_SHIPPING_UNAVAILABLE', 'Phương thức vận chuyển không được một gian hàng hỗ trợ.'],
         ORDER_AMOUNT_INVALID: [400, 'ORDER_AMOUNT_INVALID', 'Giá trị đơn hàng không phù hợp với giới hạn cho phép.'],
         VOUCHER_INVALID: [400, 'VOUCHER_INVALID', 'Mã giảm giá không hợp lệ hoặc đã hết hạn.'],
         VOUCHER_UNAVAILABLE: [409, 'VOUCHER_UNAVAILABLE', 'Mã giảm giá không đủ điều kiện hoặc đã hết lượt sử dụng.'],

@@ -1,4 +1,4 @@
-import { getSellerRegistration, updateSellerRegistration } from '../controllers/seller-registration.controller.js'
+import { getSellerRegistration, updateSellerRegistration, revealSellerIdentity, listSellerIdentityAccessEvents } from '../controllers/seller-registration.controller.js'
 import { Router } from 'express'
 import {
   verifyCredentials,
@@ -37,6 +37,8 @@ router.get('/users/:userId/seller-shop', getSellerShop)
 router.get('/users/:userId/seller-shop/registration', getSellerRegistration)
 router.put('/users/:userId/seller-shop/registration', updateSellerRegistration)
 router.get('/admin/shops/:shopId/registration', getSellerRegistration)
+router.post('/admin/shops/:shopId/identity-access', revealSellerIdentity)
+router.get('/admin/shops/:shopId/identity-access-events', listSellerIdentityAccessEvents)
 router.post('/users/:userId/seller-shop/resubmit', resubmitSellerShop)
 router.put('/users/:userId/seller-shop', (req, res, next) => {
   req.body = { ...(req.body || {}), userId: req.params.userId }

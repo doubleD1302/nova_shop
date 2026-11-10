@@ -18,6 +18,22 @@ const router = Router()
 router.post('/reports', authenticate, createContentReport)
 router.use('/admin', authenticate, requireRole('admin'))
 router.get('/admin/email-status', getEmailStatus)
+router.get('/admin/shops/:shopId/identity-access-events', async (req, res, next) => {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(req.params.shopId)}/identity-access-events?userId=${encodeURIComponent(req.user.id)}`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+})
+router.post('/admin/shops/:shopId/identity-access', async (req, res, next) => {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(req.params.shopId)}/identity-access`, {
+      method: 'POST', body: { userId: req.user.id, reason: req.body?.reason },
+    })
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+})
 router.get('/admin/shops/:shopId/registration', async (req, res, next) => {
   try {
     const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(req.params.shopId)}/registration?userId=${encodeURIComponent(req.user.id)}`)

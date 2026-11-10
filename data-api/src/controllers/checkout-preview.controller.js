@@ -1,3 +1,4 @@
+import { shopSupportsShipping } from '../utils/shop-shipping.js'
 import { executeTransaction } from '../config/database.js'
 import { calculateShipping, estimateItemWeight } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
@@ -7,6 +8,7 @@ import { getWeatherRisk } from '../services/weather.js'
 const messages = {
   PRODUCT_UNAVAILABLE: [409, 'Một sản phẩm trong giỏ không còn được bán.'],
   INSUFFICIENT_STOCK: [409, 'Số lượng đặt vượt quá tồn kho hiện tại.'],
+  SHOP_SHIPPING_UNAVAILABLE: [409, 'Phương thức vận chuyển không được một gian hàng hỗ trợ.'],
   VOUCHER_INVALID: [400, 'Mã giảm giá không hợp lệ hoặc đã hết hạn.'],
   VOUCHER_UNAVAILABLE: [409, 'Mã giảm giá không đủ điều kiện hoặc đã hết lượt sử dụng.'],
 }
@@ -47,6 +49,7 @@ export async function calculateCheckoutPreview(query, { userId, items, shippingM
 
   let shippingFee = 0
   for (const group of groups.values()) {
+    if (!(await shopSupportsShipping(query, group.shopId, shippingMethod))) return { error: 'SHOP_SHIPPING_UNAVAILABLE' }
     const option = calculateShipping(shippingMethod, group)
     if (!option) return { error: 'INVALID_SHIPPING_METHOD' }
     group.shippingFee = option.fee
