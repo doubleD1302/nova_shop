@@ -90,3 +90,19 @@ export async function deleteAddress(req, res, next) {
     return deleted ? res.json({ success: true, data: {} }) : missing(res)
   } catch (err) { return next(err) }
 }
+export async function setDefaultAddress(req, res, next) {
+  try {
+    const { userId, addressId } = req.params
+    if (!validId(userId) || !validId(addressId)) return invalid(res)
+    const result = await executeTransaction(async (query) => {
+      const users = await query("SELECT id FROM users WHERE id = ? AND status = 'active' FOR UPDATE", [userId])
+      if (!users.length) return false
+      const rows = await query('SELECT id FROM addresses WHERE id = ? AND user_id = ? AND deleted_at IS NULL FOR UPDATE', [addressId, userId])
+      if (!rows.length) return false
+      await query('UPDATE addresses SET is_default = 0 WHERE user_id = ? AND is_default = 1 AND deleted_at IS NULL', [userId])
+      await query('UPDATE addresses SET is_default = 1 WHERE id = ? AND user_id = ?', [addressId, userId])
+      return true
+    })
+    return result ? res.json({ success: true, data: {} }) : missing(res)
+  } catch (err) { return next(err) }
+}

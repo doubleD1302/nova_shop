@@ -15,6 +15,8 @@ try {
  const created=await request('/users/1/addresses','POST',input); assert.equal(created.status,201); const id=created.json.data.address.id
  assert.equal((await request('/users/2/addresses/'+id,'DELETE')).status,404)
  const updated=await request('/users/1/addresses/'+id,'PUT',{...input,detail:'456 Test',isDefault:true}); assert.equal(updated.status,200)
+ assert.equal((await request('/users/2/addresses/'+id+'/default','PATCH')).status,404)
+ assert.equal((await request('/users/1/addresses/'+id+'/default','PATCH')).status,200)
  const listed=await request('/users/1/addresses'); assert.equal(listed.json.data.addresses.filter(x=>x.isDefault).length,1); assert.equal(listed.json.data.addresses[0].detail,'456 Test')
  assert.equal((await request('/users/1/addresses/'+id,'DELETE')).status,200)
  const after=await request('/users/1/addresses'); assert.equal(after.json.data.addresses.filter(x=>x.isDefault).length,1)

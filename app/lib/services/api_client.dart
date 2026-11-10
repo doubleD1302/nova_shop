@@ -110,11 +110,14 @@ class ApiClient {
     return headers;
   }
 
-  Future<ApiResponse> _executeWithAutoReconnect(Future<http.Response> Function() doRequest) async {
+  Future<ApiResponse> _executeWithAutoReconnect(Future<http.Response> Function() doRequest, {bool retryOnFailure = true}) async {
     try {
       final res = await doRequest();
       return ApiResponse.fromResponse(res);
     } catch (_) {
+      if (!retryOnFailure) {
+        return ApiResponse.error('Không nhận được phản hồi. Hãy kiểm tra lại kết quả trước khi thử lại.');
+      }
       try {
         ApiConfig.resetBaseUrl();
         await ApiConfig.autoDetectBaseUrl();
@@ -131,22 +134,22 @@ class ApiClient {
   }
 
   /// Gửi HTTP GET
-  Future<ApiResponse> get(String endpoint, {Map<String, String>? queryParams, Map<String, String>? headers}) async {
+  Future<ApiResponse> get(String endpoint, {Map<String, String>? queryParams, Map<String, String>? headers, bool retryOnFailure = true}) async {
     return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint, queryParams);
       final reqHeaders = await _buildHeaders(headers);
       return await http.get(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-    });
+    }, retryOnFailure: retryOnFailure);
   }
 
   /// Gửi HTTP POST
-  Future<ApiResponse> post(String endpoint, {dynamic body, Map<String, String>? headers}) async {
+  Future<ApiResponse> post(String endpoint, {dynamic body, Map<String, String>? headers, bool retryOnFailure = true}) async {
     return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       final jsonBody = body != null ? jsonEncode(body) : null;
       return await http.post(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-    });
+    }, retryOnFailure: retryOnFailure);
   }
 
   /// Gửi HTTP PUT
@@ -160,22 +163,22 @@ class ApiClient {
   }
 
   /// Gửi HTTP DELETE
-  Future<ApiResponse> delete(String endpoint, {Map<String, String>? headers}) async {
+  Future<ApiResponse> delete(String endpoint, {Map<String, String>? headers, bool retryOnFailure = true}) async {
     return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       return await http.delete(uri, headers: reqHeaders).timeout(ApiConfig.timeout);
-    });
+    }, retryOnFailure: retryOnFailure);
   }
 
   /// Gửi HTTP PATCH
-  Future<ApiResponse> patch(String endpoint, {dynamic body, Map<String, String>? headers}) async {
+  Future<ApiResponse> patch(String endpoint, {dynamic body, Map<String, String>? headers, bool retryOnFailure = true}) async {
     return _executeWithAutoReconnect(() async {
       final uri = _buildUri(endpoint);
       final reqHeaders = await _buildHeaders(headers);
       final jsonBody = body != null ? jsonEncode(body) : null;
       return await http.patch(uri, headers: reqHeaders, body: jsonBody).timeout(ApiConfig.timeout);
-    });
+    }, retryOnFailure: retryOnFailure);
   }
 
   /// Ghép base URL với endpoint và query parameters

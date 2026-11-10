@@ -39,6 +39,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể tải sổ địa chỉ. Vui lòng thử lại.')));
       }
     }
   }
@@ -50,6 +51,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
         const SnackBar(content: Text('Đã đặt làm địa chỉ mặc định.')),
       );
       _loadAddresses();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể đặt địa chỉ mặc định.')));
     }
   }
 
@@ -81,6 +84,8 @@ class _AddressesScreenState extends State<AddressesScreen> {
           const SnackBar(content: Text('Đã xóa địa chỉ thành công.')),
         );
         _loadAddresses();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể xóa địa chỉ.')));
       }
     }
   }
@@ -240,12 +245,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
                                 );
                                 setModalState(() => isSubmitting = false);
 
-                                if (result != null && mounted) {
+                                if (result != null && mounted && ctx.mounted) {
                                   Navigator.pop(ctx);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('Đã thêm địa chỉ nhận hàng thành công!'), backgroundColor: Color(0xFF00BFA5)),
                                   );
                                   _loadAddresses();
+                                } else if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể xác nhận đã thêm địa chỉ. Vui lòng tải lại danh sách trước khi thử lại.')));
                                 }
                               },
                         child: isSubmitting
