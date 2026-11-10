@@ -4,7 +4,6 @@ import '../config/api_config.dart';
 import '../theme/seller_theme.dart';
 import '../widgets/nova_logo.dart';
 import 'seller_main_screen.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -217,12 +216,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               const Icon(Icons.dns_outlined, size: 13, color: SellerTheme.primary),
                               const SizedBox(width: 5),
-                              Text(
-                                _serverStatus,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: SellerTheme.primary,
-                                  fontWeight: FontWeight.w600,
+                              Flexible(
+                                child: Text(
+                                  _serverStatus,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: SellerTheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -313,18 +316,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           const Text(
-                            'Chưa có gian hàng trên ShopNova? ',
+                            'Chưa có gian hàng? ',
                             style: TextStyle(fontSize: 12, color: SellerTheme.textSecondary),
                           ),
                           GestureDetector(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: SellerTheme.card,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: const Text(
+                                    'Đăng ký bán hàng trên ShopNova',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
+                                  ),
+                                  content: const Text(
+                                    'Đăng ký mở gian hàng mới chỉ thực hiện trên ứng dụng khách hàng ShopNova.\n\nSau khi đăng ký mở shop xong trên ứng dụng ShopNova, bạn hãy quay lại ứng dụng ShopNova Seller để đăng nhập và quản lý gian hàng của mình.',
+                                    style: TextStyle(fontSize: 13, color: SellerTheme.textSecondary, height: 1.4),
+                                  ),
+                                  actions: [
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Đã hiểu'),
+                                    ),
+                                  ],
+                                ),
                               );
                             },
                             child: const Text(
-                              'Đăng ký ngay',
+                              'Đăng ký trên App ShopNova',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,

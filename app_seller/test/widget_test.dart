@@ -2,12 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shopnova_seller/main.dart';
 import 'package:shopnova_seller/screens/register_screen.dart';
+import 'package:shopnova_seller/screens/seller_main_screen.dart';
 import 'package:shopnova_seller/screens/seller_product_form_screen.dart';
 
 void main() {
-  testWidgets('ShopNovaSellerApp renders login screen', (WidgetTester tester) async {
+  testWidgets('ShopNovaSellerApp renders login screen and directs new shop registration to ShopNova app', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
     await tester.pumpWidget(const ShopNovaSellerApp());
     expect(find.text('ShopNova Seller Centre'), findsOneWidget);
+    expect(find.text('Đăng ký trên App ShopNova'), findsOneWidget);
+
+    await tester.tap(find.text('Đăng ký trên App ShopNova'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đăng ký bán hàng trên ShopNova'), findsOneWidget);
+  });
+
+  testWidgets('SellerMainScreen renders 5 tabs and Drawer without overflow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(const MaterialApp(home: SellerMainScreen()));
+    await tester.pump();
+
+    expect(find.text('Kênh Người Bán'), findsOneWidget);
+    expect(find.text('Tổng quan'), findsOneWidget);
+    expect(find.text('Tài chính'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.menu_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Mã giảm giá (Vouchers)'), findsOneWidget);
+    expect(find.text('Tài chính & Ví Shop'), findsOneWidget);
   });
 
   testWidgets('RegisterScreen renders welcome screen and transitions to Step 1', (WidgetTester tester) async {

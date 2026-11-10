@@ -5,7 +5,6 @@ import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
 import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/account/favorites_screen.dart';
 import 'package:shopnova/screens/seller/seller_register_screen.dart';
-import 'package:shopnova/services/portal_controller.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/services/cart_service.dart';
@@ -631,7 +630,6 @@ class _AccountScreenState extends State<AccountScreen> {
             children: [
               _buildProfileSection(context),
               const SizedBox(height: 12),
-              _buildAdminPortalBanner(context),
               _buildSellerPartnerBanner(context),
               const SizedBox(height: 12),
               _buildStatsBar(context),
@@ -741,7 +739,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     isLoggedIn
-                                        ? (user.isAdmin ? 'Quản trị viên Hệ thống' : (user.isSeller ? 'Người bán hàng' : 'Thành viên ShopNova'))
+                                        ? (user.role == 'seller' ? 'Người bán hàng' : 'Thành viên ShopNova')
                                         : 'Chưa đăng nhập',
                                     style: TextStyle(
                                       color: isLoggedIn ? primaryColor : const Color(0xFF555770),
@@ -843,13 +841,7 @@ class _AccountScreenState extends State<AccountScreen> {
       animation: auth,
       builder: (context, _) {
         final user = auth.currentUser;
-        final isSeller = auth.isAuthenticated &&
-            user != null &&
-            (user.isSeller || (user.shopId != null && user.shopId!.isNotEmpty));
-
-        if (user?.isAdmin == true && !isSeller) {
-          return const SizedBox.shrink();
-        }
+        final isSeller = auth.isAuthenticated && user?.isSeller == true;
 
         if (isSeller) {
           return Container(
@@ -903,14 +895,14 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Quay lại không gian quản lý đơn hàng, sản phẩm & doanh thu',
+                        'Quản lý đơn hàng, thêm sản phẩm và xem doanh thu',
                         style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                       ),
                     ],
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: _openSellerChannel,
+                  onPressed: _showSellerAppNoticeDialog,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00BFA5),
                     foregroundColor: Colors.white,
@@ -920,14 +912,14 @@ class _AccountScreenState extends State<AccountScreen> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Kênh Người Bán', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: const Text('Quản Lý Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           );
         }
 
-        // Người mua thuần túy hoặc Khách: chỉ hiển thị Đăng ký bán hàng (giống Website AccountMenu.jsx)
+        // Người dùng chưa là Seller (Buyer hoặc Khách)
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1010,25 +1002,42 @@ class _AccountScreenState extends State<AccountScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
-                    );
-                  },
-                  icon: const Icon(Icons.how_to_reg_outlined, size: 16),
-                  label: const Text('Đăng Ký Bán Hàng Miễn Phí', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showSellerAppNoticeDialog,
+                      icon: const Icon(Icons.storefront_outlined, size: 15),
+                      label: const Text('Quản Lý Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.how_to_reg_outlined, size: 15),
+                      label: const Text('Đăng Ký Mở Shop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1270,105 +1279,68 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  void _openSellerChannel() {
-    final auth = AuthService();
-    final user = auth.currentUser;
-    if (auth.isAuthenticated && user != null && (user.isSeller || (user.shopId != null && user.shopId!.isNotEmpty))) {
-      PortalController().switchToSeller();
-      if (Navigator.canPop(context)) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
-      );
-    }
-  }
-
-  Widget _buildAdminPortalBanner(BuildContext context) {
-    final auth = AuthService();
-    return AnimatedBuilder(
-      animation: auth,
-      builder: (context, _) {
-        final user = auth.currentUser;
-        if (!auth.isAuthenticated || user == null || !user.isAdmin) {
-          return const SizedBox.shrink();
-        }
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF49352D), Color(0xFF80513B)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  void _showSellerAppNoticeDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.storefront_rounded, color: Color(0xFF00796B), size: 24),
+            SizedBox(width: 8),
+            Text('Kênh Người Bán ShopNova', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tính năng quản lý shop, xử lý đơn hàng và đăng sản phẩm đã được chuyển sang ứng dụng riêng biệt:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF555770)),
             ),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF49352D).withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F2F1),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Color(0xFF00796B), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Ứng dụng: ShopNova Seller', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF004D40))),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Vui lòng tải hoặc mở ứng dụng ShopNova Seller trên thiết bị để đăng nhập và quản lý gian hàng của bạn.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
+              );
+            },
+            child: const Text('Đăng ký mở shop mới', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Cổng Quản Trị Hệ Thống',
-                          style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(width: 6),
-                        Icon(Icons.shield_rounded, color: Color(0xFFF5E7D4), size: 14),
-                      ],
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Quay lại trang Admin kiểm duyệt KYC, sản phẩm & đơn hàng',
-                      style: TextStyle(color: Color(0xFFF5E7D4), fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  PortalController().switchToAdmin();
-                  if (Navigator.canPop(context)) {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryDark,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Quản Trị', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00796B), foregroundColor: Colors.white),
+            child: const Text('Đã hiểu'),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -1742,42 +1714,24 @@ class _AccountScreenState extends State<AccountScreen> {
               },
             ),
             const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
-            if (!(AuthService().currentUser?.isSeller == true || (AuthService().currentUser?.shopId?.isNotEmpty == true)) && AuthService().currentUser?.isAdmin != true) ...[
-              _buildSettingsTile(
-                icon: Icons.add_business_rounded,
-                title: 'Đăng ký bán hàng',
-                subtitle: 'Mở gian hàng 0đ, tiếp cận triệu khách hàng toàn quốc',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
-                  );
-                },
-              ),
-            ],
-            if (AuthService().currentUser?.isSeller == true || (AuthService().currentUser?.shopId?.isNotEmpty == true)) ...[
-              _buildSettingsTile(
-                icon: Icons.storefront_rounded,
-                title: 'Kênh Người Bán',
-                subtitle: 'Chuyển sang giao diện Kênh Người Bán độc lập',
-                onTap: _openSellerChannel,
-              ),
-            ],
-            if (AuthService().currentUser?.isAdmin == true) ...[
-              if (AuthService().currentUser?.isSeller == true || (AuthService().currentUser?.shopId?.isNotEmpty == true))
-                const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
-              _buildSettingsTile(
-                icon: Icons.admin_panel_settings_rounded,
-                title: 'Trang Quản Trị (Admin)',
-                subtitle: 'Chuyển sang Cổng Quản Trị Hệ Thống',
-                onTap: () {
-                  PortalController().switchToAdmin();
-                  if (Navigator.canPop(context)) {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  }
-                },
-              ),
-            ],
+            _buildSettingsTile(
+              icon: Icons.add_business_rounded,
+              title: 'Đăng Ký Đối Tác Bán Hàng',
+              subtitle: 'Mở gian hàng 0đ, tiếp cận triệu khách hàng toàn quốc',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SellerRegisterScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.storefront_rounded,
+              title: 'Quản Lý Shop (App Seller)',
+              subtitle: 'Mở ứng dụng ShopNova Seller để quản lý kho và đơn bán',
+              onTap: _showSellerAppNoticeDialog,
+            ),
             const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
             _buildSettingsTile(
               icon: Icons.lock_outline_rounded,

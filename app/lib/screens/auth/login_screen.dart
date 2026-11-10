@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
-import '../../services/portal_controller.dart';
 import '../../config/api_config.dart';
 import '../../widgets/common/nova_logo.dart';
 import 'register_screen.dart';
@@ -100,12 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: const Color(0xFF00BFA5),
         ),
       );
-      PortalController().syncFromAuth(forceResetToRole: true);
-      if (user != null && (user.isAdmin || user.isSeller || (user.shopId != null && user.shopId!.isNotEmpty))) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -282,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Đăng nhập để mua sắm, bán hàng hoặc quản trị.',
+            'Đăng nhập tài khoản ShopNova để nhận ưu đãi và mua sắm không giới hạn',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 12),

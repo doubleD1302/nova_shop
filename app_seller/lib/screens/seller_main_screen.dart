@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../config/api_config.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/payout_service.dart';
@@ -46,6 +47,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   final TextEditingController _shopTaglineController = TextEditingController();
   final TextEditingController _shopDescController = TextEditingController();
   final TextEditingController _shopAddressController = TextEditingController();
+  final TextEditingController _withdrawAmountController = TextEditingController();
   String _shopLocation = 'TP. Hồ Chí Minh';
   String? _shopLogoUrl;
   String? _shopBannerUrl;
@@ -53,6 +55,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   bool _isUploadingLogo = false;
   bool _isUploadingBanner = false;
   bool _isResubmitting = false;
+  bool _isSubmittingPayout = false;
 
   // Bộ lọc đơn hàng (6 tabs giống website)
   String _orderTab = 'all'; // all, pending, confirmed, shipping, delivered, cancelled
@@ -78,6 +81,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     _shopTaglineController.dispose();
     _shopDescController.dispose();
     _shopAddressController.dispose();
+    _withdrawAmountController.dispose();
     super.dispose();
   }
 
@@ -104,19 +108,23 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
         });
       } else {
         final user = AuthService().currentUser;
-        final shopId = user?.shopId ?? '1';
-        final shopRes = await _client.get('/api/v1/shops/$shopId');
-        if (mounted) {
-          setState(() {
-            if (shopRes.success && shopRes.data is Map) {
-              final dataMap = shopRes.data as Map;
-              final shopMap = dataMap.containsKey('shop') ? dataMap['shop'] : dataMap;
-              final map = Map<String, dynamic>.from(shopMap as Map);
-              _shopProfile = map;
-              _initShopControllers(map);
-            }
-            _isLoadingProfile = false;
-          });
+        final shopId = user?.shopId;
+        if (shopId != null && shopId.isNotEmpty) {
+          final shopRes = await _client.get('/api/v1/shops/$shopId');
+          if (mounted) {
+            setState(() {
+              if (shopRes.success && shopRes.data is Map) {
+                final dataMap = shopRes.data as Map;
+                final shopMap = dataMap.containsKey('shop') ? dataMap['shop'] : dataMap;
+                final map = Map<String, dynamic>.from(shopMap as Map);
+                _shopProfile = map;
+                _initShopControllers(map);
+              }
+              _isLoadingProfile = false;
+            });
+          }
+        } else {
+          setState(() => _isLoadingProfile = false);
         }
       }
     }
@@ -553,17 +561,69 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   Future<void> _loadPayout() async {
     setState(() => _isLoadingPayout = true);
     try {
-      final res = await _payoutService.getPayoutStatus();
-      if (mounted && res != null && res['success'] == true) {
+      final data = await _payoutService.getPayoutStatus();
+      if (mounted) {
         setState(() {
-          _payoutData = res['data'] is Map ? Map<String, dynamic>.from(res['data']) : null;
+          if (data != null) {
+            _payoutData = data.containsKey('data') && data['data'] is Map
+                ? Map<String, dynamic>.from(data['data'])
+                : Map<String, dynamic>.from(data);
+          } else {
+            _payoutData = null;
+          }
           _isLoadingPayout = false;
         });
-      } else {
-        if (mounted) setState(() => _isLoadingPayout = false);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingPayout = false);
+    }
+  }
+
+  Future<void> _handleSetupPayout() async {
+    setState(() => _isSubmittingPayout = true);
+    final res = await _payoutService.setupPayout();
+    if (!mounted) return;
+    setState(() => _isSubmittingPayout = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res['message']?.toString() ?? 'Đã kích hoạt ví người bán'),
+        backgroundColor: res['success'] == true ? SellerTheme.success : SellerTheme.danger,
+      ),
+    );
+    _loadPayout();
+  }
+
+  Future<void> _handleRequestWithdrawal() async {
+    final rawText = _withdrawAmountController.text.trim().replaceAll(RegExp(r'\D'), '');
+    final amount = int.tryParse(rawText) ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập số tiền rút hợp lệ.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingPayout = true);
+    final res = await _payoutService.requestWithdrawal(amount);
+    if (!mounted) return;
+    setState(() => _isSubmittingPayout = false);
+
+    if (res['success'] == true) {
+      _withdrawAmountController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message']?.toString() ?? 'Yêu cầu rút tiền thành công!'),
+          backgroundColor: SellerTheme.success,
+        ),
+      );
+      _loadPayout();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message']?.toString() ?? 'Rút tiền không thành công.'),
+          backgroundColor: SellerTheme.danger,
+        ),
+      );
     }
   }
 
@@ -791,7 +851,10 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: SellerTheme.textPrimary),
                         ),
                         const SizedBox(height: 2),
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -801,7 +864,6 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                               ),
                               child: const Text('✓ Đã xác minh', style: TextStyle(fontSize: 9.5, color: SellerTheme.success, fontWeight: FontWeight.bold)),
                             ),
-                            const SizedBox(width: 6),
                             Text('ID: $shopId', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
                           ],
                         ),
@@ -833,8 +895,9 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Mã giảm giá (Vouchers)', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Tính năng Khuyến mãi Shop đang sẵn sàng trên web và ứng dụng.')),
+                      _showPendingApiDialog(
+                        'Mã giảm giá của Shop (Vouchers)',
+                        'Tính năng tạo & quản lý mã giảm giá riêng cho gian hàng đang được bổ sung Backend API. Hiện tại hệ thống áp dụng mã voucher toàn sàn.',
                       );
                     },
                   ),
@@ -844,8 +907,9 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Quảng cáo & Flash Sale', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Chương trình Flash Sale áp dụng cho toàn sàn ShopNova.')),
+                      _showPendingApiDialog(
+                        'Quảng cáo & Chiến dịch Marketing',
+                        'Tính năng đăng ký chiến dịch quảng bá và mua gói đẩy sản phẩm đang chờ Backend API hoàn thiện.',
                       );
                     },
                   ),
@@ -855,7 +919,10 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Chăm sóc khách hàng', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      _showNotificationsDialog();
+                      _showPendingApiDialog(
+                        'Chăm sóc khách hàng (Live Chat)',
+                        'Hệ thống nhắn tin trực tiếp WebSocket giữa Người Bán và Khách Hàng đang trong giai đoạn phát triển Backend API.',
+                      );
                     },
                   ),
                 ],
@@ -1538,7 +1605,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
               color: SellerTheme.surfaceSubtle,
               child: imageUrl != null && imageUrl.isNotEmpty
                   ? Image.network(
-                      imageUrl,
+                      ApiConfig.resolveImageUrl(imageUrl),
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: SellerTheme.textSecondary),
                     )
@@ -2184,7 +2251,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                         color: SellerTheme.surfaceSubtle,
                         child: _shopBannerUrl != null && _shopBannerUrl!.isNotEmpty
                             ? Image.network(
-                                _shopBannerUrl!,
+                                ApiConfig.resolveImageUrl(_shopBannerUrl),
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => const Center(
                                   child: Icon(Icons.storefront_rounded, size: 36, color: SellerTheme.textSecondary),
@@ -2237,7 +2304,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                           child: ClipOval(
                             child: _shopLogoUrl != null && _shopLogoUrl!.isNotEmpty
                                 ? Image.network(
-                                    _shopLogoUrl!,
+                                    ApiConfig.resolveImageUrl(_shopLogoUrl),
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) => const Center(
                                       child: Icon(Icons.storefront_rounded, size: 28, color: SellerTheme.primary),
@@ -2407,7 +2474,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                         width: double.infinity,
                         color: SellerTheme.surfaceSubtle,
                         child: _shopBannerUrl != null && _shopBannerUrl!.isNotEmpty
-                            ? Image.network(_shopBannerUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())
+                            ? Image.network(ApiConfig.resolveImageUrl(_shopBannerUrl), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())
                             : const SizedBox.shrink(),
                       ),
                       Padding(
@@ -2424,7 +2491,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                               ),
                               child: ClipOval(
                                 child: _shopLogoUrl != null && _shopLogoUrl!.isNotEmpty
-                                    ? Image.network(_shopLogoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.storefront_rounded, size: 22, color: SellerTheme.primary))
+                                    ? Image.network(ApiConfig.resolveImageUrl(_shopLogoUrl), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.storefront_rounded, size: 22, color: SellerTheme.primary))
                                     : const Icon(Icons.storefront_rounded, size: 22, color: SellerTheme.primary),
                               ),
                             ),
@@ -2484,100 +2551,214 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   }
 
   // ============================================================
-  // TAB 4: TÀI CHÍNH & VÍ NGƯỜI BÁN (PAYOUT)
+  // TAB 4: TÀI CHÍNH & VÍ NGƯỜI BÁN (PAYOUT THẬT TỪ BACKEND)
   // ============================================================
 
   Widget _buildFinanceTab() {
-    final balance = double.tryParse(_payoutData?['balance']?.toString() ?? '15000000') ?? 15000000;
-    final pending = double.tryParse(_payoutData?['pendingBalance']?.toString() ?? '3500000') ?? 3500000;
+    if (_isLoadingPayout) {
+      return const Center(child: CircularProgressIndicator(color: SellerTheme.primary));
+    }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Ví Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF2C1810), Color(0xFF49352D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    final hasAccount = _payoutData != null && (_payoutData!['hasAccount'] == true || _payoutData!.containsKey('balance'));
+    final balance = double.tryParse(_payoutData?['balance']?.toString() ?? '0') ?? 0;
+    final pending = double.tryParse(_payoutData?['pendingBalance']?.toString() ?? '0') ?? 0;
+    final withdrawals = (_payoutData?['withdrawals'] as List?) ?? [];
+
+    return RefreshIndicator(
+      color: SellerTheme.primary,
+      onRefresh: _loadPayout,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Ví Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2C1810), Color(0xFF49352D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 6)),
+                ],
               ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 6)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Ví Người Bán NovaShop', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
-                      child: const Text('Đang hoạt động', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                const Text('Số dư khả dụng', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                const SizedBox(height: 2),
-                Text(
-                  _currencyFormat.format(balance),
-                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Text('Chờ quyết toán: ${_currencyFormat.format(pending)}', style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // Rút tiền Action
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: SellerTheme.card,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: SellerTheme.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Yêu Cầu Rút Tiền', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
-                const SizedBox(height: 4),
-                const Text('Tiền sẽ được chuyển về tài khoản ngân hàng liên kết trong vòng 24 giờ.', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
-                const SizedBox(height: 14),
-                TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Số tiền muốn rút (₫)', hintText: 'Tối thiểu 100.000 ₫'),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Yêu cầu rút tiền đã được tiếp nhận và xử lý.'), backgroundColor: SellerTheme.success),
-                      );
-                    },
-                    child: const Text('GỬI YÊU CẦU RÚT TIỀN'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Ví Người Bán NovaShop', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
+                        child: Text(
+                          hasAccount ? 'Đang hoạt động' : 'Chưa kích hoạt',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  const Text('Số dư khả dụng', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                  const SizedBox(height: 2),
+                  Text(
+                    _currencyFormat.format(balance),
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Chờ quyết toán: ${_currencyFormat.format(pending)}', style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+                      if (!hasAccount)
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: SellerTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                          onPressed: _isSubmittingPayout ? null : _handleSetupPayout,
+                          child: Text(_isSubmittingPayout ? 'Đang tạo...' : 'Kích hoạt Ví', style: const TextStyle(fontSize: 11.5)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 18),
+
+            // Rút tiền Action
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: SellerTheme.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Yêu Cầu Rút Tiền', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                  const SizedBox(height: 4),
+                  const Text('Số tiền rút được xử lý trực tiếp qua API ví thanh toán của shop.', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _withdrawAmountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Số tiền muốn rút (₫)',
+                      hintText: 'Ví dụ: 100000',
+                      suffixText: '₫',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    children: [50000, 100000, 200000, 500000].map((amt) {
+                      return ActionChip(
+                        label: Text('${amt ~/ 1000}k', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                        backgroundColor: SellerTheme.surfaceSubtle,
+                        side: const BorderSide(color: SellerTheme.border),
+                        onPressed: () {
+                          _withdrawAmountController.text = amt.toString();
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: (!hasAccount || _isSubmittingPayout) ? null : _handleRequestWithdrawal,
+                      child: Text(
+                        _isSubmittingPayout
+                            ? 'ĐANG XỬ LÝ...'
+                            : (hasAccount ? 'GỬI YÊU CẦU RÚT TIỀN' : 'HÃY KÍCH HOẠT VÍ TRƯỚC KHI RÚT'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Lịch sử rút tiền thật
+            const Text('Lịch Sử Rút Tiền Gần Đây', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+            const SizedBox(height: 10),
+            if (withdrawals.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: SellerTheme.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: SellerTheme.border),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 32, color: SellerTheme.textSecondary),
+                    SizedBox(height: 6),
+                    Text('Chưa có giao dịch rút tiền nào', style: TextStyle(fontSize: 12, color: SellerTheme.textSecondary)),
+                  ],
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: withdrawals.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, i) {
+                  final w = Map<String, dynamic>.from(withdrawals[i] as Map);
+                  final amt = double.tryParse(w['amount']?.toString() ?? '0') ?? 0;
+                  final created = w['createdAt']?.toString() ?? '';
+                  final status = w['status']?.toString() ?? 'completed';
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: SellerTheme.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: SellerTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.arrow_upward_rounded, color: SellerTheme.primary, size: 18),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('- ${_currencyFormat.format(amt)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: SellerTheme.danger)),
+                                Text(created.length >= 10 ? created.substring(0, 10) : created, style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: SellerTheme.successBg, borderRadius: BorderRadius.circular(8)),
+                          child: Text(
+                            (status == 'completed' || status == 'simulated') ? 'Thành công' : status,
+                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: SellerTheme.success),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

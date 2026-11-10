@@ -34,6 +34,13 @@ class ApiConfig {
     return '$baseUrl$cleanPath';
   }
 
+  static String resolveImageUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$baseUrl$cleanPath';
+  }
+
   static Future<String> autoDetectBaseUrl() async {
     if (_customBaseUrl != null) return _customBaseUrl!;
 
