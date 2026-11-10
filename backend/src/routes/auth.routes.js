@@ -10,6 +10,7 @@ import {
   refreshToken,
   logout,
   changePassword,
+  getUserStats,
 } from '../controllers/auth.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 import { loginRateLimiter } from '../middlewares/rate-limit.middleware.js'
@@ -30,6 +31,7 @@ router.post('/logout', logout)
 
 // GET /api/v1/auth/me - Lấy thông tin tài khoản hiện tại (bắt buộc Bearer JWT)
 router.get('/me', authenticate, getMe)
+router.get('/stats', authenticate, getUserStats)
 router.put('/profile', authenticate, updateProfile)
 router.post('/change-password', authenticate, changePassword)
 router.post('/seller-shop', authenticate, requireRole('buyer', 'seller', 'admin'), createSellerShop)

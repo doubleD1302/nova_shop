@@ -4,6 +4,7 @@ import {
   cancelOrder,
   createOrder,
   listOrders,
+  getOrderDetail,
   confirmOrderReceived,
   listSellerOrders,
   updateSellerOrderStatus,
@@ -14,6 +15,7 @@ const router = Router()
 router.post('/orders/preview', previewCheckout)
 router.post('/orders', createOrder)
 router.get('/orders', listOrders)
+router.get('/orders/:orderId', getOrderDetail)
 router.post('/orders/:orderId/confirm-received', confirmOrderReceived)
 router.post('/orders/:orderId/cancel', cancelOrder)
 router.get('/seller/orders', listSellerOrders)

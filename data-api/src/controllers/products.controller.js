@@ -260,6 +260,161 @@ export async function listProducts(req, res, next) {
   }
 }
 
+async function populateProductCards(productIds) {
+  if (!productIds.length) return []
+  const placeholders = productIds.map(() => '?').join(',')
+  const products = await executeQuery(`
+    SELECT p.id, p.shop_id, p.category_id, p.slug, p.name, p.description, p.specs, p.badges,
+           p.is_featured, p.is_flash_sale, p.free_shipping, p.created_at,
+           s.name AS shop_name, s.slug AS shop_slug, s.province AS shop_province, s.is_mall,
+           s.logo_url AS shop_logo_url, s.banner_url AS shop_banner_url, s.tagline AS shop_tagline,
+           c.name AS category_name, c.slug AS category_slug,
+           COALESCE(rv.rating, 0) AS rating, COALESCE(rv.rating_count, 0) AS rating_count,
+           COALESCE(sd.sold_count, 0) AS sold_count,
+           COALESCE(st.stock, 0) AS stock
+    FROM products p
+    JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
+    JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
+    JOIN categories c ON c.id = p.category_id AND c.is_active = 1
+    LEFT JOIN (
+      SELECT product_id, AVG(rating) AS rating, COUNT(*) AS rating_count
+      FROM reviews r JOIN users reviewer ON reviewer.id = r.user_id AND reviewer.status = 'active'
+      WHERE r.status = 'visible' AND r.product_id IN (${placeholders}) GROUP BY product_id
+    ) rv ON rv.product_id = p.id
+    LEFT JOIN (
+      SELECT oi.product_id, SUM(oi.qty) AS sold_count
+      FROM order_items oi JOIN shop_orders so ON so.id = oi.shop_order_id
+      WHERE so.status = 'delivered' AND oi.product_id IN (${placeholders}) GROUP BY oi.product_id
+    ) sd ON sd.product_id = p.id
+    LEFT JOIN (
+      SELECT product_id, SUM(stock_qty) AS stock
+      FROM product_variants WHERE is_active = 1 AND product_id IN (${placeholders}) GROUP BY product_id
+    ) st ON st.product_id = p.id
+    WHERE p.id IN (${placeholders})
+    ORDER BY FIELD(p.id, ${placeholders})
+  `, [...productIds, ...productIds, ...productIds, ...productIds, ...productIds])
+
+  const [variants, images] = await Promise.all([
+    executeQuery(
+      `SELECT id, product_id, name, attributes, price, original_price, stock_qty
+       FROM product_variants WHERE is_active = 1 AND product_id IN (${placeholders})
+       ORDER BY product_id, id`,
+      productIds,
+    ),
+    executeQuery(
+      `SELECT product_id, url, sort_order FROM product_images
+       WHERE product_id IN (${placeholders})
+       ORDER BY product_id, sort_order ASC`,
+      productIds,
+    ),
+  ])
+
+  return products.map((product) => {
+    const pVariants = variants.filter((v) => String(v.product_id) === String(product.id))
+    const pImages = images.filter((img) => String(img.product_id) === String(product.id))
+    const minPrice = pVariants.length ? Math.min(...pVariants.map((v) => Number(v.price))) : 0
+    const origPrices = pVariants.map((v) => Number(v.original_price)).filter((p) => p && p > 0)
+    const minOrigPrice = origPrices.length ? Math.min(...origPrices) : minPrice
+    const discount = minOrigPrice > minPrice ? Math.round(((minOrigPrice - minPrice) / minOrigPrice) * 100) : 0
+    const imageUrl = pImages.length ? pImages[0].url : ''
+
+    return {
+      id: String(product.id),
+      name: product.name,
+      slug: product.slug,
+      price: minPrice,
+      originalPrice: minOrigPrice,
+      discount,
+      imageUrl,
+      images: pImages.map((img) => img.url),
+      rating: Number(Number(product.rating).toFixed(1)),
+      ratingCount: Number(product.rating_count),
+      soldCount: Number(product.sold_count),
+      sold: Number(product.sold_count),
+      province: product.shop_province,
+      location: product.shop_province,
+      isMall: Boolean(product.is_mall),
+      shopMall: Boolean(product.is_mall),
+      freeShipping: Boolean(product.free_shipping),
+      badges: parseJson(product.badges, []),
+      stock: Number(product.stock),
+      flash: Boolean(product.is_flash_sale),
+      featured: Boolean(product.is_featured),
+      shop: {
+        id: String(product.shop_id),
+        name: product.shop_name,
+        slug: product.shop_slug,
+        isMall: Boolean(product.is_mall),
+        province: product.shop_province,
+      },
+      category: {
+        id: product.category_slug,
+        name: product.category_name,
+        slug: product.category_slug,
+      },
+      createdAt: asDateString(product.created_at),
+    }
+  })
+}
+
+export async function getFeaturedProducts(req, res, next) {
+  try {
+    const hasApproval = await hasColumn('products', 'approval_status')
+    const approvalWhere = hasApproval ? "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)" : ''
+
+    const flashRows = await executeQuery(`
+      SELECT p.id
+      FROM products p
+      JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
+      JOIN users u ON u.id = s.owner_id AND u.status = 'active'
+      JOIN categories c ON c.id = p.category_id AND c.is_active = 1
+      WHERE p.status = 'active' ${approvalWhere}
+        AND (p.is_flash_sale = 1 OR EXISTS (
+          SELECT 1 FROM product_variants vd WHERE vd.product_id = p.id AND vd.is_active = 1 AND vd.original_price > vd.price
+        ))
+      ORDER BY p.is_flash_sale DESC, (
+        SELECT MAX(100 * (vd.original_price - vd.price) / vd.original_price)
+        FROM product_variants vd WHERE vd.product_id = p.id AND vd.is_active = 1 AND vd.original_price > vd.price
+      ) DESC, p.id DESC
+      LIMIT 12
+    `)
+
+    const featuredRows = await executeQuery(`
+      SELECT p.id
+      FROM products p
+      JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
+      JOIN users u ON u.id = s.owner_id AND u.status = 'active'
+      JOIN categories c ON c.id = p.category_id AND c.is_active = 1
+      WHERE p.status = 'active' ${approvalWhere}
+      ORDER BY p.is_featured DESC, (
+        SELECT COALESCE(SUM(oi.qty), 0) FROM order_items oi
+        JOIN shop_orders so ON so.id = oi.shop_order_id
+        WHERE oi.product_id = p.id AND so.status = 'delivered'
+      ) DESC, p.id DESC
+      LIMIT 20
+    `)
+
+    const flashSaleIds = flashRows.map((r) => String(r.id))
+    const featuredIds = featuredRows.map((r) => String(r.id))
+
+    const [flashSale, featuredProducts] = await Promise.all([
+      populateProductCards(flashSaleIds),
+      populateProductCards(featuredIds),
+    ])
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        flashSale,
+        featuredProducts,
+      },
+    })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+
 export async function listProductReviews(req, res, next) {
   try {
     const { productId } = req.params

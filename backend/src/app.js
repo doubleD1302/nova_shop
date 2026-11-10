@@ -20,6 +20,9 @@ import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
 import chatRouter from './routes/chat.routes.js'
 import paymentsRouter from './routes/payments.routes.js'
+import bannersRouter from './routes/banners.routes.js'
+import favoritesRouter from './routes/favorites.routes.js'
+import reviewsRouter from './routes/reviews.routes.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 import { validateQuery } from './middlewares/input.middleware.js'
@@ -68,6 +71,9 @@ if (env.uploadStorage === 's3') {
 // 4. Khai báo các API routes với tiền tố /api/v1
 app.use('/api/v1', healthRouter)
 app.use('/api/v1', settingsRouter)
+app.use('/api/v1', bannersRouter)
+app.use('/api/v1/favorites', favoritesRouter)
+app.use('/api/v1/reviews', reviewsRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/addresses', addressesRouter)
 app.use('/api/v1', shopsRouter)

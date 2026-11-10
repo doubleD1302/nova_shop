@@ -1,4 +1,3 @@
-import { env } from '../config/env.js'
 import crypto from 'node:crypto'
 import { signAccessToken, ACCESS_TOKEN_EXPIRES_IN } from '../middlewares/auth.middleware.js'
 import {
@@ -107,8 +106,7 @@ async function migrateVerifiedLegacyAccount(username, password) {
 }
 
 export async function login(req, res, next) {
-  const username = req.body?.username || req.body?.usernameOrEmail
-  const { password } = req.body || {}
+  const { username, password } = req.body || {}
   if (typeof username !== 'string' || !username.trim() || typeof password !== 'string' || !password) {
     return res.status(400).json({
       success: false,
@@ -129,26 +127,9 @@ export async function login(req, res, next) {
     try {
       user = await verifyCredentials(username.trim().toLowerCase(), password)
     } catch (err) {
-      if (!(err instanceof DataApiClientError) || err.code !== 'INVALID_CREDENTIALS') {
-        if (!env.allowLocalDbFallback) throw err
-        const localUser = findUserByUsername(username.trim().toLowerCase())
-        if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
-          user = localUser
-        } else {
-          throw err
-        }
-      } else {
-        user = await migrateVerifiedLegacyAccount(username, password)
-        if (!user) {
-          if (!env.allowLocalDbFallback) throw err
-          const localUser = findUserByUsername(username.trim().toLowerCase())
-          if (localUser && localUser.status === 'active' && verifyPassword(localUser.passwordHash, password)) {
-            user = localUser
-          } else {
-            throw err
-          }
-        }
-      }
+      if (!(err instanceof DataApiClientError) || err.code !== 'INVALID_CREDENTIALS') throw err
+      user = await migrateVerifiedLegacyAccount(username, password)
+      if (!user) throw err
     }
     const refreshToken = await createSessionForUser(user.id)
     return res.status(200).json(authResponse(user, 'Đăng nhập thành công.', refreshToken))
@@ -306,7 +287,6 @@ export async function register(req, res, next) {
         role,
         shopName: role === 'seller' ? body.shopName.trim() : undefined,
         shopTagline: typeof body.shopTagline === 'string' ? body.shopTagline.trim() : '',
-        ...(body.sellerProfile !== undefined ? { sellerProfile: body.sellerProfile } : {}),
       },
     })
     const refreshToken = await createSessionForUser(result.user.id)
@@ -338,8 +318,7 @@ export async function updateProfile(req, res, next) {
 
 export async function createSellerShop(req, res, next) {
   const shopName = req.body?.shopName
-  if (typeof shopName !== 'string' || !shopName.trim() || shopName.trim().length > 160 ||
-    (req.body?.shopTagline != null && (typeof req.body.shopTagline !== 'string' || req.body.shopTagline.trim().length > 255))) {
+  if (typeof shopName !== 'string' || !shopName.trim() || shopName.trim().length > 160) {
     return res.status(400).json({
       success: false,
       message: 'Tên gian hàng là bắt buộc (tối đa 160 ký tự).',
@@ -349,7 +328,7 @@ export async function createSellerShop(req, res, next) {
   try {
     const result = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop`, {
       method: 'POST',
-      body: { shopName: shopName.trim(), shopTagline: req.body?.shopTagline?.trim() || '', ...(req.body?.sellerProfile !== undefined ? { sellerProfile: req.body.sellerProfile } : {}) },
+      body: { shopName: shopName.trim() },
     })
     const refreshToken = await createSessionForUser(result.user.id)
     return res.status(200).json({
@@ -536,6 +515,15 @@ export async function changePassword(req, res, next) {
         error: { code: 'INVALID_CREDENTIALS' },
       })
     }
+    return next(err)
+  }
+}
+
+export async function getUserStats(req, res, next) {
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/stats`)
+    return res.status(200).json({ success: true, data })
+  } catch (err) {
     return next(err)
   }
 }

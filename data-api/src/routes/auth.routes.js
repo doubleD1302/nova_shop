@@ -1,4 +1,3 @@
-import { getSellerRegistration, updateSellerRegistration, revealSellerIdentity, listSellerIdentityAccessEvents } from '../controllers/seller-registration.controller.js'
 import { Router } from 'express'
 import {
   verifyCredentials,
@@ -13,6 +12,7 @@ import {
   revokeSession,
   revokeAllSessions,
   changePassword,
+  getUserStats,
 } from '../controllers/auth.controller.js'
 import { getSellerShop, resubmitSellerShop, updateSellerShop } from '../controllers/shops.controller.js'
 
@@ -32,15 +32,11 @@ router.post('/auth/sessions/revoke-all', revokeAllSessions)
 
 // GET /internal/v1/users/:userId/auth-profile - Lấy hồ sơ xác thực tài khoản
 router.get('/users/:userId/auth-profile', getUserAuthProfile)
+router.get('/users/:userId/stats', getUserStats)
 router.put('/users/:userId/profile', updateUserProfile)
 router.post('/users/:userId/change-password', changePassword)
 router.post('/users/:userId/seller-shop', createSellerShop)
 router.get('/users/:userId/seller-shop', getSellerShop)
-router.get('/users/:userId/seller-shop/registration', getSellerRegistration)
-router.put('/users/:userId/seller-shop/registration', updateSellerRegistration)
-router.get('/admin/shops/:shopId/registration', getSellerRegistration)
-router.post('/admin/shops/:shopId/identity-access', revealSellerIdentity)
-router.get('/admin/shops/:shopId/identity-access-events', listSellerIdentityAccessEvents)
 router.post('/users/:userId/seller-shop/resubmit', resubmitSellerShop)
 router.put('/users/:userId/seller-shop', (req, res, next) => {
   req.body = { ...(req.body || {}), userId: req.params.userId }

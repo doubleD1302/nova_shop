@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   listProducts,
+  getFeaturedProducts,
   listProductReviews,
   listEligibleReviewItems,
   createProductReview,
@@ -14,6 +15,7 @@ import {
 const router = Router()
 
 router.get('/products', listProducts)
+router.get('/products/featured', getFeaturedProducts)
 router.get('/products/:productId/category-attributes', getPublicCategoryAttributes)
 router.get('/products/:productId/reviews', listProductReviews)
 router.get('/products/:productId/reviews/eligible', listEligibleReviewItems)

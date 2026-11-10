@@ -1,4 +1,5 @@
 import { callDataApi } from '../clients/data.client.js'
+import { listProducts } from './products.controller.js'
 
 export async function listShops(req, res, next) {
   try {
@@ -72,4 +73,49 @@ export async function getCategoryAttributes(req, res, next) {
     const data = await callDataApi(`/internal/v1/categories/${encodeURIComponent(slug)}/attributes${suffix}`)
     return res.json({ success: true, data })
   } catch (err) { return next(err) }
+}
+
+export async function getShopFollowStatus(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const data = await callDataApi(`/internal/v1/shops/${encodeURIComponent(shopId)}/follow?userId=${encodeURIComponent(req.user.id)}`)
+    return res.status(200).json({ success: true, data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export async function followShop(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const data = await callDataApi(`/internal/v1/shops/${encodeURIComponent(shopId)}/follow`, {
+      method: 'POST',
+      body: { userId: req.user.id },
+    })
+    return res.status(200).json({ success: true, message: 'Đã theo dõi gian hàng.', data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export async function unfollowShop(req, res, next) {
+  try {
+    const { shopId } = req.params
+    const data = await callDataApi(`/internal/v1/shops/${encodeURIComponent(shopId)}/follow`, {
+      method: 'DELETE',
+      body: { userId: req.user.id },
+    })
+    return res.status(200).json({ success: true, message: 'Đã hủy theo dõi gian hàng.', data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export async function getShopProducts(req, res, next) {
+  try {
+    req.query.shopId = req.params.shopId
+    return listProducts(req, res, next)
+  } catch (err) {
+    return next(err)
+  }
 }

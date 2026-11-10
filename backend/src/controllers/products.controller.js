@@ -44,6 +44,15 @@ export async function listProducts(req, res, next) {
   }
 }
 
+export async function getFeaturedProducts(req, res, next) {
+  try {
+    const data = await callDataApi('/internal/v1/products/featured')
+    return res.status(200).json({ success: true, data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
 export async function getProductDetail(req, res, next) {
   try {
     const key = req.params.productId
@@ -111,7 +120,11 @@ export async function createProductReview(req, res, next) {
         return res.status(503).json({ success: false, message: 'Không thể kiểm tra ảnh đánh giá.', error: { code: 'IMAGE_STORAGE_UNAVAILABLE' } })
       }
     }
-    const result = await callDataApi(`/internal/v1/products/${encodeURIComponent(req.params.productId)}/reviews`, {
+    const productId = req.params.productId || req.body?.productId
+    if (!productId || !/^[1-9]\d{0,19}$/.test(String(productId))) {
+      return res.status(400).json({ success: false, message: 'Mã sản phẩm không hợp lệ.', error: { code: 'INVALID_PRODUCT_ID' } })
+    }
+    const result = await callDataApi(`/internal/v1/products/${encodeURIComponent(productId)}/reviews`, {
       method: 'POST',
       body: { ...req.body, images, userId: req.user.id },
     })

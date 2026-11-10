@@ -17,6 +17,8 @@ import paymentsRouter from './routes/payments.routes.js'
 import settingsRouter from './routes/settings.routes.js'
 import marketingRouter from './routes/marketing.routes.js'
 import reportsRouter from './routes/reports.routes.js'
+import favoritesRouter from './routes/favorites.routes.js'
+import bannersRouter from './routes/banners.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
@@ -41,6 +43,8 @@ app.use(
   '/internal/v1',
   serviceAuthMiddleware,
   validateQuery,
+  bannersRouter,
+  favoritesRouter,
   systemRouter,
   authRouter,
   addressesRouter,

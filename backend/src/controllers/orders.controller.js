@@ -14,6 +14,21 @@ export async function listOrders(req, res, next) {
   }
 }
 
+export async function getOrderDetail(req, res, next) {
+  try {
+    const orderId = req.params.orderId
+    if (!/^[1-9]\d{0,19}$/.test(orderId)) {
+      return res.status(400).json({ success: false, message: 'Mã đơn hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const result = await callDataApi(
+      `/internal/v1/orders/${encodeURIComponent(orderId)}?userId=${encodeURIComponent(req.user.id)}`,
+    )
+    return res.status(200).json({ success: true, data: result })
+  } catch (err) {
+    return next(err)
+  }
+}
+
 export async function createOrder(req, res, next) {
   try {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {

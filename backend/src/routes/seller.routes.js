@@ -23,9 +23,14 @@ import {
   getSellerInventoryData,
   exportSellerInventoryExcel,
 } from '../controllers/reports.controller.js'
+import { createSellerShop } from '../controllers/auth.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
+
+// Đăng ký mở gian hàng từ Mobile App / Web (chấp nhận buyer, seller, admin)
+router.post('/register-shop', authenticate, requireRole('buyer', 'seller', 'admin'), createSellerShop)
+
 router.use(authenticate, requireRole('seller', 'admin'))
 router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)
