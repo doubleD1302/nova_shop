@@ -564,22 +564,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(Icons.assignment_ind_outlined, color: AdminTheme.primary, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Hồ Sơ KYC Gian Hàng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
-                                Text('$shopName · ID #$shopId (v$version)', style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary)),
-                              ],
-                            ),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(10)),
+                                child: const Icon(Icons.assignment_ind_outlined, color: AdminTheme.primary, size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Hồ Sơ KYC Gian Hàng',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary),
+                                    ),
+                                    Text(
+                                      '$shopName · ID #$shopId (v$version)',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
                       ],
@@ -609,7 +623,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       _kycRow('Email hóa đơn điện tử:', invoiceEmail.toString()),
                                       _kycRow('Đơn vị vận chuyển:', shippingMethods),
                                       _kycRow('Địa chỉ kho / liên hệ:', shop['address']?.toString() ?? 'Chưa cập nhật'),
-                                      _kycRow('Tỉnh / Thành phố:', shop['location']?.toString() ?? 'TP. Hồ Chí Minh'),
+                                      _kycRow('Tỉnh / Thành phố:', shop['location']?.toString() ?? 'Chưa cập nhật'),
                                     ],
                                   ),
                                 ),
@@ -863,15 +877,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final approvalStatus = product['approvalStatus']?.toString() ?? 'pending';
     final isFlashSale = product['isFlashSale'] == true;
 
-    List<String> images = [];
+    final List<String> images = [];
     if (product['images'] is List) {
       for (final img in product['images'] as List) {
-        if (img is String) images.add(img);
-        if (img is Map && img['url'] != null) images.add(img['url'].toString());
+        final rawImg = img is String ? img : (img is Map ? img['url']?.toString() : null);
+        final resolved = ApiConfig.resolveImageUrl(rawImg);
+        if (resolved.isNotEmpty && !images.contains(resolved)) {
+          images.add(resolved);
+        }
       }
     }
     if (images.isEmpty && product['imageUrl'] != null) {
-      images.add(product['imageUrl'].toString());
+      final resolved = ApiConfig.resolveImageUrl(product['imageUrl']?.toString());
+      if (resolved.isNotEmpty) {
+        images.add(resolved);
+      }
     }
 
     showModalBottomSheet(
@@ -891,22 +911,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.inventory_2_outlined, color: AdminTheme.primary, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Chi Tiết & Kiểm Duyệt Sản Phẩm', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
-                        Text('Mã ID #$pId · Gian hàng: $shopName', style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary)),
-                      ],
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.inventory_2_outlined, color: AdminTheme.primary, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Chi Tiết & Kiểm Duyệt Sản Phẩm',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary),
+                            ),
+                            Text(
+                              'Mã ID #$pId · Gian hàng: $shopName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
               ],
@@ -931,16 +965,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         itemCount: images.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 10),
                         itemBuilder: (ctx, idx) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              color: AdminTheme.surfaceSubtle,
-                              child: Image.network(
-                                images[idx],
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, color: AdminTheme.textSecondary),
+                          return GestureDetector(
+                            onTap: () => _showZoomImageDialog(images[idx]),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                color: AdminTheme.surfaceSubtle,
+                                child: Image.network(
+                                  images[idx],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, color: AdminTheme.textSecondary),
+                                ),
                               ),
                             ),
                           );
@@ -950,28 +987,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 14),
                   Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
                   const SizedBox(height: 6),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _statusPill(approvalStatus),
-                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(6)),
                         child: Text(category, style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary, fontWeight: FontWeight.bold)),
                       ),
-                      if (isFlashSale) ...[
-                        const SizedBox(width: 8),
+                      if (isFlashSale)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(6)),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.bolt, size: 12, color: Colors.amber.shade900),
                               Text('FLASH SALE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900)),
                             ],
                           ),
                         ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -1084,7 +1122,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final targetId = report['targetId']?.toString() ?? '';
     final reporter = report['reporterUsername']?.toString() ?? report['reporterName']?.toString() ?? 'Người dùng';
     final status = report['status']?.toString() ?? 'open';
-    final evidenceUrl = report['evidenceUrl']?.toString();
+    final evidenceUrl = ApiConfig.resolveImageUrl(report['evidenceUrl']?.toString());
     final shopId = report['shopId']?.toString();
     final violationId = report['violationId']?.toString() ?? repId;
 
@@ -1105,22 +1143,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.flag_outlined, color: AdminTheme.danger, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Báo Cáo Vi Phạm #$repId', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
-                        Text('Người gửi: @$reporter', style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary)),
-                      ],
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.flag_outlined, color: AdminTheme.danger, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Báo Cáo Vi Phạm #$repId',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary),
+                            ),
+                            Text(
+                              'Người gửi: @$reporter',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
               ],
@@ -1163,7 +1215,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (evidenceUrl != null && evidenceUrl.isNotEmpty) ...[
+                  if (evidenceUrl.isNotEmpty) ...[
                     const Text('HÌNH ẢNH BẰNG CHỨNG', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
                     const SizedBox(height: 6),
                     GestureDetector(
@@ -1177,7 +1229,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              Image.network(evidenceUrl, fit: BoxFit.cover, width: double.infinity, height: 160),
+                              Image.network(evidenceUrl, fit: BoxFit.cover, width: double.infinity, height: 160, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, color: AdminTheme.textSecondary)),
                               Positioned(
                                 bottom: 8,
                                 right: 8,
@@ -1279,7 +1331,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 4.0,
-                child: Image.network(imageUrl, fit: BoxFit.contain),
+                child: Image.network(ApiConfig.resolveImageUrl(imageUrl), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, color: Colors.white, size: 42)),
               ),
             ),
             Positioned(
@@ -1831,7 +1883,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     height: 100,
                     width: double.infinity,
                     child: CustomPaint(
-                      painter: _AdminTrendPainter(),
+                      painter: _AdminTrendPainter(orders: _orders.isNotEmpty ? _orders : _recentOrders),
                     ),
                   ),
                 ],
@@ -1888,12 +1940,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('#${ro['code'] ?? ro['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
-                            Text(ro['shopName']?.toString() ?? 'Shop', style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('#${ro['code'] ?? ro['id']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
+                              Text(ro['shopName']?.toString() ?? 'Shop', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+                            ],
+                          ),
                         ),
                         Text(
                           _currencyFormat.format(double.tryParse(ro['totalAmount']?.toString() ?? '0') ?? 0),
@@ -2344,11 +2398,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     final approvalStatus = p['approvalStatus']?.toString() ?? 'pending';
                     final shopName = p['shopName']?.toString() ?? 'Shop';
 
-                    String? thumbUrl = p['imageUrl']?.toString();
-                    if (thumbUrl == null && p['images'] is List && (p['images'] as List).isNotEmpty) {
+                    String? rawThumb = p['imageUrl']?.toString();
+                    if ((rawThumb == null || rawThumb.trim().isEmpty) && p['images'] is List && (p['images'] as List).isNotEmpty) {
                       final first = p['images'][0];
-                      thumbUrl = first is String ? first : (first is Map ? first['url']?.toString() : null);
+                      rawThumb = first is String ? first : (first is Map ? first['url']?.toString() : null);
                     }
+                    final thumbUrl = ApiConfig.resolveImageUrl(rawThumb);
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -2359,15 +2414,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                       child: Row(
                         children: [
-                          ClipRRect(
+                          InkWell(
+                            onTap: () => _showProductPreviewModal(p),
                             borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              width: 54,
-                              height: 54,
-                              color: AdminTheme.surfaceSubtle,
-                              child: thumbUrl != null && thumbUrl.isNotEmpty
-                                  ? Image.network(thumbUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_outlined, color: AdminTheme.textSecondary))
-                                  : const Icon(Icons.inventory_2_outlined, color: AdminTheme.textSecondary),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: 54,
+                                height: 54,
+                                color: AdminTheme.surfaceSubtle,
+                                child: thumbUrl.isNotEmpty
+                                    ? Image.network(thumbUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_outlined, color: AdminTheme.textSecondary))
+                                    : const Icon(Icons.inventory_2_outlined, color: AdminTheme.textSecondary),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2378,7 +2437,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
-                                  Text('$shopName · ${_currencyFormat.format(price)}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
+                                  Text('$shopName · ${_currencyFormat.format(price)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
@@ -2970,6 +3029,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
 // Painter vẽ đồ thị xu hướng doanh thu Admin
 class _AdminTrendPainter extends CustomPainter {
+  final List<Map<String, dynamic>> orders;
+  _AdminTrendPainter({required this.orders});
+
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
@@ -2991,15 +3053,33 @@ class _AdminTrendPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    final points = <Offset>[
-      Offset(size.width * 0.05, size.height * 0.75),
-      Offset(size.width * 0.20, size.height * 0.60),
-      Offset(size.width * 0.35, size.height * 0.70),
-      Offset(size.width * 0.50, size.height * 0.40),
-      Offset(size.width * 0.65, size.height * 0.50),
-      Offset(size.width * 0.80, size.height * 0.25),
-      Offset(size.width * 0.95, size.height * 0.15),
-    ];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dailyTotals = List<double>.filled(7, 0.0);
+
+    for (final o in orders) {
+      final status = (o['status']?.toString() ?? '').toLowerCase();
+      if (status == 'cancelled') continue;
+      final rawDate = o['createdAt'] ?? o['created_at'];
+      if (rawDate == null) continue;
+      final parsed = DateTime.tryParse(rawDate.toString())?.toLocal();
+      if (parsed == null) continue;
+      final orderDay = DateTime(parsed.year, parsed.month, parsed.day);
+      final diffDays = today.difference(orderDay).inDays;
+      if (diffDays >= 0 && diffDays < 7) {
+        final bucketIndex = 6 - diffDays;
+        final amount = double.tryParse((o['totalAmount'] ?? o['total_amount'] ?? o['subtotal'] ?? 0).toString()) ?? 0.0;
+        dailyTotals[bucketIndex] += amount;
+      }
+    }
+
+    final maxTotal = dailyTotals.fold<double>(0.0, (m, v) => v > m ? v : m);
+    final points = <Offset>[];
+    for (int i = 0; i < 7; i++) {
+      final xRatio = 0.05 + (i * 0.15);
+      final yRatio = maxTotal > 0 ? (0.85 - (dailyTotals[i] / maxTotal) * 0.70) : 0.90;
+      points.add(Offset(size.width * xRatio, size.height * yRatio));
+    }
 
     final path = Path()..moveTo(points[0].dx, points[0].dy);
     for (int i = 1; i < points.length; i++) {
