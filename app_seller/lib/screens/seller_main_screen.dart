@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/payout_service.dart';
+import '../services/upload_service.dart';
 import '../theme/seller_theme.dart';
 import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
+import 'register_screen.dart' show kVietnamProvinces;
 import 'seller_product_form_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
@@ -38,6 +41,19 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   bool _isLoadingProfile = false;
   bool _isLoadingPayout = false;
 
+  // Controllers chỉnh sửa hồ sơ gian hàng
+  final TextEditingController _shopNameController = TextEditingController();
+  final TextEditingController _shopTaglineController = TextEditingController();
+  final TextEditingController _shopDescController = TextEditingController();
+  final TextEditingController _shopAddressController = TextEditingController();
+  String _shopLocation = 'TP. Hồ Chí Minh';
+  String? _shopLogoUrl;
+  String? _shopBannerUrl;
+  bool _isSavingShop = false;
+  bool _isUploadingLogo = false;
+  bool _isUploadingBanner = false;
+  bool _isResubmitting = false;
+
   // Bộ lọc đơn hàng (6 tabs giống website)
   String _orderTab = 'all'; // all, pending, confirmed, shipping, delivered, cancelled
   String _orderSearch = '';
@@ -56,6 +72,15 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     _loadAll();
   }
 
+  @override
+  void dispose() {
+    _shopNameController.dispose();
+    _shopTaglineController.dispose();
+    _shopDescController.dispose();
+    _shopAddressController.dispose();
+    super.dispose();
+  }
+
   void _loadAll() {
     _loadProfile();
     _loadOrders();
@@ -71,9 +96,11 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
       if (res.success && res.data is Map) {
         final dataMap = res.data as Map;
         final shopMap = dataMap.containsKey('shop') ? dataMap['shop'] : dataMap;
+        final map = Map<String, dynamic>.from(shopMap as Map);
         setState(() {
-          _shopProfile = Map<String, dynamic>.from(shopMap as Map);
+          _shopProfile = map;
           _isLoadingProfile = false;
+          _initShopControllers(map);
         });
       } else {
         final user = AuthService().currentUser;
@@ -84,13 +111,383 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             if (shopRes.success && shopRes.data is Map) {
               final dataMap = shopRes.data as Map;
               final shopMap = dataMap.containsKey('shop') ? dataMap['shop'] : dataMap;
-              _shopProfile = Map<String, dynamic>.from(shopMap as Map);
+              final map = Map<String, dynamic>.from(shopMap as Map);
+              _shopProfile = map;
+              _initShopControllers(map);
             }
             _isLoadingProfile = false;
           });
         }
       }
     }
+  }
+
+  void _initShopControllers(Map<String, dynamic> map) {
+    if (_shopNameController.text.isEmpty) {
+      _shopNameController.text = map['name']?.toString() ?? '';
+    }
+    if (_shopTaglineController.text.isEmpty) {
+      _shopTaglineController.text = map['tagline']?.toString() ?? '';
+    }
+    if (_shopDescController.text.isEmpty) {
+      _shopDescController.text = map['description']?.toString() ?? '';
+    }
+    if (_shopAddressController.text.isEmpty) {
+      _shopAddressController.text = map['address']?.toString() ?? '';
+    }
+    final loc = map['location']?.toString();
+    if (loc != null && loc.isNotEmpty && kVietnamProvinces.contains(loc)) {
+      _shopLocation = loc;
+    }
+    _shopLogoUrl = map['logoUrl']?.toString();
+    _shopBannerUrl = map['bannerUrl']?.toString();
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    try {
+      final picker = ImagePicker();
+      final xFile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+      if (xFile == null) return;
+
+      setState(() => _isUploadingLogo = true);
+      final bytes = await xFile.readAsBytes();
+      final res = await UploadService().uploadBytes(bytes: bytes, fileName: xFile.name, purpose: 'shop');
+      if (mounted) {
+        setState(() {
+          _isUploadingLogo = false;
+          if (res.success && res.url != null) {
+            _shopLogoUrl = res.url;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tải ảnh logo lên thành công!'), backgroundColor: SellerTheme.success),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(res.error ?? 'Tải ảnh logo thất bại.'), backgroundColor: SellerTheme.danger),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingLogo = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi chọn ảnh: $e'), backgroundColor: SellerTheme.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final picker = ImagePicker();
+      final xFile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1920, maxHeight: 600, imageQuality: 85);
+      if (xFile == null) return;
+
+      setState(() => _isUploadingBanner = true);
+      final bytes = await xFile.readAsBytes();
+      final res = await UploadService().uploadBytes(bytes: bytes, fileName: xFile.name, purpose: 'shop');
+      if (mounted) {
+        setState(() {
+          _isUploadingBanner = false;
+          if (res.success && res.url != null) {
+            _shopBannerUrl = res.url;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tải ảnh bìa gian hàng thành công!'), backgroundColor: SellerTheme.success),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(res.error ?? 'Tải ảnh bìa thất bại.'), backgroundColor: SellerTheme.danger),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingBanner = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi chọn ảnh: $e'), backgroundColor: SellerTheme.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveShopProfile() async {
+    if (_shopNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập tên gian hàng.'), backgroundColor: SellerTheme.danger),
+      );
+      return;
+    }
+
+    setState(() => _isSavingShop = true);
+    final body = {
+      'name': _shopNameController.text.trim(),
+      'tagline': _shopTaglineController.text.trim(),
+      'address': _shopAddressController.text.trim(),
+      'location': _shopLocation,
+      'description': _shopDescController.text.trim(),
+      'logoUrl': _shopLogoUrl,
+      'bannerUrl': _shopBannerUrl,
+    };
+    final res = await _client.put('/api/v1/seller/shop', body: body);
+    if (mounted) {
+      setState(() => _isSavingShop = false);
+      if (res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã lưu thông tin gian hàng thành công!'), backgroundColor: SellerTheme.success),
+        );
+        _loadProfile();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi cập nhật gian hàng.'), backgroundColor: SellerTheme.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _resubmitShop() async {
+    setState(() => _isResubmitting = true);
+    final res = await _client.post('/api/v1/seller/shop/resubmit');
+    if (mounted) {
+      setState(() => _isResubmitting = false);
+      if (res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã gửi lại hồ sơ duyệt gian hàng thành công. Gian hàng chuyển sang trạng thái chờ duyệt.'),
+            backgroundColor: SellerTheme.success,
+          ),
+        );
+        _loadProfile();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Gửi lại hồ sơ thất bại.'), backgroundColor: SellerTheme.danger),
+        );
+      }
+    }
+  }
+
+  void _showPendingApiDialog(String title, String desc) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SellerTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFBF3E8),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.hourglass_top_rounded, color: SellerTheme.primary, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.code_off_rounded, size: 14, color: Colors.amber.shade900),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Chưa có API Backend',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              desc,
+              style: const TextStyle(fontSize: 13, color: SellerTheme.textPrimary, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: SellerTheme.surfaceSubtle,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Thông báo phát triển:',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: SellerTheme.primary),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• Giao diện UI/UX đã được xây dựng đồng bộ 100% với website NovaShop.\n• Tính năng sẽ hoạt động đầy đủ ngay sau khi Backend triển khai API tương ứng.',
+                    style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SellerTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectionReasonModal(Map<String, dynamic> product) {
+    final name = product['name']?.toString() ?? 'Sản phẩm';
+    final id = product['id']?.toString() ?? '';
+    final reason = product['rejectionReason']?.toString() ?? 'Chưa có thông tin lý do cụ thể từ Ban Quản Trị.';
+    final reviewedAt = product['reviewedAt']?.toString();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: SellerTheme.card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Lý Do Từ Chối Duyệt',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20, color: SellerTheme.textSecondary),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const Divider(color: SellerTheme.border, height: 24),
+            Text('Sản phẩm: $name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.textPrimary)),
+            Text('Mã sản phẩm: #$id', style: const TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'GHI CHÚ TỪ BAN QUẢN TRỊ:',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.red, letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    reason,
+                    style: TextStyle(fontSize: 12.5, color: Colors.red.shade900, height: 1.4),
+                  ),
+                  if (reviewedAt != null && reviewedAt.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Thời gian phản hồi: $reviewedAt',
+                      style: TextStyle(fontSize: 10.5, color: Colors.red.shade700),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('💡 ', style: TextStyle(fontSize: 14)),
+                Expanded(
+                  child: Text(
+                    'Hướng dẫn: Hãy bấm "Chỉnh sửa sản phẩm này" để sửa lại thông tin/hình ảnh theo góp ý. Sau khi nhấn Lưu, sản phẩm sẽ tự động gửi lại cho Admin duyệt.',
+                    style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary, height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Đóng'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showProductDialog(product);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SellerTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Chỉnh sửa sản phẩm này →'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadOrders() async {
@@ -864,15 +1261,31 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                   _quickToolItem(Icons.add_circle_outline_rounded, 'Thêm sản phẩm', () => _showProductDialog()),
                   _quickToolItem(Icons.inventory_2_outlined, 'Quản lý đơn', () => setState(() => _activeNav = 2)),
                   _quickToolItem(Icons.confirmation_number_outlined, 'Khuyến mãi', () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quản lý mã giảm giá của gian hàng.')));
+                    _showPendingApiDialog(
+                      'Khuyến mãi của shop',
+                      'Tính năng tạo mã giảm giá (Voucher) và thiết lập chương trình ưu đãi của gian hàng.',
+                    );
                   }),
                   _quickToolItem(Icons.campaign_outlined, 'Marketing', () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiếp thị sản phẩm và tăng lưu lượng truy cập.')));
+                    _showPendingApiDialog(
+                      'Marketing & Quảng cáo',
+                      'Công cụ chạy quảng cáo tìm kiếm và tiếp thị liên kết cho sản phẩm của shop.',
+                    );
                   }),
                   _quickToolItem(Icons.assessment_outlined, 'Báo cáo', () => setState(() => _activeNav = 4)),
-                  _quickToolItem(Icons.headset_mic_outlined, 'CSKH', _showNotificationsDialog),
+                  _quickToolItem(Icons.headset_mic_outlined, 'CSKH', () {
+                    _showPendingApiDialog(
+                      'Chăm sóc khách hàng',
+                      'Hộp thư tin nhắn trò chuyện trực tiếp (Live Chat) và phản hồi đánh giá của người mua.',
+                    );
+                  }),
                   _quickToolItem(Icons.storefront_outlined, 'Hồ sơ shop', () => setState(() => _activeNav = 3)),
-                  _quickToolItem(Icons.account_balance_wallet_outlined, 'Ví người bán', () => setState(() => _activeNav = 4)),
+                  _quickToolItem(Icons.more_horiz_rounded, 'Xem thêm', () {
+                    _showPendingApiDialog(
+                      'Danh mục công cụ mở rộng',
+                      'Bao gồm Quản lý kho nâng cao, Lịch sử giao dịch ví và Tải báo cáo phân tích Excel.',
+                    );
+                  }),
                 ],
               ),
             ),
@@ -1141,7 +1554,26 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _approvalBadge(approvalStatus),
+                    Row(
+                      children: [
+                        _approvalBadge(approvalStatus),
+                        if (approvalStatus == 'rejected') ...[
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => _showRejectionReasonModal(item),
+                            child: const Text(
+                              'Xem lý do',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: SellerTheme.danger,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert_rounded, size: 18, color: SellerTheme.textSecondary),
                       onSelected: (val) {
@@ -1560,89 +1992,300 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
 
   Widget _buildShopTab() {
     final user = AuthService().currentUser;
-    final nameCtrl = TextEditingController(text: _shopProfile?['name']?.toString() ?? user?.fullName ?? '');
-    final taglineCtrl = TextEditingController(text: _shopProfile?['tagline']?.toString() ?? '');
-    final descCtrl = TextEditingController(text: _shopProfile?['description']?.toString() ?? '');
-    final addressCtrl = TextEditingController(text: _shopProfile?['address']?.toString() ?? '');
-    final locCtrl = TextEditingController(text: _shopProfile?['location']?.toString() ?? 'TP. Hồ Chí Minh');
+    final shopStatus = _shopProfile?['status']?.toString() ?? 'pending';
+    final approvalStatus = _shopProfile?['approvalStatus']?.toString() ?? shopStatus;
+    final approvalVersion = _shopProfile?['approvalVersion'] ?? 1;
+    final rejectionReason = _shopProfile?['rejectionReason']?.toString() ?? 'Hồ sơ chưa đạt tiêu chuẩn quy định của sàn NovaShop.';
+
+    final productCount = _shopProfile?['productCount'] ?? _sellerProducts.length;
+    final followers = _shopProfile?['followers'] ?? 0;
+    final rating = double.tryParse(_shopProfile?['rating']?.toString() ?? '5.0') ?? 5.0;
+    final ratingCount = _shopProfile?['ratingCount'] ?? 0;
+    final joined = _shopProfile?['joined']?.toString() ?? '2026';
+    final totalSold = _shopProfile?['totalSold'] ?? 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner Top
-          Container(
-            height: 110,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [SellerTheme.primaryHover, SellerTheme.primary]),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Icon(Icons.storefront_rounded, size: 48, color: Colors.white70),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          if (_shopProfile?['approvalStatus'] == 'rejected') ...[
+          // 1. BANNER TRẠNG THÁI XÉT DUYỆT (GIỐNG SELLERSHOPPAGE.JSX)
+          if (approvalStatus == 'pending' || shopStatus == 'pending') ...[
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: SellerTheme.dangerBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: SellerTheme.danger.withValues(alpha: 0.3)),
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.shade300),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.error_outline, color: SellerTheme.danger, size: 20),
+                      Icon(Icons.hourglass_top_rounded, color: Colors.amber.shade900, size: 18),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Gian hàng bị từ chối phê duyệt KYC',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.danger),
+                      Text(
+                        'Hồ sơ gian hàng đang chờ duyệt (v$approvalVersion)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Lý do: ${_shopProfile?['rejectionReason'] ?? 'Hồ sơ chưa đạt tiêu chuẩn sàn'}. Vui lòng cập nhật lại thông tin và bấm gửi duyệt lại.',
-                    style: const TextStyle(fontSize: 12, color: SellerTheme.danger),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: SellerTheme.danger,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      minimumSize: Size.zero,
-                    ),
-                    onPressed: () async {
-                      final res = await _client.post('/api/v1/seller/shop/resubmit');
-                      if (mounted) {
-                        if (res.success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đã gửi lại hồ sơ gian hàng cho ban quản trị duyệt!'), backgroundColor: SellerTheme.success),
-                          );
-                          _loadProfile();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Gửi lại thất bại.'), backgroundColor: SellerTheme.danger),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('GỬI DUYỆT LẠI GIAN HÀNG', style: TextStyle(fontSize: 11)),
+                    'Hồ sơ gian hàng của bạn đang trong hàng đợi kiểm duyệt của Ban Quản Trị NovaShop. Bạn có thể cập nhật thông tin và lưu lại bất cứ lúc nào.',
+                    style: TextStyle(fontSize: 12, color: Colors.amber.shade900, height: 1.35),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+          ] else if (approvalStatus == 'rejected' || shopStatus == 'rejected') ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Hồ sơ bị từ chối duyệt (v$approvalVersion)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.red),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        onPressed: _isResubmitting ? null : _resubmitShop,
+                        child: Text(_isResubmitting ? 'Đang gửi...' : 'Gửi lại hồ sơ', style: const TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'LÝ DO TỪ CHỐI TỪ BAN QUẢN TRỊ:',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(rejectionReason, style: TextStyle(fontSize: 12, color: Colors.red.shade900)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Vui lòng chỉnh sửa lại các thông tin chưa phù hợp ở biểu mẫu bên dưới, bấm "Lưu Thay Đổi", sau đó bấm "Gửi lại hồ sơ".',
+                    style: TextStyle(fontSize: 11.5, color: Colors.red),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (approvalStatus == 'active' || shopStatus == 'active') ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Gian hàng đang hoạt động bình thường trên NovaShop (v$approvalVersion)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green.shade900),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (shopStatus == 'suspended') ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lock_outline_rounded, color: Colors.red, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Gian hàng đang bị tạm khóa vi phạm bởi Quản trị viên.',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
           ],
 
-          // Form fields
+          // 2. ẢNH BÌA GIAN HÀNG (BANNER) & LOGO SHOP
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: SellerTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SellerTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Hình Ảnh Gian Hàng', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                    if (_isUploadingBanner || _isUploadingLogo)
+                      const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: SellerTheme.primary)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Khung Banner
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 100,
+                        width: double.infinity,
+                        color: SellerTheme.surfaceSubtle,
+                        child: _shopBannerUrl != null && _shopBannerUrl!.isNotEmpty
+                            ? Image.network(
+                                _shopBannerUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(Icons.storefront_rounded, size: 36, color: SellerTheme.textSecondary),
+                                ),
+                              )
+                            : const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_photo_alternate_outlined, color: SellerTheme.textSecondary, size: 28),
+                                    SizedBox(height: 4),
+                                    Text('Chưa có ảnh bìa (1200x300)', style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black.withValues(alpha: 0.65),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                          ),
+                          icon: const Icon(Icons.camera_alt_outlined, size: 13),
+                          label: Text(_isUploadingBanner ? 'Đang tải...' : 'Đổi ảnh bìa', style: const TextStyle(fontSize: 11)),
+                          onPressed: _isUploadingBanner ? null : _pickAndUploadBanner,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Avatar / Logo gian hàng
+                Row(
+                  children: [
+                    Stack(
+                      children: [
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: SellerTheme.surfaceSubtle,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: SellerTheme.border, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: _shopLogoUrl != null && _shopLogoUrl!.isNotEmpty
+                                ? Image.network(
+                                    _shopLogoUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.storefront_rounded, size: 28, color: SellerTheme.primary),
+                                    ),
+                                  )
+                                : const Center(
+                                    child: Icon(Icons.storefront_rounded, size: 28, color: SellerTheme.primary),
+                                  ),
+                          ),
+                        ),
+                        if (_isUploadingLogo)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                              child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Logo Gian Hàng', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                          const SizedBox(height: 2),
+                          const Text('Ảnh vuông tỷ lệ 1:1, tối đa 5 MB (PNG, JPG, WebP)', style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                          const SizedBox(height: 6),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              minimumSize: Size.zero,
+                            ),
+                            icon: const Icon(Icons.upload_outlined, size: 14),
+                            label: const Text('Tải logo lên', style: TextStyle(fontSize: 11)),
+                            onPressed: _isUploadingLogo ? null : _pickAndUploadLogo,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 3. BIỂU MẪU HỒ SƠ GIAN HÀNG
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -1653,68 +2296,188 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Thông Tin Gian Hàng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
-                const SizedBox(height: 4),
-                const Text('Cập nhật hồ sơ kinh doanh và địa chỉ để khách hàng tin tưởng', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
-                const Divider(color: SellerTheme.border, height: 24),
+                const Text('Thông Tin Chi Tiết', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                const SizedBox(height: 2),
+                const Text('Hiển thị công khai tới khách mua hàng trên sàn NovaShop', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+                const Divider(color: SellerTheme.border, height: 22),
                 TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Tên gian hàng *'),
+                  controller: _shopNameController,
+                  decoration: const InputDecoration(labelText: 'Tên gian hàng *', hintText: 'Ví dụ: Cửa Hàng Thời Trang Nova'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: taglineCtrl,
-                  decoration: const InputDecoration(labelText: 'Khẩu hiệu (Tagline)'),
+                  controller: _shopTaglineController,
+                  decoration: const InputDecoration(labelText: 'Slogan / Khẩu hiệu ngắn', hintText: 'Ví dụ: Uy tín, chất lượng hàng đầu'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: addressCtrl,
-                  decoration: const InputDecoration(labelText: 'Địa chỉ kho lấy hàng'),
+                  controller: _shopAddressController,
+                  decoration: const InputDecoration(labelText: 'Địa chỉ kho gửi hàng / liên hệ', hintText: 'Số nhà, ngõ, đường, phường/xã'),
+                ),
+                const SizedBox(height: 12),
+
+                // Tỉnh / Thành phố (Dropdown 63 tỉnh thành)
+                DropdownButtonFormField<String>(
+                  value: kVietnamProvinces.contains(_shopLocation) ? _shopLocation : 'TP. Hồ Chí Minh',
+                  decoration: const InputDecoration(labelText: 'Tỉnh / Thành phố gửi hàng *'),
+                  items: kVietnamProvinces
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13))))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _shopLocation = val);
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: locCtrl,
-                  decoration: const InputDecoration(labelText: 'Khu vực / Tỉnh thành'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
+                  controller: _shopDescController,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Mô tả chi tiết gian hàng'),
+                  decoration: const InputDecoration(labelText: 'Mô tả chi tiết gian hàng', hintText: 'Giới thiệu về nguồn gốc sản phẩm, chính sách bảo hành...'),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final body = {
-                        'name': nameCtrl.text.trim(),
-                        'tagline': taglineCtrl.text.trim(),
-                        'address': addressCtrl.text.trim(),
-                        'location': locCtrl.text.trim(),
-                        'description': descCtrl.text.trim(),
-                      };
-                      final res = await _client.put('/api/v1/seller/shop', body: body);
-                      if (mounted) {
-                        if (res.success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cập nhật hồ sơ shop thành công!'), backgroundColor: SellerTheme.success),
-                          );
-                          _loadProfile();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi cập nhật.'), backgroundColor: SellerTheme.danger),
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('LƯU THÔNG TIN GIAN HÀNG'),
-                  ),
+
+                // Nút Lưu và Gửi lại
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 46,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: SellerTheme.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: Text(_isSavingShop ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'),
+                          onPressed: _isSavingShop ? null : _saveShopProfile,
+                        ),
+                      ),
+                    ),
+                    if (approvalStatus == 'rejected' || shopStatus == 'rejected') ...[
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        height: 46,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.send_rounded, size: 16),
+                          label: Text(_isResubmitting ? 'ĐANG GỬI...' : 'GỬI DUYỆT LẠI'),
+                          onPressed: _isResubmitting ? null : _resubmitShop,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Chủ sở hữu: ${user?.fullName ?? user?.username ?? "Bạn"} · ID: #${_shopProfile?['id'] ?? "—"}',
+                  style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 14),
+
+          // 4. XEM TRƯỚC GIAO DIỆN GIAN HÀNG & THỐNG KÊ (GIỐNG SELLERSHOPPAGE.JSX)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: SellerTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SellerTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Xem Trước Giao Diện Gian Hàng', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                const SizedBox(height: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: SellerTheme.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 60,
+                        width: double.infinity,
+                        color: SellerTheme.surfaceSubtle,
+                        child: _shopBannerUrl != null && _shopBannerUrl!.isNotEmpty
+                            ? Image.network(_shopBannerUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())
+                            : const SizedBox.shrink(),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: SellerTheme.border),
+                              ),
+                              child: ClipOval(
+                                child: _shopLogoUrl != null && _shopLogoUrl!.isNotEmpty
+                                    ? Image.network(_shopLogoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.storefront_rounded, size: 22, color: SellerTheme.primary))
+                                    : const Icon(Icons.storefront_rounded, size: 22, color: SellerTheme.primary),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _shopNameController.text.isNotEmpty ? _shopNameController.text : 'Tên gian hàng',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.textPrimary),
+                                  ),
+                                  Text(
+                                    _shopTaglineController.text.isNotEmpty ? _shopTaglineController.text : 'Chưa có giới thiệu ngắn',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary),
+                                  ),
+                                  Text(_shopLocation, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: SellerTheme.primary)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: SellerTheme.border, height: 24),
+                const Text('Thống Kê Gian Hàng', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                const SizedBox(height: 8),
+                _shopStatRow('Sản phẩm đang bán', '$productCount'),
+                _shopStatRow('Người theo dõi', '$followers'),
+                _shopStatRow('Đánh giá gian hàng', '${rating.toStringAsFixed(1)} / 5 ($ratingCount)'),
+                _shopStatRow('Tham gia từ', joined),
+                _shopStatRow('Đã bán', '$totalSold'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _shopStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: SellerTheme.textSecondary)),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
         ],
       ),
     );
