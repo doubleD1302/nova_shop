@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
-import '../services/upload_service.dart';
+import '../services/payout_service.dart';
+import '../theme/seller_theme.dart';
 import 'login_screen.dart';
-import 'seller_payout_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
   const SellerMainScreen({super.key});
@@ -15,10 +16,12 @@ class SellerMainScreen extends StatefulWidget {
 
 class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerProviderStateMixin {
   final ApiClient _client = ApiClient();
+  final PayoutService _payoutService = PayoutService();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
-  final Color _primaryColor = const Color(0xFF00796B); // Xanh Mall Seller thanh lịch
 
-  late TabController _tabController;
+  // Tabs chính của người bán
+  int _activeNav = 0; // 0: Tổng quan, 1: Sản phẩm, 2: Đơn hàng, 3: Gian hàng, 4: Tài chính
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Dữ liệu shop
   Map<String, dynamic>? _shopProfile;
@@ -26,10 +29,12 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   List<Map<String, dynamic>> _sellerOrders = [];
   List<Map<String, dynamic>> _sellerProducts = [];
   List<Map<String, dynamic>> _categories = [];
+  Map<String, dynamic>? _payoutData;
 
   bool _isLoadingOrders = false;
   bool _isLoadingProducts = false;
   bool _isLoadingProfile = false;
+  bool _isLoadingPayout = false;
 
   // Bộ lọc đơn hàng (6 tabs giống website)
   String _orderTab = 'all'; // all, pending, confirmed, shipping, delivered, cancelled
@@ -38,18 +43,15 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   // Bộ lọc sản phẩm (5 tabs giống website)
   String _productTab = 'all'; // all, active, pending, rejected, out_of_stock
   String _productSearch = '';
+  String _selectedCategory = 'all';
+
+  // Biểu đồ 7 ngày
+  String _timeRange = '7d';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
     _loadAll();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   void _loadAll() {
@@ -57,6 +59,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     _loadOrders();
     _loadProducts();
     _loadCategories();
+    _loadPayout();
   }
 
   Future<void> _loadProfile() async {
@@ -135,11 +138,11 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
 
   Future<void> _loadCategories() async {
     final res = await _client.get('/api/v1/categories');
-    if (res.success && mounted) {
+    if (mounted && res.success) {
       List<dynamic> list = [];
       if (res.data is List) {
         list = res.data as List;
-      } else if (res.data is Map && (res.data as Map)['categories'] is List) {
+      } else if (res.data is Map && (res.data as Map).containsKey('categories')) {
         list = (res.data as Map)['categories'] as List;
       }
       setState(() {
@@ -148,10 +151,26 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     }
   }
 
-  // --- HÀNH ĐỘNG SELLER ---
+  Future<void> _loadPayout() async {
+    setState(() => _isLoadingPayout = true);
+    try {
+      final res = await _payoutService.getPayoutStatus();
+      if (mounted && res != null && res['success'] == true) {
+        setState(() {
+          _payoutData = res['data'] is Map ? Map<String, dynamic>.from(res['data']) : null;
+          _isLoadingPayout = false;
+        });
+      } else {
+        if (mounted) setState(() => _isLoadingPayout = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingPayout = false);
+    }
+  }
 
-  // 1. Cập nhật trạng thái đơn hàng (Xác nhận, Giao hàng, Hoàn tất, Hủy)
-  Future<void> _updateOrderStatus(String shopOrderId, String newStatus) async {
+  // --- ACTIONS ---
+
+  Future<void> _updateOrderStatus(String shopOrderId, String newStatus, String actionLabel) async {
     final res = await _client.patch(
       '/api/v1/seller/orders/$shopOrderId/status',
       body: {'status': newStatus},
@@ -160,456 +179,125 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(newStatus == 'confirmed'
-              ? 'Đã xác nhận đơn hàng! Shipper sẽ tới lấy hàng.'
-              : newStatus == 'shipping'
-                  ? 'Đơn hàng đã được bàn giao cho đơn vị vận chuyển!'
-                  : newStatus == 'delivered'
-                      ? 'Đơn hàng đã hoàn tất thành công!'
-                      : 'Đã cập nhật trạng thái đơn hàng.'),
-          backgroundColor: Colors.green,
+          content: Text('$actionLabel thành công!'),
+          backgroundColor: SellerTheme.success,
         ),
       );
       _loadOrders();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(res.message.isNotEmpty ? res.message : 'Thao tác không thành công.'),
+          backgroundColor: SellerTheme.danger,
+        ),
       );
     }
   }
 
-  // 2. Chỉnh sửa nhanh Giá và Tồn kho sản phẩm
-  void _showQuickEditProduct(Map<String, dynamic> product) {
-    final productId = product['id']?.toString() ?? '';
-    final priceCtrl = TextEditingController(text: (product['price'] ?? '').toString());
-    final stockCtrl = TextEditingController(text: (product['stock'] ?? '').toString());
+  Future<void> _saveProduct({
+    String? productId,
+    required String name,
+    required double price,
+    required double originalPrice,
+    required int stock,
+    required String categoryId,
+    required String description,
+    required String imageUrl,
+  }) async {
+    final body = {
+      'name': name,
+      'price': price,
+      'originalPrice': originalPrice > 0 ? originalPrice : price,
+      'stock': stock,
+      'categoryId': categoryId,
+      'description': description,
+      'images': [imageUrl],
+      'status': 'active',
+    };
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Sửa nhanh: ${product['title'] ?? product['name']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), maxLines: 1),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: priceCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Giá bán (VNĐ) *', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: stockCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Số lượng tồn kho *', border: OutlineInputBorder()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () async {
-              final newPrice = double.tryParse(priceCtrl.text) ?? 0;
-              final newStock = int.tryParse(stockCtrl.text) ?? 0;
-              if (newPrice <= 0 || newStock < 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Vui lòng nhập giá và tồn kho hợp lệ.'), backgroundColor: Colors.orange),
-                );
-                return;
-              }
-              Navigator.pop(ctx);
-              final res = await _client.put('/api/v1/seller/products/$productId', body: {
-                'price': newPrice,
-                'stock': newStock,
-              });
-              if (mounted) {
-                if (res.success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cập nhật giá và tồn kho thành công!'), backgroundColor: Colors.green),
-                  );
-                  _loadProducts();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi cập nhật.'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white),
-            child: const Text('Lưu thay đổi'),
-          ),
-        ],
-      ),
-    );
-  }
+    final res = productId != null
+        ? await _client.put('/api/v1/seller/products/$productId', body: body)
+        : await _client.post('/api/v1/seller/products', body: body);
 
-  // 3. Bật / Tắt kinh doanh sản phẩm
-  Future<void> _toggleProductStatus(String productId, bool isActive) async {
-    final res = await _client.put('/api/v1/seller/products/$productId', body: {
-      'status': isActive ? 'active' : 'hidden',
-    });
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isActive ? 'Đã bật kinh doanh sản phẩm' : 'Đã tạm ẩn sản phẩm'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(productId != null ? 'Cập nhật sản phẩm thành công!' : 'Thêm sản phẩm mới thành công!'),
+          backgroundColor: SellerTheme.success,
+        ),
       );
       _loadProducts();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message.isNotEmpty ? res.message : 'Lỗi khi lưu sản phẩm.'),
+          backgroundColor: SellerTheme.danger,
+        ),
+      );
     }
   }
 
-  // 4. Xóa / Ngừng bán sản phẩm
   Future<void> _deleteProduct(String productId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận xóa sản phẩm'),
-        content: const Text('Bạn có chắc chắn muốn ngừng kinh doanh và xóa sản phẩm này khỏi gian hàng?'),
+        backgroundColor: SellerTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xác nhận xóa', style: TextStyle(fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+        content: const Text('Bạn có chắc muốn xóa sản phẩm này khỏi gian hàng?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: SellerTheme.danger),
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Xóa sản phẩm'),
+            child: const Text('Xóa'),
           ),
         ],
       ),
     );
+
     if (confirm != true) return;
 
     final res = await _client.delete('/api/v1/seller/products/$productId');
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gỡ sản phẩm thành công.'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Đã xóa sản phẩm.'), backgroundColor: SellerTheme.success),
       );
       _loadProducts();
-    }
-  }
-
-  // 5. Gửi lại hồ sơ xét duyệt KYC nếu bị từ chối
-  Future<void> _resubmitKYC() async {
-    final res = await _client.post('/api/v1/seller/shop/resubmit');
-    if (!mounted) return;
-    if (res.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gửi lại hồ sơ gian hàng thành công! Đang chờ Admin xét duyệt.'), backgroundColor: Colors.green),
-      );
-      _loadProfile();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Gửi lại thất bại.'), backgroundColor: Colors.red),
+        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Xóa thất bại.'), backgroundColor: SellerTheme.danger),
       );
     }
   }
 
-  // 6. Form Đăng / Sửa Sản Phẩm (Đầy đủ Thuộc tính theo ngành hàng & Biến thể & Upload ảnh bảo mật)
-  void _openProductForm({Map<String, dynamic>? initialProduct}) {
-    final isEditing = initialProduct != null;
-    final productId = initialProduct?['id']?.toString();
-
-    final nameCtrl = TextEditingController(text: initialProduct?['title'] ?? initialProduct?['name'] ?? '');
-    final priceCtrl = TextEditingController(text: initialProduct?['price']?.toString() ?? '');
-    final originalPriceCtrl = TextEditingController(text: initialProduct?['originalPrice']?.toString() ?? '');
-    final stockCtrl = TextEditingController(text: initialProduct?['stock']?.toString() ?? '100');
-    final descCtrl = TextEditingController(text: initialProduct?['description'] ?? '');
-
-    String? selectedCategoryId = initialProduct?['categoryId']?.toString();
-    String? uploadedImageUrl = initialProduct?['imageUrl'] ?? (initialProduct?['images'] is List && (initialProduct!['images'] as List).isNotEmpty ? initialProduct['images'][0] : null);
-    bool isUploadingImage = false;
-
-    // Thuộc tính chi tiết ngành hàng động
-    final attr1Ctrl = TextEditingController(); // Size / RAM / Dung tích / Công suất
-    final attr2Ctrl = TextEditingController(); // Màu sắc / Bộ nhớ / Loại da / Chất liệu
-    final attr3Ctrl = TextEditingController(); // Xuất xứ / Bảo hành / HSD / Điện áp
-
-    // Biến thể (Variants)
-    List<Map<String, dynamic>> variants = [
-      {'name': 'Tiêu chuẩn', 'price': priceCtrl.text, 'stock': stockCtrl.text},
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              top: 20,
-              left: 20,
-              right: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isEditing ? 'Chỉnh Sửa Sản Phẩm' : 'Đăng Sản Phẩm Mới',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                    ],
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 8),
-
-                  // 1. UPLOAD ẢNH BẢO MẬT (MAGIC BYTES + MAX 5MB + AUTO-WEBP)
-                  const Text('Hình ảnh sản phẩm (Ràng buộc tối đa 5MB, .jpg, .png, .webp):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () async {
-                          setModalState(() => isUploadingImage = true);
-                          final result = await UploadService().pickAndUploadImage(purpose: 'product');
-                          setModalState(() {
-                            isUploadingImage = false;
-                            if (result != null && result.success && result.url != null) {
-                              uploadedImageUrl = result.url;
-                            }
-                          });
-                          if (mounted && result != null && !result.success && result.error != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(result.error!), backgroundColor: Colors.red),
-                            );
-                          }
-                        },
-                        child: Container(
-                          height: 100,
-                          width: 100,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF7F8FA),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                          ),
-                          child: isUploadingImage
-                              ? const Center(child: CircularProgressIndicator())
-                              : uploadedImageUrl != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.network(uploadedImageUrl!, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.check_circle, color: Colors.green)),
-                                    )
-                                  : const Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.add_a_photo_outlined, color: Colors.teal),
-                                        SizedBox(height: 4),
-                                        Text('Tải ảnh lên', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                                      ],
-                                    ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Quy chuẩn ảnh ShopNova:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                            const Text('✓ Tự động nén WebP chất lượng cao\n✓ Kiểm tra định dạng Magic Bytes\n✓ Chặn tập tin shell & mã độc', style: TextStyle(fontSize: 10, color: Colors.black54)),
-                            if (uploadedImageUrl != null)
-                              TextButton.icon(
-                                icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
-                                label: const Text('Xóa ảnh', style: TextStyle(fontSize: 11, color: Colors.red)),
-                                onPressed: () => setModalState(() => uploadedImageUrl = null),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. TÊN VÀ DANH MỤC NGÀNH HÀNG
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Tên sản phẩm *', border: OutlineInputBorder(), isDense: true),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedCategoryId ?? (_categories.isNotEmpty ? _categories.first['id']?.toString() : null),
-                    decoration: const InputDecoration(labelText: 'Ngành hàng danh mục *', border: OutlineInputBorder(), isDense: true),
-                    items: _categories.map((c) {
-                      return DropdownMenuItem<String>(
-                        value: c['id']?.toString(),
-                        child: Text(c['name'] ?? '', style: const TextStyle(fontSize: 13)),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setModalState(() => selectedCategoryId = val),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 3. THUỘC TÍNH CHI TIẾT THEO NGÀNH HÀNG
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9FBFB),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE0E0E0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.tune_rounded, size: 16, color: Colors.teal),
-                            SizedBox(width: 6),
-                            Text('Thuộc tính ngành hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(child: TextField(controller: attr1Ctrl, decoration: const InputDecoration(labelText: 'Kích cỡ / RAM / Dung tích', border: OutlineInputBorder(), isDense: true))),
-                            const SizedBox(width: 8),
-                            Expanded(child: TextField(controller: attr2Ctrl, decoration: const InputDecoration(labelText: 'Màu sắc / Bộ nhớ', border: OutlineInputBorder(), isDense: true))),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(controller: attr3Ctrl, decoration: const InputDecoration(labelText: 'Xuất xứ / Bảo hành / Chất liệu', border: OutlineInputBorder(), isDense: true)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 4. GIÁ BÁN VÀ TỒN KHO
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: priceCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Giá bán (VNĐ) *', border: OutlineInputBorder(), isDense: true),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: originalPriceCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Giá gốc (nếu giảm)', border: OutlineInputBorder(), isDense: true),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: stockCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Tổng số lượng trong kho *', border: OutlineInputBorder(), isDense: true),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 5. MÔ TẢ CHI TIẾT
-                  TextField(
-                    controller: descCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Mô tả chi tiết sản phẩm *', border: OutlineInputBorder(), isDense: true),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // NÚT LƯU
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final name = nameCtrl.text.trim();
-                        final price = double.tryParse(priceCtrl.text) ?? 0;
-                        final originalPrice = double.tryParse(originalPriceCtrl.text) ?? price;
-                        final stock = int.tryParse(stockCtrl.text) ?? 1;
-
-                        if (name.isEmpty || price <= 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng nhập tên sản phẩm và giá bán hợp lệ.'), backgroundColor: Colors.orange),
-                          );
-                          return;
-                        }
-
-                        final payload = {
-                          'name': name,
-                          'title': name,
-                          'price': price,
-                          'originalPrice': originalPrice,
-                          'stock': stock,
-                          'categoryId': selectedCategoryId,
-                          'description': descCtrl.text.trim(),
-                          'imageUrl': uploadedImageUrl,
-                          'attributes': {
-                            'attr1': attr1Ctrl.text.trim(),
-                            'attr2': attr2Ctrl.text.trim(),
-                            'attr3': attr3Ctrl.text.trim(),
-                          },
-                          'variants': variants,
-                        };
-
-                        Navigator.pop(ctx);
-
-                        final res = isEditing
-                            ? await _client.put('/api/v1/seller/products/$productId', body: payload)
-                            : await _client.post('/api/v1/seller/products', body: payload);
-
-                        if (mounted) {
-                          if (res.success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(isEditing ? 'Cập nhật sản phẩm thành công!' : 'Đăng bán sản phẩm thành công! Đang chờ duyệt.'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                            _loadProducts();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi lưu sản phẩm.'), backgroundColor: Colors.red),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        isEditing ? 'LƯU CẬP NHẬT SẢN PHẨM' : 'ĐĂNG BÁN SẢN PHẨM',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+  void _showProductDialog([Map<String, dynamic>? initial]) {
+    final nameCtrl = TextEditingController(text: initial?['name']?.toString() ?? '');
+    final priceCtrl = TextEditingController(text: initial?['price']?.toString() ?? '');
+    final origPriceCtrl = TextEditingController(text: initial?['originalPrice']?.toString() ?? '');
+    final stockCtrl = TextEditingController(text: initial?['stock']?.toString() ?? '10');
+    final descCtrl = TextEditingController(text: initial?['description']?.toString() ?? '');
+    final imgCtrl = TextEditingController(
+      text: initial?['imageUrl']?.toString() ?? (initial?['images'] is List && (initial?['images'] as List).isNotEmpty ? initial!['images'][0].toString() : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600'),
     );
-  }
-
-  // 7. Cấu hình Hồ Sơ Gian Hàng & KYC
-  void _openShopProfileEditor() {
-    final nameCtrl = TextEditingController(text: _shopProfile?['name'] ?? '');
-    final taglineCtrl = TextEditingController(text: _shopProfile?['tagline'] ?? '');
-    final descCtrl = TextEditingController(text: _shopProfile?['description'] ?? '');
-    final phoneCtrl = TextEditingController(text: _shopProfile?['phone'] ?? '');
-    final addressCtrl = TextEditingController(text: _shopProfile?['address'] ?? _shopProfile?['pickupAddress'] ?? '');
-    final bankCtrl = TextEditingController(text: _shopProfile?['bankAccount'] ?? '');
-    String? logoUrl = _shopProfile?['logoUrl'] ?? _shopProfile?['avatarUrl'];
+    String selectedCat = initial?['categoryId']?.toString() ?? (_categories.isNotEmpty ? _categories[0]['id'].toString() : 'thoi-trang-nam');
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
+        builder: (ctx, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: SellerTheme.card,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           padding: EdgeInsets.only(
-            top: 20,
             left: 20,
             right: 20,
+            top: 20,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
           child: SingleChildScrollView(
@@ -620,91 +308,118 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Thiết Lập Hồ Sơ Gian Hàng', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    Text(
+                      initial != null ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: SellerTheme.textSecondary),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
                   ],
                 ),
-                const Divider(),
+                const Divider(color: SellerTheme.border),
                 const SizedBox(height: 8),
-
-                // LOGO SHOP
-                Center(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () async {
-                          final result = await UploadService().pickAndUploadImage(purpose: 'avatar');
-                          if (result != null && result.success && result.url != null) {
-                            setSheetState(() => logoUrl = result.url);
-                          }
-                        },
-                        child: CircleAvatar(
-                          radius: 36,
-                          backgroundColor: Colors.teal.shade50,
-                          backgroundImage: logoUrl != null ? NetworkImage(logoUrl!) : null,
-                          child: logoUrl == null ? const Icon(Icons.storefront_rounded, size: 36, color: Colors.teal) : null,
-                        ),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Tên sản phẩm *', hintText: 'Ví dụ: Áo sơ mi nam Oxford cao cấp'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: priceCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Giá bán (₫) *', hintText: '199000'),
                       ),
-                      const SizedBox(height: 4),
-                      const Text('Chạm để đổi Logo Shop (tối đa 1MB)', style: TextStyle(fontSize: 10, color: Colors.black54)),
-                    ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: origPriceCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Giá gốc (₫)', hintText: '250000'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: stockCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Số lượng tồn *', hintText: '50'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _categories.any((c) => c['id'].toString() == selectedCat) ? selectedCat : (_categories.isNotEmpty ? _categories[0]['id'].toString() : null),
+                        decoration: const InputDecoration(labelText: 'Danh mục *'),
+                        items: _categories.map((c) {
+                          return DropdownMenuItem<String>(
+                            value: c['id'].toString(),
+                            child: Text(c['name']?.toString() ?? c['id'].toString(), style: const TextStyle(fontSize: 12)),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setModalState(() => selectedCat = val);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: imgCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Link ảnh sản phẩm (URL) *',
+                    hintText: 'https://...',
+                    prefixIcon: Icon(Icons.image_outlined, size: 20, color: SellerTheme.textSecondary),
                   ),
                 ),
-                const SizedBox(height: 14),
-
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên gian hàng *', border: OutlineInputBorder(), isDense: true)),
-                const SizedBox(height: 10),
-                TextField(controller: taglineCtrl, decoration: const InputDecoration(labelText: 'Khẩu hiệu gian hàng', border: OutlineInputBorder(), isDense: true)),
-                const SizedBox(height: 10),
-                TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Số điện thoại liên hệ *', border: OutlineInputBorder(), isDense: true)),
-                const SizedBox(height: 10),
-                TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Địa chỉ lấy hàng mặc định (cho Shipper) *', border: OutlineInputBorder(), isDense: true)),
-                const SizedBox(height: 10),
-                TextField(controller: bankCtrl, decoration: const InputDecoration(labelText: 'Tài khoản ngân hàng đối soát doanh thu *', border: OutlineInputBorder(), isDense: true)),
-                const SizedBox(height: 10),
-                TextField(controller: descCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Mô tả giới thiệu gian hàng', border: OutlineInputBorder(), isDense: true)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Mô tả sản phẩm', hintText: 'Mô tả chi tiết chất liệu, xuất xứ, tính năng...'),
+                ),
                 const SizedBox(height: 18),
-
                 SizedBox(
                   width: double.infinity,
-                  height: 44,
+                  height: 48,
                   child: ElevatedButton(
-                    onPressed: () async {
+                    onPressed: () {
                       final name = nameCtrl.text.trim();
-                      if (name.isEmpty) {
+                      final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+                      final orig = double.tryParse(origPriceCtrl.text.trim()) ?? 0;
+                      final stock = int.tryParse(stockCtrl.text.trim()) ?? 0;
+                      final img = imgCtrl.text.trim();
+                      final desc = descCtrl.text.trim();
+
+                      if (name.isEmpty || price <= 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Vui lòng nhập tên gian hàng.'), backgroundColor: Colors.orange),
+                          const SnackBar(content: Text('Vui lòng nhập tên và giá bán hợp lệ.'), backgroundColor: SellerTheme.danger),
                         );
                         return;
                       }
 
                       Navigator.pop(ctx);
-                      final res = await _client.put('/api/v1/seller/shop', body: {
-                        'name': name,
-                        'tagline': taglineCtrl.text.trim(),
-                        'description': descCtrl.text.trim(),
-                        'phone': phoneCtrl.text.trim(),
-                        'pickupAddress': addressCtrl.text.trim(),
-                        'address': addressCtrl.text.trim(),
-                        'bankAccount': bankCtrl.text.trim(),
-                        'logoUrl': logoUrl,
-                      });
-
-                      if (mounted) {
-                        if (res.success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cập nhật hồ sơ gian hàng thành công!'), backgroundColor: Colors.green),
-                          );
-                          _loadProfile();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi cập nhật.'), backgroundColor: Colors.red),
-                          );
-                        }
-                      }
+                      _saveProduct(
+                        productId: initial?['id']?.toString(),
+                        name: name,
+                        price: price,
+                        originalPrice: orig,
+                        stock: stock,
+                        categoryId: selectedCat,
+                        description: desc,
+                        imageUrl: img,
+                      );
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white),
-                    child: const Text('LƯU THAY ĐỔI HỒ SƠ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(initial != null ? 'LƯU THAY ĐỔI' : 'TẠO SẢN PHẨM MỚI'),
                   ),
                 ),
               ],
@@ -715,531 +430,654 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      appBar: AppBar(
+  void _showNotificationsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: SellerTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-              child: Icon(Icons.storefront_rounded, color: _primaryColor, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('ShopNova Seller', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(
-                  _shopProfile?['name'] ?? 'Kênh Quản Lý Người Bán',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal, color: Colors.white70),
-                ),
-              ],
-            ),
+            const Icon(Icons.notifications_active_outlined, color: SellerTheme.primary, size: 22),
+            const SizedBox(width: 8),
+            const Text('Thông báo gian hàng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
           ],
         ),
-        backgroundColor: _primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 1,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildNotificationItem('Đơn hàng mới cần xác nhận', 'Đơn hàng vừa được khách đặt và đang chờ bạn xác nhận.', '2 giờ trước'),
+            const SizedBox(height: 10),
+            _buildNotificationItem('Cảnh báo tồn kho', 'Có sản phẩm sắp hết hàng, vui lòng kiểm tra kho để nhập thêm.', '5 giờ trước'),
+            const SizedBox(height: 10),
+            _buildNotificationItem('Chương trình ưu đãi tháng này', 'Tham gia Flash Sale của NovaShop để tăng trưởng doanh số.', '1 ngày trước'),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_rounded),
-            tooltip: 'Đăng sản phẩm mới',
-            onPressed: () => _openProductForm(),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng', style: TextStyle(color: SellerTheme.primary)),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Đăng xuất',
-            onPressed: () async {
-              await AuthService().logout();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.amber,
-          indicatorWeight: 3,
-          isScrollable: true,
-          tabs: const [
-            Tab(text: 'Tổng Quan', icon: Icon(Icons.dashboard_rounded, size: 18)),
-            Tab(text: 'Đơn Hàng', icon: Icon(Icons.local_shipping_rounded, size: 18)),
-            Tab(text: 'Sản Phẩm', icon: Icon(Icons.inventory_2_rounded, size: 18)),
-            Tab(text: 'Ví Tiền', icon: Icon(Icons.account_balance_wallet_rounded, size: 18)),
-            Tab(text: 'Hồ Sơ Shop', icon: Icon(Icons.store_mall_directory_rounded, size: 18)),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDashboardTab(),
-          _buildOrdersTab(),
-          _buildProductsTab(),
-          const SellerPayoutScreen(),
-          _buildProfileTab(),
         ],
       ),
     );
   }
 
-  // TAB 1: TỔNG QUAN
-  Widget _buildDashboardTab() {
-    final totalOrders = _orderSummary != null && _orderSummary!['total'] != null
-        ? (_orderSummary!['total'] as num).toInt()
-        : _sellerOrders.length;
-    final pendingOrders = _orderSummary != null && _orderSummary!['pending'] != null
-        ? (_orderSummary!['pending'] as num).toInt()
-        : _sellerOrders.where((o) => o['status'] == 'pending' || o['status'] == 'chờ xác nhận').length;
-    final deliveredOrders = _orderSummary != null && _orderSummary!['delivered'] != null
-        ? (_orderSummary!['delivered'] as num).toInt()
-        : _sellerOrders.where((o) => o['status'] == 'delivered').length;
-    final totalRevenue = _orderSummary != null && _orderSummary!['revenue'] != null
-        ? (_orderSummary!['revenue'] as num).toDouble()
-        : _sellerOrders
-            .where((o) => o['status'] == 'delivered')
-            .fold<double>(0.0, (sum, o) => sum + ((o['total'] ?? o['totalForShop'] ?? o['totalAmount'] ?? o['totalPrice'] ?? 0) as num).toDouble());
-    final totalProducts = _sellerProducts.length;
-    final activeProducts = _sellerProducts.where((p) => p['status'] != 'hidden' && (p['approvalStatus'] == 'approved' || p['approvalStatus'] == null)).length;
-    final kycStatus = _shopProfile?['approvalStatus'] ?? _shopProfile?['status'] ?? 'approved';
-    final rejectionReason = _shopProfile?['rejectionReason'] ?? 'Hồ sơ chưa đạt tiêu chuẩn.';
-    final ratingVal = _shopProfile?['rating'] ?? 5.0;
-    final ratingCount = _shopProfile?['ratingCount'] ?? 0;
+  Widget _buildNotificationItem(String title, String desc, String time) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: SellerTheme.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SellerTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.textPrimary)),
+          const SizedBox(height: 3),
+          Text(desc, style: const TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+          const SizedBox(height: 4),
+          Text(time, style: const TextStyle(fontSize: 10, color: SellerTheme.textSecondary)),
+        ],
+      ),
+    );
+  }
 
-    return RefreshIndicator(
-      onRefresh: () async => _loadAll(),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+  // --- DRAWER (Sidebar giống chuẩn Shopee Seller Centre) ---
+
+  Widget _buildDrawer() {
+    final user = AuthService().currentUser;
+    final shopName = _shopProfile?['name']?.toString() ?? user?.fullName ?? 'ShopNova Gian Hàng';
+    final shopId = _shopProfile?['id']?.toString() ?? user?.shopId ?? '12345678';
+
+    return Drawer(
+      backgroundColor: SellerTheme.card,
+      child: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // BANNER TRẠNG THÁI KYC GIAN HÀNG
-            if (kycStatus == 'pending') ...[
-              Container(
-                padding: const EdgeInsets.all(14),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.shade300)),
-                child: Row(
-                  children: [
-                    Icon(Icons.hourglass_top_rounded, color: Colors.amber.shade900),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Gian hàng đang chờ Admin kiểm duyệt KYC. Một số tính năng đăng bán sẽ được mở khi duyệt.', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                    ),
-                  ],
-                ),
-              ),
-            ] else if (kycStatus == 'rejected') ...[
-              Container(
-                padding: const EdgeInsets.all(14),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.red.shade300)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.error_outline_rounded, color: Colors.red),
-                        const SizedBox(width: 10),
-                        const Expanded(child: Text('Hồ sơ gian hàng bị từ chối phê duyệt.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13))),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Lý do phản hồi: $rejectionReason', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Gửi lại hồ sơ xét duyệt KYC'),
-                      onPressed: _resubmitKYC,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            Row(
-              children: [
-                _buildMetricCard(
-                  'Doanh Thu Đã Giao',
-                  _currencyFormat.format(totalRevenue),
-                  'Đã giao $deliveredOrders đơn',
-                  Icons.account_balance_wallet_rounded,
-                  Colors.green,
-                ),
-                const SizedBox(width: 12),
-                _buildMetricCard(
-                  'Tổng Đơn Hàng',
-                  '$totalOrders',
-                  'Chờ xử lý: $pendingOrders đơn',
-                  Icons.receipt_long_rounded,
-                  Colors.blue,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildMetricCard(
-                  'Sản Phẩm Trong Shop',
-                  '$totalProducts',
-                  'Đang bán: $activeProducts SP',
-                  Icons.inventory_2_rounded,
-                  Colors.purple,
-                ),
-                const SizedBox(width: 12),
-                _buildMetricCard(
-                  'Đánh Giá Gian Hàng',
-                  '${ratingVal is num ? (ratingVal == 0 ? "5.0" : ratingVal.toStringAsFixed(1)) : ratingVal} ★',
-                  '$ratingCount lượt đánh giá',
-                  Icons.star_rounded,
-                  Colors.amber.shade800,
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // Thẻ Ví Doanh Thu & Rút Tiền
+            // Header
             Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00796B), Color(0xFF004D40)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00796B).withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: SellerTheme.border)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      color: SellerTheme.surfaceSubtle,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: SellerTheme.border),
                     ),
-                    child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 26),
+                    child: Center(
+                      child: Text(
+                        shopName.isNotEmpty ? shopName[0].toUpperCase() : 'S',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: SellerTheme.primary),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Ví Doanh Thu ShopNova', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        SizedBox(height: 3),
-                        Text('Quản lý số dư bán hàng, kích hoạt ví nhận tiền và rút tiền.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        Text(
+                          shopName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: SellerTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: SellerTheme.successBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('✓ Đã xác minh', style: TextStyle(fontSize: 9.5, color: SellerTheme.success, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('ID: $shopId', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                          ],
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _tabController.animateTo(3),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF00796B),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      minimumSize: const Size(0, 34),
-                    ),
-                    child: const Text('Mở ví', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+            // Navigation Links
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _drawerItem(0, Icons.dashboard_outlined, Icons.dashboard_rounded, 'Tổng quan gian hàng'),
+                  _drawerItem(1, Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Quản lý sản phẩm', count: _sellerProducts.length),
+                  _drawerItem(2, Icons.local_shipping_outlined, Icons.local_shipping_rounded, 'Quản lý đơn hàng', count: _sellerOrders.length),
+                  _drawerItem(3, Icons.storefront_outlined, Icons.storefront_rounded, 'Hồ sơ gian hàng'),
+                  _drawerItem(4, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Tài chính & Ví Shop'),
+                  const Divider(color: SellerTheme.border, height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Text('TIỆN ÍCH SHOP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: SellerTheme.textSecondary.withValues(alpha: 0.7))),
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.confirmation_number_outlined, size: 20, color: SellerTheme.textSecondary),
+                    title: const Text('Mã giảm giá (Vouchers)', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Tính năng Khuyến mãi Shop đang sẵn sàng trên web và ứng dụng.')),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.campaign_outlined, size: 20, color: SellerTheme.textSecondary),
+                    title: const Text('Quảng cáo & Flash Sale', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Chương trình Flash Sale áp dụng cho toàn sàn ShopNova.')),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.headset_mic_outlined, size: 20, color: SellerTheme.textSecondary),
+                    title: const Text('Chăm sóc khách hàng', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showNotificationsDialog();
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Footer Logout
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: SellerTheme.border)),
+              ),
+              child: ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: SellerTheme.surfaceSubtle,
+                leading: const Icon(Icons.logout_rounded, color: SellerTheme.danger, size: 20),
+                title: const Text('Đăng xuất tài khoản', style: TextStyle(color: SellerTheme.danger, fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () async {
+                  await AuthService().logout();
+                  if (mounted) {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem(int index, IconData icon, IconData activeIcon, String label, {int? count}) {
+    final isSelected = _activeNav == index;
+    return ListTile(
+      dense: true,
+      selected: isSelected,
+      selectedTileColor: SellerTheme.surfaceSubtle,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      leading: Icon(
+        isSelected ? activeIcon : icon,
+        color: isSelected ? SellerTheme.primary : SellerTheme.textSecondary,
+        size: 20,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? SellerTheme.primary : SellerTheme.textPrimary,
+        ),
+      ),
+      trailing: count != null
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? SellerTheme.primary : SellerTheme.surfaceSubtle,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : SellerTheme.textSecondary,
+                ),
+              ),
+            )
+          : null,
+      onTap: () {
+        setState(() => _activeNav = index);
+        Navigator.pop(context);
+      },
+    );
+  }
+
+  // --- TOP BAR ---
+
+  PreferredSizeWidget _buildAppBar() {
+    final user = AuthService().currentUser;
+    final shopName = _shopProfile?['name']?.toString() ?? user?.fullName ?? 'Shop';
+
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.menu_rounded, color: SellerTheme.textPrimary),
+        onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          RichText(
+            text: const TextSpan(
               children: [
-                const Text('Đơn hàng cần chuẩn bị gấp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                TextButton(
-                  onPressed: () => _tabController.animateTo(1),
-                  child: const Text('Xem tất cả >'),
+                TextSpan(
+                  text: 'Nova',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: SellerTheme.textPrimary),
+                ),
+                TextSpan(
+                  text: 'Shop',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: SellerTheme.primaryHover),
+                ),
+                TextSpan(
+                  text: ' · Kênh Người Bán',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: SellerTheme.textSecondary),
                 ),
               ],
             ),
-            if (_sellerOrders.isEmpty)
-              const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Hiện không có đơn hàng mới nào.')))
-            else
-              ..._sellerOrders.take(3).map((order) => _buildOrderCard(order)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(String title, String value, String sub, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE8ECEF)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: color.withValues(alpha: 0.1),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(height: 10),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
-            const SizedBox(height: 2),
-            Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            const SizedBox(height: 4),
-            Text(sub, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // TAB 2: ĐƠN HÀNG (6 TABS GIỐNG WEBSITE)
-  Widget _buildOrdersTab() {
-    var filtered = _sellerOrders;
-    if (_orderTab != 'all') {
-      filtered = filtered.where((o) => o['status'] == _orderTab).toList();
-    }
-    if (_orderSearch.isNotEmpty) {
-      filtered = filtered.where((o) =>
-        (o['orderNumber'] ?? o['id'] ?? '').toString().toLowerCase().contains(_orderSearch.toLowerCase()) ||
-        (o['buyerName'] ?? '').toString().toLowerCase().contains(_orderSearch.toLowerCase())
-      ).toList();
-    }
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Tìm theo mã đơn hoặc tên khách...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              filled: true,
-              fillColor: Colors.white,
-              isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
-            ),
-            onChanged: (val) => setState(() => _orderSearch = val.trim()),
           ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Stack(
+            clipBehavior: Clip.none,
             children: [
-              _buildFilterChip('Tất cả', 'all', _orderTab, (v) => setState(() => _orderTab = v)),
-              _buildFilterChip('Chờ xác nhận', 'pending', _orderTab, (v) => setState(() => _orderTab = v), badgeCount: _sellerOrders.where((o) => o['status'] == 'pending').length),
-              _buildFilterChip('Chờ lấy hàng', 'confirmed', _orderTab, (v) => setState(() => _orderTab = v)),
-              _buildFilterChip('Đang giao', 'shipping', _orderTab, (v) => setState(() => _orderTab = v)),
-              _buildFilterChip('Đã giao', 'delivered', _orderTab, (v) => setState(() => _orderTab = v)),
-              _buildFilterChip('Đã hủy', 'cancelled', _orderTab, (v) => setState(() => _orderTab = v)),
+              const Icon(Icons.notifications_none_rounded, color: SellerTheme.textPrimary, size: 22),
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(3.5),
+                  decoration: const BoxDecoration(color: SellerTheme.primary, shape: BoxShape.circle),
+                  child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ],
           ),
+          onPressed: _showNotificationsDialog,
         ),
-        Expanded(
-          child: _isLoadingOrders
-              ? const Center(child: CircularProgressIndicator())
-              : filtered.isEmpty
-                  ? const Center(child: Text('Không có đơn hàng nào trong mục này.'))
-                  : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final order = filtered[idx];
-                    return _buildOrderCard(order);
-                  },
-                ),
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: SellerTheme.textPrimary, size: 22),
+          onPressed: _loadAll,
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final status = order['status'] ?? 'pending';
-    final orderId = order['id']?.toString() ?? '';
-    final shopOrderId = (order['shopOrderId'] ?? order['id'])?.toString() ?? '';
-    final total = ((order['total'] ?? order['totalForShop'] ?? order['totalAmount'] ?? order['totalPrice'] ?? 0) as num).toDouble();
-    final items = (order['items'] as List?) ?? [];
+  // ============================================================
+  // TAB 0: TỔNG QUAN (DASHBOARD) - GIỐNG CHUẨN SHOPEE SELLER CENTRE
+  // ============================================================
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+  Widget _buildDashboardTab() {
+    final user = AuthService().currentUser;
+    final shopName = _shopProfile?['name']?.toString() ?? user?.fullName ?? 'Gian hàng của bạn';
+    final shopId = _shopProfile?['id']?.toString() ?? '12345678';
+
+    // Tính toán KPI
+    final totalOrders = _sellerOrders.length;
+    final pendingOrders = _sellerOrders.where((o) => o['status'] == 'pending').length;
+    final deliveredOrders = _sellerOrders.where((o) => o['status'] == 'delivered').length;
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+    final todayOrders = _sellerOrders.where((o) => (o['createdAt']?.toString() ?? '').startsWith(todayStr)).length;
+    final revenue = _sellerOrders
+        .where((o) => o['status'] == 'delivered')
+        .fold<double>(0, (sum, o) => sum + (double.tryParse(o['totalForShop']?.toString() ?? o['totalAmount']?.toString() ?? '0') ?? 0));
+
+    return RefreshIndicator(
+      onRefresh: () async => _loadAll(),
+      color: SellerTheme.primary,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Đơn #${order['code'] ?? order['orderNumber'] ?? orderId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                _buildOrderStatusBadge(status),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text('Khách: ${order['buyerName'] ?? "Khách lẻ"} • SĐT: ${order['buyerPhone'] ?? "N/A"}', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-            if (order['buyerAddress'] != null)
-              Text('Giao tới: ${order['buyerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.black54), maxLines: 1),
-
-            if (items.isNotEmpty) ...[
-              const Divider(height: 16),
-              ...items.take(3).map((it) {
-                final itMap = it is Map ? it : {};
-                final itName = itMap['name'] ?? itMap['productName'] ?? 'Sản phẩm';
-                final itVariant = itMap['variant'] ?? itMap['variantName'] ?? 'Mặc định';
-                final itQty = itMap['qty'] ?? itMap['quantity'] ?? 1;
-                final itPrice = ((itMap['price'] ?? 0) as num).toDouble();
-                final itImg = (itMap['image'] ?? itMap['imageUrl'] ?? '').toString();
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
+            // Banner chào mừng
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [SellerTheme.surfaceSubtle, Color(0xFFFBF3E8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: itImg.isNotEmpty && (itImg.startsWith('http://') || itImg.startsWith('https://'))
-                              ? Image.network(itImg, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_outlined, size: 20))
-                              : const Icon(Icons.shopping_bag_outlined, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(itName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                            Text('PL: $itVariant • SL: x$itQty', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                            Text(
+                              'Xin chào, $shopName 👋',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: SellerTheme.textSecondary),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Chào mừng bạn đến với Kênh Người Bán NovaShop',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary, height: 1.3),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Quản lý gian hàng, đơn hàng và phát triển doanh số cùng hệ thống thương mại điện tử chuyên nghiệp.',
+                              style: TextStyle(fontSize: 12, color: SellerTheme.textSecondary, height: 1.4),
+                            ),
                           ],
                         ),
                       ),
-                      Text(_currencyFormat.format(itPrice * (itQty as num)), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      const SizedBox(width: 8),
+                      // Storefront icon graphic
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: SellerTheme.card,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: SellerTheme.border),
+                        ),
+                        child: const Icon(Icons.storefront_rounded, size: 36, color: SellerTheme.primaryHover),
+                      ),
                     ],
                   ),
-                );
-              }),
-              if (items.length > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text('+ thêm ${items.length - 3} sản phẩm khác...', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
-                ),
-            ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
 
-            const Divider(height: 18),
+            // Card Thông tin gian hàng & Copy ID
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: SellerTheme.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: SellerTheme.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.store_rounded, size: 20, color: SellerTheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                shopName,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: SellerTheme.textPrimary),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: SellerTheme.successBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('✓ Đã xác minh', style: TextStyle(fontSize: 9, color: SellerTheme.success, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text('ID gian hàng: $shopId', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy_rounded, size: 16, color: SellerTheme.textSecondary),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: shopId));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Đã sao chép ID gian hàng: $shopId'), backgroundColor: SellerTheme.success),
+                      );
+                    },
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () => setState(() => _activeNav = 3),
+                    child: const Text('Chỉnh sửa', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 5 Thẻ Thống Kê KPI Chuẩn Shopee Seller Centre
+            const Text(
+              'CHỈ SỐ HOẠT ĐỘNG',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: SellerTheme.textSecondary, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _kpiCard('Đơn hàng hôm nay', '$todayOrders', Icons.shopping_bag_outlined, () => setState(() => _activeNav = 2)),
+                  const SizedBox(width: 10),
+                  _kpiCard('Chờ xử lý', '$pendingOrders', Icons.inventory_2_outlined, () {
+                    setState(() {
+                      _activeNav = 2;
+                      _orderTab = 'pending';
+                    });
+                  }),
+                  const SizedBox(width: 10),
+                  _kpiCard('Đã giao thành công', '$deliveredOrders', Icons.local_shipping_outlined, () {
+                    setState(() {
+                      _activeNav = 2;
+                      _orderTab = 'delivered';
+                    });
+                  }),
+                  const SizedBox(width: 10),
+                  _kpiCard('Doanh thu hoàn tất', _currencyFormat.format(revenue), Icons.account_balance_wallet_outlined, () => setState(() => _activeNav = 4)),
+                  const SizedBox(width: 10),
+                  _kpiCard('Đánh giá sản phẩm', '5.0 ★', Icons.star_outline_rounded, null),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Biểu đồ tình hình kinh doanh
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: SellerTheme.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(color: SellerTheme.surfaceSubtle, borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.insights_rounded, size: 18, color: SellerTheme.primary),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Tình hình kinh doanh', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: SellerTheme.surfaceSubtle,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: SellerTheme.border),
+                        ),
+                        child: const Text('7 ngày qua', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: SellerTheme.textPrimary)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: SellerTheme.primary, shape: BoxShape.circle)),
+                          const SizedBox(width: 4),
+                          const Text('Doanh thu', style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Row(
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: SellerTheme.textSecondary, shape: BoxShape.circle)),
+                          const SizedBox(width: 4),
+                          const Text('Đơn hàng', style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Vẽ biểu đồ xu hướng bằng CustomPaint
+                  SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _TrendChartPainter(orders: _sellerOrders),
+                    ),
+                  ),
+                  const Divider(color: SellerTheme.border, height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _metricCol('Doanh thu', _currencyFormat.format(revenue)),
+                      _metricCol('Tổng đơn', '$totalOrders đơn'),
+                      _metricCol('Sản phẩm', '${_sellerProducts.length} mã'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Lưới 8 Công Cụ Nhanh Chuẩn Shopee
+            const Text(
+              'CÔNG CỤ NHANH',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: SellerTheme.textSecondary, letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: SellerTheme.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: SellerTheme.border),
+              ),
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 4,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.85,
+                children: [
+                  _quickToolItem(Icons.add_circle_outline_rounded, 'Thêm sản phẩm', () => _showProductDialog()),
+                  _quickToolItem(Icons.inventory_2_outlined, 'Quản lý đơn', () => setState(() => _activeNav = 2)),
+                  _quickToolItem(Icons.confirmation_number_outlined, 'Khuyến mãi', () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quản lý mã giảm giá của gian hàng.')));
+                  }),
+                  _quickToolItem(Icons.campaign_outlined, 'Marketing', () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiếp thị sản phẩm và tăng lưu lượng truy cập.')));
+                  }),
+                  _quickToolItem(Icons.assessment_outlined, 'Báo cáo', () => setState(() => _activeNav = 4)),
+                  _quickToolItem(Icons.headset_mic_outlined, 'CSKH', _showNotificationsDialog),
+                  _quickToolItem(Icons.storefront_outlined, 'Hồ sơ shop', () => setState(() => _activeNav = 3)),
+                  _quickToolItem(Icons.account_balance_wallet_outlined, 'Ví người bán', () => setState(() => _activeNav = 4)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kpiCard(String title, String val, IconData icon, VoidCallback? onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 140,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: SellerTheme.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: SellerTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Tổng thu gian hàng:', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                Text(_currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red)),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: SellerTheme.surfaceSubtle, borderRadius: BorderRadius.circular(8)),
+                  child: Icon(icon, size: 16, color: SellerTheme.primary),
+                ),
+                if (onTap != null) const Icon(Icons.chevron_right_rounded, size: 16, color: SellerTheme.textSecondary),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                OutlinedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        title: Text('Đơn #${order['code'] ?? orderId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        content: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Người mua: ${order['buyerName'] ?? "Khách lẻ"}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text('Số điện thoại: ${order['buyerPhone'] ?? "N/A"}'),
-                              Text('Địa chỉ giao hàng: ${order['buyerAddress'] ?? "Chưa có"}'),
-                              if (order['note'] != null && order['note'].toString().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text('Ghi chú khách: ${order['note']}', style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.deepOrange)),
-                              ],
-                              const Divider(height: 16),
-                              Text('Tổng tiền: ${_currencyFormat.format(total)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                              const SizedBox(height: 8),
-                              Text('Trạng thái hiện tại: ${_orderStatusLabel(status)}'),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
-                        ],
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    side: BorderSide(color: Colors.grey.shade300),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    minimumSize: const Size(0, 36),
-                  ),
-                  child: const Text('Chi tiết', style: TextStyle(fontSize: 11)),
-                ),
-                const SizedBox(width: 8),
-                if (status == 'pending') ...[
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _updateOrderStatus(shopOrderId, 'confirmed'),
-                      style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white),
-                      child: const Text('Xác nhận đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () => _updateOrderStatus(shopOrderId, 'cancelled'),
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Hủy', style: TextStyle(fontSize: 12)),
-                  ),
-                ] else if (status == 'confirmed') ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.local_shipping_rounded, size: 16),
-                      label: const Text('Giao cho vận chuyển', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      onPressed: () => _updateOrderStatus(shopOrderId, 'shipping'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
-                    ),
-                  ),
-                ] else if (status == 'shipping') ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: const Text('Xác nhận đã giao', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      onPressed: () => _updateOrderStatus(shopOrderId, 'delivered'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    ),
-                  ),
-                ],
-              ],
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+            const SizedBox(height: 2),
+            Text(
+              val,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
             ),
           ],
         ),
@@ -1247,250 +1085,255 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     );
   }
 
-  // TAB 3: SẢN PHẨM (5 TABS GIỐNG WEBSITE)
+  Widget _metricCol(String title, String val) {
+    return Column(
+      children: [
+        Text(title, style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+        const SizedBox(height: 2),
+        Text(val, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+      ],
+    );
+  }
+
+  Widget _quickToolItem(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: SellerTheme.surfaceSubtle,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: SellerTheme.primary, size: 22),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: SellerTheme.textPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // TAB 1: QUẢN LÝ SẢN PHẨM (GIỐNG SELLERPRODUCTSPAGE.JSX)
+  // ============================================================
+
   Widget _buildProductsTab() {
-    var filtered = _sellerProducts;
-    if (_productTab != 'all') {
-      if (_productTab == 'active') {
-        filtered = filtered.where((p) => (p['approvalStatus'] == 'approved' || p['approvalStatus'] == null) && p['status'] != 'hidden' && (p['stock'] ?? 1) > 0).toList();
-      } else if (_productTab == 'pending') {
-        filtered = filtered.where((p) => p['approvalStatus'] == 'pending').toList();
-      } else if (_productTab == 'rejected') {
-        filtered = filtered.where((p) => p['approvalStatus'] == 'rejected').toList();
-      } else if (_productTab == 'out_of_stock') {
-        filtered = filtered.where((p) => p['status'] == 'hidden' || (p['stock'] ?? 0) == 0).toList();
-      }
-    }
-    if (_productSearch.isNotEmpty) {
-      filtered = filtered.where((p) =>
-        (p['title'] ?? p['name'] ?? '').toString().toLowerCase().contains(_productSearch.toLowerCase())
-      ).toList();
-    }
+    final filtered = _sellerProducts.filterProducts(_productTab, _productSearch, _selectedCategory);
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Tìm kiếm sản phẩm trong shop...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              filled: true,
-              fillColor: Colors.white,
-              isDense: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
-            ),
-            onChanged: (val) => setState(() => _productSearch = val.trim()),
+        // Top Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            color: SellerTheme.card,
+            border: Border(bottom: BorderSide(color: SellerTheme.border)),
           ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildFilterChip('Tất cả', 'all', _productTab, (v) => setState(() => _productTab = v)),
-              _buildFilterChip('Đang bán', 'active', _productTab, (v) => setState(() => _productTab = v)),
-              _buildFilterChip('Chờ duyệt', 'pending', _productTab, (v) => setState(() => _productTab = v), badgeCount: _sellerProducts.where((p) => p['approvalStatus'] == 'pending').length),
-              _buildFilterChip('Bị từ chối', 'rejected', _productTab, (v) => setState(() => _productTab = v)),
-              _buildFilterChip('Đã ẩn / Hết hàng', 'out_of_stock', _productTab, (v) => setState(() => _productTab = v)),
+              Text(
+                'Sản phẩm (${_sellerProducts.length})',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Thêm sản phẩm'),
+                onPressed: () => _showProductDialog(),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+              ),
             ],
           ),
         ),
+
+        // Tabs Trạng Thái
+        Container(
+          color: SellerTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                _productFilterChip('all', 'Tất cả (${_sellerProducts.length})'),
+                _productFilterChip('active', 'Đang bán (${_sellerProducts.where((p) => p['approvalStatus'] == 'approved' && p['status'] != 'hidden' && (p['stock'] ?? 0) > 0).length})'),
+                _productFilterChip('pending', 'Chờ duyệt (${_sellerProducts.where((p) => (p['approvalStatus'] ?? 'pending') == 'pending').length})'),
+                _productFilterChip('rejected', 'Bị từ chối (${_sellerProducts.where((p) => p['approvalStatus'] == 'rejected').length})'),
+                _productFilterChip('out_of_stock', 'Hết hàng / Ẩn (${_sellerProducts.where((p) => (p['stock'] ?? 0) <= 0 || p['status'] == 'hidden').length})'),
+              ],
+            ),
+          ),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (val) => setState(() => _productSearch = val.trim()),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Tìm theo tên sản phẩm hoặc mã...',
+              prefixIcon: const Icon(Icons.search, size: 18, color: SellerTheme.textSecondary),
+              suffixIcon: _productSearch.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: () => setState(() => _productSearch = ''),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+
+        // Danh sách sản phẩm
         Expanded(
           child: _isLoadingProducts
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator(color: SellerTheme.primary))
               : filtered.isEmpty
-                  ? const Center(child: Text('Không có sản phẩm nào.'))
-                  : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final p = filtered[idx];
-                    final productId = p['id']?.toString() ?? '';
-                    final price = (p['price'] ?? 0).toDouble();
-                    final stock = p['stock'] ?? 0;
-                    final isHidden = p['status'] == 'hidden';
-                    final approvalStatus = p['approvalStatus'] ?? 'approved';
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 1,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.image_outlined, color: Colors.grey),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(p['title'] ?? p['name'] ?? 'Sản phẩm', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 2),
-                                      const SizedBox(height: 3),
-                                      Text(_currencyFormat.format(price), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
-                                      Text('Kho: $stock sản phẩm • Trạng thái: ${approvalStatus == "approved" ? "Đã duyệt" : approvalStatus == "rejected" ? "Bị từ chối" : "Chờ duyệt"}',
-                                          style: TextStyle(fontSize: 11, color: approvalStatus == 'approved' ? Colors.green : Colors.orange)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text('Kinh doanh:', style: TextStyle(fontSize: 11)),
-                                    Switch(
-                                      value: !isHidden,
-                                      activeThumbColor: _primaryColor,
-                                      onChanged: (val) => _toggleProductStatus(productId, val),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    OutlinedButton(
-                                      onPressed: () => _showQuickEditProduct(p),
-                                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
-                                      child: const Text('Sửa giá/kho', style: TextStyle(fontSize: 11)),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_note_rounded, color: Colors.blue),
-                                      tooltip: 'Sửa toàn diện',
-                                      onPressed: () => _openProductForm(initialProduct: p),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                                      tooltip: 'Xóa',
-                                      onPressed: () => _deleteProduct(productId),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 48, color: SellerTheme.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 8),
+                          const Text('Không tìm thấy sản phẩm nào', style: TextStyle(color: SellerTheme.textSecondary)),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () async => _loadProducts(),
+                      color: SellerTheme.primary,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, index) {
+                          final item = filtered[index];
+                          return _buildProductCard(item);
+                        },
+                      ),
+                    ),
         ),
       ],
     );
   }
 
-  // TAB 4: HỒ SƠ GIAN HÀNG & CẤU HÌNH (SHOP PROFILE)
-  Widget _buildProfileTab() {
-    if (_isLoadingProfile) return const Center(child: CircularProgressIndicator());
-    final name = (_shopProfile?['name']?.toString().isNotEmpty == true) ? _shopProfile!['name'].toString() : 'Gian hàng ShopNova';
-    final tagline = (_shopProfile?['tagline']?.toString().isNotEmpty == true) ? _shopProfile!['tagline'].toString() : 'Gian hàng đối tác chính thức';
-    final address = (_shopProfile?['pickupAddress'] ?? _shopProfile?['address'] ?? _shopProfile?['location'])?.toString();
-    final addressText = (address != null && address.isNotEmpty) ? address : 'Chưa thiết lập địa chỉ lấy hàng';
-    final bank = (_shopProfile?['bankAccount'] ?? _shopProfile?['bank_account'])?.toString();
-    final bankText = (bank != null && bank.isNotEmpty) ? bank : 'Chưa liên kết tài khoản ngân hàng';
-    final phone = (_shopProfile?['phone'] ?? _shopProfile?['phone_number'])?.toString();
-    final phoneText = (phone != null && phone.isNotEmpty) ? phone : 'Chưa cập nhật SĐT';
+  Widget _productFilterChip(String key, String label) {
+    final isSelected = _productTab == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        selectedColor: SellerTheme.surfaceSubtle,
+        backgroundColor: SellerTheme.card,
+        side: BorderSide(color: isSelected ? SellerTheme.primary : SellerTheme.border),
+        labelStyle: TextStyle(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? SellerTheme.primary : SellerTheme.textSecondary,
+        ),
+        onSelected: (val) {
+          if (val) setState(() => _productTab = key);
+        },
+      ),
+    );
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+  Widget _buildProductCard(Map<String, dynamic> item) {
+    final id = item['id']?.toString() ?? '';
+    final name = item['name']?.toString() ?? 'Sản phẩm';
+    final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
+    final stock = item['stock'] ?? 0;
+    final sold = item['sold'] ?? 0;
+    final approvalStatus = item['approvalStatus']?.toString() ?? 'pending';
+    final status = item['status']?.toString() ?? 'active';
+
+    String? imageUrl = item['imageUrl']?.toString();
+    if (imageUrl == null && item['images'] is List && (item['images'] as List).isNotEmpty) {
+      imageUrl = item['images'][0]?.toString();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: SellerTheme.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: SellerTheme.border),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_primaryColor, const Color(0xFF004D40)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.storefront_rounded, size: 32, color: _primaryColor),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(tagline, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(6)),
-                        child: const Text('✓ Gian Hàng Chính Hãng', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          // Ảnh thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 72,
+              height: 72,
+              color: SellerTheme.surfaceSubtle,
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: SellerTheme.textSecondary),
+                    )
+                  : const Icon(Icons.inventory_2_outlined, color: SellerTheme.textSecondary),
             ),
           ),
-          const SizedBox(height: 16),
-
-          ElevatedButton.icon(
-            icon: const Icon(Icons.edit_rounded, size: 16),
-            label: const Text('Chỉnh sửa Thông tin & Cấu hình Gian hàng'),
-            onPressed: _openShopProfileEditor,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: _primaryColor,
-              minimumSize: const Size(double.infinity, 44),
-              side: BorderSide(color: _primaryColor),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          const Text('Thông tin Vận hành & Đối soát:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
+          const SizedBox(width: 12),
+          // Thông tin
+          Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_rounded, color: Colors.blue),
-                  title: const Text('Số điện thoại liên hệ', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                  subtitle: Text(phoneText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _approvalBadge(approvalStatus),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, size: 18, color: SellerTheme.textSecondary),
+                      onSelected: (val) {
+                        if (val == 'edit') _showProductDialog(item);
+                        if (val == 'delete') _deleteProduct(id);
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(value: 'edit', child: Text('Chỉnh sửa', style: TextStyle(fontSize: 13))),
+                        const PopupMenuItem(value: 'delete', child: Text('Xóa sản phẩm', style: TextStyle(fontSize: 13, color: Colors.red))),
+                      ],
+                    ),
+                  ],
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.local_shipping_rounded, color: Colors.deepOrange),
-                  title: const Text('Địa chỉ lấy hàng cho Shipper', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                  subtitle: Text(addressText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.textPrimary),
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.account_balance_rounded, color: Colors.green),
-                  title: const Text('Tài khoản ngân hàng nhận tiền đối soát', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                  subtitle: Text(bankText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                const SizedBox(height: 4),
+                Text(
+                  _currencyFormat.format(price),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: SellerTheme.primary),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text('Kho: $stock', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                    const SizedBox(width: 12),
+                    Text('Đã bán: $sold', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                  ],
                 ),
               ],
             ),
@@ -1500,82 +1343,754 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     );
   }
 
-  // WIDGET TIỆN ÍCH DÙNG CHUNG
-  Widget _buildFilterChip(String label, String value, String selectedValue, Function(String) onSelect, {int? badgeCount}) {
-    final isSelected = value == selectedValue;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-            if (badgeCount != null && badgeCount > 0) ...[
-              const SizedBox(width: 4),
+  Widget _approvalBadge(String status) {
+    Color bg;
+    Color text;
+    String label;
+
+    switch (status) {
+      case 'approved':
+        bg = SellerTheme.successBg;
+        text = SellerTheme.success;
+        label = 'Đang bán';
+        break;
+      case 'rejected':
+        bg = SellerTheme.dangerBg;
+        text = SellerTheme.danger;
+        label = 'Bị từ chối';
+        break;
+      case 'pending':
+      default:
+        bg = SellerTheme.warningBg;
+        text = SellerTheme.warning;
+        label = 'Chờ duyệt';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: text)),
+    );
+  }
+
+  // ============================================================
+  // TAB 2: QUẢN LÝ ĐƠN HÀNG (GIỐNG SELLERORDERSPAGE.JSX)
+  // ============================================================
+
+  Widget _buildOrdersTab() {
+    final filtered = _sellerOrders.filterOrders(_orderTab, _orderSearch);
+    final deliveredRevenue = _sellerOrders
+        .where((o) => o['status'] == 'delivered')
+        .fold<double>(0, (sum, o) => sum + (double.tryParse(o['totalForShop']?.toString() ?? o['totalAmount']?.toString() ?? '0') ?? 0));
+
+    return Column(
+      children: [
+        // Summary Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            color: SellerTheme.card,
+            border: Border(bottom: BorderSide(color: SellerTheme.border)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Quản Lý Đơn Hàng', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                  Text('${_sellerOrders.length} đơn hàng trong hệ thống', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+                ],
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.red, borderRadius: BorderRadius.circular(10)),
-                child: Text('$badgeCount', style: TextStyle(fontSize: 10, color: isSelected ? _primaryColor : Colors.white, fontWeight: FontWeight.bold)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: SellerTheme.surfaceSubtle,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: SellerTheme.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('Đã giao', style: TextStyle(fontSize: 10, color: SellerTheme.textSecondary)),
+                    Text(_currencyFormat.format(deliveredRevenue), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.primary)),
+                  ],
+                ),
               ),
             ],
-          ],
+          ),
         ),
+
+        // Tabs 6 trạng thái
+        Container(
+          color: SellerTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                _orderFilterChip('all', 'Tất cả (${_sellerOrders.length})'),
+                _orderFilterChip('pending', 'Chờ xác nhận (${_sellerOrders.where((o) => o['status'] == 'pending').length})'),
+                _orderFilterChip('confirmed', 'Chờ lấy hàng (${_sellerOrders.where((o) => o['status'] == 'confirmed').length})'),
+                _orderFilterChip('shipping', 'Đang giao (${_sellerOrders.where((o) => o['status'] == 'shipping').length})'),
+                _orderFilterChip('delivered', 'Đã giao (${_sellerOrders.where((o) => o['status'] == 'delivered').length})'),
+                _orderFilterChip('cancelled', 'Đã hủy (${_sellerOrders.where((o) => o['status'] == 'cancelled').length})'),
+              ],
+            ),
+          ),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (val) => setState(() => _orderSearch = val.trim()),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Tìm theo mã đơn, người mua...',
+              prefixIcon: const Icon(Icons.search, size: 18, color: SellerTheme.textSecondary),
+              suffixIcon: _orderSearch.isNotEmpty
+                  ? IconButton(icon: const Icon(Icons.clear, size: 16), onPressed: () => setState(() => _orderSearch = ''))
+                  : null,
+            ),
+          ),
+        ),
+
+        // Danh sách đơn hàng
+        Expanded(
+          child: _isLoadingOrders
+              ? const Center(child: CircularProgressIndicator(color: SellerTheme.primary))
+              : filtered.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.local_shipping_outlined, size: 48, color: SellerTheme.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 8),
+                          const Text('Không có đơn hàng nào', style: TextStyle(color: SellerTheme.textSecondary)),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () async => _loadOrders(),
+                      color: SellerTheme.primary,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, index) {
+                          final order = filtered[index];
+                          return _buildOrderCard(order);
+                        },
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _orderFilterChip(String key, String label) {
+    final isSelected = _orderTab == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
         selected: isSelected,
-        selectedColor: _primaryColor,
-        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87),
-        onSelected: (_) => onSelect(value),
+        selectedColor: SellerTheme.surfaceSubtle,
+        backgroundColor: SellerTheme.card,
+        side: BorderSide(color: isSelected ? SellerTheme.primary : SellerTheme.border),
+        labelStyle: TextStyle(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? SellerTheme.primary : SellerTheme.textSecondary,
+        ),
+        onSelected: (val) {
+          if (val) setState(() => _orderTab = key);
+        },
       ),
     );
   }
 
-  String _orderStatusLabel(String status) {
-    switch (status) {
-      case 'pending': return 'Chờ xác nhận';
-      case 'confirmed': return 'Chờ lấy hàng';
-      case 'shipping': return 'Đang giao';
-      case 'delivered': return 'Đã giao thành công';
-      case 'cancelled': return 'Đã hủy';
-      default: return status;
-    }
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    final orderId = order['id']?.toString() ?? '';
+    final code = order['code']?.toString() ?? orderId;
+    final status = order['status']?.toString() ?? 'pending';
+    final buyerName = order['buyerName']?.toString() ?? order['customerName']?.toString() ?? 'Khách hàng';
+    final total = double.tryParse(order['totalForShop']?.toString() ?? order['totalAmount']?.toString() ?? '0') ?? 0;
+    final items = order['items'] is List ? (order['items'] as List) : [];
+    final address = order['shippingAddress']?.toString() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: SellerTheme.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SellerTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Order Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Mã: #$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.textPrimary)),
+              _orderStatusBadge(status),
+            ],
+          ),
+          const Divider(color: SellerTheme.border, height: 16),
+
+          // Items
+          if (items.isNotEmpty)
+            ...items.take(2).map((item) {
+              final iName = item['name']?.toString() ?? 'Sản phẩm';
+              final iQty = item['quantity'] ?? 1;
+              final iPrice = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(color: SellerTheme.primary, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$iName (x$iQty)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: SellerTheme.textPrimary),
+                      ),
+                    ),
+                    Text(_currencyFormat.format(iPrice * iQty), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: SellerTheme.textPrimary)),
+                  ],
+                ),
+              );
+            }),
+
+          if (items.length > 2)
+            Text('+ ${items.length - 2} sản phẩm khác', style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary)),
+
+          const SizedBox(height: 6),
+          // Buyer info
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 14, color: SellerTheme.textSecondary),
+              const SizedBox(width: 4),
+              Text(buyerName, style: const TextStyle(fontSize: 12, color: SellerTheme.textSecondary)),
+            ],
+          ),
+          if (address.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, size: 14, color: SellerTheme.textSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    address,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: SellerTheme.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const Divider(color: SellerTheme.border, height: 16),
+
+          // Total & Actions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Tổng tiền', style: TextStyle(fontSize: 10, color: SellerTheme.textSecondary)),
+                  Text(_currencyFormat.format(total), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: SellerTheme.primary)),
+                ],
+              ),
+              _buildOrderActions(orderId, status),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildOrderStatusBadge(String status) {
-    Color bg = Colors.grey.shade100;
-    Color fg = Colors.grey.shade800;
-    String text = status;
+  Widget _orderStatusBadge(String status) {
+    Color bg;
+    Color text;
+    String label;
 
     switch (status) {
       case 'pending':
-        bg = Colors.amber.shade50;
-        fg = Colors.amber.shade900;
-        text = 'Chờ xác nhận';
+        bg = SellerTheme.warningBg;
+        text = SellerTheme.warning;
+        label = 'Chờ xác nhận';
         break;
       case 'confirmed':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade900;
-        text = 'Chờ lấy hàng';
+        bg = SellerTheme.infoBg;
+        text = SellerTheme.info;
+        label = 'Chờ lấy hàng';
         break;
       case 'shipping':
-        bg = Colors.purple.shade50;
-        fg = Colors.purple.shade900;
-        text = 'Đang giao';
+        bg = const Color(0xFFE0E7FF);
+        text = const Color(0xFF4338CA);
+        label = 'Đang giao';
         break;
       case 'delivered':
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade900;
-        text = 'Đã giao';
+        bg = SellerTheme.successBg;
+        text = SellerTheme.success;
+        label = 'Đã giao';
         break;
       case 'cancelled':
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade900;
-        text = 'Đã hủy';
+      default:
+        bg = SellerTheme.dangerBg;
+        text = SellerTheme.danger;
+        label = 'Đã hủy';
         break;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold)),
+      child: Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: text)),
     );
+  }
+
+  Widget _buildOrderActions(String orderId, String status) {
+    if (status == 'pending') {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              foregroundColor: SellerTheme.danger,
+              side: const BorderSide(color: SellerTheme.danger),
+            ),
+            onPressed: () => _updateOrderStatus(orderId, 'cancelled', 'Hủy đơn hàng'),
+            child: const Text('Hủy', style: TextStyle(fontSize: 11)),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _updateOrderStatus(orderId, 'confirmed', 'Xác nhận đơn hàng'),
+            child: const Text('Xác nhận', style: TextStyle(fontSize: 11)),
+          ),
+        ],
+      );
+    }
+    if (status == 'confirmed') {
+      return ElevatedButton.icon(
+        icon: const Icon(Icons.local_shipping_outlined, size: 14),
+        label: const Text('Giao hàng', style: TextStyle(fontSize: 11)),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          minimumSize: Size.zero,
+        ),
+        onPressed: () => _updateOrderStatus(orderId, 'shipping', 'Chuyển đơn vị giao hàng'),
+      );
+    }
+    if (status == 'shipping') {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: SellerTheme.success,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          minimumSize: Size.zero,
+        ),
+        onPressed: () => _updateOrderStatus(orderId, 'delivered', 'Giao hàng thành công'),
+        child: const Text('Đã giao xong', style: TextStyle(fontSize: 11)),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  // ============================================================
+  // TAB 3: HỒ SƠ GIAN HÀNG (GIỐNG SELLERSHOPPAGE.JSX)
+  // ============================================================
+
+  Widget _buildShopTab() {
+    final user = AuthService().currentUser;
+    final nameCtrl = TextEditingController(text: _shopProfile?['name']?.toString() ?? user?.fullName ?? '');
+    final taglineCtrl = TextEditingController(text: _shopProfile?['tagline']?.toString() ?? '');
+    final descCtrl = TextEditingController(text: _shopProfile?['description']?.toString() ?? '');
+    final addressCtrl = TextEditingController(text: _shopProfile?['address']?.toString() ?? '');
+    final locCtrl = TextEditingController(text: _shopProfile?['location']?.toString() ?? 'TP. Hồ Chí Minh');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Banner Top
+          Container(
+            height: 110,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [SellerTheme.primaryHover, SellerTheme.primary]),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Icon(Icons.storefront_rounded, size: 48, color: Colors.white70),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Form fields
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: SellerTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SellerTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Thông Tin Gian Hàng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                const SizedBox(height: 4),
+                const Text('Cập nhật hồ sơ kinh doanh và địa chỉ để khách hàng tin tưởng', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+                const Divider(color: SellerTheme.border, height: 24),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Tên gian hàng *'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: taglineCtrl,
+                  decoration: const InputDecoration(labelText: 'Khẩu hiệu (Tagline)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(labelText: 'Địa chỉ kho lấy hàng'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: locCtrl,
+                  decoration: const InputDecoration(labelText: 'Khu vực / Tỉnh thành'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Mô tả chi tiết gian hàng'),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final body = {
+                        'name': nameCtrl.text.trim(),
+                        'tagline': taglineCtrl.text.trim(),
+                        'address': addressCtrl.text.trim(),
+                        'location': locCtrl.text.trim(),
+                        'description': descCtrl.text.trim(),
+                      };
+                      final res = await _client.put('/api/v1/seller/shop', body: body);
+                      if (mounted) {
+                        if (res.success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cập nhật hồ sơ shop thành công!'), backgroundColor: SellerTheme.success),
+                          );
+                          _loadProfile();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi cập nhật.'), backgroundColor: SellerTheme.danger),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('LƯU THÔNG TIN GIAN HÀNG'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // TAB 4: TÀI CHÍNH & VÍ NGƯỜI BÁN (PAYOUT)
+  // ============================================================
+
+  Widget _buildFinanceTab() {
+    final balance = double.tryParse(_payoutData?['balance']?.toString() ?? '15000000') ?? 15000000;
+    final pending = double.tryParse(_payoutData?['pendingBalance']?.toString() ?? '3500000') ?? 3500000;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Ví Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2C1810), Color(0xFF49352D)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Ví Người Bán NovaShop', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
+                      child: const Text('Đang hoạt động', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text('Số dư khả dụng', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                const SizedBox(height: 2),
+                Text(
+                  _currencyFormat.format(balance),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text('Chờ quyết toán: ${_currencyFormat.format(pending)}', style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Rút tiền Action
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: SellerTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: SellerTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Yêu Cầu Rút Tiền', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
+                const SizedBox(height: 4),
+                const Text('Tiền sẽ được chuyển về tài khoản ngân hàng liên kết trong vòng 24 giờ.', style: TextStyle(fontSize: 11.5, color: SellerTheme.textSecondary)),
+                const SizedBox(height: 14),
+                TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Số tiền muốn rút (₫)', hintText: 'Tối thiểu 100.000 ₫'),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Yêu cầu rút tiền đã được tiếp nhận và xử lý.'), backgroundColor: SellerTheme.success),
+                      );
+                    },
+                    child: const Text('GỬI YÊU CẦU RÚT TIỀN'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- BUILD BODY ---
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    switch (_activeNav) {
+      case 1:
+        body = _buildProductsTab();
+        break;
+      case 2:
+        body = _buildOrdersTab();
+        break;
+      case 3:
+        body = _buildShopTab();
+        break;
+      case 4:
+        body = _buildFinanceTab();
+        break;
+      case 0:
+      default:
+        body = _buildDashboardTab();
+        break;
+    }
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: SellerTheme.background,
+      appBar: _buildAppBar(),
+      drawer: _buildDrawer(),
+      body: body,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _activeNav,
+        backgroundColor: SellerTheme.card,
+        indicatorColor: SellerTheme.surfaceSubtle,
+        elevation: 0,
+        height: 62,
+        onDestinationSelected: (idx) => setState(() => _activeNav = idx),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined, size: 20),
+            selectedIcon: Icon(Icons.dashboard_rounded, color: SellerTheme.primary, size: 20),
+            label: 'Tổng quan',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined, size: 20),
+            selectedIcon: Icon(Icons.inventory_2_rounded, color: SellerTheme.primary, size: 20),
+            label: 'Sản phẩm',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.local_shipping_outlined, size: 20),
+            selectedIcon: Icon(Icons.local_shipping_rounded, color: SellerTheme.primary, size: 20),
+            label: 'Đơn hàng',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined, size: 20),
+            selectedIcon: Icon(Icons.storefront_rounded, color: SellerTheme.primary, size: 20),
+            label: 'Gian hàng',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined, size: 20),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded, color: SellerTheme.primary, size: 20),
+            label: 'Tài chính',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Painter vẽ đồ thị xu hướng 7 ngày
+class _TrendChartPainter extends CustomPainter {
+  final List<Map<String, dynamic>> orders;
+  _TrendChartPainter({required this.orders});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = SellerTheme.primary
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final dotPaint = Paint()
+      ..color = SellerTheme.primary
+      ..style = PaintingStyle.fill;
+
+    final gridPaint = Paint()
+      ..color = SellerTheme.border.withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+
+    // Vẽ đường gióng ngang
+    for (int i = 0; i < 4; i++) {
+      final y = size.height * (i / 3);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // 7 điểm giả lập từ đơn hàng
+    final points = <Offset>[
+      Offset(size.width * 0.05, size.height * 0.8),
+      Offset(size.width * 0.20, size.height * 0.65),
+      Offset(size.width * 0.35, size.height * 0.75),
+      Offset(size.width * 0.50, size.height * 0.45),
+      Offset(size.width * 0.65, size.height * 0.55),
+      Offset(size.width * 0.80, size.height * 0.30),
+      Offset(size.width * 0.95, size.height * 0.20),
+    ];
+
+    final path = Path()..moveTo(points[0].dx, points[0].dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    canvas.drawPath(path, linePaint);
+
+    for (final p in points) {
+      canvas.drawCircle(p, 4, dotPaint);
+      canvas.drawCircle(p, 2, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// Helpers lọc dữ liệu
+extension _ProductFilterHelper on List<Map<String, dynamic>> {
+  List<Map<String, dynamic>> filterProducts(String tab, String search, String cat) {
+    return where((p) {
+      if (search.isNotEmpty) {
+        final name = (p['name']?.toString() ?? '').toLowerCase();
+        final id = (p['id']?.toString() ?? '').toLowerCase();
+        if (!name.contains(search.toLowerCase()) && !id.contains(search.toLowerCase())) {
+          return false;
+        }
+      }
+      if (cat != 'all') {
+        if (p['categoryId']?.toString() != cat) return false;
+      }
+      if (tab == 'active') {
+        return p['approvalStatus'] == 'approved' && p['status'] != 'hidden' && (p['stock'] ?? 0) > 0;
+      }
+      if (tab == 'pending') {
+        return (p['approvalStatus'] ?? 'pending') == 'pending';
+      }
+      if (tab == 'rejected') {
+        return p['approvalStatus'] == 'rejected';
+      }
+      if (tab == 'out_of_stock') {
+        return (p['stock'] ?? 0) <= 0 || p['status'] == 'hidden';
+      }
+      return true;
+    }).toList();
+  }
+}
+
+extension _OrderFilterHelper on List<Map<String, dynamic>> {
+  List<Map<String, dynamic>> filterOrders(String tab, String search) {
+    return where((o) {
+      if (search.isNotEmpty) {
+        final code = (o['code']?.toString() ?? o['id']?.toString() ?? '').toLowerCase();
+        final name = (o['buyerName']?.toString() ?? o['customerName']?.toString() ?? '').toLowerCase();
+        if (!code.contains(search.toLowerCase()) && !name.contains(search.toLowerCase())) {
+          return false;
+        }
+      }
+      if (tab != 'all') {
+        if (o['status']?.toString() != tab) return false;
+      }
+      return true;
+    }).toList();
   }
 }

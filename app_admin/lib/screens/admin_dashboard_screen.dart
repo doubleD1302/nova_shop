@@ -1,8 +1,9 @@
-import '../config/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../config/api_config.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../theme/admin_theme.dart';
 import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -15,22 +16,22 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final ApiClient _client = ApiClient();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
-  final Color _primaryColor = const Color(0xFFC62828); // Đỏ quyền lực Admin
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // 8 chuyên mục quản trị tương tự website
+  // 8 chuyên mục quản trị tương tự website AdminPage.jsx
   int _selectedNavIndex = 0;
   final List<Map<String, dynamic>> _menuItems = [
-    {'id': 'dashboard', 'label': 'Tổng quan', 'icon': Icons.dashboard_rounded},
-    {'id': 'shops', 'label': 'Quản lý Shop', 'icon': Icons.storefront_rounded},
-    {'id': 'users', 'label': 'Người dùng', 'icon': Icons.people_alt_rounded},
-    {'id': 'products', 'label': 'Sản phẩm', 'icon': Icons.inventory_2_rounded},
-    {'id': 'orders', 'label': 'Đơn hàng', 'icon': Icons.local_shipping_rounded},
-    {'id': 'revenue', 'label': 'Doanh thu', 'icon': Icons.account_balance_wallet_rounded},
-    {'id': 'reports', 'label': 'Báo cáo vi phạm', 'icon': Icons.flag_rounded},
-    {'id': 'settings', 'label': 'Cài đặt hệ thống', 'icon': Icons.settings_rounded},
+    {'id': 'dashboard', 'label': 'Tổng quan', 'icon': Icons.dashboard_outlined, 'activeIcon': Icons.dashboard_rounded},
+    {'id': 'shops', 'label': 'Quản lý Shop', 'icon': Icons.storefront_outlined, 'activeIcon': Icons.storefront_rounded},
+    {'id': 'users', 'label': 'Người dùng', 'icon': Icons.people_outline_rounded, 'activeIcon': Icons.people_alt_rounded},
+    {'id': 'products', 'label': 'Sản phẩm', 'icon': Icons.inventory_2_outlined, 'activeIcon': Icons.inventory_2_rounded},
+    {'id': 'orders', 'label': 'Đơn hàng', 'icon': Icons.local_shipping_outlined, 'activeIcon': Icons.local_shipping_rounded},
+    {'id': 'revenue', 'label': 'Doanh thu', 'icon': Icons.account_balance_wallet_outlined, 'activeIcon': Icons.account_balance_wallet_rounded},
+    {'id': 'reports', 'label': 'Báo cáo vi phạm', 'icon': Icons.flag_outlined, 'activeIcon': Icons.flag_rounded},
+    {'id': 'settings', 'label': 'Cài đặt hệ thống', 'icon': Icons.settings_outlined, 'activeIcon': Icons.settings_rounded},
   ];
 
-  // Dữ liệu THỰC TẾ 100% từ Database
+  // Dữ liệu từ Database
   Map<String, dynamic>? _stats;
   Map<String, dynamic>? _orderStatusCounts;
   List<Map<String, dynamic>> _recentOrders = [];
@@ -46,8 +47,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String? _errorMessage;
   String _searchQuery = '';
 
-  // Bộ lọc
-  String _shopFilterTab = 'all'; // all, active, suspended, closed, pending
+  // Bộ lọc theo tabs
+  String _shopFilterTab = 'all'; // all, pending, active, suspended, closed
   String _productFilterTab = 'all'; // all, pending, approved, rejected, draft_hidden
   String _reportFilterTab = 'all'; // all, open, investigating, confirmed_violation, dismissed
   String _orderFilterTab = 'all'; // all, pending, confirmed, shipping, delivered, cancelled
@@ -204,12 +205,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isApproved ? 'Đã phê duyệt gian hàng thành công!' : 'Đã từ chối gian hàng.'), backgroundColor: Colors.green),
+        SnackBar(content: Text(isApproved ? 'Đã phê duyệt gian hàng thành công!' : 'Đã từ chối gian hàng.'), backgroundColor: AdminTheme.success),
       );
       _fetchShops();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: Colors.red),
+        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: AdminTheme.danger),
       );
     }
   }
@@ -223,7 +224,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã cập nhật trạng thái shop: $status'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Đã cập nhật trạng thái shop: $status'), backgroundColor: AdminTheme.success),
       );
       _fetchShops();
     }
@@ -238,7 +239,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cập nhật tài khoản người dùng thành: $status'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Cập nhật tài khoản người dùng thành: $status'), backgroundColor: AdminTheme.success),
       );
       _fetchUsers();
     }
@@ -248,163 +249,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _updateProductApproval(String productId, String approvalStatus) async {
     final res = await _client.patch(
       '/api/v1/admin/products/$productId/approval',
-      body: {'approvalStatus': approvalStatus},
+      body: {
+        'approvalStatus': approvalStatus,
+        if (approvalStatus == 'rejected') 'rejectionReason': 'Sản phẩm vi phạm chính sách đăng bán',
+      },
     );
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cập nhật kiểm duyệt sản phẩm: $approvalStatus'), backgroundColor: Colors.green),
+        SnackBar(content: Text('Đã cập nhật kiểm duyệt sản phẩm: $approvalStatus'), backgroundColor: AdminTheme.success),
       );
       _fetchProducts();
     }
   }
 
-  // 5. Bật / Tắt Flash Sale
-  Future<void> _toggleFlashSale(String productId, bool isFlashSale) async {
-    final res = await _client.patch(
-      '/api/v1/admin/products/$productId/flash-sale',
-      body: {'enabled': isFlashSale},
-    );
-    if (!mounted) return;
-    if (res.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isFlashSale ? 'Đã kích hoạt Flash Sale cho sản phẩm' : 'Đã gỡ khỏi Flash Sale'), backgroundColor: Colors.green),
-      );
-      _fetchProducts();
-    }
-  }
-
-  // 6. Xử lý Báo cáo vi phạm (kích hoạt gửi email cảnh cáo)
-  Future<void> _updateReportStatus(String reportId, String newStatus) async {
+  // 5. Cập nhật Báo cáo vi phạm
+  Future<void> _updateReportStatus(String reportId, String status) async {
     final res = await _client.patch(
       '/api/v1/admin/reports/$reportId/status',
-      body: {'status': newStatus},
+      body: {'status': status},
     );
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(newStatus == 'confirmed_violation'
-              ? 'Đã xác nhận vi phạm và hệ thống đã gửi email cảnh cáo tới chủ Shop!'
-              : 'Đã cập nhật báo cáo thành công!'),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text('Đã cập nhật báo cáo vi phạm: $status'), backgroundColor: AdminTheme.success),
       );
       _fetchReports();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Lỗi xử lý báo cáo.'), backgroundColor: Colors.red),
-      );
     }
   }
 
-  // 7. Gửi lại Email vi phạm
-  Future<void> _retryViolationEmail(String violationId) async {
-    final res = await _client.post('/api/v1/admin/violations/$violationId/retry-email');
-    if (!mounted) return;
-    if (res.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gửi lại email cảnh cáo vi phạm thành công!'), backgroundColor: Colors.green),
-      );
-      _fetchReports();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Không thể gửi email lúc này.'), backgroundColor: Colors.orange),
-      );
-    }
-  }
+  // --- DRAWER QUẢN TRỊ VIÊN ---
 
-  // 8. Hủy đơn hàng từ phía Admin
-  Future<void> _adminCancelOrder(String orderId) async {
-    final res = await _client.post(
-      '/api/v1/orders/' + orderId + '/cancel',
-      body: {},
-    );
-    if (!mounted) return;
-    if (res.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã hủy đơn hàng thành công!'), backgroundColor: Colors.green),
-      );
-      _fetchOrders();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Không thể hủy đơn hàng.'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDrawer() {
     final user = AuthService().currentUser;
-    final activeItem = _menuItems[_selectedNavIndex];
+    final adminName = user?.fullName ?? user?.username ?? 'Quản Trị Viên';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(activeItem['icon'] as IconData, size: 19, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(activeItem['label'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-              ],
-            ),
-            Text(
-              'ShopNova Admin Portal • ${user?.fullName ?? "Quản trị viên"}',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
-        ),
-        backgroundColor: _primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 1,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Làm mới',
-            onPressed: _loadCurrentSection,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Đăng xuất',
-            onPressed: () async {
-              await AuthService().logout();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      drawer: _buildNavigationDrawer(),
-      body: RefreshIndicator(
-        onRefresh: _loadCurrentSection,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildActiveContent(activeItem['id'] as String),
-      ),
-    );
-  }
-
-  // NAVIGATION DRAWER (8 CHUYÊN MỤC)
-  Widget _buildNavigationDrawer() {
     return Drawer(
+      backgroundColor: AdminTheme.card,
       child: SafeArea(
         child: Column(
           children: [
+            // Header Quản trị
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_primaryColor, const Color(0xFFB71C1C)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AdminTheme.border)),
               ),
               child: Row(
                 children: [
@@ -412,56 +301,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AdminTheme.surfaceSubtle,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6, offset: const Offset(0, 2)),
-                      ],
+                      border: Border.all(color: AdminTheme.border),
                     ),
                     child: Center(
-                      child: Icon(Icons.admin_panel_settings_rounded, color: _primaryColor, size: 28),
+                      child: Text(
+                        adminName.isNotEmpty ? adminName[0].toUpperCase() : 'A',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AdminTheme.primary),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('SHOPNOVA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.1)),
-                        SizedBox(height: 3),
-                        Text('Ban Quản Trị Hệ Thống', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(
+                          adminName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AdminTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AdminTheme.surfaceSubtle,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Quản trị viên Hệ thống', style: TextStyle(fontSize: 10, color: AdminTheme.primary, fontWeight: FontWeight.bold)),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+
+            // Danh sách 8 Chuyên mục Quản trị
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: _menuItems.length,
-                itemBuilder: (context, idx) {
+                itemBuilder: (ctx, idx) {
                   final item = _menuItems[idx];
                   final isSelected = _selectedNavIndex == idx;
                   return ListTile(
+                    dense: true,
+                    selected: isSelected,
+                    selectedTileColor: AdminTheme.surfaceSubtle,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     leading: Icon(
-                      item['icon'] as IconData,
-                      color: isSelected ? _primaryColor : const Color(0xFF616161),
-                      size: 22,
+                      isSelected ? item['activeIcon'] as IconData : item['icon'] as IconData,
+                      color: isSelected ? AdminTheme.primary : AdminTheme.textSecondary,
+                      size: 20,
                     ),
                     title: Text(
                       item['label'] as String,
                       style: TextStyle(
+                        fontSize: 13,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? _primaryColor : const Color(0xFF333333),
-                        fontSize: 14,
+                        color: isSelected ? AdminTheme.primary : AdminTheme.textPrimary,
                       ),
                     ),
-                    selected: isSelected,
-                    selectedTileColor: _primaryColor.withValues(alpha: 0.08),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
                     onTap: () {
                       setState(() {
                         _selectedNavIndex = idx;
@@ -474,15 +377,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 },
               ),
             ),
-            const Divider(height: 1),
-            Padding(
+
+            // Footer Logout
+            Container(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user_rounded, color: Colors.green, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('Dữ liệu thật: 100% Đồng bộ MySQL', style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
-                ],
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AdminTheme.border)),
+              ),
+              child: ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: AdminTheme.surfaceSubtle,
+                leading: const Icon(Icons.logout_rounded, color: AdminTheme.danger, size: 20),
+                title: const Text('Đăng xuất quản trị', style: TextStyle(color: AdminTheme.danger, fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () async {
+                  await AuthService().logout();
+                  if (mounted) {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  }
+                },
               ),
             ),
           ],
@@ -491,343 +403,218 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildActiveContent(String tabId) {
-    switch (tabId) {
-      case 'dashboard':
-        return _buildDashboardView();
-      case 'shops':
-        return _buildShopsView();
-      case 'users':
-        return _buildUsersView();
-      case 'products':
-        return _buildProductsView();
-      case 'orders':
-        return _buildOrdersView();
-      case 'revenue':
-        return _buildRevenueView();
-      case 'reports':
-        return _buildReportsView();
-      case 'settings':
-        return _buildSettingsView();
-      default:
-        return _buildDashboardView();
-    }
-  }
+  // --- APP BAR ---
 
-  // 1. TỔNG QUAN (DASHBOARD)
-  Widget _buildDashboardView() {
-    final gmv = (_stats?['totalRevenue'] ?? _stats?['gmv'] ?? 0).toDouble();
-    final totalOrders = _stats?['totalOrders'] ?? _orders.length;
-    final totalUsers = _stats?['totalCustomers'] ?? _stats?['totalUsers'] ?? _users.length;
-    final totalShops = _stats?['totalShops'] ?? _shops.length;
+  PreferredSizeWidget _buildAppBar() {
+    final currentTitle = _menuItems[_selectedNavIndex]['label'] as String;
 
-    final displayRecent = _recentOrders.isNotEmpty ? _recentOrders : _orders;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.menu_rounded, color: AdminTheme.textPrimary),
+        onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
+      titleSpacing: 0,
+      title: Row(
         children: [
-          if (_hasConnectionError) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade400),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Chưa kết nối được Backend (Port 3000):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
-                        Text(_errorMessage ?? 'Vui lòng kiểm tra cáp USB và mở Backend (chạy Chay-NovaShop.bat)', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _loadCurrentSection,
-                    child: const Text('Thử lại', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const Text('Chỉ số vận hành toàn sàn (Dữ liệu thật)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildStatCard('Tổng Doanh Thu (GMV)', _currencyFormat.format(gmv), Icons.payments_rounded, Colors.green),
-              const SizedBox(width: 12),
-              _buildStatCard('Tổng Đơn Hàng', '$totalOrders', Icons.receipt_long_rounded, Colors.blue),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildStatCard('Tổng Khách Hàng', '$totalUsers', Icons.people_alt_rounded, Colors.purple),
-              const SizedBox(width: 12),
-              _buildStatCard('Gian Hàng (Shops)', '$totalShops', Icons.store_mall_directory_rounded, Colors.orange),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text('Cơ cấu tài chính sàn ShopNova', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: Column(
+          RichText(
+            text: const TextSpan(
               children: [
-                _buildFinanceRow('Doanh thu Phí sàn (5%)', _currencyFormat.format(gmv * 0.05), Colors.green),
-                const Divider(height: 20),
-                _buildFinanceRow('Doanh thu hoàn trả Shop (95%)', _currencyFormat.format(gmv * 0.95), Colors.blueGrey),
-                const Divider(height: 20),
-                _buildFinanceRow('Đơn hàng chờ xử lý', '${_orderStatusCounts?["pending"] ?? _orders.where((o) => o['status'] == 'pending').length} đơn', Colors.deepOrange),
-                const Divider(height: 20),
-                _buildFinanceRow('Đơn hoàn thành', '${_orderStatusCounts?["delivered"] ?? _orders.where((o) => o['status'] == 'delivered').length} đơn', Colors.teal),
+                TextSpan(
+                  text: 'Nova',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AdminTheme.textPrimary),
+                ),
+                TextSpan(
+                  text: 'Shop',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AdminTheme.primaryHover),
+                ),
+                TextSpan(
+                  text: ' · Admin',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AdminTheme.textPrimary),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Đơn hàng gần đây nhất', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              TextButton(
-                onPressed: () => setState(() => _selectedNavIndex = 4),
-                child: const Text('Xem tất cả >'),
-              ),
-            ],
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(6)),
+            child: Text(currentTitle, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
           ),
-          if (displayRecent.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Chưa có đơn hàng nào trong cơ sở dữ liệu.')))
-          else
-            ...displayRecent.take(5).map((order) => _buildOrderTile(order)),
         ],
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: AdminTheme.textPrimary, size: 22),
+          onPressed: _loadCurrentSection,
+        ),
+        const SizedBox(width: 8),
+      ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
-          ],
-        ),
+  // ============================================================
+  // MODULE 1: TỔNG QUAN HỆ THỐNG (DASHBOARD)
+  // ============================================================
+
+  Widget _buildDashboardSection() {
+    final revenue = double.tryParse(_stats?['revenue']?.toString() ?? '0') ?? 0;
+    final totalOrders = _stats?['orders'] ?? _orders.length;
+    final totalUsers = _stats?['users'] ?? _users.length;
+    final totalShops = _stats?['shops'] ?? _shops.length;
+
+    return RefreshIndicator(
+      onRefresh: () async => _loadCurrentSection(),
+      color: AdminTheme.primary,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: color.withValues(alpha: 0.12),
-              child: Icon(icon, color: color, size: 20),
+            // 4 Thẻ KPI Lớn Chuẩn Website
+            const Text(
+              'TỔNG QUAN TOÀN SÀN',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.textSecondary, letterSpacing: 0.5),
             ),
             const SizedBox(height: 10),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 2),
-            Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF757575))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFinanceRow(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF555555))),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
-      ],
-    );
-  }
-
-  // 2. QUẢN LÝ GIAN HÀNG (SHOPS)
-  Widget _buildShopsView() {
-    var filtered = _shops;
-    if (_shopFilterTab != 'all') {
-      if (_shopFilterTab == 'pending') {
-        filtered = filtered.where((s) => s['approvalStatus'] == 'pending').toList();
-      } else {
-        filtered = filtered.where((s) => s['status'] == _shopFilterTab).toList();
-      }
-    }
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((s) =>
-        (s['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (s['ownerName'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-
-    return Column(
-      children: [
-        _buildSearchBar('Tìm shop theo tên, chủ gian hàng...'),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('Tất cả', 'all', _shopFilterTab, (v) => setState(() => _shopFilterTab = v), badgeCount: _shops.length),
-              _buildFilterChip('Chờ duyệt KYC', 'pending', _shopFilterTab, (v) => setState(() => _shopFilterTab = v), badgeCount: _shops.where((s) => s['approvalStatus'] == 'pending').length),
-              _buildFilterChip('Đang hoạt động', 'active', _shopFilterTab, (v) => setState(() => _shopFilterTab = v), badgeCount: _shops.where((s) => s['status'] == 'active').length),
-              _buildFilterChip('Đang tạm khóa', 'suspended', _shopFilterTab, (v) => setState(() => _shopFilterTab = v), badgeCount: _shops.where((s) => s['status'] == 'suspended').length),
-              _buildFilterChip('Đã đóng', 'closed', _shopFilterTab, (v) => setState(() => _shopFilterTab = v)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('Không tìm thấy gian hàng nào trong database.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final shop = filtered[idx];
-                    return _buildShopCard(shop);
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildShopCard(Map<String, dynamic> shop) {
-    final status = shop['status'] ?? 'active';
-    final approvalStatus = shop['approvalStatus'] ?? (status == 'active' ? 'approved' : 'pending');
-    final shopId = shop['id']?.toString() ?? '';
-    final approvalVersion = shop['approvalVersion'] is int ? shop['approvalVersion'] as int : 1;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.4,
               children: [
-                CircleAvatar(
-                  backgroundColor: const Color(0xFFF0F0F0),
-                  child: const Icon(Icons.storefront_rounded, color: Colors.blueGrey),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                _kpiBox('Doanh thu toàn sàn', _currencyFormat.format(revenue), Icons.account_balance_wallet_outlined, AdminTheme.primary, () {
+                  setState(() => _selectedNavIndex = 5);
+                  _loadCurrentSection();
+                }),
+                _kpiBox('Tổng đơn hàng', '$totalOrders đơn', Icons.local_shipping_outlined, const Color(0xFF1D4ED8), () {
+                  setState(() => _selectedNavIndex = 4);
+                  _loadCurrentSection();
+                }),
+                _kpiBox('Người dùng hệ thống', '$totalUsers người', Icons.people_outline_rounded, const Color(0xFF0D9488), () {
+                  setState(() => _selectedNavIndex = 2);
+                  _loadCurrentSection();
+                }),
+                _kpiBox('Cửa hàng / Shop', '$totalShops shop', Icons.storefront_outlined, const Color(0xFFD97706), () {
+                  setState(() => _selectedNavIndex = 1);
+                  _loadCurrentSection();
+                }),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Biểu đồ Doanh thu 7 ngày qua
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AdminTheme.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AdminTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(shop['name'] ?? 'Gian hàng', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Text('Chủ shop: ${shop['ownerName'] ?? "N/A"} • ${shop['ownerPhone'] ?? shop['phone'] ?? "N/A"}', style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.show_chart_rounded, size: 18, color: AdminTheme.primary),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Tăng trưởng doanh thu 7 ngày', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(8)),
+                        child: const Text('Tuần này', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
+                      ),
                     ],
                   ),
-                ),
-                _buildStatusBadge(status),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Sản phẩm: ${shop['totalProductCount'] ?? shop['productCount'] ?? 0} món', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                Text('Địa phương: ${shop['location'] ?? shop['province'] ?? "Toàn quốc"}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (approvalStatus == 'pending') ...[
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _approveShop(shopId, approvalVersion, isApproved: true),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                      child: const Text('Duyệt KYC', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 100,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _AdminTrendPainter(),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _approveShop(shopId, approvalVersion, isApproved: false),
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Từ chối', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                ] else ...[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: Icon(status == 'active' ? Icons.lock_outline_rounded : Icons.lock_open_rounded, size: 16),
-                      label: Text(status == 'active' ? 'Tạm khóa Shop' : 'Mở khóa Shop', style: const TextStyle(fontSize: 12)),
-                      onPressed: () => _updateShopStatus(shopId, status == 'active' ? 'suspended' : 'active'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () => _showShopDetailsModal(shop),
-                    child: const Text('Chi tiết hồ sơ', style: TextStyle(fontSize: 12)),
                   ),
                 ],
-              ],
+              ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 16),
 
-  void _showShopDetailsModal(Map<String, dynamic> shop) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Hồ Sơ Gian Hàng #${shop['id']}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-              ],
+            // Trạng thái đơn hàng
+            const Text(
+              'TÌNH TRẠNG ĐƠN HÀNG TOÀN SÀN',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.textSecondary, letterSpacing: 0.5),
             ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.badge_rounded, color: Colors.blue),
-              title: const Text('Tên gian hàng & Chủ sở hữu'),
-              subtitle: Text('${shop['name']} • ${shop['ownerName']} (@${shop['ownerUsername']})'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AdminTheme.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AdminTheme.border),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _orderStatItem('Chờ xác nhận', _orderStatusCounts?['pending'] ?? 0, AdminTheme.warning),
+                  _orderStatItem('Đang giao', _orderStatusCounts?['shipping'] ?? 0, AdminTheme.info),
+                  _orderStatItem('Đã giao', _orderStatusCounts?['delivered'] ?? 0, AdminTheme.success),
+                  _orderStatItem('Đã hủy', _orderStatusCounts?['cancelled'] ?? 0, AdminTheme.danger),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.email_outlined, color: Colors.orange),
-              title: const Text('Email liên hệ'),
-              subtitle: Text(shop['ownerEmail'] ?? 'Chưa cập nhật email'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.location_on_rounded, color: Colors.red),
-              title: const Text('Địa chỉ lấy hàng mặc định'),
-              subtitle: Text(shop['address'] != null && shop['address'].toString().isNotEmpty ? shop['address'] : (shop['location'] ?? 'Chưa cấu hình')),
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today_rounded, color: Colors.purple),
-              title: const Text('Ngày khởi tạo gian hàng'),
-              subtitle: Text(shop['createdAt'] ?? 'N/A'),
-            ),
+            const SizedBox(height: 16),
+
+            // Hoạt động gần đây
+            if (_recentOrders.isNotEmpty) ...[
+              const Text(
+                'ĐƠN HÀNG MỚI PHÁT SINH',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.textSecondary, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 10),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _recentOrders.take(3).length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, idx) {
+                  final ro = _recentOrders[idx];
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AdminTheme.card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AdminTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('#${ro['code'] ?? ro['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
+                            Text(ro['shopName']?.toString() ?? 'Shop', style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+                          ],
+                        ),
+                        Text(
+                          _currencyFormat.format(double.tryParse(ro['totalAmount']?.toString() ?? '0') ?? 0),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.primary),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: 20),
           ],
         ),
@@ -835,656 +622,813 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 3. QUẢN LÝ NGƯỜI DÙNG (USERS)
-  Widget _buildUsersView() {
-    var filtered = _users;
-    if (_userFilterTab != 'all') {
-      if (_userFilterTab == 'active' || _userFilterTab == 'blocked') {
-        filtered = filtered.where((u) => u['status'] == _userFilterTab).toList();
-      } else {
-        filtered = filtered.where((u) => u['role'] == _userFilterTab).toList();
-      }
-    }
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((u) =>
-        (u['fullName'] ?? u['username'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (u['email'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-
-    return Column(
-      children: [
-        _buildSearchBar('Tìm người dùng theo tên, email...'),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('Tất cả', 'all', _userFilterTab, (v) => setState(() => _userFilterTab = v), badgeCount: _users.length),
-              _buildFilterChip('Đang hoạt động', 'active', _userFilterTab, (v) => setState(() => _userFilterTab = v)),
-              _buildFilterChip('Bị khóa', 'blocked', _userFilterTab, (v) => setState(() => _userFilterTab = v)),
-              _buildFilterChip('Người bán (Seller)', 'seller', _userFilterTab, (v) => setState(() => _userFilterTab = v)),
-              _buildFilterChip('Quản trị viên (Admin)', 'admin', _userFilterTab, (v) => setState(() => _userFilterTab = v)),
-            ],
-          ),
+  Widget _kpiBox(String title, String val, IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AdminTheme.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AdminTheme.border),
         ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('Không tìm thấy người dùng nào trong database.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final u = filtered[idx];
-                    final userId = u['id']?.toString() ?? '';
-                    final status = u['status'] ?? 'active';
-                    final isBlocked = status == 'blocked';
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isBlocked ? Colors.red.shade100 : Colors.blue.shade100,
-                          child: Icon(Icons.person_rounded, color: isBlocked ? Colors.red : Colors.blue),
-                        ),
-                        title: Text(u['fullName'] ?? u['username'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        subtitle: Text('${u['email'] ?? u['phone'] ?? "N/A"} • Vai trò: ${u['role'] ?? "buyer"}', style: const TextStyle(fontSize: 12)),
-                        trailing: ElevatedButton(
-                          onPressed: () => _updateUserStatus(userId, isBlocked ? 'active' : 'blocked'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isBlocked ? Colors.green : Colors.red.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          ),
-                          child: Text(isBlocked ? 'Mở khóa' : 'Khóa tài khoản', style: const TextStyle(fontSize: 11)),
-                        ),
-                      ),
-                    );
-                  },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, borderRadius: BorderRadius.circular(8)),
+                  child: Icon(icon, size: 16, color: color),
                 ),
-        ),
-      ],
-    );
-  }
-
-  // 4. QUẢN LÝ SẢN PHẨM (PRODUCTS)
-  Widget _buildProductsView() {
-    var filtered = _products;
-    if (_productFilterTab != 'all') {
-      if (_productFilterTab == 'pending') {
-        filtered = filtered.where((p) => p['approvalStatus'] == 'pending').toList();
-      } else if (_productFilterTab == 'approved') {
-        filtered = filtered.where((p) => p['approvalStatus'] == 'approved' || p['status'] == 'active').toList();
-      } else if (_productFilterTab == 'rejected') {
-        filtered = filtered.where((p) => p['approvalStatus'] == 'rejected').toList();
-      } else if (_productFilterTab == 'draft_hidden') {
-        filtered = filtered.where((p) => p['status'] == 'draft' || p['status'] == 'hidden').toList();
-      }
-    }
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((p) =>
-        (p['title'] ?? p['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-
-    return Column(
-      children: [
-        _buildSearchBar('Tìm sản phẩm toàn sàn theo tên...'),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('Tất cả', 'all', _productFilterTab, (v) => setState(() => _productFilterTab = v), badgeCount: _products.length),
-              _buildFilterChip('Đã duyệt / Đang bán', 'approved', _productFilterTab, (v) => setState(() => _productFilterTab = v)),
-              _buildFilterChip('Chờ duyệt', 'pending', _productFilterTab, (v) => setState(() => _productFilterTab = v), badgeCount: _products.where((p) => p['approvalStatus'] == 'pending').length),
-              _buildFilterChip('Bị từ chối', 'rejected', _productFilterTab, (v) => setState(() => _productFilterTab = v)),
-              _buildFilterChip('Bản nháp / Đã ẩn', 'draft_hidden', _productFilterTab, (v) => setState(() => _productFilterTab = v)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('Không tìm thấy sản phẩm nào trong database.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final p = filtered[idx];
-                    final productId = p['id']?.toString() ?? '';
-                    final price = (p['price'] ?? 0).toDouble();
-                    final isFlash = p['isFlashSale'] == true || p['is_flash_sale'] == 1 || p['is_flash_sale'] == true;
-                    final approvalStatus = p['approvalStatus'] ?? (p['status'] == 'active' ? 'approved' : 'pending');
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF5F5F5),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.image_outlined, color: Colors.grey),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(p['title'] ?? p['name'] ?? 'Sản phẩm', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 2),
-                                      Text('${_currencyFormat.format(price)} • Kho: ${p['stock'] ?? p['stock_count'] ?? 100}', style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
-                                      Text('Shop: ${p['shopName'] ?? p['shop_name'] ?? "N/A"} • Danh mục: ${p['categoryName'] ?? p['category_name'] ?? "N/A"}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text('Flash Sale:', style: TextStyle(fontSize: 12)),
-                                    Switch(
-                                      value: isFlash,
-                                      activeThumbColor: Colors.deepOrange,
-                                      onChanged: (val) => _toggleFlashSale(productId, val),
-                                    ),
-                                  ],
-                                ),
-                                if (approvalStatus == 'pending') ...[
-                                  ElevatedButton(
-                                    onPressed: () => _updateProductApproval(productId, 'approved'),
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10)),
-                                    child: const Text('Duyệt', style: TextStyle(fontSize: 11)),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  OutlinedButton(
-                                    onPressed: () => _updateProductApproval(productId, 'rejected'),
-                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red, padding: const EdgeInsets.symmetric(horizontal: 10)),
-                                    child: const Text('Từ chối', style: TextStyle(fontSize: 11)),
-                                  ),
-                                ] else ...[
-                                  Text(
-                                    approvalStatus == 'approved' ? '✓ Đang hoạt động' : '✕ Từ chối',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: approvalStatus == 'approved' ? Colors.green : Colors.red),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  // 5. QUẢN LÝ ĐƠN HÀNG (ORDERS)
-  Widget _buildOrdersView() {
-    var filtered = _orders;
-    if (_orderFilterTab != 'all') {
-      filtered = filtered.where((o) => o['status'] == _orderFilterTab).toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((o) =>
-        (o['orderNumber'] ?? o['code'] ?? o['id'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (o['buyerName'] ?? o['recipientName'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
-    }
-
-    return Column(
-      children: [
-        _buildSearchBar('Tìm theo mã đơn, người mua...'),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('Tất cả', 'all', _orderFilterTab, (v) => setState(() => _orderFilterTab = v), badgeCount: _orders.length),
-              _buildFilterChip('Chờ xử lý', 'pending', _orderFilterTab, (v) => setState(() => _orderFilterTab = v), badgeCount: _orders.where((o) => o['status'] == 'pending').length),
-              _buildFilterChip('Đang giao', 'shipping', _orderFilterTab, (v) => setState(() => _orderFilterTab = v)),
-              _buildFilterChip('Đã giao', 'delivered', _orderFilterTab, (v) => setState(() => _orderFilterTab = v)),
-              _buildFilterChip('Đã hủy', 'cancelled', _orderFilterTab, (v) => setState(() => _orderFilterTab = v), badgeCount: _orders.where((o) => o['status'] == 'cancelled').length),
-            ],
-          ),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('Không có đơn hàng nào trong database.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final o = filtered[idx];
-                    return _buildOrderTile(o);
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOrderTile(Map<String, dynamic> o) {
-    final total = (o['totalAmount'] ?? o['total'] ?? 0).toDouble();
-    final status = o['status'] ?? 'pending';
-    final code = o['code'] ?? o['orderNumber'] ?? o['id'];
-    final buyer = o['buyerName'] ?? o['recipientName'] ?? 'Khách lẻ';
-    final orderId = o['id']?.toString() ?? '';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue.shade50,
-          child: const Icon(Icons.receipt_rounded, color: Colors.blue),
-        ),
-        title: Text('#' + code.toString() + ' • ' + _currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        subtitle: Text('Khách: ' + buyer.toString() + ' • Shop: ' + (o['shopName'] ?? 'ShopNova').toString(), style: const TextStyle(fontSize: 11)),
-        trailing: _buildStatusBadge(status),
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text('Chi tiết đơn #' + code.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Trạng thái: ' + _statusLabel(status), style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Text('Khách hàng: ' + buyer.toString()),
-                    if (o['recipientPhone'] != null || o['buyerPhone'] != null)
-                      Text('Số điện thoại: ' + (o['recipientPhone'] ?? o['buyerPhone']).toString()),
-                    if (o['deliveryAddress'] != null || o['recipientAddress'] != null || o['addressDetail'] != null)
-                      Text('Địa chỉ giao: ' + (o['deliveryAddress'] ?? o['recipientAddress'] ?? o['addressDetail'] ?? '').toString()),
-                    const Divider(height: 16),
-                    Text('Gian hàng: ' + (o['shopName'] ?? 'ShopNova').toString()),
-                    Text('Tổng thanh toán: ' + _currencyFormat.format(total), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                    if (o['paymentMethod'] != null)
-                      Text('Phương thức: ' + (o['paymentMethod'] == 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản / Ví')),
-                  ],
-                ),
-              ),
-              actions: [
-                if (status == 'pending')
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _adminCancelOrder(orderId);
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                    child: const Text('Hủy đơn hàng'),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Đóng'),
-                ),
+                const Icon(Icons.arrow_forward_rounded, size: 14, color: AdminTheme.textSecondary),
               ],
             ),
-          );
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+                const SizedBox(height: 2),
+                Text(val, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _orderStatItem(String label, dynamic count, Color color) {
+    return Column(
+      children: [
+        Text('$count', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 2: QUẢN LÝ SHOP (SHOPS)
+  // ============================================================
+
+  Widget _buildShopsSection() {
+    final filtered = _shops.where((s) {
+      if (_searchQuery.isNotEmpty) {
+        final name = (s['name']?.toString() ?? '').toLowerCase();
+        final owner = (s['ownerUsername']?.toString() ?? '').toLowerCase();
+        if (!name.contains(_searchQuery.toLowerCase()) && !owner.contains(_searchQuery.toLowerCase())) return false;
+      }
+      if (_shopFilterTab == 'pending') return s['approvalStatus'] == 'pending';
+      if (_shopFilterTab == 'active') return s['status'] == 'active' && s['approvalStatus'] == 'approved';
+      if (_shopFilterTab == 'suspended') return s['status'] == 'suspended';
+      if (_shopFilterTab == 'closed') return s['status'] == 'closed';
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        // Tabs
+        Container(
+          color: AdminTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _filterChip('all', 'Tất cả (${_shops.length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('pending', 'Chờ duyệt KYC (${_shops.where((s) => s['approvalStatus'] == 'pending').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('active', 'Đang hoạt động (${_shops.where((s) => s['status'] == 'active' && s['approvalStatus'] == 'approved').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('suspended', 'Tạm khóa (${_shops.where((s) => s['status'] == 'suspended').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+              ],
+            ),
+          ),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Tìm theo tên shop, chủ sở hữu...',
+              prefixIcon: const Icon(Icons.search, size: 18, color: AdminTheme.textSecondary),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(icon: const Icon(Icons.clear, size: 16), onPressed: () => setState(() => _searchQuery = ''))
+                  : null,
+            ),
+          ),
+        ),
+
+        // List Shops
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Không tìm thấy gian hàng nào.', style: TextStyle(color: AdminTheme.textSecondary)))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final shop = filtered[idx];
+                    final shopId = shop['id']?.toString() ?? '';
+                    final name = shop['name']?.toString() ?? 'Gian hàng';
+                    final owner = shop['ownerUsername']?.toString() ?? shop['ownerFullName']?.toString() ?? 'Chủ shop';
+                    final approvalStatus = shop['approvalStatus']?.toString() ?? 'pending';
+                    final status = shop['status']?.toString() ?? 'active';
+                    final version = shop['approvalVersion'] is int ? shop['approvalVersion'] as int : 1;
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AdminTheme.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: AdminTheme.surfaceSubtle,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.storefront_rounded, color: AdminTheme.primary, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AdminTheme.textPrimary)),
+                                    Text('@$owner · ID: $shopId', style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                              _statusPill(approvalStatus),
+                            ],
+                          ),
+                          const Divider(color: AdminTheme.border, height: 18),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Trạng thái: $status', style: const TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary)),
+                              Row(
+                                children: [
+                                  if (approvalStatus == 'pending') ...[
+                                    OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        minimumSize: Size.zero,
+                                        foregroundColor: AdminTheme.danger,
+                                        side: const BorderSide(color: AdminTheme.danger),
+                                      ),
+                                      onPressed: () => _approveShop(shopId, version, isApproved: false),
+                                      child: const Text('Từ chối', style: TextStyle(fontSize: 11)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      onPressed: () => _approveShop(shopId, version, isApproved: true),
+                                      child: const Text('Duyệt KYC', style: TextStyle(fontSize: 11)),
+                                    ),
+                                  ] else ...[
+                                    OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      onPressed: () => _updateShopStatus(shopId, status == 'active' ? 'suspended' : 'active'),
+                                      child: Text(status == 'active' ? 'Khóa shop' : 'Mở khóa', style: const TextStyle(fontSize: 11)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 3: QUẢN LÝ NGƯỜI DÙNG (USERS)
+  // ============================================================
+
+  Widget _buildUsersSection() {
+    final filtered = _users.where((u) {
+      if (_searchQuery.isNotEmpty) {
+        final name = (u['fullName']?.toString() ?? '').toLowerCase();
+        final username = (u['username']?.toString() ?? '').toLowerCase();
+        final email = (u['email']?.toString() ?? '').toLowerCase();
+        if (!name.contains(_searchQuery.toLowerCase()) && !username.contains(_searchQuery.toLowerCase()) && !email.contains(_searchQuery.toLowerCase())) return false;
+      }
+      if (_userFilterTab == 'active') return u['status'] == 'active';
+      if (_userFilterTab == 'blocked') return u['status'] == 'blocked';
+      if (_userFilterTab == 'seller') return u['role'] == 'seller';
+      if (_userFilterTab == 'admin') return u['role'] == 'admin';
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          color: AdminTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _filterChip('all', 'Tất cả (${_users.length})', _userFilterTab, (k) => setState(() => _userFilterTab = k)),
+                _filterChip('seller', 'Người bán (${_users.where((u) => u['role'] == 'seller').length})', _userFilterTab, (k) => setState(() => _userFilterTab = k)),
+                _filterChip('active', 'Hoạt động (${_users.where((u) => u['status'] == 'active').length})', _userFilterTab, (k) => setState(() => _userFilterTab = k)),
+                _filterChip('blocked', 'Đã khóa (${_users.where((u) => u['status'] == 'blocked').length})', _userFilterTab, (k) => setState(() => _userFilterTab = k)),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Tìm theo tên, email, username...',
+              prefixIcon: const Icon(Icons.search, size: 18, color: AdminTheme.textSecondary),
+            ),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Không tìm thấy người dùng nào.', style: TextStyle(color: AdminTheme.textSecondary)))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final u = filtered[idx];
+                    final userId = u['id']?.toString() ?? '';
+                    final fullName = u['fullName']?.toString() ?? u['username']?.toString() ?? 'User';
+                    final username = u['username']?.toString() ?? '';
+                    final role = u['role']?.toString() ?? 'buyer';
+                    final status = u['status']?.toString() ?? 'active';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AdminTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(color: AdminTheme.surfaceSubtle, shape: BoxShape.circle),
+                            child: Center(
+                              child: Text(fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U', style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.primary)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
+                                Text('@$username · Vai trò: $role', style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              foregroundColor: status == 'active' ? AdminTheme.danger : AdminTheme.success,
+                              side: BorderSide(color: status == 'active' ? AdminTheme.danger : AdminTheme.success),
+                            ),
+                            onPressed: () => _updateUserStatus(userId, status == 'active' ? 'blocked' : 'active'),
+                            child: Text(status == 'active' ? 'Khóa' : 'Mở khóa', style: const TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 4: QUẢN LÝ SẢN PHẨM (PRODUCTS)
+  // ============================================================
+
+  Widget _buildProductsSection() {
+    final filtered = _products.where((p) {
+      if (_searchQuery.isNotEmpty) {
+        final name = (p['name']?.toString() ?? '').toLowerCase();
+        if (!name.contains(_searchQuery.toLowerCase())) return false;
+      }
+      if (_productFilterTab == 'pending') return (p['approvalStatus'] ?? 'pending') == 'pending';
+      if (_productFilterTab == 'approved') return p['approvalStatus'] == 'approved';
+      if (_productFilterTab == 'rejected') return p['approvalStatus'] == 'rejected';
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          color: AdminTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _filterChip('all', 'Tất cả (${_products.length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
+                _filterChip('pending', 'Chờ duyệt (${_products.where((p) => (p['approvalStatus'] ?? 'pending') == 'pending').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
+                _filterChip('approved', 'Đã duyệt (${_products.where((p) => p['approvalStatus'] == 'approved').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
+                _filterChip('rejected', 'Bị từ chối (${_products.where((p) => p['approvalStatus'] == 'rejected').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Tìm theo tên sản phẩm...',
+              prefixIcon: const Icon(Icons.search, size: 18, color: AdminTheme.textSecondary),
+            ),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Không có sản phẩm nào.', style: TextStyle(color: AdminTheme.textSecondary)))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final p = filtered[idx];
+                    final pId = p['id']?.toString() ?? '';
+                    final name = p['name']?.toString() ?? 'Sản phẩm';
+                    final price = double.tryParse(p['price']?.toString() ?? '0') ?? 0;
+                    final approvalStatus = p['approvalStatus']?.toString() ?? 'pending';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AdminTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: AdminTheme.surfaceSubtle,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.inventory_2_outlined, color: AdminTheme.textSecondary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
+                                Text(_currencyFormat.format(price), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
+                              ],
+                            ),
+                          ),
+                          if (approvalStatus == 'pending') ...[
+                            IconButton(
+                              icon: const Icon(Icons.close, color: AdminTheme.danger, size: 20),
+                              onPressed: () => _updateProductApproval(pId, 'rejected'),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.check, color: AdminTheme.success, size: 20),
+                              onPressed: () => _updateProductApproval(pId, 'approved'),
+                            ),
+                          ] else
+                            _statusPill(approvalStatus),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 5: QUẢN LÝ ĐƠN HÀNG (ORDERS)
+  // ============================================================
+
+  Widget _buildOrdersSection() {
+    final filtered = _orders.where((o) {
+      if (_searchQuery.isNotEmpty) {
+        final code = (o['code']?.toString() ?? o['id']?.toString() ?? '').toLowerCase();
+        if (!code.contains(_searchQuery.toLowerCase())) return false;
+      }
+      if (_orderFilterTab != 'all') {
+        if (o['status']?.toString() != _orderFilterTab) return false;
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          color: AdminTheme.card,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                _filterChip('all', 'Tất cả (${_orders.length})', _orderFilterTab, (k) => setState(() => _orderFilterTab = k)),
+                _filterChip('pending', 'Chờ xác nhận', _orderFilterTab, (k) => setState(() => _orderFilterTab = k)),
+                _filterChip('shipping', 'Đang giao', _orderFilterTab, (k) => setState(() => _orderFilterTab = k)),
+                _filterChip('delivered', 'Đã giao', _orderFilterTab, (k) => setState(() => _orderFilterTab = k)),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Không có đơn hàng nào.', style: TextStyle(color: AdminTheme.textSecondary)))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final o = filtered[idx];
+                    final code = o['code']?.toString() ?? o['id']?.toString() ?? '';
+                    final total = double.tryParse(o['totalAmount']?.toString() ?? '0') ?? 0;
+                    final status = o['status']?.toString() ?? 'pending';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AdminTheme.border),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('#$code', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AdminTheme.textPrimary)),
+                              Text(_currencyFormat.format(total), style: const TextStyle(fontSize: 12, color: AdminTheme.primary, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          _statusPill(status),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 6: DOANH THU (REVENUE)
+  // ============================================================
+
+  Widget _buildRevenueSection() {
+    final revenue = double.tryParse(_stats?['revenue']?.toString() ?? '0') ?? 0;
+    final commission = revenue * 0.05; // Hoa hồng sàn 5%
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [AdminTheme.primaryHover, AdminTheme.primary]),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Tổng GMV Toàn Sàn ShopNova', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(_currencyFormat.format(revenue), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Text('Doanh thu hoa hồng sàn ước tính (5%): ${_currencyFormat.format(commission)}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // MODULE 7: BÁO CÁO VI PHẠM (REPORTS)
+  // ============================================================
+
+  Widget _buildReportsSection() {
+    return Column(
+      children: [
+        Expanded(
+          child: _reports.isEmpty
+              ? const Center(child: Text('Không có báo cáo vi phạm nào cần xử lý.', style: TextStyle(color: AdminTheme.textSecondary)))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: _reports.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final rep = _reports[idx];
+                    final repId = rep['id']?.toString() ?? '';
+                    final reason = rep['reason']?.toString() ?? 'Vi phạm nội dung';
+                    final status = rep['status']?.toString() ?? 'open';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AdminTheme.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AdminTheme.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Báo cáo #$repId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              _statusPill(status),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text('Lý do: $reason', style: const TextStyle(fontSize: 12, color: AdminTheme.textPrimary)),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () => _updateReportStatus(repId, 'dismissed'),
+                                child: const Text('Bác bỏ', style: TextStyle(fontSize: 11)),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () => _updateReportStatus(repId, 'confirmed_violation'),
+                                child: const Text('Xác nhận vi phạm', style: TextStyle(fontSize: 11)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MODULE 8: CÀI ĐẶT HỆ THỐNG (SETTINGS)
+  // ============================================================
+
+  Widget _buildSettingsSection() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AdminTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AdminTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Thông Tin Máy Chủ API', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+                const Divider(color: AdminTheme.border, height: 20),
+                Text('Endpoint: ${ApiConfig.baseUrl}', style: const TextStyle(fontSize: 12, color: AdminTheme.textPrimary)),
+                const SizedBox(height: 6),
+                const Text('Trạng thái kết nối: Hoạt động bình thường (Online)', style: TextStyle(fontSize: 12, color: AdminTheme.success, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AdminTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AdminTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Dịch Vụ Email Thông Báo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+                const Divider(color: AdminTheme.border, height: 20),
+                Text('Trạng thái: ${_emailStatus?['status'] ?? 'Ready / Connected'}', style: const TextStyle(fontSize: 12, color: AdminTheme.textPrimary)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET HELPERS ---
+
+  Widget _filterChip(String key, String label, String currentVal, Function(String) onSelect) {
+    final isSelected = currentVal == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        selectedColor: AdminTheme.surfaceSubtle,
+        backgroundColor: AdminTheme.card,
+        side: BorderSide(color: isSelected ? AdminTheme.primary : AdminTheme.border),
+        labelStyle: TextStyle(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? AdminTheme.primary : AdminTheme.textSecondary,
+        ),
+        onSelected: (val) {
+          if (val) onSelect(key);
         },
       ),
     );
   }
 
-  // 6. PHÂN TÍCH DOANH THU (REVENUE)
-  Widget _buildRevenueView() {
-    final gmv = (_stats?['totalRevenue'] ?? _stats?['gmv'] ?? 0).toDouble();
-    final commission = gmv * 0.05;
-    final payouts = gmv * 0.95;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Báo cáo Tài chính Nền tảng ShopNova (Dữ liệu thật)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_primaryColor, const Color(0xFF8E0000)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('TỔNG GIÁ TRỊ GIAO DỊCH (GMV TÍCH LŨY)', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text(_currencyFormat.format(gmv), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Icon(Icons.insights_rounded, color: Colors.amber, size: 18),
-                    const SizedBox(width: 6),
-                    Text('Tổng đơn toàn sàn: ${_stats?["totalOrders"] ?? _orders.length} đơn', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard('Phí Sàn Thu Được (5%)', _currencyFormat.format(commission), Icons.savings_rounded, Colors.green),
-              const SizedBox(width: 12),
-              _buildStatCard('Thực Trả Người Bán (95%)', _currencyFormat.format(payouts), Icons.payments_rounded, Colors.blue),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFEEEEEE))),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Chính sách phân bổ dòng tiền:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 8),
-                const Text('• Tiền thanh toán của Người mua được bảo vệ trong tài khoản ký quỹ sàn ShopNova.', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                const Text('• Khi đơn hàng hoàn thành (delivered) và không có khiếu nại hoàn tiền trong 7 ngày, tiền tự động đối soát trả cho Người bán.', style: TextStyle(fontSize: 12, color: Colors.black87)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 7. BÁO CÁO VI PHẠM (REPORTS)
-  Widget _buildReportsView() {
-    var filtered = _reports;
-    if (_reportFilterTab != 'all') {
-      filtered = filtered.where((r) => r['status'] == _reportFilterTab).toList();
-    }
-
-    return Column(
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('Tất cả', 'all', _reportFilterTab, (v) => setState(() => _reportFilterTab = v), badgeCount: _reports.length),
-              _buildFilterChip('Chờ xử lý', 'open', _reportFilterTab, (v) => setState(() => _reportFilterTab = v)),
-              _buildFilterChip('Đang xác minh', 'investigating', _reportFilterTab, (v) => setState(() => _reportFilterTab = v)),
-              _buildFilterChip('Đã xác nhận vi phạm', 'confirmed_violation', _reportFilterTab, (v) => setState(() => _reportFilterTab = v)),
-              _buildFilterChip('Đã bác bỏ', 'dismissed', _reportFilterTab, (v) => setState(() => _reportFilterTab = v)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: Text('Không có báo cáo vi phạm nào trong database.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final r = filtered[idx];
-                    final reportId = r['id']?.toString() ?? '';
-                    final status = r['status'] ?? 'open';
-                    final violationId = r['violationId']?.toString() ?? reportId;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Báo cáo #${r['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                _buildStatusBadge(status),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text('Lý do: ${r['reason'] ?? "N/A"}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13)),
-                            Text('Shop bị tố cáo: ${r['shopName'] ?? "N/A"} • SP: ${r['productName'] ?? "N/A"}', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                            if (r['description'] != null && r['description'].toString().isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text('Nội dung: ${r['description']}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                            ],
-                            const Divider(height: 18),
-                            Row(
-                              children: [
-                                if (status == 'open' || status == 'investigating') ...[
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () => _updateReportStatus(reportId, 'confirmed_violation'),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                      child: const Text('Xác nhận Vi Phạm (Gửi Email)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  OutlinedButton(
-                                    onPressed: () => _updateReportStatus(reportId, 'dismissed'),
-                                    child: const Text('Bác bỏ', style: TextStyle(fontSize: 11)),
-                                  ),
-                                ] else if (status == 'confirmed_violation') ...[
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      icon: const Icon(Icons.send_rounded, size: 14),
-                                      label: const Text('Gửi Lại Email Cảnh Cáo', style: TextStyle(fontSize: 11)),
-                                      onPressed: () => _retryViolationEmail(violationId),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  // 8. CÀI ĐẶT HỆ THỐNG (SETTINGS)
-  Widget _buildSettingsView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Trạng Thái Hệ Thống ShopNova (Realtime)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFEEEEEE))),
-            child: Column(
-              children: [
-                _buildSystemStatusTile('Máy chủ Backend API', 'Đang hoạt động (Online port 3000)', Icons.cloud_done_rounded, Colors.green),
-                const Divider(height: 20),
-                _buildSystemStatusTile('Cơ sở dữ liệu (Aiven Cloud MySQL)', 'Kết nối ổn định (shopnova_dev)', Icons.storage_rounded, Colors.blue),
-                const Divider(height: 20),
-                _buildSystemStatusTile('Dịch vụ Gửi Email Vi Phạm', _emailStatus?['available'] == true ? 'Sẵn sàng (${_emailStatus?["provider"] ?? "SMTP"})' : 'Đang kích hoạt (Online)', Icons.mark_email_read_rounded, Colors.teal),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text('Cấu hình Thông số Sàn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFEEEEEE))),
-            child: const Column(
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.percent_rounded, color: Colors.orange),
-                  title: Text('Hoa hồng nền tảng mặc định', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  trailing: Text('5.0%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
-                ),
-                Divider(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.timer_outlined, color: Colors.purple),
-                  title: Text('Thời gian giữ ký quỹ đối soát', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  trailing: Text('7 ngày', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSystemStatusTile(String title, String status, IconData icon, Color color) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text(status, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // WIDGET TIỆN ÍCH DÙNG CHUNG
-  Widget _buildSearchBar(String hint) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: const Icon(Icons.search, size: 20),
-          filled: true,
-          fillColor: Colors.white,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
-        ),
-        onChanged: (val) => setState(() => _searchQuery = val.trim()),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value, String selectedValue, Function(String) onSelect, {int? badgeCount}) {
-    final isSelected = value == selectedValue;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-            if (badgeCount != null && badgeCount > 0) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.red, borderRadius: BorderRadius.circular(10)),
-                child: Text('$badgeCount', style: TextStyle(fontSize: 10, color: isSelected ? _primaryColor : Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ],
-        ),
-        selected: isSelected,
-        selectedColor: _primaryColor,
-        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87),
-        onSelected: (_) => onSelect(value),
-      ),
-    );
-  }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'active': return 'Đang hoạt động';
-      case 'delivered': return 'Đã giao hàng';
-      case 'confirmed_violation': return 'Đã xác nhận vi phạm';
-      case 'pending': return 'Chờ duyệt / Chờ xử lý';
-      case 'open': return 'Chờ xử lý';
-      case 'shipping': return 'Đang giao hàng';
-      case 'investigating': return 'Đang xác minh';
-      case 'dismissed': return 'Đã bác bỏ';
-      case 'suspended': return 'Đã tạm khóa';
-      case 'blocked': return 'Đã khóa';
-      case 'cancelled': return 'Đã hủy';
-      default: return status;
-    }
-  }
-
-  Widget _buildStatusBadge(String status) {
-    Color bg = Colors.grey.shade200;
-    Color fg = Colors.grey.shade800;
-    String text = status;
+  Widget _statusPill(String status) {
+    Color bg;
+    Color text;
+    String label;
 
     switch (status) {
       case 'active':
       case 'delivered':
-      case 'confirmed_violation':
-        bg = Colors.green.shade50;
-        fg = Colors.green.shade800;
-        text = status == 'active' ? 'Đang hoạt động' : status == 'delivered' ? 'Đã giao' : 'Đã xác nhận VP';
+      case 'approved':
+        bg = AdminTheme.successBg;
+        text = AdminTheme.success;
+        label = status == 'approved' ? 'Đã duyệt' : (status == 'delivered' ? 'Đã giao' : 'Hoạt động');
         break;
       case 'pending':
-      case 'open':
-        bg = Colors.amber.shade50;
-        fg = Colors.amber.shade900;
-        text = status == 'pending' ? 'Chờ duyệt' : 'Chờ xử lý';
+        bg = AdminTheme.warningBg;
+        text = AdminTheme.warning;
+        label = 'Chờ xử lý';
         break;
-      case 'shipping':
-      case 'investigating':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
-        text = status == 'shipping' ? 'Đang giao' : 'Đang điều tra';
-        break;
+      case 'rejected':
+      case 'cancelled':
       case 'suspended':
       case 'blocked':
-      case 'cancelled':
-        bg = Colors.red.shade50;
-        fg = Colors.red.shade800;
-        text = status == 'suspended' ? 'Tạm khóa' : status == 'blocked' ? 'Bị khóa' : 'Đã hủy';
+        bg = AdminTheme.dangerBg;
+        text = AdminTheme.danger;
+        label = status == 'suspended' ? 'Đã khóa' : (status == 'rejected' ? 'Bị từ chối' : 'Đã hủy');
         break;
-      case 'dismissed':
-        bg = Colors.grey.shade200;
-        fg = Colors.grey.shade700;
-        text = 'Đã bác bỏ';
+      default:
+        bg = AdminTheme.surfaceSubtle;
+        text = AdminTheme.textSecondary;
+        label = status;
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold)),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: text)),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content;
+    switch (_selectedNavIndex) {
+      case 1:
+        content = _buildShopsSection();
+        break;
+      case 2:
+        content = _buildUsersSection();
+        break;
+      case 3:
+        content = _buildProductsSection();
+        break;
+      case 4:
+        content = _buildOrdersSection();
+        break;
+      case 5:
+        content = _buildRevenueSection();
+        break;
+      case 6:
+        content = _buildReportsSection();
+        break;
+      case 7:
+        content = _buildSettingsSection();
+        break;
+      case 0:
+      default:
+        content = _buildDashboardSection();
+        break;
+    }
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AdminTheme.background,
+      appBar: _buildAppBar(),
+      drawer: _buildDrawer(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AdminTheme.primary))
+          : content,
+    );
+  }
+}
+
+// Painter vẽ đồ thị xu hướng doanh thu Admin
+class _AdminTrendPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = AdminTheme.primary
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final dotPaint = Paint()
+      ..color = AdminTheme.primary
+      ..style = PaintingStyle.fill;
+
+    final gridPaint = Paint()
+      ..color = AdminTheme.border.withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+
+    for (int i = 0; i < 4; i++) {
+      final y = size.height * (i / 3);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final points = <Offset>[
+      Offset(size.width * 0.05, size.height * 0.75),
+      Offset(size.width * 0.20, size.height * 0.60),
+      Offset(size.width * 0.35, size.height * 0.70),
+      Offset(size.width * 0.50, size.height * 0.40),
+      Offset(size.width * 0.65, size.height * 0.50),
+      Offset(size.width * 0.80, size.height * 0.25),
+      Offset(size.width * 0.95, size.height * 0.15),
+    ];
+
+    final path = Path()..moveTo(points[0].dx, points[0].dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    canvas.drawPath(path, linePaint);
+
+    for (final p in points) {
+      canvas.drawCircle(p, 4, dotPaint);
+      canvas.drawCircle(p, 2, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

@@ -6,11 +6,15 @@ import { closeObjectStorage } from './services/object-storage.js'
  * Khởi động máy chủ HTTP trên cổng đã cấu hình
  */
 const server = app.listen(env.port, () => {
+  // Server running
   console.log(`[ShopNova Backend] Server đang chạy tại http://localhost:${env.port}`)
   console.log(`[ShopNova Backend] Môi trường: ${env.nodeEnv}`)
   console.log(`[ShopNova Backend] Health check: http://localhost:${env.port}/api/v1/health`)
   console.log(`[ShopNova Backend] Readiness check: http://localhost:${env.port}/api/v1/ready`)
 })
+
+server.keepAliveTimeout = 65000
+server.headersTimeout = 66000
 
 /**
  * Xử lý lỗi khi khởi động server

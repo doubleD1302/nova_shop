@@ -38,8 +38,8 @@ class ApiConfig {
     if (_customBaseUrl != null) return _customBaseUrl!;
 
     final candidates = [
-      productionUrl,
-      usbLoopbackUrl,
+      usbLoopbackUrl, // Khi cắm cáp USB (adb reverse), ưu tiên kết nối máy chủ phát triển cục bộ ngay lập tức
+      productionUrl,  // Khi không cắm cáp USB, tự động kết nối máy chủ Cloud Render đồng bộ với website
       lanHostUrl,
       altLanHostUrl,
       emulatorUrl,
@@ -47,7 +47,7 @@ class ApiConfig {
 
     for (final candidate in candidates) {
       try {
-        final timeoutMs = candidate == productionUrl ? 3000 : 800;
+        final timeoutMs = candidate == productionUrl ? 5000 : 1500;
         final res = await http
             .get(Uri.parse('$candidate/api/v1/health'))
             .timeout(Duration(milliseconds: timeoutMs));

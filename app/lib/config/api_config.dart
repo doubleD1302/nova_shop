@@ -77,8 +77,8 @@ class ApiConfig {
     }
 
     final candidates = [
-      productionUrl,  // Backend Render Online (Đồng bộ với Website)
-      usbLoopbackUrl, // Cáp USB adb reverse (http://127.0.0.1:3000)
+      usbLoopbackUrl, // Cáp USB adb reverse (http://127.0.0.1:3000) ưu tiên khi cắm máy tính
+      productionUrl,  // Backend Render Online (Đồng bộ với Website) khi chạy độc lập
       lanHostUrl,     // Wi-Fi LAN máy tính (http://10.39.18.75:3000)
       altLanHostUrl,  // Wi-Fi LAN phụ
       emulatorUrl,    // Máy ảo Android (http://10.0.2.2:3000)
@@ -86,7 +86,7 @@ class ApiConfig {
 
     for (final url in candidates) {
       try {
-        final timeoutMs = url == productionUrl ? 3000 : 800;
+        final timeoutMs = url == productionUrl ? 5000 : 1500;
         final res = await http
             .get(Uri.parse('$url/api/v1/health'))
             .timeout(Duration(milliseconds: timeoutMs));

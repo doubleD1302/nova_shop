@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
+import 'theme/admin_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,11 +18,7 @@ class ShopNovaAdminApp extends StatelessWidget {
     return MaterialApp(
       title: 'ShopNova Admin',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFC62828)),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
-      ),
+      theme: AdminTheme.lightTheme,
       home: AuthService().isAuthenticated
           ? const AdminDashboardScreen()
           : const LoginScreen(),
