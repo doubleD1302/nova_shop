@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
+import 'seller_hub_screen.dart';
 
 const List<String> kVietnamProvinces = [
   'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
@@ -1113,7 +1114,7 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ban Quản Trị sẽ xét duyệt hồ sơ trong thời gian sớm nhất. Bạn đã có thể bắt đầu mở ứng dụng ShopNova Seller để đăng bán và quản lý sản phẩm.',
+                    'Ban Quản Trị sẽ xét duyệt hồ sơ trong thời gian sớm nhất. Bạn có thể truy cập trực tiếp Kênh Người Bán ngay trong ứng dụng để thiết lập gian hàng và đăng bán sản phẩm.',
                     style: TextStyle(fontSize: 11.5, color: Colors.amber.shade900),
                   ),
                 ],
@@ -1126,13 +1127,17 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context, true);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SellerHubScreen()),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEE4D2D),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Hoàn Tất & Về Trang Cá Nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                child: const Text('Vào Kênh Người Bán Ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
           ],
