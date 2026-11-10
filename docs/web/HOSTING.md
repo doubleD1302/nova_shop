@@ -58,6 +58,7 @@ Cũng có thể dùng `render.yaml` qua **New → Blueprint**. Blueprint sẽ si
 | `NODE_ENV` | `production` |
 | `CORS_ORIGINS` | Origin HTTPS production thực tế của Vercel |
 | `DATA_API_KEY` | Secret dịch vụ, dùng chung giữa hai tiến trình |
+| `SELLER_IDENTITY_KEY` | Khóa AES-256 32 byte mã hóa base64, dùng chung ổn định giữa các Data API truy cập cùng dữ liệu hồ sơ |
 | `JWT_SECRET` | Secret khác service key, ít nhất 32 ký tự |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON Service Account của cùng Firebase project; secret chỉ cấu hình ở Backend |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | Thông tin TiDB Cloud hiện có (cổng mặc định 4000) |
