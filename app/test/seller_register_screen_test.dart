@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SellerRegisterScreen Widget Tests', () {
-    testWidgets('SellerRegisterScreen renders header, perks, and registration form', (tester) async {
+    testWidgets('SellerRegisterScreen renders welcome screen and transitions to Step 1', (tester) async {
       AuthService().logout();
 
       tester.view.physicalSize = const Size(1080, 2400);
@@ -19,30 +19,28 @@ void main() {
           home: SellerRegisterScreen(),
         ),
       );
+      await tester.pump();
+
+      // Check Welcome Screen
+      expect(find.text('Chào mừng đến với\nKênh Người Bán NovaShop!'), findsOneWidget);
+      expect(find.text('Bắt đầu đăng ký'), findsOneWidget);
+
+      // Tap "Bắt đầu đăng ký"
+      await tester.tap(find.text('Bắt đầu đăng ký'));
       await tester.pumpAndSettle();
 
-      // Check Header
-      expect(find.text('Đăng Ký Đối Tác Bán Hàng'), findsOneWidget);
-      expect(find.text('Khởi Nghiệp Bán Hàng 0đ'), findsOneWidget);
+      // Check Header & Stepper
+      expect(find.text('Đăng Ký Kênh Người Bán'), findsOneWidget);
+      expect(find.text('Thông tin'), findsOneWidget);
+      expect(find.text('Vận chuyển'), findsOneWidget);
+      expect(find.text('Định danh'), findsOneWidget);
+      expect(find.text('Thuế'), findsOneWidget);
+      expect(find.text('Hoàn tất'), findsOneWidget);
 
-      // Check Perks
-      expect(find.text('0đ Phí mở shop'), findsOneWidget);
-      expect(find.text('Freeship Xtra'), findsOneWidget);
-      expect(find.text('Nova AI Bán Hàng'), findsOneWidget);
-      expect(find.text('Khung Giờ Flash'), findsOneWidget);
-
-      // Check Section & Form Labels
-      expect(find.text('Thông Tin Gian Hàng Của Bạn'), findsOneWidget);
-      expect(find.text('Tên Gian Hàng / Shop Name *'), findsOneWidget);
-      expect(find.text('Tỉnh / Thành Phố Kho Hàng *'), findsOneWidget);
-      expect(find.text('Khẩu Hiệu / Giới Thiệu Ngắn'), findsOneWidget);
-      expect(find.text('Ngành Hàng Kinh Doanh Chính'), findsOneWidget);
-
-      // Check category chips
-      expect(find.text('Điện thoại & Phụ kiện'), findsOneWidget);
-
-      // Check submit button
-      expect(find.text('Hoàn Tất Đăng Ký Mở Gian Hàng'), findsOneWidget);
+      // Check Step 1 Form Labels
+      expect(find.text('Thông tin cơ bản Shop'), findsOneWidget);
+      expect(find.text('Địa chỉ lấy hàng *'), findsOneWidget);
+      expect(find.text('Tiếp theo'), findsOneWidget);
     });
   });
 }

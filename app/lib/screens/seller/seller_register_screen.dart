@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../../services/upload_service.dart';
-import '../auth/login_screen.dart';
-import 'seller_hub_screen.dart';
 import '../../theme/app_colors.dart';
 
-/// Màn hình Đăng Ký Đối Tác Bán Hàng / Mở Gian Hàng ShopNova
-/// Quy trình 3 bước chuẩn:
-/// - Bước 1: Khởi tạo tài khoản, ngân hàng đối soát & KYC (Registration & KYC)
-/// - Bước 2: Thiết lập hồ sơ & Cấu hình gian hàng tại Seller Center (Store Profile Setup)
-/// - Bước 3: Kiểm duyệt từ Admin Sàn ShopNova (Admin Approval & Moderation)
+const List<String> kVietnamProvinces = [
+  'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
+  'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu',
+  'Bắc Ninh', 'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước',
+  'Bình Thuận', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Đắk Nông',
+  'Điện Biên', 'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Giang',
+  'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang', 'Hòa Bình',
+  'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
+  'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định',
+  'Nghệ An', 'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên',
+  'Quảng Bình', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị',
+  'Sóc Trăng', 'Sơn La', 'Tây Ninh', 'Thái Bình', 'Thái Nguyên',
+  'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang', 'Trà Vinh', 'Tuyên Quang',
+  'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái',
+];
+
+/// Màn hình Đăng Ký Kênh Người Bán ShopNova chuẩn Shopee Seller Centre:
+/// 1. Màn hình Chào mừng (Welcome)
+/// 2. Stepper 5 bước: Thông tin Shop -> Cài đặt vận chuyển -> Thông tin định danh -> Thông tin thuế -> Hoàn tất
 class SellerRegisterScreen extends StatefulWidget {
   const SellerRegisterScreen({super.key});
 
@@ -18,252 +29,1110 @@ class SellerRegisterScreen extends StatefulWidget {
 }
 
 class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
 
-  // Controllers thông tin cơ bản
+  // currentStep: 0 = Màn hình Welcome, 1..5 = Các bước Stepper
+  int _currentStep = 0;
+  bool _submitting = false;
+  String? _errorMessage;
+
+  // Controllers Bước 1: Thông tin Shop
   final TextEditingController _shopNameController = TextEditingController();
-  final TextEditingController _taglineController = TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _shopTaglineController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
+  // Controllers tài khoản (nếu chưa đăng nhập)
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
 
-  // Thông tin ngân hàng đối soát doanh thu (Bước 1)
-  final TextEditingController _bankNameController = TextEditingController(text: 'Vietcombank');
-  final TextEditingController _bankAccountNumberController = TextEditingController();
-  final TextEditingController _bankAccountOwnerController = TextEditingController();
-
-  // KYC (CCCD/CMND mặt trước & mặt sau - UploadService purpose: 'shop')
-  String? _idCardFrontUrl;
-  String? _idCardBackUrl;
-  bool _isUploadingFront = false;
-  bool _isUploadingBack = false;
-
+  // Địa chỉ lấy hàng
+  String _pickupAddress = '';
   String _selectedProvince = 'TP. Hồ Chí Minh';
-  String _selectedCategory = 'dien-thoai';
+
+  // Bước 2: Cài đặt vận chuyển
+  bool _shippingNhanh = true;
+  bool _shippingTietKiem = true;
+  bool _shippingHoaToc = false;
+
+  // Bước 3: Thông tin định danh
+  String _businessType = 'personal'; // 'personal' | 'household' | 'enterprise'
+  final TextEditingController _ownerNameController = TextEditingController();
+  final TextEditingController _idCardController = TextEditingController();
+
+  // Bước 4: Thông tin thuế
+  final TextEditingController _taxCodeController = TextEditingController();
+  final TextEditingController _invoiceEmailController = TextEditingController();
   bool _agreeTerms = true;
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-
-  final List<String> _provinces = [
-    'TP. Hồ Chí Minh',
-    'Hà Nội',
-    'Đà Nẵng',
-    'Cần Thơ',
-    'Hải Phòng',
-    'Bình Dương',
-    'Đồng Nai',
-    'Khánh Hòa',
-    'Quảng Ninh',
-    'Bắc Ninh',
-    'Thừa Thiên Huế',
-    'Nghệ An',
-    'Lâm Đồng',
-    'Tiền Giang',
-    'Toàn quốc',
-  ];
-
-  final List<Map<String, String>> _categories = [
-    {'id': 'dien-thoai', 'name': 'Điện thoại & Phụ kiện', 'icon': '📱'},
-    {'id': 'may-tinh', 'name': 'Máy tính & Laptop', 'icon': '💻'},
-    {'id': 'thiet-bi-gia-dung', 'name': 'Thiết bị gia dụng', 'icon': '🔌'},
-    {'id': 'thoi-trang-nam', 'name': 'Thời trang nam', 'icon': '👕'},
-    {'id': 'thoi-trang-nu', 'name': 'Thời trang nữ', 'icon': '👗'},
-    {'id': 'sac-dep', 'name': 'Sắc đẹp & Mỹ phẩm', 'icon': '💄'},
-    {'id': 'nha-cua', 'name': 'Nhà cửa & Đời sống', 'icon': '🏡'},
-    {'id': 'me-be', 'name': 'Mẹ & Bé yêu', 'icon': '🍼'},
-    {'id': 'the-thao', 'name': 'Thể thao & Du lịch', 'icon': '⚽'},
-    {'id': 'o-to-xe-may', 'name': 'Ô tô & Xe máy', 'icon': '🏍️'},
-    {'id': 'may-anh', 'name': 'Máy ảnh & Quay phim', 'icon': '📷'},
-    {'id': 'bach-hoa', 'name': 'Bách hóa Online', 'icon': '🛒'},
-  ];
 
   @override
   void initState() {
     super.initState();
     final user = _authService.currentUser;
     if (user != null) {
-      _fullNameController.text = user.fullName;
-      if (user.phone != null && user.phone!.isNotEmpty) {
-        _phoneController.text = user.phone!;
-      }
       if (user.email != null && user.email!.isNotEmpty) {
         _emailController.text = user.email!;
+        _invoiceEmailController.text = user.email!;
       }
-      _shopNameController.text = '${user.fullName} Store';
-      _bankAccountOwnerController.text = user.fullName.toUpperCase();
+      if (user.phone != null && user.phone!.isNotEmpty) {
+        _phoneController.text = user.phone!.replaceAll('+84', '');
+      }
+      _fullNameController.text = user.fullName;
+      _ownerNameController.text = user.fullName;
     }
   }
 
   @override
   void dispose() {
     _shopNameController.dispose();
-    _taglineController.dispose();
-    _fullNameController.dispose();
-    _phoneController.dispose();
+    _shopTaglineController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
+    _fullNameController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
-    _bankNameController.dispose();
-    _bankAccountNumberController.dispose();
-    _bankAccountOwnerController.dispose();
+    _confirmPasswordController.dispose();
+    _ownerNameController.dispose();
+    _idCardController.dispose();
+    _taxCodeController.dispose();
+    _invoiceEmailController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    if (!_agreeTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đồng ý với Điều khoản đối tác bán hàng của ShopNova.'),
-          backgroundColor: Color(0xFFD0011B),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    final shopName = _shopNameController.text.trim();
-    final tagline = _taglineController.text.trim();
-    final province = _selectedProvince;
-
-    final user = _authService.currentUser;
-    bool success = false;
-
-    if (user != null) {
-      // 1. Người dùng đã đăng nhập -> Nâng cấp tài khoản lên Seller
-      success = await _authService.registerSellerShop(
-        shopName: shopName,
-        province: province,
-        tagline: tagline.isNotEmpty ? tagline : 'Cung cấp sản phẩm chính hãng chất lượng cao',
-      );
-    } else {
-      // 2. Người dùng mới -> Đăng ký tài khoản Seller mới
-      final fullName = _fullNameController.text.trim();
-      final phone = _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
-      final password = _passwordController.text;
-
-      success = await _authService.register(
-        username: phone.toLowerCase(),
-        password: password,
-        fullName: fullName,
-        phone: phone,
-        role: 'seller',
-        shopName: shopName,
-      );
-    }
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (success) {
-      _showSuccessDialog(shopName);
-    } else {
-      final error = _authService.lastError ?? 'Đăng ký gian hàng thất bại. Vui lòng thử lại.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: const Color(0xFFD0011B),
-        ),
-      );
-    }
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.trim());
   }
 
-  void _showSuccessDialog(String shopName) {
-    showDialog(
+  void _showAddressModal() {
+    String modalProvince = _selectedProvince;
+    final detailController = TextEditingController(
+      text: _pickupAddress.contains(',')
+          ? _pickupAddress.substring(0, _pickupAddress.lastIndexOf(',')).trim()
+          : _pickupAddress,
+    );
+
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00BFA5), Color(0xFF00897B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00BFA5).withValues(alpha: 0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFFCF7),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Địa chỉ lấy hàng của Shop',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF8B7566)),
+                    onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
-              child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 42),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'CHÚC MỪNG BẠN!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1E2022),
-                letterSpacing: 0.3,
+              const Divider(color: Color(0xFFE6D5C2)),
+              const SizedBox(height: 12),
+              const Text('Tỉnh / Thành phố', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: modalProvince,
+                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+                items: kVietnamProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
+                onChanged: (val) {
+                  if (val != null) setModalState(() => modalProvince = val);
+                },
+              ),
+              const SizedBox(height: 14),
+              const Text('Địa chỉ chi tiết (Số nhà, tên đường, phường/xã)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+              const SizedBox(height: 6),
+              TextField(
+                controller: detailController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'Ví dụ: 123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1...',
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEE4D2D),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    final detail = detailController.text.trim();
+                    if (detail.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Vui lòng nhập địa chỉ chi tiết.'), backgroundColor: Colors.red),
+                      );
+                      return;
+                    }
+                    setState(() {
+                      _selectedProvince = modalProvince;
+                      _pickupAddress = '$detail, $modalProvince';
+                      _errorMessage = null;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Lưu địa chỉ lấy hàng', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleNextStep() async {
+    setState(() => _errorMessage = null);
+
+    // Validate Bước 1: Thông tin Shop
+    if (_currentStep == 1) {
+      final name = _shopNameController.text.trim();
+      if (name.isEmpty) {
+        setState(() => _errorMessage = 'Vui lòng nhập Tên Shop (bắt buộc).');
+        return;
+      }
+      if (name.length < 3 || name.length > 30) {
+        setState(() => _errorMessage = 'Tên Shop phải có độ dài từ 3 đến 30 ký tự.');
+        return;
+      }
+      if (_pickupAddress.isEmpty) {
+        setState(() => _errorMessage = 'Vui lòng bấm "+ Thêm địa chỉ" để thiết lập địa chỉ lấy hàng của Shop.');
+        return;
+      }
+      final email = _emailController.text.trim();
+      if (email.isEmpty || !_isValidEmail(email)) {
+        setState(() => _errorMessage = 'Vui lòng nhập email hợp lệ để nhận thông báo đơn hàng.');
+        return;
+      }
+      final phone = _phoneController.text.trim();
+      if (phone.isEmpty || !RegExp(r'^[+()\d .-]{8,20}$').hasMatch(phone)) {
+        setState(() => _errorMessage = 'Vui lòng nhập số điện thoại liên hệ hợp lệ.');
+        return;
+      }
+
+      final user = _authService.currentUser;
+      if (user == null) {
+        final fullName = _fullNameController.text.trim();
+        final username = _usernameController.text.trim().toLowerCase();
+        final password = _passwordController.text;
+        final confirm = _confirmPasswordController.text;
+
+        if (fullName.isEmpty || username.isEmpty || password.isEmpty) {
+          setState(() => _errorMessage = 'Vui lòng điền họ tên, tên đăng nhập và mật khẩu tài khoản người bán.');
+          return;
+        }
+        if (!RegExp(r'^[a-z0-9_]{3,50}$').hasMatch(username)) {
+          setState(() => _errorMessage = 'Tên đăng nhập phải từ 3–50 ký tự (chữ cái, chữ số hoặc dấu gạch dưới).');
+          return;
+        }
+        if (password.length < 8) {
+          setState(() => _errorMessage = 'Mật khẩu phải có ít nhất 8 ký tự.');
+          return;
+        }
+        if (password != confirm) {
+          setState(() => _errorMessage = 'Mật khẩu nhập lại không khớp.');
+          return;
+        }
+      }
+
+      setState(() => _currentStep = 2);
+      return;
+    }
+
+    // Validate Bước 2: Cài đặt vận chuyển
+    if (_currentStep == 2) {
+      if (!_shippingNhanh && !_shippingTietKiem && !_shippingHoaToc) {
+        setState(() => _errorMessage = 'Vui lòng kích hoạt ít nhất 1 phương thức vận chuyển cho Shop.');
+        return;
+      }
+      setState(() => _currentStep = 3);
+      return;
+    }
+
+    // Validate Bước 3: Thông tin định danh
+    if (_currentStep == 3) {
+      final owner = _ownerNameController.text.trim();
+      if (owner.isEmpty) {
+        setState(() => _errorMessage = 'Vui lòng nhập họ và tên chủ sở hữu / người đại diện.');
+        return;
+      }
+      final idCard = _idCardController.text.trim();
+      if (idCard.isEmpty || !RegExp(r'^\d{9,12}$').hasMatch(idCard)) {
+        setState(() => _errorMessage = 'Số CMND / CCCD hợp lệ phải có từ 9 đến 12 chữ số.');
+        return;
+      }
+      setState(() => _currentStep = 4);
+      return;
+    }
+
+    // Validate Bước 4: Thông tin thuế & Gửi duyệt
+    if (_currentStep == 4) {
+      if (!_agreeTerms) {
+        setState(() => _errorMessage = 'Bạn cần đồng ý với Quy chế hoạt động sàn TMĐT NovaShop để tiếp tục.');
+        return;
+      }
+
+      final taxCode = _taxCodeController.text.trim();
+      if (taxCode.isNotEmpty && !RegExp(r'^\d{10}(?:-\d{3})?$').hasMatch(taxCode)) {
+        setState(() => _errorMessage = 'Mã số thuế không hợp lệ.');
+        return;
+      }
+
+      final invoiceEmail = _invoiceEmailController.text.trim();
+      if (invoiceEmail.isNotEmpty && !_isValidEmail(invoiceEmail)) {
+        setState(() => _errorMessage = 'Email nhận hóa đơn không hợp lệ.');
+        return;
+      }
+
+      final shippingMethods = [
+        if (_shippingNhanh) 'nhanh',
+        if (_shippingTietKiem) 'tietkiem',
+        if (_shippingHoaToc) 'hoatoc',
+      ];
+
+      final phone = _phoneController.text.trim();
+      final fullPhone = phone.startsWith('+84') ? phone : (phone.startsWith('0') ? '+84${phone.substring(1)}' : '+84$phone');
+
+      final sellerProfile = {
+        'pickupAddress': _pickupAddress,
+        'province': _selectedProvince,
+        'contactEmail': _emailController.text.trim().toLowerCase(),
+        'contactPhone': fullPhone,
+        'shippingMethods': shippingMethods,
+        'businessType': _businessType,
+        'ownerName': _ownerNameController.text.trim(),
+        'idCard': _idCardController.text.trim(),
+        if (taxCode.isNotEmpty) 'taxCode': taxCode,
+        if (invoiceEmail.isNotEmpty) 'invoiceEmail': invoiceEmail.toLowerCase(),
+        'agreeTerms': true,
+      };
+
+      setState(() {
+        _submitting = true;
+        _errorMessage = null;
+      });
+
+      final user = _authService.currentUser;
+      final shopName = _shopNameController.text.trim();
+      final shopTagline = _shopTaglineController.text.trim();
+
+      bool success = false;
+      if (user != null) {
+        success = await _authService.registerSellerShop(
+          shopName: shopName,
+          tagline: shopTagline.isNotEmpty ? shopTagline : null,
+          sellerProfile: sellerProfile,
+        );
+      } else {
+        success = await _authService.register(
+          username: _usernameController.text.trim().toLowerCase(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim(),
+          email: _emailController.text.trim().toLowerCase(),
+          phone: fullPhone,
+          role: 'seller',
+          shopName: shopName,
+          shopTagline: shopTagline.isNotEmpty ? shopTagline : null,
+          sellerProfile: sellerProfile,
+        );
+      }
+
+      if (!mounted) return;
+      setState(() => _submitting = false);
+
+      if (success) {
+        setState(() => _currentStep = 5);
+      } else {
+        setState(() {
+          _errorMessage = _authService.lastError ?? 'Đăng ký gian hàng thất bại. Vui lòng kiểm tra lại.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_currentStep == 0) {
+      return _buildWelcomeScreen();
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF3E8),
+      appBar: AppBar(
+        title: const Text('Đăng Ký Kênh Người Bán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D))),
+        backgroundColor: const Color(0xFFFFFCF7),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF49352D)),
+          onPressed: () {
+            if (_currentStep > 1) {
+              setState(() => _currentStep--);
+            } else {
+              setState(() => _currentStep = 0);
+            }
+          },
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Stepper Header 5 bước
+            _buildStepperHeader(),
+
+            // Nội dung theo bước
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_errorMessage != null) ...[
+                      _buildErrorBanner(_errorMessage!),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (_currentStep == 1) _buildStep1ShopInfo(),
+                    if (_currentStep == 2) _buildStep2Shipping(),
+                    if (_currentStep == 3) _buildStep3Identity(),
+                    if (_currentStep == 4) _buildStep4Tax(),
+                    if (_currentStep == 5) _buildStep5Completed(),
+
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Gian hàng "$shopName" đã được khởi tạo thành công trên hệ sinh thái ShopNova.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF555770), height: 1.4),
-            ),
-            const SizedBox(height: 16),
+
+            // Navigation bar dưới cùng
+            if (_currentStep >= 1 && _currentStep <= 4)
+              _buildBottomNavigationBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // GIAO DIỆN 0: MÀN HÌNH CHÀO MỪNG (THEO ẢNH MINH HỌA SHOPEE WELCOME)
+  // =========================================================================
+  Widget _buildWelcomeScreen() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBF3E8),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFFCF7),
+        elevation: 0,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: const Color(0xFFEE4D2D), borderRadius: BorderRadius.circular(6)),
+              child: const Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.white),
+            ),
+            const SizedBox(width: 8),
+            const Text('ShopNova Seller', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF49352D))),
+          ],
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
               decoration: BoxDecoration(
-                color: const Color(0xFFF7F7F8),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E2E6)),
+                color: const Color(0xFFFFFCF7),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE6D5C2)),
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
               ),
-              child: const Row(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.verified_rounded, color: AppColors.primary, size: 18),
-                  SizedBox(width: 8),
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEFE7),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFBD6E49).withOpacity(0.3), width: 2),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.storefront_rounded, size: 64, color: Color(0xFFBD6E49)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    'Chào mừng đến với\nKênh Người Bán NovaShop!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Color(0xFF49352D), height: 1.3),
+                  ),
+                  const SizedBox(height: 12),
+
+                  const Text(
+                    'Vui lòng cung cấp thông tin để thành lập tài khoản người bán trên NovaShop.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13.5, color: Color(0xFF8B7566), height: 1.4),
+                  ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _currentStep = 1),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEE4D2D),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Bắt đầu đăng ký', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('← Quay lại trang trước', style: TextStyle(fontSize: 13, color: Color(0xFF8B7566))),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // THANH STEPPER TRÊN ĐẦU
+  // =========================================================================
+  Widget _buildStepperHeader() {
+    final steps = [
+      {'id': 1, 'title': 'Thông tin'},
+      {'id': 2, 'title': 'Vận chuyển'},
+      {'id': 3, 'title': 'Định danh'},
+      {'id': 4, 'title': 'Thuế'},
+      {'id': 5, 'title': 'Hoàn tất'},
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFCF7),
+        border: Border(bottom: BorderSide(color: Color(0xFFE6D5C2))),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: steps.map((st) {
+          final id = st['id'] as int;
+          final isCurrent = _currentStep == id;
+          final isCompleted = _currentStep > id;
+
+          Color badgeColor;
+          Widget badgeContent;
+          if (isCompleted) {
+            badgeColor = const Color(0xFFEE4D2D);
+            badgeContent = const Icon(Icons.check, size: 12, color: Colors.white);
+          } else if (isCurrent) {
+            badgeColor = const Color(0xFFEE4D2D);
+            badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white));
+          } else {
+            badgeColor = const Color(0xFFE6D5C2);
+            badgeContent = Text('$id', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B7566)));
+          }
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  shape: BoxShape.circle,
+                  boxShadow: isCurrent ? [BoxShadow(color: const Color(0xFFEE4D2D).withOpacity(0.3), blurRadius: 6)] : null,
+                ),
+                child: Center(child: badgeContent),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                st['title'] as String,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                  color: isCurrent ? const Color(0xFFEE4D2D) : (isCompleted ? const Color(0xFF49352D) : const Color(0xFF8B7566)),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String message) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDE8E8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF8B4B4)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 12.5, color: Colors.red, fontWeight: FontWeight.w500))),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BƯỚC 1: THÔNG TIN SHOP
+  // =========================================================================
+  Widget _buildStep1ShopInfo() {
+    final user = _authService.currentUser;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6D5C2)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Thông tin cơ bản Shop', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+          const SizedBox(height: 12),
+
+          TextField(
+            controller: _shopNameController,
+            maxLength: 30,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Tên Shop *',
+              hintText: 'Nhập tên gian hàng...',
+              counterText: '${_shopNameController.text.length}/30',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          TextField(
+            controller: _shopTaglineController,
+            maxLength: 100,
+            decoration: const InputDecoration(
+              labelText: 'Slogan gian hàng',
+              hintText: 'Ví dụ: Hàng chính hãng, Giao hàng siêu tốc...',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          const Text('Địa chỉ lấy hàng *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+          const SizedBox(height: 6),
+          if (_pickupAddress.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFBF3E8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE6D5C2)),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, color: Color(0xFFEE4D2D), size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Hồ sơ đang ở trạng thái Chờ Duyệt. Bạn có thể vào Kênh Người Bán để cấu hình logo, banner và địa chỉ kho.',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF28293D)),
+                    child: Text(_pickupAddress, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF49352D))),
+                  ),
+                  TextButton(
+                    onPressed: _showAddressModal,
+                    child: const Text('Thay đổi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFEE4D2D))),
+                  ),
+                ],
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: _showAddressModal,
+              icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+              label: const Text('+ Thêm địa chỉ lấy hàng'),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFEE4D2D), style: BorderStyle.solid),
+                foregroundColor: const Color(0xFFEE4D2D),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email liên hệ nhận đơn *',
+              hintText: 'email@example.com',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Số điện thoại *',
+              hintText: '0901234567',
+              prefixText: '+84 ',
+            ),
+          ),
+
+          if (user == null) ...[
+            const SizedBox(height: 20),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEFE7).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFEE4D2D).withOpacity(0.4)),
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.person_add_alt_1_outlined, color: Color(0xFFEE4D2D), size: 18),
+                      SizedBox(width: 8),
+                      Text('Thiết lập tài khoản người bán', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _fullNameController,
+                    decoration: const InputDecoration(labelText: 'Họ và tên chủ sở hữu *', hintText: 'Nguyễn Văn A'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(labelText: 'Tên đăng nhập *', hintText: 'seller_username'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: !_showPassword,
+                    decoration: InputDecoration(
+                      labelText: 'Mật khẩu *',
+                      hintText: 'Tối thiểu 8 ký tự',
+                      suffixIcon: IconButton(
+                        icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                        onPressed: () => setState(() => _showPassword = !_showPassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: !_showConfirmPassword,
+                    decoration: InputDecoration(
+                      labelText: 'Nhập lại mật khẩu *',
+                      suffixIcon: IconButton(
+                        icon: Icon(_showConfirmPassword ? Icons.visibility_off : Icons.visibility, size: 18),
+                        onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BƯỚC 2: CÀI ĐẶT VẬN CHUYỂN
+  // =========================================================================
+  Widget _buildStep2Shipping() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6D5C2)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBF3E8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6D5C2)),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.local_shipping_outlined, color: Color(0xFFEE4D2D), size: 18),
+                    SizedBox(width: 8),
+                    Text('Phương thức vận chuyển đối tác', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF49352D))),
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Lựa chọn các đơn vị vận chuyển đối tác để giao sản phẩm của bạn tới khách hàng trên toàn quốc.',
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF8B7566)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildShippingMethodTile(
+            title: '⚡ Vận chuyển Nhanh',
+            badge: 'Khuyên dùng',
+            subtitle: 'Giao Hàng Nhanh (GHN), Viettel Post, SPX Express. Thời gian giao 1–3 ngày làm việc.',
+            value: _shippingNhanh,
+            onChanged: (val) => setState(() => _shippingNhanh = val),
+          ),
+          const SizedBox(height: 10),
+
+          _buildShippingMethodTile(
+            title: '📦 Vận chuyển Tiết Kiệm',
+            subtitle: 'Giao Hàng Tiết Kiệm (GHTK), VNPost Bưu Điện. Tối ưu chi phí ship cho người mua.',
+            value: _shippingTietKiem,
+            onChanged: (val) => setState(() => _shippingTietKiem = val),
+          ),
+          const SizedBox(height: 10),
+
+          _buildShippingMethodTile(
+            title: '🚀 Vận chuyển Hỏa Tốc',
+            subtitle: 'Ahamove, GrabExpress. Giao siêu tốc trong 1–2 giờ (nội thành cùng tỉnh/thành phố).',
+            value: _shippingHoaToc,
+            onChanged: (val) => setState(() => _shippingHoaToc = val),
+          ),
+          const SizedBox(height: 16),
+
+          const Text('Tỉnh / Thành phố kho gửi hàng:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _selectedProvince,
+            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+            items: kVietnamProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedProvince = val);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShippingMethodTile({
+    required String title,
+    String? badge,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: value ? const Color(0xFFEE4D2D) : const Color(0xFFE6D5C2)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: CheckboxListTile(
+          activeColor: const Color(0xFFEE4D2D),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          title: Row(
+            children: [
+              Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(6)),
+                  child: Text(badge, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                ),
+              ],
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(subtitle, style: const TextStyle(fontSize: 11.5, color: Color(0xFF8B7566))),
+          ),
+          value: value,
+          onChanged: (v) => onChanged(v ?? false),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BƯỚC 3: THÔNG TIN ĐỊNH DANH
+  // =========================================================================
+  Widget _buildStep3Identity() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6D5C2)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Loại hình kinh doanh *', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF49352D))),
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              _buildBusinessTypeButton('personal', 'Cá nhân'),
+              const SizedBox(width: 8),
+              _buildBusinessTypeButton('household', 'Hộ kinh doanh'),
+              const SizedBox(width: 8),
+              _buildBusinessTypeButton('enterprise', 'Doanh nghiệp'),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          TextField(
+            controller: _ownerNameController,
+            decoration: const InputDecoration(
+              labelText: 'Họ và tên chủ sở hữu / Người đại diện *',
+              hintText: 'Họ tên đúng trên CMND/CCCD...',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          TextField(
+            controller: _idCardController,
+            keyboardType: TextInputType.number,
+            maxLength: 12,
+            decoration: const InputDecoration(
+              labelText: 'Số CMND / CCCD / Hộ chiếu (9–12 số) *',
+              hintText: 'Ví dụ: 001201012345',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusinessTypeButton(String type, String label) {
+    final isSelected = _businessType == type;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _businessType = type),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFFFEFE7) : const Color(0xFFFFFCF7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFFE6D5C2)),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? const Color(0xFFEE4D2D) : const Color(0xFF8B7566),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BƯỚC 4: THÔNG TIN THUẾ
+  // =========================================================================
+  Widget _buildStep4Tax() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFCF7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6D5C2)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBF3E8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE6D5C2)),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Khai báo mã số thuế', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF49352D))),
+                SizedBox(height: 4),
+                Text(
+                  'Theo quy định của Tổng cục Thuế đối với người bán hàng trên sàn TMĐT. Nếu bạn là cá nhân chưa có MST, có thể cập nhật sau.',
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF8B7566)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          TextField(
+            controller: _taxCodeController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Mã số thuế cá nhân / hộ kinh doanh (tùy chọn)',
+              hintText: 'Ví dụ: 8012345678',
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          TextField(
+            controller: _invoiceEmailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email nhận hóa đơn và thông báo thuế',
+              hintText: 'email@example.com',
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          Material(
+            color: Colors.transparent,
+            child: CheckboxListTile(
+              activeColor: const Color(0xFFEE4D2D),
+              contentPadding: EdgeInsets.zero,
+              value: _agreeTerms,
+              onChanged: (val) => setState(() => _agreeTerms = val ?? false),
+              title: const Text(
+                'Tôi cam kết mọi thông tin khai báo trên là chính xác, không vi phạm bản quyền thương hiệu và đồng ý tuân thủ Quy chế hoạt động sàn TMĐT NovaShop.',
+                style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF49352D)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // BƯỚC 5: HOÀN TẤT & CHỜ DUYỆT
+  // =========================================================================
+  Widget _buildStep5Completed() {
+    final shopName = _shopNameController.text.trim();
+
+    return Center(
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFCF7),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE6D5C2)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check, size: 48, color: Colors.green.shade700),
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'Đăng ký mở gian hàng thành công!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF49352D)),
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              'Hồ sơ gian hàng "$shopName" của bạn đã được khởi tạo và gửi lên Ban Quản Trị NovaShop.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF8B7566)),
+            ),
+            const SizedBox(height: 18),
+
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.hourglass_bottom_rounded, color: Colors.amber.shade900, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Trạng thái: Chờ phê duyệt (Pending)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Colors.amber.shade900)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ban Quản Trị sẽ xét duyệt hồ sơ trong thời gian sớm nhất. Bạn đã có thể bắt đầu mở ứng dụng ShopNova Seller để đăng bán và quản lý sản phẩm.',
+                    style: TextStyle(fontSize: 11.5, color: Colors.amber.shade900),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
+
             SizedBox(
               width: double.infinity,
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SellerHubScreen()),
-                  );
+                  Navigator.pop(context, true);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
+                  backgroundColor: const Color(0xFFEE4D2D),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Vào Kênh Người Bán Ngay', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_rounded, size: 18),
-                  ],
-                ),
+                child: const Text('Hoàn Tất & Về Trang Cá Nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
           ],
@@ -272,917 +1141,55 @@ class _SellerRegisterScreenState extends State<SellerRegisterScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = _authService.currentUser;
-    final isLoggedIn = user != null;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Đăng Ký Đối Tác Bán Hàng',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        elevation: 0,
-        backgroundColor: AppColors.primary,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.earth],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. HERO HEADER
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.earth],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                        ),
-                        child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 32),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Khởi Nghiệp Bán Hàng 0đ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Tiếp cận hơn 5 triệu người mua sắm tích cực trên ShopNova ngay hôm nay.',
-                              style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.3),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // 2. 4 ĐẶC QUYỀN ĐỐI TÁC SHOPNOVA
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'ĐẶC QUYỀN DÀNH CHO BẠN',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF6E7191),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildPerkCard(
-                          icon: Icons.money_off_csred_rounded,
-                          color: const Color(0xFF00BFA5),
-                          title: '0đ Phí mở shop',
-                          desc: 'Không đặt cọc, không phí duy trì hàng tháng',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildPerkCard(
-                          icon: Icons.local_shipping_rounded,
-                          color: const Color(0xFF2979FF),
-                          title: 'Freeship Xtra',
-                          desc: 'Hỗ trợ trợ giá ship toàn quốc cho khách hàng',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildPerkCard(
-                          icon: Icons.auto_awesome_rounded,
-                          color: const Color(0xFFFF9100),
-                          title: 'Nova AI Bán Hàng',
-                          desc: 'Tự động gợi ý giá, mô tả sản phẩm thông minh',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildPerkCard(
-                          icon: Icons.flash_on_rounded,
-                          color: AppColors.primary,
-                          title: 'Khung Giờ Flash',
-                          desc: 'Ưu tiên đẩy sản phẩm vào khung giờ chớp nhoáng',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // QUY TRÌNH 3 BƯỚC ĐỐI TÁC BÁN HÀNG
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFEEEEF0)),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'QUY TRÌNH 3 BƯỚC MỞ GIAN HÀNG',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildProcessStep(
-                      step: '1',
-                      title: 'Khởi tạo tài khoản & Định danh KYC',
-                      desc: 'Cung cấp tên shop, email, mật khẩu & tài khoản ngân hàng chính chủ nhận doanh thu',
-                      isCurrent: true,
-                    ),
-                    _buildProcessStep(
-                      step: '2',
-                      title: 'Thiết lập hồ sơ & Cấu hình gian hàng',
-                      desc: 'Cập nhật logo, ảnh bìa banner, địa chỉ kho lấy hàng mặc định tại Seller Center',
-                      isCurrent: false,
-                    ),
-                    _buildProcessStep(
-                      step: '3',
-                      title: 'Kiểm duyệt từ Admin sàn ShopNova',
-                      desc: 'Admin phê duyệt trạng thái "Đang hoạt động" để shop chính thức đăng bán sản phẩm',
-                      isCurrent: false,
-                      isLast: true,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 3. FORM ĐĂNG KÝ
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Thông Tin Gian Hàng Của Bạn',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Vui lòng điền thông tin chính xác để tối ưu khả năng tìm kiếm của khách hàng.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF8F90A6)),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Tài khoản đang liên kết
-                      if (isLoggedIn) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Row(
-                            children: [
-                              const CircleAvatar(
-                                radius: 16,
-                                backgroundColor: AppColors.primary,
-                                child: Icon(Icons.person, color: Colors.white, size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      user.fullName,
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
-                                    ),
-                                    Text(
-                                      'Tài khoản: @${user.username} (${user.role == 'seller' ? 'Đã là Người bán' : 'Thành viên nâng cấp'})',
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF555770)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.check_circle_rounded, color: Color(0xFF00BFA5), size: 20),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // 1. Tên gian hàng
-                      _buildFieldLabel('Tên Gian Hàng / Shop Name *'),
-                      TextFormField(
-                        controller: _shopNameController,
-                        decoration: _inputDecoration(
-                          hint: 'VD: NovaAudio Official, Gia Dụng 24h...',
-                          prefixIcon: Icons.store_rounded,
-                        ),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) return 'Vui lòng nhập tên gian hàng của bạn.';
-                          if (val.trim().length < 3) return 'Tên gian hàng tối thiểu 3 ký tự.';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // 2. Tỉnh / Thành phố kho hàng
-                      _buildFieldLabel('Tỉnh / Thành Phố Kho Hàng *'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedProvince,
-                        decoration: _inputDecoration(
-                          prefixIcon: Icons.location_on_rounded,
-                        ),
-                        items: _provinces.map((p) {
-                          return DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13.5)));
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedProvince = val);
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // 3. Khẩu hiệu / Giới thiệu
-                      _buildFieldLabel('Khẩu Hiệu / Giới Thiệu Ngắn'),
-                      TextFormField(
-                        controller: _taglineController,
-                        maxLines: 2,
-                        decoration: _inputDecoration(
-                          hint: 'VD: Chuyên đồ công nghệ chính hãng 100%, bảo hành 12 tháng, giao hàng 2h.',
-                          prefixIcon: Icons.format_quote_rounded,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // 4. Ngành hàng chủ lực
-                      _buildFieldLabel('Ngành Hàng Kinh Doanh Chính'),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _categories.map((cat) {
-                          final isSelected = _selectedCategory == cat['id'];
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => setState(() => _selectedCategory = cat['id']!),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.surfaceAlt : const Color(0xFFF7F7F8),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected ? AppColors.primary : const Color(0xFFE2E2E6),
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(cat['icon']!, style: const TextStyle(fontSize: 13)),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    cat['name']!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                      color: isSelected ? AppColors.primary : const Color(0xFF333333),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-
-                      // 5. Nếu chưa đăng nhập: Yêu cầu tạo tài khoản mới
-                      if (!isLoggedIn) ...[
-                        const SizedBox(height: 20),
-                        const Divider(height: 1, color: Color(0xFFEEEEF0)),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Container(
-                              width: 4,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2979FF),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Thông Tin Tài Khoản Đối Tác Mới',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-
-                        _buildFieldLabel('Họ và Tên Chủ Shop *'),
-                        TextFormField(
-                          controller: _fullNameController,
-                          decoration: _inputDecoration(
-                            hint: 'VD: Nguyễn Văn A',
-                            prefixIcon: Icons.badge_rounded,
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Vui lòng nhập họ và tên.';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        _buildFieldLabel('Số Điện Thoại / Tên Đăng Nhập *'),
-                        TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: _inputDecoration(
-                            hint: 'VD: 0987654321',
-                            prefixIcon: Icons.phone_android_rounded,
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Vui lòng nhập số điện thoại.';
-                            final clean = val.replaceAll(RegExp(r'\D'), '');
-                            if (clean.length < 9) return 'Số điện thoại không hợp lệ.';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        _buildFieldLabel('Mật Khẩu Đăng Nhập *'),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: _inputDecoration(
-                            hint: 'Tối thiểu 6 ký tự bảo mật',
-                            prefixIcon: Icons.lock_rounded,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                color: const Color(0xFF8F90A6),
-                                size: 20,
-                              ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                          ),
-                          validator: (val) {
-                            if (val == null || val.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự.';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 10),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Đã có tài khoản ShopNova? ', style: TextStyle(fontSize: 12.5, color: Color(0xFF555770))),
-                            InkWell(
-                              onTap: () async {
-                                await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-                                setState(() {});
-                              },
-                              child: const Text(
-                                'Đăng nhập ngay',
-                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primary),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      // Email liên hệ & đối soát
-                      const SizedBox(height: 16),
-                      _buildFieldLabel('Email Liên Hệ Đối Soát & Nhận Đơn'),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: _inputDecoration(
-                          hint: 'VD: seller@shopnova.vn (Tùy chọn)',
-                          prefixIcon: Icons.email_outlined,
-                        ),
-                      ),
-
-                      // THÔNG TIN TÀI KHOẢN NGÂN HÀNG (BƯỚC 1)
-                      const SizedBox(height: 20),
-                      const Divider(height: 1, color: Color(0xFFEEEEF0)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00BFA5),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Tài Khoản Ngân Hàng Nhận Doanh Thu',
-                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Thông tin tài khoản chính chủ để ShopNova thực hiện đối soát và chuyển tiền bán hàng.',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF8F90A6)),
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildFieldLabel('Ngân Hàng Thụ Hưởng *'),
-                      TextFormField(
-                        controller: _bankNameController,
-                        decoration: _inputDecoration(
-                          hint: 'VD: Vietcombank, MB Bank, Techcombank, ACB...',
-                          prefixIcon: Icons.account_balance_rounded,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      _buildFieldLabel('Số Tài Khoản Ngân Hàng *'),
-                      TextFormField(
-                        controller: _bankAccountNumberController,
-                        keyboardType: TextInputType.number,
-                        decoration: _inputDecoration(
-                          hint: 'VD: 0123456789 (STK chính chủ)',
-                          prefixIcon: Icons.credit_card_rounded,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      _buildFieldLabel('Tên Chủ Tài Khoản (Viết hoa không dấu) *'),
-                      TextFormField(
-                        controller: _bankAccountOwnerController,
-                        textCapitalization: TextCapitalization.characters,
-                        decoration: _inputDecoration(
-                          hint: 'VD: NGUYEN VAN A',
-                          prefixIcon: Icons.person_pin_rounded,
-                        ),
-                      ),
-
-                      // XÁC THỰC ĐỊNH DANH KYC (CCCD / CMND)
-                      const SizedBox(height: 20),
-                      const Divider(height: 1, color: Color(0xFFEEEEF0)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFF9100),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Xác Thực Định Danh Điện Tử (KYC - Tùy Chọn)',
-                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Tải ảnh chụp CCCD/CMND 2 mặt để gian hàng được cấp huy hiệu Uy Tín và ưu tiên duyệt nhanh.',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF8F90A6)),
-                      ),
-                      const SizedBox(height: 12),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildKycUploadCard(
-                              title: 'Mặt trước CCCD',
-                              imageUrl: _idCardFrontUrl,
-                              isLoading: _isUploadingFront,
-                              onTap: () async {
-                                setState(() => _isUploadingFront = true);
-                                final res = await UploadService().pickAndUploadImage(purpose: 'shop');
-                                setState(() {
-                                  _isUploadingFront = false;
-                                  if (res != null && res.success && res.url != null) {
-                                    _idCardFrontUrl = res.url;
-                                  } else if (res != null && res.error != null && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(res.error!), backgroundColor: const Color(0xFFD0011B)),
-                                    );
-                                  }
-                                });
-                              },
-                              onRemove: () => setState(() => _idCardFrontUrl = null),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildKycUploadCard(
-                              title: 'Mặt sau CCCD',
-                              imageUrl: _idCardBackUrl,
-                              isLoading: _isUploadingBack,
-                              onTap: () async {
-                                setState(() => _isUploadingBack = true);
-                                final res = await UploadService().pickAndUploadImage(purpose: 'shop');
-                                setState(() {
-                                  _isUploadingBack = false;
-                                  if (res != null && res.success && res.url != null) {
-                                    _idCardBackUrl = res.url;
-                                  } else if (res != null && res.error != null && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(res.error!), backgroundColor: const Color(0xFFD0011B)),
-                                    );
-                                  }
-                                });
-                              },
-                              onRemove: () => setState(() => _idCardBackUrl = null),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Cam kết điều khoản
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _agreeTerms,
-                              activeColor: AppColors.primary,
-                              onChanged: (val) => setState(() => _agreeTerms = val ?? false),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Tôi cam kết bán sản phẩm chính hãng, đầy đủ hóa đơn chứng từ và tuân thủ Quy chế hoạt động & Chính sách đối tác bán hàng của ShopNova.',
-                              style: TextStyle(fontSize: 11.5, color: Color(0xFF555770), height: 1.35),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Nút Submit
-                      Container(
-                        width: double.infinity,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.earth],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleSubmit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.storefront_rounded, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Hoàn Tất Đăng Ký Mở Gian Hàng',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF28293D)),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration({String? hint, IconData? prefixIcon, Widget? suffixIcon}) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B0C0)),
-      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: const Color(0xFF8F90A6), size: 19) : null,
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: const Color(0xFFFAFAFB),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE2E2E6)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE2E2E6)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-    );
-  }
-
-  Widget _buildPerkCard({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String desc,
-  }) {
+  // =========================================================================
+  // THANH ĐIỀU HƯỚNG DƯỚI CÙNG
+  // =========================================================================
+  Widget _buildBottomNavigationBar() {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEF0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFCF7),
+        border: Border(top: BorderSide(color: Color(0xFFE6D5C2))),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF1E2022)),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            desc,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6E7191), height: 1.25),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProcessStep({
-    required String step,
-    required String title,
-    required String desc,
-    required bool isCurrent,
-    bool isLast = false,
-  }) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isCurrent ? AppColors.primary : const Color(0xFFF0F1F5),
-              shape: BoxShape.circle,
+          OutlinedButton(
+            onPressed: _submitting
+                ? null
+                : () {
+                    if (_currentStep > 1) {
+                      setState(() => _currentStep--);
+                    } else {
+                      setState(() => _currentStep = 0);
+                    }
+                  },
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              side: const BorderSide(color: Color(0xFFE6D5C2)),
             ),
-            alignment: Alignment.center,
             child: Text(
-              step,
-              style: TextStyle(
-                color: isCurrent ? Colors.white : const Color(0xFF555770),
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
+              _currentStep > 1 ? 'Quay lại' : 'Hủy',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B7566)),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Bước $step: $title',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
-                    color: isCurrent ? AppColors.primary : const Color(0xFF1E2022),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF6E7191), height: 1.3),
-                ),
-              ],
+          ElevatedButton(
+            onPressed: _submitting ? null : _handleNextStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEE4D2D),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
+            child: _submitting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(
+                    _currentStep == 4 ? 'Hoàn tất & Gửi duyệt' : 'Tiếp theo',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildKycUploadCard({
-    required String title,
-    required String? imageUrl,
-    required bool isLoading,
-    required VoidCallback onTap,
-    required VoidCallback onRemove,
-  }) {
-    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
-    return Container(
-      height: 110,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFAFB),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hasImage ? const Color(0xFF00BFA5) : const Color(0xFFE2E2E6),
-          width: hasImage ? 1.5 : 1,
-        ),
-      ),
-      child: hasImage
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.credit_card_rounded, color: Colors.grey),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: InkWell(
-                    onTap: onRemove,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                      child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 4,
-                  left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-                    child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            )
-          : InkWell(
-              onTap: isLoading ? null : onTap,
-              borderRadius: BorderRadius.circular(10),
-              child: Center(
-                child: isLoading
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.add_a_photo_outlined, size: 24, color: Color(0xFF8F90A6)),
-                          const SizedBox(height: 6),
-                          Text(
-                            title,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF555770)),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Tối đa 5MB (JPG/PNG)',
-                            style: TextStyle(fontSize: 9.5, color: Color(0xFF8F90A6)),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
     );
   }
 }

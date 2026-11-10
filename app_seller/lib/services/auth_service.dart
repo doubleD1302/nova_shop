@@ -190,6 +190,7 @@ class AuthService extends ChangeNotifier {
     String? phone,
     required String shopName,
     String? shopTagline,
+    Map<String, dynamic>? sellerProfile,
   }) async {
     try {
       final res = await _api.post('/api/v1/auth/register', body: {
@@ -201,6 +202,7 @@ class AuthService extends ChangeNotifier {
         'role': 'seller',
         'shopName': shopName.trim(),
         if (shopTagline != null && shopTagline.trim().isNotEmpty) 'shopTagline': shopTagline.trim(),
+        if (sellerProfile != null) 'sellerProfile': sellerProfile,
       });
 
       if (res.success && res.data != null) {
@@ -225,6 +227,42 @@ class AuthService extends ChangeNotifier {
       return res;
     } catch (e) {
       return ApiResponse.error('Lỗi khi đăng ký gian hàng: $e');
+    }
+  }
+
+  Future<ApiResponse> openSellerShop({
+    required String shopName,
+    String? shopTagline,
+    required Map<String, dynamic> sellerProfile,
+  }) async {
+    try {
+      final res = await _api.post('/api/v1/auth/seller-shop', body: {
+        'shopName': shopName.trim(),
+        if (shopTagline != null && shopTagline.trim().isNotEmpty) 'shopTagline': shopTagline.trim(),
+        'sellerProfile': sellerProfile,
+      });
+
+      if (res.success && res.data != null) {
+        final token = res.data['token'] ?? res.data['accessToken'];
+        final refreshToken = res.data['refreshToken'];
+        final userData = res.data['user'] ?? res.data;
+        if (token != null) {
+          await _api.saveToken(token.toString());
+        }
+        if (userData != null) {
+          _currentUser = SellerUser.fromJson(userData);
+          _isAuthenticated = true;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_userKey, jsonEncode(_currentUser!.toJson()));
+          if (refreshToken != null) {
+            await prefs.setString(_refreshTokenKey, refreshToken.toString());
+          }
+          notifyListeners();
+        }
+      }
+      return res;
+    } catch (e) {
+      return ApiResponse.error('Lỗi khi mở gian hàng người bán: $e');
     }
   }
 

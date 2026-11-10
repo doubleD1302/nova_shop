@@ -7,6 +7,7 @@ import '../services/payout_service.dart';
 import '../theme/seller_theme.dart';
 import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
+import 'seller_product_form_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
   const SellerMainScreen({super.key});
@@ -274,161 +275,22 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     }
   }
 
-  void _showProductDialog([Map<String, dynamic>? initial]) {
-    final nameCtrl = TextEditingController(text: initial?['name']?.toString() ?? '');
-    final priceCtrl = TextEditingController(text: initial?['price']?.toString() ?? '');
-    final origPriceCtrl = TextEditingController(text: initial?['originalPrice']?.toString() ?? '');
-    final stockCtrl = TextEditingController(text: initial?['stock']?.toString() ?? '10');
-    final descCtrl = TextEditingController(text: initial?['description']?.toString() ?? '');
-    final imgCtrl = TextEditingController(
-      text: initial?['imageUrl']?.toString() ?? (initial?['images'] is List && (initial?['images'] as List).isNotEmpty ? initial!['images'][0].toString() : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600'),
-    );
-    String selectedCat = initial?['categoryId']?.toString() ?? (_categories.isNotEmpty ? _categories[0]['id'].toString() : 'thoi-trang-nam');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: SellerTheme.card,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      initial != null ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: SellerTheme.textSecondary),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const Divider(color: SellerTheme.border),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Tên sản phẩm *', hintText: 'Ví dụ: Áo sơ mi nam Oxford cao cấp'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: priceCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Giá bán (₫) *', hintText: '199000'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: origPriceCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Giá gốc (₫)', hintText: '250000'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: stockCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Số lượng tồn *', hintText: '50'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _categories.any((c) => c['id'].toString() == selectedCat) ? selectedCat : (_categories.isNotEmpty ? _categories[0]['id'].toString() : null),
-                        decoration: const InputDecoration(labelText: 'Danh mục *'),
-                        items: _categories.map((c) {
-                          return DropdownMenuItem<String>(
-                            value: c['id'].toString(),
-                            child: Text(c['name']?.toString() ?? c['id'].toString(), style: const TextStyle(fontSize: 12)),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setModalState(() => selectedCat = val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: imgCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Link ảnh sản phẩm (URL) *',
-                    hintText: 'https://...',
-                    prefixIcon: Icon(Icons.image_outlined, size: 20, color: SellerTheme.textSecondary),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Mô tả sản phẩm', hintText: 'Mô tả chi tiết chất liệu, xuất xứ, tính năng...'),
-                ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      final name = nameCtrl.text.trim();
-                      final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
-                      final orig = double.tryParse(origPriceCtrl.text.trim()) ?? 0;
-                      final stock = int.tryParse(stockCtrl.text.trim()) ?? 0;
-                      final img = imgCtrl.text.trim();
-                      final desc = descCtrl.text.trim();
-
-                      if (name.isEmpty || price <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Vui lòng nhập tên và giá bán hợp lệ.'), backgroundColor: SellerTheme.danger),
-                        );
-                        return;
-                      }
-
-                      Navigator.pop(ctx);
-                      _saveProduct(
-                        productId: initial?['id']?.toString(),
-                        name: name,
-                        price: price,
-                        originalPrice: orig,
-                        stock: stock,
-                        categoryId: selectedCat,
-                        description: desc,
-                        imageUrl: img,
-                      );
-                    },
-                    child: Text(initial != null ? 'LƯU THAY ĐỔI' : 'TẠO SẢN PHẨM MỚI'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Future<void> _showProductDialog([Map<String, dynamic>? initial]) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SellerProductFormScreen(
+          initialProduct: initial,
+          shopInfo: _shopProfile,
+          initialCategories: _categories,
         ),
       ),
     );
+
+    if (updated == true) {
+      _loadProducts();
+      _loadProfile();
+    }
   }
 
   void _showNotificationsDialog() {

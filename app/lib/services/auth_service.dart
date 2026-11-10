@@ -393,6 +393,7 @@ class AuthService extends ChangeNotifier {
     String role = 'buyer',
     String? shopName,
     String? shopTagline,
+    Map<String, dynamic>? sellerProfile,
   }) async {
     _isLoading = true;
     _lastError = null;
@@ -412,6 +413,9 @@ class AuthService extends ChangeNotifier {
       }
       if (role == 'seller' && shopTagline != null && shopTagline.trim().isNotEmpty) {
         payload['shopTagline'] = shopTagline.trim();
+      }
+      if (role == 'seller' && sellerProfile != null) {
+        payload['sellerProfile'] = sellerProfile;
       }
 
       final response = await http
@@ -475,6 +479,7 @@ class AuthService extends ChangeNotifier {
     required String shopName,
     String province = 'TP. Hồ Chí Minh',
     String? tagline,
+    Map<String, dynamic>? sellerProfile,
   }) async {
     _isLoading = true;
     _lastError = null;
@@ -485,6 +490,8 @@ class AuthService extends ChangeNotifier {
         '/api/v1/auth/seller-shop',
         body: {
           'shopName': shopName.trim(),
+          if (tagline != null && tagline.trim().isNotEmpty) 'shopTagline': tagline.trim(),
+          if (sellerProfile != null) 'sellerProfile': sellerProfile,
         },
       );
 

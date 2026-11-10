@@ -89,3 +89,4 @@ class NovaLogo extends StatelessWidget {
     );
   }
 }
+
