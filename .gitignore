@@ -144,3 +144,8 @@ mcp_config.json
 # Local SQLite database
 *.sqlite
 data-api/data/
+
+# Local configuration
+/database/run-migration.cjs
+/data-api/setup-db.js
+/data-api/import-schema.js
