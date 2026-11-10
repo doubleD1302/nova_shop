@@ -4,6 +4,7 @@ import '../config/api_config.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../theme/admin_theme.dart';
+import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -215,6 +216,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _promptRejectShop(String shopId, int version, String shopName) async {
+    final ctrl = TextEditingController(text: 'Hồ sơ chưa đủ điều kiện hoặc thiếu thông tin định danh.');
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AdminTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Từ chối duyệt "$shopName"', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nhập lý do từ chối để thông báo cho người bán:', style: TextStyle(fontSize: 12, color: AdminTheme.textSecondary)),
+            const SizedBox(height: 10),
+            TextField(controller: ctrl, maxLines: 3, style: const TextStyle(fontSize: 13), decoration: const InputDecoration(hintText: 'Nhập lý do...')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.danger),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Từ chối'),
+          ),
+        ],
+      ),
+    );
+    if (reason != null && reason.isNotEmpty) {
+      _approveShop(shopId, version, isApproved: false, comment: reason);
+    }
+  }
+
   // 2. Khóa / Mở khóa Shop
   Future<void> _updateShopStatus(String shopId, String status) async {
     final res = await _client.patch(
@@ -246,18 +279,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // 4. Duyệt / Từ chối Sản phẩm
-  Future<void> _updateProductApproval(String productId, String approvalStatus) async {
+  Future<void> _updateProductApproval(String productId, String approvalStatus, {String? reason}) async {
     final res = await _client.patch(
       '/api/v1/admin/products/$productId/approval',
       body: {
         'approvalStatus': approvalStatus,
-        if (approvalStatus == 'rejected') 'rejectionReason': 'Sản phẩm vi phạm chính sách đăng bán',
+        if (approvalStatus == 'rejected') 'rejectionReason': reason ?? 'Sản phẩm vi phạm chính sách đăng bán',
       },
     );
     if (!mounted) return;
     if (res.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đã cập nhật kiểm duyệt sản phẩm: $approvalStatus'), backgroundColor: AdminTheme.success),
+      );
+      _fetchProducts();
+    }
+  }
+
+  Future<void> _promptRejectProduct(String productId, String productName) async {
+    final ctrl = TextEditingController(text: 'Sản phẩm vi phạm tiêu chuẩn hình ảnh hoặc thông tin mô tả.');
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AdminTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Từ chối duyệt "$productName"', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nhập lý do từ chối để thông báo cho người bán:', style: TextStyle(fontSize: 12, color: AdminTheme.textSecondary)),
+            const SizedBox(height: 10),
+            TextField(controller: ctrl, maxLines: 3, style: const TextStyle(fontSize: 13), decoration: const InputDecoration(hintText: 'Nhập lý do...')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.danger),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Từ chối'),
+          ),
+        ],
+      ),
+    );
+    if (reason != null && reason.isNotEmpty) {
+      _updateProductApproval(productId, 'rejected', reason: reason);
+    }
+  }
+
+  Future<void> _toggleFlashSale(String productId, bool currentVal) async {
+    final res = await _client.patch(
+      '/api/v1/admin/products/$productId/flash-sale',
+      body: {'enabled': !currentVal},
+    );
+    if (!mounted) return;
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(!currentVal ? 'Đã bật Flash Sale cho sản phẩm!' : 'Đã tắt Flash Sale.'),
+          backgroundColor: AdminTheme.success,
+        ),
       );
       _fetchProducts();
     }
@@ -416,24 +498,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       titleSpacing: 0,
       title: Row(
         children: [
-          RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Nova',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AdminTheme.textPrimary),
-                ),
-                TextSpan(
-                  text: 'Shop',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AdminTheme.primaryHover),
-                ),
-                TextSpan(
-                  text: ' · Admin',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AdminTheme.textPrimary),
-                ),
-              ],
-            ),
-          ),
+          const NovaLogo(size: 28, fontSize: 16, subtitle: 'Cổng Quản Trị'),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -792,7 +857,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         foregroundColor: AdminTheme.danger,
                                         side: const BorderSide(color: AdminTheme.danger),
                                       ),
-                                      onPressed: () => _approveShop(shopId, version, isApproved: false),
+                                      onPressed: () => _promptRejectShop(shopId, version, name),
                                       child: const Text('Từ chối', style: TextStyle(fontSize: 11)),
                                     ),
                                     const SizedBox(width: 8),
@@ -1025,10 +1090,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ],
                             ),
                           ),
+                          IconButton(
+                            icon: Icon(
+                              p['isFlashSale'] == true ? Icons.bolt_rounded : Icons.bolt_outlined,
+                              color: p['isFlashSale'] == true ? AdminTheme.warning : AdminTheme.textSecondary,
+                              size: 20,
+                            ),
+                            tooltip: 'Flash Sale sàn',
+                            onPressed: () => _toggleFlashSale(pId, p['isFlashSale'] == true),
+                          ),
                           if (approvalStatus == 'pending') ...[
                             IconButton(
                               icon: const Icon(Icons.close, color: AdminTheme.danger, size: 20),
-                              onPressed: () => _updateProductApproval(pId, 'rejected'),
+                              onPressed: () => _promptRejectProduct(pId, name),
                             ),
                             IconButton(
                               icon: const Icon(Icons.check, color: AdminTheme.success, size: 20),

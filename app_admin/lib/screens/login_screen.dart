@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../config/api_config.dart';
 import '../theme/admin_theme.dart';
+import '../widgets/nova_logo.dart';
 import 'admin_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -172,47 +173,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo Shield Admin Brand icon
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AdminTheme.primaryHover, AdminTheme.primary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AdminTheme.primary.withValues(alpha: 0.25),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.shield_rounded, color: Colors.white, size: 38),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      // Official NovaShop Admin Logo
+                      const NovaLogo(size: 68, fontSize: 24, subtitle: 'Cổng Quản Trị'),
+                      const SizedBox(height: 12),
 
                       // Brand Name
                       const Text(
                         'ShopNova Admin',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AdminTheme.textPrimary,
-                          letterSpacing: -0.5,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AdminTheme.primaryHover,
+                          letterSpacing: -0.2,
                         ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
                         'Cổng Điều Hành Quản Trị Hệ Thống',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AdminTheme.primaryHover),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AdminTheme.textPrimary),
                       ),
                       const SizedBox(height: 4),
                       const Text(

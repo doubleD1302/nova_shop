@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../config/api_config.dart';
 import '../theme/seller_theme.dart';
+import '../widgets/nova_logo.dart';
 import 'seller_main_screen.dart';
 import 'register_screen.dart';
 
@@ -177,47 +178,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo Storefront Brand icon
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [SellerTheme.primaryHover, SellerTheme.primary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: SellerTheme.primary.withValues(alpha: 0.25),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.storefront_rounded, color: Colors.white, size: 38),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      // Official NovaShop Logo
+                      const NovaLogo(size: 68, fontSize: 24, subtitle: 'Kênh Người Bán'),
+                      const SizedBox(height: 12),
 
-                      // Brand Name
+                      // Brand Subtitle
                       const Text(
                         'ShopNova Seller Centre',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: SellerTheme.textPrimary,
-                          letterSpacing: -0.5,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: SellerTheme.primaryHover,
+                          letterSpacing: -0.2,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Kênh Quản Lý Gian Hàng Người Bán',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: SellerTheme.primaryHover),
                       ),
                       const SizedBox(height: 4),
                       const Text(

@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/payout_service.dart';
 import '../theme/seller_theme.dart';
+import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
@@ -674,37 +675,13 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   // --- TOP BAR ---
 
   PreferredSizeWidget _buildAppBar() {
-    final user = AuthService().currentUser;
-    final shopName = _shopProfile?['name']?.toString() ?? user?.fullName ?? 'Shop';
-
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.menu_rounded, color: SellerTheme.textPrimary),
         onPressed: () => _scaffoldKey.currentState?.openDrawer(),
       ),
       titleSpacing: 0,
-      title: Row(
-        children: [
-          RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Nova',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: SellerTheme.textPrimary),
-                ),
-                TextSpan(
-                  text: 'Shop',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: SellerTheme.primaryHover),
-                ),
-                TextSpan(
-                  text: ' · Kênh Người Bán',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: SellerTheme.textSecondary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      title: const NovaLogo(size: 30, fontSize: 16, subtitle: 'Kênh Người Bán'),
       actions: [
         IconButton(
           icon: Stack(
@@ -1745,6 +1722,63 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             ),
           ),
           const SizedBox(height: 16),
+
+          if (_shopProfile?['approvalStatus'] == 'rejected') ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: SellerTheme.dangerBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: SellerTheme.danger.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: SellerTheme.danger, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Gian hàng bị từ chối phê duyệt KYC',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: SellerTheme.danger),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Lý do: ${_shopProfile?['rejectionReason'] ?? 'Hồ sơ chưa đạt tiêu chuẩn sàn'}. Vui lòng cập nhật lại thông tin và bấm gửi duyệt lại.',
+                    style: const TextStyle(fontSize: 12, color: SellerTheme.danger),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SellerTheme.danger,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () async {
+                      final res = await _client.post('/api/v1/seller/shop/resubmit');
+                      if (mounted) {
+                        if (res.success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã gửi lại hồ sơ gian hàng cho ban quản trị duyệt!'), backgroundColor: SellerTheme.success),
+                          );
+                          _loadProfile();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Gửi lại thất bại.'), backgroundColor: SellerTheme.danger),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('GỬI DUYỆT LẠI GIAN HÀNG', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Form fields
           Container(
