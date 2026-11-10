@@ -6,6 +6,8 @@ import 'package:shopnova/models/user.dart';
 import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/screens/auth/login_screen.dart';
+import 'package:shopnova/screens/auth/register_screen.dart';
+import 'package:shopnova/screens/seller/seller_register_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -115,6 +117,27 @@ void main() {
       expect(find.textContaining('demo_seller'), findsNothing);
       expect(find.textContaining('demo_admin'), findsNothing);
       expect(find.text('Đăng Nhập Ngay'), findsOneWidget);
+    });
+
+    testWidgets('RegisterScreen is buyer-only without inline seller role toggle or static example placeholders', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: RegisterScreen()));
+      await tester.pump();
+
+      expect(find.text('Đăng Ký Tài Khoản'), findsNWidgets(2));
+      expect(find.text('Tôi là Người Mua'), findsNothing);
+      expect(find.text('Tôi là Người Bán'), findsNothing);
+      expect(find.text('Thông tin gian hàng của bạn'), findsNothing);
+      expect(find.textContaining('500.000đ'), findsNothing);
+      expect(find.textContaining('email@example.com'), findsNothing);
+      expect(find.textContaining('0912345678'), findsNothing);
+      expect(find.text('Đăng ký mở gian hàng tại Kênh Người Bán'), findsOneWidget);
+    });
+
+    testWidgets('RegisterScreen with initialRole=seller redirects to SellerRegisterScreen', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: RegisterScreen(initialRole: 'seller')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SellerRegisterScreen), findsOneWidget);
     });
   });
 }
