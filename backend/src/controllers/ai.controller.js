@@ -108,11 +108,22 @@ export async function chatWithAi(req, res, next) {
         aiResult = { reply: orders ? `Các đơn của bạn: ${orders}. Bạn có thể xem chi tiết trong mục Đơn hàng.` : result.total ? 'Không có đơn hàng ở trang này.' : 'Bạn chưa có đơn hàng để hiển thị.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [], pagination: { page, total: result.total, hasMore: offset + result.orders.length < result.total } }
       }
     } else {
-      const catalog = await findCatalogProducts(searchQuery, page)
-      const products = catalog.products
-      const catalogAvailable = catalog.available
-      if (catalogAvailable === false) return res.status(503).json({ success: false, message: 'Chưa thể lấy dữ liệu sản phẩm ShopNova. Bạn hãy thử lại sau.', error: { code: 'DATA_API_UNAVAILABLE' } })
-      const ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 15)
+      const wantsProducts = consultantInsights?.wantsProductRecommendations === true
+      let ranked = []
+      let catalogAvailable = null
+      let catalogPartial = false
+      let catalogHasMore = null
+
+      if (wantsProducts) {
+        const catalog = await findCatalogProducts(searchQuery, page)
+        const products = catalog.products
+        catalogAvailable = catalog.available
+        if (catalogAvailable === false) return res.status(503).json({ success: false, message: 'Chưa thể lấy dữ liệu sản phẩm ShopNova. Bạn hãy thử lại sau.', error: { code: 'DATA_API_UNAVAILABLE' } })
+        catalogPartial = catalog.partial
+        catalogHasMore = catalog.hasMore
+        ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 15)
+      }
+
       const recentHistory = (context.history || history).map((turn) => ({
         userQuery: turn.isUser ? turn.text : undefined,
         aiReply: turn.isUser ? undefined : turn.text,
@@ -122,34 +133,48 @@ export async function chatWithAi(req, res, next) {
         conversationHistory: [...(brain.conversationHistory || []), ...recentHistory],
         brainProfile: brain.profile,
         catalogProducts: ranked,
-        catalogPartial: catalog.partial,
+        catalogPartial,
         catalogPage: page,
-        catalogHasMore: catalog.hasMore,
+        catalogHasMore,
+        intent: consultantInsights?.intentCategory || 'product_recommendation',
         consultantInsights,
       })
       if (!response?.reply) {
         return res.status(503).json({ success: false, message: 'Nova AI tạm thời không khả dụng. Bạn hãy thử lại sau.', error: { code: 'AI_UNAVAILABLE' } })
       }
+
+      const intent = consultantInsights?.intentCategory || (wantsProducts ? 'product_recommendation' : 'consulting_advice')
+      const intentTitle = consultantInsights?.intentTitle || (wantsProducts ? 'Tư vấn mua sắm ShopNova' : 'Tư vấn chuyên môn')
+
       aiResult = {
         reply: response.reply,
-        intent: 'product_recommendation',
-        intentTitle: 'Tư vấn mua sắm ShopNova',
+        intent,
+        intentTitle,
         poweredBy: response.modelUsed,
         catalogAvailable,
-        catalogPartial: catalog.partial,
+        catalogPartial,
         catalogPage: page,
-        catalogHasMore: catalog.hasMore,
+        catalogHasMore,
         products: ranked.map((product) => ({
           id: product.id, name: product.name, price: product.price,
           originalPrice: product.originalPrice, rating: product.rating, sold: product.sold,
           mall: product.shopMall, imageUrl: product.images?.[0]?.url, categoryName: product.categoryName,
         })),
+        suggestions: consultantInsights?.suggestedPrompts || (wantsProducts ? [
+          '✨ Gợi ý thêm sản phẩm tương tự',
+          '💰 Xem mẫu giá mềm hơn',
+          '⭐ Xem sản phẩm bán chạy',
+        ] : [
+          '🚚 Xem chính sách đổi trả & freeship',
+          '👕 Bảng size chuẩn ShopNova',
+          '🛍️ Tìm sản phẩm hot hôm nay',
+        ]),
       }
     }
     if (aiResult.pagination) {
       const { total, hasMore } = aiResult.pagination
       aiResult.reply += `\nTrang ${page}; tổng số bản ghi: ${total}. ${hasMore ? `Bạn có thể hỏi trang ${page + 1}.` : 'Không còn trang tiếp theo.'}`
-    } else if (aiResult.intent === 'product_recommendation' && aiResult.catalogAvailable === true) {
+    } else if (aiResult.intent === 'product_recommendation' && aiResult.catalogAvailable === true && aiResult.products.length > 0) {
       aiResult.reply += `\nTrang ${page}. ${aiResult.catalogHasMore === true ? `Bạn có thể hỏi trang ${page + 1}.` : aiResult.catalogHasMore === false ? 'Không còn trang tiếp theo trong kết quả đã tìm.' : 'Một phần kết quả tìm kiếm chưa khả dụng.'}`
     }
     if (!privilegedQuestion && !isOrderQuestion) aiBrainService.recordConversationTurn(userKey, { userQuery: query, aiReply: aiResult.reply, intent: aiResult.intent, products: aiResult.products })

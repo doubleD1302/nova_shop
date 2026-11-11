@@ -152,49 +152,56 @@ class AiBrainService {
     const text = String(messageText || '').toLowerCase()
     const learned = []
 
-    // 1. Học phong cách thời trang & gu thẩm mỹ
-    const styles = [
-      { key: 'pastel', label: 'Tone màu Pastel ngọt ngào', tag: 'pastel' },
-      { key: 'tối giản', label: 'Phong cách Tối giản (Minimalism)', tag: 'tối giản' },
-      { key: 'công sở', label: 'Thời trang Công sở lịch lãm', tag: 'công sở' },
-      { key: 'dạo phố', label: 'Thời trang Dạo phố thoải mái', tag: 'dạo phố' },
-      { key: 'thể thao', label: 'Phong cách Thể thao năng động', tag: 'thể thao' },
-      { key: 'sang trọng', label: 'Phong cách Sang trọng đi tiệc', tag: 'tiệc' },
-      { key: 'tiệc', label: 'Thời trang Dạ tiệc quý phái', tag: 'tiệc' },
-      { key: 'vintage', label: 'Phong cách Vintage cổ điển', tag: 'vintage' },
-      { key: 'y2k', label: 'Phong cách Y2K sành điệu', tag: 'y2k' },
-    ]
-    for (const s of styles) {
-      if (text.includes(s.key)) {
-        if (!brain.profile.preferredStyles.includes(s.label)) {
-          brain.profile.preferredStyles.push(s.label)
-          learned.push(`Ưa chuộng: ${s.label}`)
+    // 0. Trích xuất nhu cầu chuyên môn của tư vấn viên
+    const consultantInsights = analyzeConsultantNeeds(text, brain)
+
+    // 1. Học phong cách thời trang & gu thẩm mỹ (khi không phải câu hỏi từ chối hoặc khiếu nại)
+    if (consultantInsights.intentCategory !== 'customer_support') {
+      const styles = [
+        { key: 'pastel', label: 'Tone màu Pastel ngọt ngào', tag: 'pastel' },
+        { key: 'tối giản', label: 'Phong cách Tối giản (Minimalism)', tag: 'tối giản' },
+        { key: 'công sở', label: 'Thời trang Công sở lịch lãm', tag: 'công sở' },
+        { key: 'dạo phố', label: 'Thời trang Dạo phố thoải mái', tag: 'dạo phố' },
+        { key: 'thể thao', label: 'Phong cách Thể thao năng động', tag: 'thể thao' },
+        { key: 'sang trọng', label: 'Phong cách Sang trọng đi tiệc', tag: 'tiệc' },
+        { key: 'tiệc', label: 'Thời trang Dạ tiệc quý phái', tag: 'tiệc' },
+        { key: 'vintage', label: 'Phong cách Vintage cổ điển', tag: 'vintage' },
+        { key: 'y2k', label: 'Phong cách Y2K sành điệu', tag: 'y2k' },
+      ]
+      for (const s of styles) {
+        if (text.includes(s.key)) {
+          if (!brain.profile.preferredStyles.includes(s.label)) {
+            brain.profile.preferredStyles.push(s.label)
+            learned.push(`Ưa chuộng: ${s.label}`)
+          }
+          brain.confirmedCriteria.preferredStyle = s.label
+          brain.affinity.tags[s.tag] = (brain.affinity.tags[s.tag] || 0) + 2
         }
-        brain.confirmedCriteria.preferredStyle = s.label
-        brain.affinity.tags[s.tag] = (brain.affinity.tags[s.tag] || 0) + 2
       }
     }
 
-    // 2. Học danh mục quan tâm
-    const categories = [
-      { key: 'váy', label: 'Váy / Đầm', tag: 'váy' },
-      { key: 'đầm', label: 'Váy / Đầm', tag: 'đầm' },
-      { key: 'áo sơ mi', label: 'Áo Sơ Mi', tag: 'áo sơ mi' },
-      { key: 'hoodie', label: 'Áo Hoodie & Áo Khoác', tag: 'hoodie' },
-      { key: 'áo khoác', label: 'Áo Khoác', tag: 'áo khoác' },
-      { key: 'tai nghe', label: 'Thiết Bị Âm Thanh & Phụ Kiện', tag: 'tai nghe' },
-      { key: 'túi xách', label: 'Túi Xách & Balo', tag: 'túi xách' },
-      { key: 'mỹ phẩm', label: 'Mỹ Phẩm & Chăm Sóc Da', tag: 'mỹ phẩm' },
-      { key: 'son', label: 'Son Môi', tag: 'son' },
-      { key: 'giày', label: 'Giày Dép', tag: 'giày' },
-    ]
-    for (const cat of categories) {
-      if (text.includes(cat.key)) {
-        if (!brain.profile.preferredCategories.includes(cat.label)) {
-          brain.profile.preferredCategories.push(cat.label)
-          learned.push(`Thường tìm kiếm: ${cat.label}`)
+    // 2. Học danh mục quan tâm (chỉ khi có nhu cầu tìm kiếm hoặc tham khảo mua sắm thực tế)
+    if (consultantInsights.wantsProductRecommendations) {
+      const categories = [
+        { key: 'váy', label: 'Váy / Đầm', tag: 'váy' },
+        { key: 'đầm', label: 'Váy / Đầm', tag: 'đầm' },
+        { key: 'áo sơ mi', label: 'Áo Sơ Mi', tag: 'áo sơ mi' },
+        { key: 'hoodie', label: 'Áo Hoodie & Áo Khoác', tag: 'hoodie' },
+        { key: 'áo khoác', label: 'Áo Khoác', tag: 'áo khoác' },
+        { key: 'tai nghe', label: 'Thiết Bị Âm Thanh & Phụ Kiện', tag: 'tai nghe' },
+        { key: 'túi xách', label: 'Túi Xách & Balo', tag: 'túi xách' },
+        { key: 'mỹ phẩm', label: 'Mỹ Phẩm & Chăm Sóc Da', tag: 'mỹ phẩm' },
+        { key: 'son', label: 'Son Môi', tag: 'son' },
+        { key: 'giày', label: 'Giày Dép', tag: 'giày' },
+      ]
+      for (const cat of categories) {
+        if (text.includes(cat.key)) {
+          if (!brain.profile.preferredCategories.includes(cat.label)) {
+            brain.profile.preferredCategories.push(cat.label)
+            learned.push(`Thường tìm kiếm: ${cat.label}`)
+          }
+          brain.affinity.categories[cat.label] = (brain.affinity.categories[cat.label] || 0) + 1
         }
-        brain.affinity.categories[cat.label] = (brain.affinity.categories[cat.label] || 0) + 1
       }
     }
 
@@ -261,9 +268,6 @@ class AiBrainService {
     if (brain.profile.learnedFacts.length > 15) {
       brain.profile.learnedFacts = brain.profile.learnedFacts.slice(-15)
     }
-
-    // 8. Trích xuất nhu cầu chuyên môn của tư vấn viên
-    const consultantInsights = analyzeConsultantNeeds(text, brain)
 
     brain.stats.totalInteractions += 1
     brain.updatedAt = new Date().toISOString()

@@ -157,7 +157,78 @@ assert(
   'Sản phẩm vượt quá ngân sách (2.500.000đ > 400.000đ) bị phạt điểm và đẩy xuống cuối'
 )
 
-// TEST 5: Dọn dẹp session test
+// TEST 5: Cơ sở dữ liệu chính sách nền tảng ShopNova (Platform Policies)
+assert(
+  typeof CONSULTANT_KNOWLEDGE_BASE.platformPolicies === 'object',
+  'Cơ sở dữ liệu chính sách nền tảng (platformPolicies) đã sẵn sàng'
+)
+assert(
+  CONSULTANT_KNOWLEDGE_BASE.platformPolicies.returnsAndRefunds.returnWindowDays === 15,
+  'Chính sách đổi trả miễn phí trong 15 ngày được lưu chính xác'
+)
+assert(
+  CONSULTANT_KNOWLEDGE_BASE.platformPolicies.shipping.standardFee === 16500,
+  'Phí vận chuyển tiêu chuẩn 16.500₫/shop được quy định rõ'
+)
+
+// TEST 6: Nhận biết nhu cầu gợi ý sản phẩm thông minh (Không ép đính kèm sản phẩm khi không cần)
+const policyQuestion = analyzeConsultantNeeds('ShopNova có chính sách đổi trả hàng như thế nào?')
+assert(
+  policyQuestion.wantsProductRecommendations === false,
+  'Câu hỏi chính sách đổi trả: Không đính kèm sản phẩm gợi ý'
+)
+assert(
+  policyQuestion.intentCategory === 'customer_support',
+  `Phân loại chính xác intent chăm sóc khách hàng: ${policyQuestion.intentCategory}`
+)
+
+const shippingFeeQuestion = analyzeConsultantNeeds('Phí giao hàng và freeship được tính ra sao?')
+assert(
+  shippingFeeQuestion.wantsProductRecommendations === false,
+  'Câu hỏi phí vận chuyển: Không đính kèm sản phẩm gợi ý'
+)
+assert(
+  shippingFeeQuestion.intentCategory === 'customer_support',
+  'Phân loại đúng câu hỏi vận chuyển vào customer_support'
+)
+
+const greetingQuestion = analyzeConsultantNeeds('Xin chào Nova, bạn là ai thế?')
+assert(
+  greetingQuestion.wantsProductRecommendations === false,
+  'Lời chào hỏi: Không đính kèm sản phẩm gợi ý vô cớ'
+)
+assert(
+  greetingQuestion.intentCategory === 'general_chat',
+  'Phân loại chính xác intent hội thoại chung: general_chat'
+)
+
+const sizingAdviceQuestion = analyzeConsultantNeeds('Mình nặng 52kg cao 1m60 nên chọn size gì?')
+assert(
+  sizingAdviceQuestion.wantsProductRecommendations === false,
+  'Hỏi tư vấn chọn size: Không đính kèm danh sách sản phẩm mua sắm khi chưa yêu cầu'
+)
+assert(
+  sizingAdviceQuestion.intentCategory === 'consulting_advice',
+  'Phân loại đúng intent tư vấn chuyên môn: consulting_advice'
+)
+
+const explicitNoProductQuestion = analyzeConsultantNeeds('Không cần gợi ý sản phẩm, chỉ giải thích giúp mình ANC là gì')
+assert(
+  explicitNoProductQuestion.wantsProductRecommendations === false,
+  'Khách chủ động từ chối gợi ý: Tôn trọng ý muốn khách hàng và không đính kèm sản phẩm'
+)
+
+const explicitShoppingQuestion = analyzeConsultantNeeds('Tìm cho mình đầm dạ tiệc sang trọng đi đám cưới')
+assert(
+  explicitShoppingQuestion.wantsProductRecommendations === true,
+  'Khách chủ động tìm mua đồ: Kích hoạt gợi ý sản phẩm phù hợp'
+)
+assert(
+  explicitShoppingQuestion.intentCategory === 'product_recommendation',
+  'Phân loại chính xác intent tìm kiếm sản phẩm: product_recommendation'
+)
+
+// TEST 7: Dọn dẹp session test
 aiBrainService.removeBrain(testSessionId)
 console.log('\n=== TỔNG KẾT KẾT QUẢ KIỂM THỬ THUẬT TOÁN AI ===')
 console.log(`Số bài kiểm tra vượt qua (PASS): ${passedTests}/${totalTests}`)

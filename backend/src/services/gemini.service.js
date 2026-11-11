@@ -78,7 +78,10 @@ CÁC NGUYÊN TẮC BẮT BUỘC KHI TƯ VẤN:
 2. TRẢ LỜI NGẮN GỌN, ĐÚNG TRỌNG TÂM & LOGIC: Không chào hỏi rườm rà. Đi thẳng vào câu trả lời giải quyết chính xác điều khách muốn ở câu hỏi đó. Dung lượng lý tưởng: 70 - 150 từ, cô đọng, sắc bén, lập luận chặt chẽ.
 3. CƠ SỞ KIẾN THỨC CHUYÊN MÔN TƯ VẤN VIÊN:
    - Chỉ mô tả chất liệu, kích cỡ và tính năng khi có trong dữ liệu dự án được cung cấp.
-4. KHÔNG DÙNG VĂN MẪU RẬP KHUÔN: Mỗi câu trả lời là một phân tích thực tế dành riêng cho khách hàng đó. Xưng "Nova" và gọi "bạn".`
+4. KHÔNG DÙNG VĂN MẪU RẬP KHUÔN: Mỗi câu trả lời là một phân tích thực tế dành riêng cho khách hàng đó. Xưng "Nova" và gọi "bạn".
+5. TINH TẾ & TÔN TRỌNG Ý MUỐN CỦA KHÁCH HÀNG (TUYỆT ĐỐI KHÔNG TỰ TIỆN CHÈN ÉP CHÀO MỜI SẢN PHẨM):
+   - Khi khách hàng hỏi chính sách sàn (đổi trả, phí ship, vận chuyển, bảo hành, thanh toán), hỏi kiến thức/hướng dẫn (chất liệu vải, cách giặt, chuẩn size, công nghệ) hoặc chỉ chào hỏi/trò chuyện thông thường: Hãy trả lời ĐÚNG TRỌNG TÂM, rõ ràng, nhã nhặn và đầy đủ thông tin khách cần. TUYỆT ĐỐI KHÔNG tự động chèn ép giới thiệu sản phẩm khi khách không yêu cầu.
+   - Chỉ đưa ra gợi ý sản phẩm cụ thể khi khách hàng có nhu cầu tìm kiếm, mua sắm hoặc yêu cầu gợi ý sản phẩm.`
 
   const promptText = `=== LỊCH SỬ CÂU HỎI & CÂU TRẢ LỜI TRƯỚC ĐÓ ===
 ${historyTurns || 'Đây là câu hỏi đầu tiên của phiên hội thoại.'}
@@ -86,14 +89,35 @@ ${historyTurns || 'Đây là câu hỏi đầu tiên của phiên hội thoại.
 === HỒ SƠ THÓI QUEN & TIÊU CHÍ KHÁCH HÀNG (AI BRAIN) ===
 ${brainContext || 'Chưa ghi nhận tiêu chí trước đó.'}
 ${consultantNotes.length ? `\n=== PHÂN TÍCH CHUYÊN MÔN TƯ VẤN VIÊN ===\n${consultantNotes.join('\n')}` : ''}
+${consultantInsights?.wantsProductRecommendations === false ? '\n=== CHỈ DẪN QUAN TRỌNG: KHÁCH HÀNG KHÔNG YÊU CẦU GỢI Ý SẢN PHẨM ===\nKhách hàng đang hỏi thông tin chính sách/kỹ thuật/chọn size/lời chào và KHÔNG yêu cầu tìm kiếm sản phẩm. Hãy tập trung giải đáp chính xác thắc mắc của khách bằng dữ liệu chính sách và chuyên môn ở trên một cách lịch sự, nhã nhặn. TUYỆT ĐỐI KHÔNG tự ý chèn ép chào mời sản phẩm.' : ''}
+
+=== QUY CHUẨN VÀ CHÍNH SÁCH SÀN SHOPNOVA ĐƯỢC PHÉP TRUY CẬP ===
+• Vận chuyển & Giao hàng: Phí giao hàng tiêu chuẩn 16.500₫ cho mỗi gian hàng trong đơn. Miễn phí vận chuyển (Freeship Extra) cho đơn hàng từ 1.000.000₫. Hỗ trợ giao hỏa tốc 2 giờ tại nội thành Hà Nội và TP.HCM. Giao hàng tiêu chuẩn toàn quốc từ 2 - 4 ngày làm việc.
+• Chính sách Đổi trả & Hoàn tiền: Đổi trả miễn phí trong vòng 15 ngày kể từ ngày nhận hàng. Hoàn tiền 100% nếu sản phẩm có lỗi từ nhà sản xuất hoặc không đúng mô tả. Người bán chịu toàn bộ phí vận chuyển hai chiều đối với hàng lỗi.
+• Thanh toán & Đồng kiểm: Hỗ trợ thanh toán khi nhận hàng (COD), chuyển khoản qua VietQR, thẻ tín dụng/ghi nợ quốc tế, ví MoMo, ZaloPay, VNPay. Khách hàng được quyền kiểm tra ngoại quan gói hàng (đồng kiểm) trước khi nhận từ bưu tá.
+• Cam kết & Bảo hành: 100% hàng chính hãng tại ShopNova Mall. Bảo hành chính hãng 12 tháng theo quy chuẩn từng thương hiệu.
+• Kênh hỗ trợ khách hàng: Hotline 1900 8888 (8h-21h hàng ngày), email support@shopnova.vn, hỗ trợ trực tuyến 24/7 trên ứng dụng/website ShopNova.
+
+=== CƠ SỞ KIẾN THỨC CHUYÊN MÔN TƯ VẤN VIÊN (KIẾN THỨC DỰ ÁN) ===
+• Bảng size chuẩn Nữ: Size S (40 - 47kg, 1m50 - 1m58, eo 62 - 66cm); Size M (48 - 53kg, 1m55 - 1m62, eo 67 - 71cm); Size L (54 - 60kg, 1m60 - 1m68, eo 72 - 76cm); Size XL (61 - 68kg, 1m62 - 1m70, eo 77 - 82cm).
+• Bảng size chuẩn Nam: Size M (50 - 60kg, 1m60 - 1m68, ngực 88 - 92cm); Size L (61 - 70kg, 1m68 - 1m75, ngực 93 - 97cm); Size XL (71 - 80kg, 1m72 - 1m80, ngực 98 - 104cm); Size XXL (81 - 90kg, 1m75 - 1m85, ngực 105 - 110cm).
+• Chất liệu vải:
+  - Linen (Đũi): Thoáng khí, thấm hút mồ hôi, mát mẻ, nếp nhăn tự nhiên mộc mạc; giặt nhẹ tay với nước lạnh, ủi khi còn hơi ẩm.
+  - Cotton 100%: Mềm mại, co giãn, thấm hút tốt, thân thiện với da; giặt máy chế độ thường, tránh phơi nắng gắt.
+  - Lụa Satin / Tơ tằm: Mịn bóng, sang trọng, mềm rủ; giặt tay nhẹ bằng nước lạnh hoặc giặt khô, không vắt xoắn.
+  - Kaki Cotton: Dày dặn, giữ form chuẩn, tôn dáng; ủi nhiệt độ trung bình, giặt mặt trái.
+• Công nghệ âm thanh & điện tử:
+  - ANC (Active Noise Cancellation): Chống ồn chủ động triệt tiêu tiếng ồn môi trường 35-40dB giúp tập trung học tập, làm việc.
+  - ENC: Lọc tạp âm khi đàm thoại cho giọng nói trong trẻo.
+  - Kháng nước IPX: IPX4 chống mồ hôi/tia nước nhẹ (thể thao, gym); IPX5 chống mưa vừa.
+  - Bluetooth 5.3: Tiết kiệm pin, kết nối ổn định 10-15m, độ trễ thấp dưới 45ms.
+• Quy tắc phối màu: Terracotta (Cam Đất) kết hợp Trắng Kem / Be tạo nét ấm áp thanh lịch tôn da châu Á; Pastel đi cùng Trắng/Denim tươi trẻ ngọt ngào; Monochrome Đen - Trắng tối giản hiện đại.
 
 === DỮ LIỆU NGHIỆP VỤ ĐƯỢC PHÉP TRUY CẬP ===
 ${businessContext ? JSON.stringify(businessContext) : 'Không có dữ liệu nghiệp vụ riêng.'}
 
 === SẢN PHẨM PHÙ HỢP CÓ SẴN TRONG KHO NOVASHOP ===
-Trang hiện tại: ${catalogPage}. ${catalogHasMore === true ? 'Còn kết quả ở trang tiếp theo.' : catalogHasMore === false ? 'Không còn kết quả ở trang tiếp theo trong các truy vấn đã chạy.' : 'Chưa xác định còn trang tiếp theo hay không.'}
-${catalogPartial ? 'Dữ liệu tìm kiếm chưa đầy đủ, không khẳng định toàn bộ danh mục.' : 'Kết quả chỉ thuộc các trang đã truy vấn, không khẳng định toàn bộ danh mục.'}
-${productContext.length ? JSON.stringify(productContext) : 'Không có dữ liệu sản phẩm phù hợp.'}
+${consultantInsights?.wantsProductRecommendations === false ? 'Khách hàng không yêu cầu danh sách sản phẩm ở lượt này.' : `Trang hiện tại: ${catalogPage}. ${catalogHasMore === true ? 'Còn kết quả ở trang tiếp theo.' : catalogHasMore === false ? 'Không còn kết quả ở trang tiếp theo trong các truy vấn đã chạy.' : 'Chưa xác định còn trang tiếp theo hay không.'}\n${catalogPartial ? 'Dữ liệu tìm kiếm chưa đầy đủ, không khẳng định toàn bộ danh mục.' : 'Kết quả chỉ thuộc các trang đã truy vấn, không khẳng định toàn bộ danh mục.'}\n${productContext.length ? JSON.stringify(productContext) : 'Không có dữ liệu sản phẩm phù hợp.'}`}
 
 === YÊU CẦU HIỆN TẠI CỦA KHÁCH HÀNG ===
 "${query}"
