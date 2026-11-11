@@ -238,6 +238,7 @@ function parseAndValidateEnv() {
   }
   const vnpayValues = ['VNPAY_TMN_CODE', 'VNPAY_HASH_SECRET', 'VNPAY_PAYMENT_URL', 'VNPAY_RETURN_URL']
   const momoValues = ['MOMO_PARTNER_CODE', 'MOMO_ACCESS_KEY', 'MOMO_SECRET_KEY', 'MOMO_API_URL', 'MOMO_REDIRECT_URL', 'MOMO_IPN_URL']
+  const zalopayValues = ['ZALOPAY_APP_ID', 'ZALOPAY_KEY1', 'ZALOPAY_KEY2', 'ZALOPAY_ENDPOINT', 'ZALOPAY_REDIRECT_URL', 'ZALOPAY_CALLBACK_URL']
   const hasGateway = (names) => names.some((name) => process.env[name]?.trim())
   const checkGateway = (names) => {
     if (!hasGateway(names)) return false
@@ -249,11 +250,19 @@ function parseAndValidateEnv() {
   }
   const hasVnpay = checkGateway(vnpayValues)
   const hasMomo = checkGateway(momoValues)
+  const hasZalopay = checkGateway(zalopayValues)
   const paymentGatewaysEnabled = (process.env.PAYMENT_GATEWAYS_ENABLED || 'false').trim().toLowerCase()
   if (!['true', 'false'].includes(paymentGatewaysEnabled)) {
     console.error('[Lỗi cấu hình] PAYMENT_GATEWAYS_ENABLED chỉ chấp nhận true hoặc false.')
     process.exit(1)
   }
+
+  // 3PL Logistics configurations (GHN, GHTK)
+  const ghnApiToken = (process.env.GHN_API_TOKEN || '').trim()
+  const ghnShopId = (process.env.GHN_SHOP_ID || '').trim()
+  const ghnApiUrl = (process.env.GHN_API_URL || 'https://dev-online-gateway.ghn.vn').trim()
+  const ghtkApiToken = (process.env.GHTK_API_TOKEN || '').trim()
+  const ghtkApiUrl = (process.env.GHTK_API_URL || 'https://services.giaohangtietkiem.vn').trim()
 
   const rawDemoLogin = (process.env.DEMO_LOGIN_ENABLED || 'false').trim().toLowerCase()
   if (!['true', 'false'].includes(rawDemoLogin)) {
@@ -320,6 +329,27 @@ function parseAndValidateEnv() {
       redirectUrl: gatewayUrl('MOMO_REDIRECT_URL', process.env.MOMO_REDIRECT_URL),
       ipnUrl: gatewayUrl('MOMO_IPN_URL', process.env.MOMO_IPN_URL),
     } : null,
+    zalopay: hasZalopay ? {
+      appId: process.env.ZALOPAY_APP_ID.trim(),
+      key1: process.env.ZALOPAY_KEY1.trim(),
+      key2: process.env.ZALOPAY_KEY2.trim(),
+      endpoint: gatewayUrl('ZALOPAY_ENDPOINT', process.env.ZALOPAY_ENDPOINT),
+      redirectUrl: gatewayUrl('ZALOPAY_REDIRECT_URL', process.env.ZALOPAY_REDIRECT_URL),
+      callbackUrl: gatewayUrl('ZALOPAY_CALLBACK_URL', process.env.ZALOPAY_CALLBACK_URL),
+    } : null,
+    logistics: {
+      ghn: {
+        token: ghnApiToken,
+        shopId: ghnShopId,
+        apiUrl: ghnApiUrl,
+        enabled: Boolean(ghnApiToken),
+      },
+      ghtk: {
+        token: ghtkApiToken,
+        apiUrl: ghtkApiUrl,
+        enabled: Boolean(ghtkApiToken),
+      },
+    },
     geminiApiKeys: [...new Set([...(process.env.GEMINI_API_KEYS || '').split(','), process.env.GEMINI_API_KEY || ''].map((key) => key.trim()).filter(Boolean))],
   })
 }

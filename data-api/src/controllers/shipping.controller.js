@@ -254,3 +254,217 @@ export async function getOrderTracking(req, res, next) {
     return next(err)
   }
 }
+
+/**
+ * Tự động đẩy đơn sang 3PL (tạo tracking code và lịch hẹn bưu tá lấy hàng)
+ */
+export async function dispatchOrderShipment(req, res, next) {
+  try {
+    const shopOrderId = req.params.shopOrderId
+    const { userId, trackingCode, carrier = 'GHN', pickupAppointment } = req.body || {}
+
+    if (
+      !/^[1-9]\d{0,19}$/.test(shopOrderId) ||
+      !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
+      typeof trackingCode !== 'string' || !trackingCode.trim() || trackingCode.trim().length > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thông tin đẩy đơn không hợp lệ.',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    const cleanCode = trackingCode.trim().toUpperCase()
+    const cleanCarrier = String(carrier || 'GHN').trim()
+
+    const result = await executeTransaction(async (query) => {
+      const rows = await query(
+        `SELECT so.id, so.order_id, so.status, so.shop_id, s.owner_id, o.payment_method
+         FROM shop_orders so
+         JOIN shops s ON s.id = so.shop_id
+         JOIN orders o ON o.id = so.order_id
+         WHERE so.id = ? FOR UPDATE`,
+        [shopOrderId],
+      )
+
+      if (!rows.length || String(rows[0].owner_id) !== String(userId)) {
+        return { error: 'ORDER_NOT_FOUND' }
+      }
+
+      const shopOrder = rows[0]
+      if (['delivered', 'cancelled'].includes(shopOrder.status)) {
+        return { error: 'INVALID_STATUS_FOR_DISPATCH' }
+      }
+      if (shopOrder.payment_method !== 'cod') {
+        const payments = await query('SELECT status FROM payments WHERE shop_order_id = ? FOR UPDATE', [shopOrderId])
+        if (payments[0]?.status !== 'paid') return { error: 'PAYMENT_REQUIRED' }
+      }
+
+      const nextStatus = 'shipping'
+
+      await query(
+        `UPDATE shop_orders
+         SET tracking_code = ?, shipping_name = ?, status = ?, updated_at = UTC_TIMESTAMP(3)
+         WHERE id = ?`,
+        [cleanCode, cleanCarrier, nextStatus, shopOrderId],
+      )
+
+      const shiftInfo = pickupAppointment?.shift || 'Ca gần nhất'
+      await query(
+        `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+         VALUES (?, ?, ?, ?, ?)`,
+        [shopOrderId, shopOrder.status, nextStatus, userId, `Tự động đẩy đơn sang ${cleanCarrier}, mã vận đơn ${cleanCode}, lịch lấy: ${shiftInfo}`.slice(0, 500)],
+      )
+
+      try {
+        await query(
+          `INSERT INTO shipment_trackings (shop_order_id, tracking_code, carrier, status, location, description)
+           VALUES (?, ?, ?, 'manifest_created', 'Kho người bán', ?)`,
+          [shopOrderId, cleanCode, cleanCarrier, `Bưu tá ${cleanCarrier} đã tiếp nhận lịch hẹn lấy hàng (${shiftInfo})`.slice(0, 255)],
+        )
+      } catch (err) {
+        if (!isTableMissingError(err)) throw err
+      }
+
+      return {
+        shopOrderId: String(shopOrderId),
+        trackingCode: cleanCode,
+        carrier: cleanCarrier,
+        status: nextStatus,
+        pickupAppointment,
+      }
+    })
+
+    if (result.error === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng của người bán.', error: { code: 'ORDER_NOT_FOUND' } })
+    }
+    if (result.error === 'INVALID_STATUS_FOR_DISPATCH') {
+      return res.status(400).json({ success: false, message: 'Đơn hàng đã hoàn tất hoặc đã hủy.', error: { code: 'INVALID_STATUS_FOR_DISPATCH' } })
+    }
+    if (result.error === 'PAYMENT_REQUIRED') {
+      return res.status(409).json({ success: false, message: 'Cần xác nhận thanh toán trước khi giao hàng.', error: { code: 'PAYMENT_REQUIRED' } })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Tự động tạo mã vận đơn và hẹn lịch bưu tá thành công.',
+      data: result,
+    })
+  } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+    return next(err)
+  }
+}
+
+/**
+ * Webhook cập nhật hành trình tự động từ bưu tá / đơn vị vận chuyển 3PL
+ */
+export async function applyShippingWebhookEvent(req, res, next) {
+  try {
+    const { trackingCode, carrier, status, location, description, eventTime, isDelivered } = req.body || {}
+
+    if (
+      typeof trackingCode !== 'string' || !trackingCode.trim() ||
+      typeof status !== 'string' || !['manifest_created', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'failed_attempt'].includes(status)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thông tin hành trình từ webhook không hợp lệ.',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    const cleanCode = trackingCode.trim().toUpperCase()
+    const cleanCarrier = String(carrier || '3PL').trim()
+
+    const result = await executeTransaction(async (query) => {
+      const rows = await query(
+        `SELECT so.id, so.order_id, so.status, o.payment_method
+         FROM shop_orders so
+         JOIN orders o ON o.id = so.order_id
+         WHERE so.tracking_code = ? FOR UPDATE`,
+        [cleanCode],
+      )
+
+      if (!rows.length) {
+        return { error: 'TRACKING_NOT_FOUND' }
+      }
+
+      const shopOrder = rows[0]
+
+      // Ghi mốc hành trình vào bảng shipment_trackings
+      try {
+        await query(
+          `INSERT INTO shipment_trackings (shop_order_id, tracking_code, carrier, status, location, description, event_time)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            shopOrder.id,
+            cleanCode,
+            cleanCarrier,
+            status,
+            location || 'Trung tâm khai thác',
+            description || `Cập nhật hành trình: ${status}`,
+            eventTime ? new Date(eventTime) : new Date(),
+          ],
+        )
+      } catch (err) {
+        if (!isTableMissingError(err)) throw err
+      }
+
+      // Xử lý chuyển trạng thái đơn hàng tương ứng
+      if (status === 'delivered' || isDelivered) {
+        if (shopOrder.status !== 'delivered') {
+          await query(
+            `UPDATE shop_orders SET status = 'delivered', delivered_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3)
+             WHERE id = ?`,
+            [shopOrder.id],
+          )
+          await query(
+            `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+             VALUES (?, ?, 'delivered', NULL, 'Bưu tá xác nhận giao hàng thành công qua Webhook')`,
+            [shopOrder.id, shopOrder.status],
+          )
+        }
+        // Nếu là COD: bưu tá đã thu tiền thành công -> tự động chuyển payments sang paid
+        if (shopOrder.payment_method === 'cod') {
+          await query(
+            `UPDATE payments SET status = 'paid', paid_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3)
+             WHERE shop_order_id = ? AND status = 'unpaid'`,
+            [shopOrder.id],
+          )
+        }
+      } else if (status === 'picked_up' && shopOrder.status === 'pending') {
+        await query(
+          `UPDATE shop_orders SET status = 'shipping', updated_at = UTC_TIMESTAMP(3) WHERE id = ?`,
+          [shopOrder.id],
+        )
+        await query(
+          `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+           VALUES (?, 'pending', 'shipping', NULL, 'Bưu tá đã lấy hàng thành công qua Webhook')`,
+          [shopOrder.id],
+        )
+      }
+
+      return {
+        shopOrderId: String(shopOrder.id),
+        trackingCode: cleanCode,
+        status,
+        delivered: status === 'delivered',
+      }
+    })
+
+    if (result.error === 'TRACKING_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng với mã vận đơn này.', error: { code: 'TRACKING_NOT_FOUND' } })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật hành trình vận chuyển thành công.',
+      data: result,
+    })
+  } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+    return next(err)
+  }
+}
