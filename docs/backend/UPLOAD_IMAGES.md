@@ -17,3 +17,18 @@ Kiểm tra tích hợp bằng `node data-api/scripts/test-avatar-mysql.mjs` từ
 Ảnh sản phẩm mới cần upload với `purpose: "product"`; URL có dạng `/uploads/product-<userId>-<uuid>.<đuôi>`. Backend kiểm tra object tồn tại, là file và không quá 5 MiB trước khi lưu sản phẩm; Data API kiểm tra URL mới thuộc user đang sửa. Ảnh UUID cũ không mang owner chỉ được giữ lại trên đúng sản phẩm đã có ảnh đó; không được dùng cho sản phẩm khác. URL avatar do cùng seller tải theo client cũ vẫn được chấp nhận trong giai đoạn tương thích. Không tự xóa ảnh mồ côi.
 
 Web seller gửi `purpose: "product"` khi tải ảnh sản phẩm. Các client cũ không gửi `purpose` vẫn cần cập nhật: ảnh trên 1 MiB của luồng cũ không có owner nên không được dùng làm ảnh sản phẩm mới. Ảnh cũ bị mất object sẽ cần tải lại trước khi lưu sản phẩm. Kiểm tra object chỉ phản ánh thời điểm lưu; object có thể bị xóa về sau.
+
+## Tích hợp Cloudflare R2 (S3-compatible Object Storage)
+
+Backend hỗ trợ lưu trữ đám mây S3/Cloudflare R2 qua AWS SDK v3 (`@aws-sdk/client-s3`). Cấu hình môi trường trong `backend/.env`:
+
+- `UPLOAD_STORAGE=s3`
+- `S3_BUCKET=shopnova-media`
+- `S3_REGION=auto`
+- `S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com`
+- `S3_ACCESS_KEY_ID=<access_key_id>`
+- `S3_SECRET_ACCESS_KEY=<secret_access_key>`
+- `S3_FORCE_PATH_STYLE=false`
+
+Kiểm tra kết nối và tính sẵn sàng của Object Storage bằng script:
+`node backend/scripts/test-cloudflare-r2.mjs`
