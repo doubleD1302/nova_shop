@@ -1,5 +1,7 @@
 # ShopNova Data API
 
+Tạo ba gian hàng học tập, mỗi shop 50 sản phẩm có đủ bốn ảnh: xem [bộ catalog mẫu](../docs/data-api/DEMO_CATALOG.md). Lệnh `npm run seed:catalog` chỉ chạy khi chủ động bật trên database dev/test đã xác định.
+
 Khởi tạo MySQL/TiDB mới từ schema hiện tại: xem [hướng dẫn database](../database/SETUP.md). Chạy `npm run init:db -- --seed` bằng cấu hình quản trị riêng cho database trống; sau đó cấu hình tài khoản runtime trong `.env` và chạy `npm run check:cloud`.
 
 Kiểm tra địa chỉ mặc định qua Backend → Data API → MySQL: chạy từ root `node data-api/scripts/test-address-mysql.mjs` với MySQL 8 cục bộ riêng, `ADDRESS_MYSQL_TEST=1`, `ADDRESS_DB_PORT`, `ADDRESS_DB_PASSWORD` và tùy chọn `ADDRESS_DB_USER` (mặc định root). Script tạo rồi xóa database thử nghiệm riêng; không dùng database chung. Địa chỉ được lưu qua cập nhật hồ sơ; việc tự lưu khi đặt hàng chưa được quy định.

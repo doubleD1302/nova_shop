@@ -127,7 +127,8 @@ export function CatalogProvider({ children }) {
   const sellerProductsRef = useRef(sellerDatabaseProducts)
   const sellerProductsTotalRef = useRef(sellerProductsTotal)
   const categoriesRef = useRef(categories)
-  const categoriesLoadedRef = useRef(Boolean(categories && categories.length))
+  // Dữ liệu dự phòng/cache hiển thị ngay, nhưng vẫn cần tải danh mục thật từ API.
+  const categoriesLoadedRef = useRef(false)
 
   useEffect(() => {
     const isSeller = Boolean(user && (user.role === 'seller' || user.shopId))
