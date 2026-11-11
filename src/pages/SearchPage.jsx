@@ -159,19 +159,85 @@ export default function SearchPage() {
             </div>
           ) : (
             <div className="mt-3 rounded-sm border border-line bg-white">
-              <EmptyState
-                emoji="🛍️"
-                title="Không tìm thấy sản phẩm phù hợp"
-                description="Hãy thử xoá bớt bộ lọc hoặc tìm kiếm với từ khoá khác."
-                action={
-                  <Link
-                    to="/tim-kiem"
-                    className="rounded-sm bg-brand px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
-                  >
-                    Xem toàn bộ sản phẩm
-                  </Link>
-                }
-              />
+              {query.category ? (
+                <EmptyState
+                  emoji="📦"
+                  title={currentCategory ? `Ngành hàng “${currentCategory.name}” hiện đang cập nhật sản phẩm` : 'Ngành hàng hiện đang cập nhật sản phẩm'}
+                  description="Hiện chưa có sản phẩm nào thuộc ngành hàng này được đăng bán. Mời bạn khám phá các ngành hàng đang có sẵn hoặc xem toàn bộ sản phẩm trên sàn."
+                  action={
+                    <div className="flex flex-col items-center gap-3">
+                      {categories.filter((c) => Number(c.productCount) > 0).length ? (
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-lg">
+                          <span className="w-full text-center text-[11px] font-medium text-muted">Ngành hàng đang có sẵn sản phẩm:</span>
+                          {categories.filter((c) => Number(c.productCount) > 0).slice(0, 5).map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setParam('category', c.id)}
+                              className="rounded-full border border-line bg-page px-3 py-1 text-[12px] text-ink-soft transition hover:border-brand hover:bg-brand-soft hover:text-brand"
+                            >
+                              {c.name} ({c.productCount})
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setParam('category', '')}
+                          className="rounded-sm bg-brand px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+                        >
+                          Xem toàn bộ sản phẩm
+                        </button>
+                        <Link
+                          to="/"
+                          className="rounded-sm border border-line px-4 py-2 text-[13px] font-medium text-ink-soft transition hover:border-brand hover:text-brand"
+                        >
+                          Về trang chủ
+                        </Link>
+                      </div>
+                    </div>
+                  }
+                />
+              ) : query.q ? (
+                <EmptyState
+                  emoji="🔍"
+                  title={`Không tìm thấy sản phẩm cho từ khoá “${query.q}”`}
+                  description="Hãy thử kiểm tra lại chính tả hoặc tìm kiếm bằng từ khoá ngắn gọn, phổ biến hơn."
+                  action={
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setParam('q', '')}
+                        className="rounded-sm bg-brand px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+                      >
+                        Xoá từ khoá tìm kiếm
+                      </button>
+                      <Link
+                        to="/tim-kiem"
+                        className="rounded-sm border border-line px-4 py-2 text-[13px] font-medium text-ink-soft transition hover:border-brand hover:text-brand"
+                      >
+                        Xem toàn bộ sản phẩm
+                      </Link>
+                    </div>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  emoji="🛍️"
+                  title="Không có sản phẩm nào khớp với bộ lọc đã chọn"
+                  description="Hãy thử xoá bớt một số bộ lọc (khoảng giá, đánh giá sao, nơi bán) để xem nhiều sản phẩm hơn."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setParams(new URLSearchParams())}
+                      className="rounded-sm bg-brand px-4 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
+                    >
+                      Xoá tất cả bộ lọc
+                    </button>
+                  }
+                />
+              )}
             </div>
           )}
 
@@ -179,7 +245,6 @@ export default function SearchPage() {
 
           <p className="pb-4 text-center text-[11px] text-muted">
             {formatNumber(result.total)} sản phẩm trên ShopNova.
-            trên ShopNova.
           </p>
         </div>
       </div>

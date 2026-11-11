@@ -166,9 +166,19 @@ export function CatalogProvider({ children }) {
       // Dự phòng an toàn: lấy từ bộ nhớ cache hoặc mẫu mặc định để giao diện không bao giờ bị lỗi
       const cached = getCached('novashop_cache_products_v1', DEFAULT_PRODUCTS)
       let list = (cached && cached.length ? cached : DEFAULT_PRODUCTS).map(normalizeProduct)
+      const targetCategory = options.categoryId || options.category
       if (options.flash) list = list.filter((p) => p.flash)
-      if (options.mall) list = list.filter((p) => p.shopMall)
-      if (options.category) list = list.filter((p) => p.categoryId === options.category || p.categorySlug === options.category)
+      if (options.mall) list = list.filter((p) => p.shopMall || p.mall)
+      if (options.freeship) list = list.filter((p) => p.freeship)
+      if (targetCategory) list = list.filter((p) => p.categoryId === targetCategory || p.categorySlug === targetCategory)
+      if (options.shopId) list = list.filter((p) => p.shopId === String(options.shopId))
+      if (options.minPrice != null) list = list.filter((p) => p.price >= Number(options.minPrice))
+      if (options.maxPrice != null) list = list.filter((p) => p.price <= Number(options.maxPrice))
+      if (options.location) list = list.filter((p) => p.location && (p.location === options.location || p.location.includes(options.location) || options.location.includes(p.location)))
+      if (options.q) {
+        const qKey = normalize(options.q)
+        list = list.filter((p) => normalize(p.name).includes(qKey) || normalize(p.shopName).includes(qKey))
+      }
       const limit = Number(options.limit ?? 20)
       const offset = Number(options.offset ?? 0)
       const paged = list.slice(offset, offset + limit)

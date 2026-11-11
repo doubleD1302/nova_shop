@@ -17,6 +17,49 @@ const parseJson = (value, fallback) => {
   }
 }
 
+/** Bảng ánh xạ slug thông minh cho Data API */
+const CATEGORY_ALIASES = {
+  'tui-vi': 'tui-xach',
+  'vi': 'tui-xach',
+  'balo': 'tui-xach',
+  'tui-deo-cheo': 'tui-xach',
+  'cap-sach': 'tui-xach',
+  'sac-dep': 'my-pham',
+  'lam-dep': 'my-pham',
+  'cham-soc-da': 'my-pham',
+  'trang-diem': 'my-pham',
+  'son-moi': 'my-pham',
+  'dien-tu': 'phu-kien-cong-nghe',
+  'cong-nghe': 'phu-kien-cong-nghe',
+  'tai-nghe': 'phu-kien-cong-nghe',
+  'may-tinh': 'dien-thoai',
+  'laptop': 'dien-thoai',
+  'smartphone': 'dien-thoai',
+  'dien-thoai-phu-kien': 'dien-thoai',
+  'nha-cua': 'nha-cua-doi-song',
+  'noi-that': 'nha-cua-doi-song',
+  'gia-dung': 'nha-cua-doi-song',
+  'thiet-bi-gia-dung': 'nha-cua-doi-song',
+  'giay': 'giay-dep',
+  'dep': 'giay-dep',
+  'sneaker': 'giay-dep',
+  'sandal': 'giay-dep',
+  'quan-ao-nam': 'thoi-trang-nam',
+  'ao-nam': 'thoi-trang-nam',
+  'nam': 'thoi-trang-nam',
+  'quan-ao-nu': 'thoi-trang-nu',
+  'ao-nu': 'thoi-trang-nu',
+  'vay': 'thoi-trang-nu',
+  'dam': 'thoi-trang-nu',
+  'nu': 'thoi-trang-nu',
+}
+
+function resolveCategorySlug(rawSlug) {
+  if (!rawSlug) return ''
+  const normalized = String(rawSlug).trim().toLowerCase()
+  return CATEGORY_ALIASES[normalized] || normalized
+}
+
 const asDateString = (value) => value instanceof Date ? value.toISOString() : String(value || '')
 
 async function hasColumn(tableName, columnName) {
@@ -64,7 +107,7 @@ export async function listProducts(req, res, next) {
       ...(hasApprovalStatusColumn ? ["(p.approval_status = 'approved' OR p.approval_status IS NULL)"] : []),
     ]
     const params = []
-    const categoryId = String(req.query.categoryId || '').trim()
+    const categoryId = resolveCategorySlug(req.query.categoryId)
     const shopId = String(req.query.shopId || '').trim()
     const query = String(req.query.q || '').trim().slice(0, 120)
     const location = String(req.query.location || '').trim().slice(0, 120)
@@ -78,7 +121,11 @@ export async function listProducts(req, res, next) {
       const pattern = `%${query}%`
       params.push(pattern, pattern, pattern)
     }
-    if (location) { where.push('s.province = ?'); params.push(location) }
+    if (location) {
+      const cleanLoc = location.replace(/^(?:TP\.?|Thành phố|Tỉnh)\s*/i, '').trim()
+      where.push('(s.province = ? OR s.province LIKE ?)')
+      params.push(location, `%${cleanLoc}%`)
+    }
     for (const [key, column] of [['flash', 'p.is_flash_sale'], ['mall', 's.is_mall'], ['freeship', 'p.free_shipping']]) {
       if (req.query[key] === '1' || req.query[key] === 'true') where.push(`${column} = 1`)
     }

@@ -4,6 +4,49 @@ import { env } from '../config/env.js'
 import { headUploadedImage } from '../services/object-storage.js'
 import { callDataApi } from '../clients/data.client.js'
 
+/** Bảng ánh xạ slug thông minh cho Backend */
+const CATEGORY_ALIASES = {
+  'tui-vi': 'tui-xach',
+  'vi': 'tui-xach',
+  'balo': 'tui-xach',
+  'tui-deo-cheo': 'tui-xach',
+  'cap-sach': 'tui-xach',
+  'sac-dep': 'my-pham',
+  'lam-dep': 'my-pham',
+  'cham-soc-da': 'my-pham',
+  'trang-diem': 'my-pham',
+  'son-moi': 'my-pham',
+  'dien-tu': 'phu-kien-cong-nghe',
+  'cong-nghe': 'phu-kien-cong-nghe',
+  'tai-nghe': 'phu-kien-cong-nghe',
+  'may-tinh': 'dien-thoai',
+  'laptop': 'dien-thoai',
+  'smartphone': 'dien-thoai',
+  'dien-thoai-phu-kien': 'dien-thoai',
+  'nha-cua': 'nha-cua-doi-song',
+  'noi-that': 'nha-cua-doi-song',
+  'gia-dung': 'nha-cua-doi-song',
+  'thiet-bi-gia-dung': 'nha-cua-doi-song',
+  'giay': 'giay-dep',
+  'dep': 'giay-dep',
+  'sneaker': 'giay-dep',
+  'sandal': 'giay-dep',
+  'quan-ao-nam': 'thoi-trang-nam',
+  'ao-nam': 'thoi-trang-nam',
+  'nam': 'thoi-trang-nam',
+  'quan-ao-nu': 'thoi-trang-nu',
+  'ao-nu': 'thoi-trang-nu',
+  'vay': 'thoi-trang-nu',
+  'dam': 'thoi-trang-nu',
+  'nu': 'thoi-trang-nu',
+}
+
+function resolveCategorySlug(rawSlug) {
+  if (!rawSlug) return ''
+  const normalized = String(rawSlug).trim().toLowerCase()
+  return CATEGORY_ALIASES[normalized] || normalized
+}
+
 export async function listProducts(req, res, next) {
   try {
     const params = new URLSearchParams()
@@ -12,7 +55,10 @@ export async function listProducts(req, res, next) {
       return res.status(400).json({ success: false, message: 'Bộ lọc sản phẩm không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
     for (const key of allowed) {
-      const value = req.query[key]
+      let value = req.query[key]
+      if (key === 'categoryId' && typeof value === 'string') {
+        value = resolveCategorySlug(value)
+      }
       if (value !== undefined && value !== '') params.set(key, String(value))
     }
     const result = await callDataApi(`/internal/v1/products?${params}`)

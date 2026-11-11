@@ -43,7 +43,7 @@ export default function SearchFilterSidebar({
             <FilterCheckbox
               key={c.id}
               label={c.name}
-              count={categoryCount(c.id)}
+              count={c.productCount !== undefined && c.productCount !== null ? c.productCount : categoryCount(c.id)}
               checked={query.category === c.id}
               onChange={() => setParam('category', query.category === c.id ? '' : c.id)}
             />
@@ -58,7 +58,7 @@ export default function SearchFilterSidebar({
             <FilterCheckbox
               key={s.id}
               label={s.name}
-              count={shopCount(s.id)}
+              count={s.productCount !== undefined && s.productCount !== null ? s.productCount : shopCount(s.id)}
               checked={query.shop === s.id}
               onChange={() => setParam('shop', query.shop === s.id ? '' : s.id)}
             />
