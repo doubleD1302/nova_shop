@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ShopNova</string>
+    <string name="facebook_app_id">1623775512395707</string>
+    <string name="fb_login_protocol_scheme">fb1623775512395707</string>
+    <string name="facebook_client_token">0b277241f1a5e48a51deedd7b29dc7d9</string>
+</resources>
