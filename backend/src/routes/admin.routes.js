@@ -11,6 +11,7 @@ import {
   retryViolationEmail,
   listShopViolations,
   getEmailStatus,
+  runCronJobManually,
 } from '../controllers/admin.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
@@ -21,6 +22,7 @@ router.use(['/admin/shops/:shopId/identity-access', '/admin/shops/:shopId/identi
   next()
 })
 router.use('/admin', authenticate, requireRole('admin'))
+router.post('/admin/jobs/run', runCronJobManually)
 router.get('/admin/email-status', getEmailStatus)
 router.get('/admin/shops/:shopId/identity-access-events', async (req, res, next) => {
   res.set('Cache-Control', 'no-store')

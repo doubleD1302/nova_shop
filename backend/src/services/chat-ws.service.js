@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { verifyAccessToken } from '../middlewares/auth.middleware.js'
 import { callDataApi } from '../clients/data.client.js'
+import { notifyUser } from './notification.service.js'
 
 /**
  * Bản đồ lưu trữ các kết nối WebSocket đang hoạt động theo userId
@@ -32,6 +33,15 @@ export function broadcastToUser(userId, payload) {
       sendJson(ws, payload)
     }
   }
+}
+
+/**
+ * Kiểm tra xem một người dùng có đang online trên WebSocket hay không
+ */
+export function isUserOnline(userId) {
+  if (!userId) return false
+  const sockets = userSockets.get(String(userId))
+  return Boolean(sockets && sockets.size > 0)
 }
 
 /**
@@ -166,13 +176,28 @@ export function initChatWebSocket(httpServer) {
               message: result,
             })
 
-            // Relay trực tiếp thời gian thực cho đối phương nếu đang online
+            // Relay trực tiếp thời gian thực cho đối phương nếu đang online, hoặc bắn Push Notification nếu offline
             if (result.recipientId) {
-              broadcastToUser(result.recipientId, {
-                type: 'new_message',
-                conversationId: String(conversationId),
-                message: result,
-              })
+              if (isUserOnline(result.recipientId)) {
+                broadcastToUser(result.recipientId, {
+                  type: 'new_message',
+                  conversationId: String(conversationId),
+                  message: result,
+                })
+              } else {
+                // Người nhận offline / đóng app -> Bắn Push Notification & In-app Notification
+                const senderTitle = user.role === 'seller' ? 'Gian hàng' : 'Khách hàng'
+                const cleanMsg = typeof message === 'string' ? message.trim() : ''
+                const shortContent = cleanMsg.length > 80 ? cleanMsg.slice(0, 77) + '...' : cleanMsg
+                notifyUser({
+                  userId: result.recipientId,
+                  title: `Tin nhắn mới từ ${senderTitle}`,
+                  content: shortContent,
+                  type: 'chat',
+                  link: `/chat?conversationId=${conversationId}`,
+                  metadata: { conversationId: String(conversationId), senderId: user.id },
+                }).catch(() => {})
+              }
             }
           } catch (err) {
             sendJson(ws, {

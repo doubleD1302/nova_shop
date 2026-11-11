@@ -2,6 +2,7 @@ import app from './app.js'
 import { env } from './config/env.js'
 import { closeObjectStorage } from './services/object-storage.js'
 import { initChatWebSocket } from './services/chat-ws.service.js'
+import { startAllCronJobs, stopAllCronJobs } from './jobs/cron.manager.js'
 
 /**
  * Khởi động máy chủ HTTP trên cổng đã cấu hình
@@ -20,6 +21,9 @@ server.headersTimeout = 66000
 
 // Khởi tạo cổng WebSocket Live Chat
 initChatWebSocket(server)
+
+// Khởi tạo hệ thống tự động hóa tác vụ nền và định kỳ (Cron Jobs)
+startAllCronJobs()
 
 /**
  * Xử lý lỗi khi khởi động server
@@ -45,6 +49,7 @@ async function handleShutdown(signal) {
   console.log(`\n[ShopNova Backend] Đang đóng server an toàn (tín hiệu: ${signal})...`)
   server.close(async () => {
     try {
+      stopAllCronJobs()
       closeObjectStorage()
       console.log('[ShopNova Backend] Kết nối object storage đã đóng.')
     } catch (err) {

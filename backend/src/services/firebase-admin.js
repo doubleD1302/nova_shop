@@ -16,11 +16,11 @@ export class InvalidFirebaseIdTokenError extends Error {
   }
 }
 
-function getFirebaseAdminAuth() {
+export function getFirebaseAdminApp() {
   const serviceAccount = env.firebaseServiceAccount
   const projectId = serviceAccount?.projectId || env.firebaseProjectId
 
-  if (!projectId) throw new FirebaseAdminNotConfiguredError()
+  if (!projectId) return null
 
   const appName = 'shopnova-firebase-auth'
   const app = getApps().find((candidate) => candidate.name === appName) || initializeApp(
@@ -37,7 +37,14 @@ function getFirebaseAdminAuth() {
     appName,
   )
 
-  return { auth: getAuth(app), hasServiceAccount: Boolean(serviceAccount) }
+  return app
+}
+
+function getFirebaseAdminAuth() {
+  const app = getFirebaseAdminApp()
+  if (!app) throw new FirebaseAdminNotConfiguredError()
+
+  return { auth: getAuth(app), hasServiceAccount: Boolean(env.firebaseServiceAccount) }
 }
 
 export async function verifyFirebaseIdToken(idToken, providerName = 'Google') {

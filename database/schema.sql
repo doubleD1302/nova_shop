@@ -273,6 +273,7 @@ CREATE TABLE vouchers (
   per_user_limit SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Số lượt tối đa mỗi user',
   used_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Lượt chưa hoàn trả; cập nhật cùng transaction',
   is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Bật voucher',
+  status ENUM('active', 'inactive', 'expired') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái vòng đời voucher',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật, UTC',
   PRIMARY KEY (id),
@@ -334,7 +335,7 @@ CREATE TABLE shop_orders (
   order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn tổng',
   shop_id BIGINT UNSIGNED NOT NULL COMMENT 'Shop xử lý',
   shop_name VARCHAR(160) NOT NULL COMMENT 'Snapshot tên shop',
-  status ENUM('pending','confirmed','shipping','delivered','cancelled') NOT NULL DEFAULT 'pending' COMMENT 'Trạng thái giao hàng của riêng shop',
+  status ENUM('pending','confirmed','shipping','delivered','completed','cancelled') NOT NULL DEFAULT 'pending' COMMENT 'Trạng thái giao hàng của riêng shop',
   subtotal DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Tiền hàng shop ban đầu',
   shipping_fee DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Phí ship shop ban đầu',
   discount_amount DECIMAL(15,0) NOT NULL DEFAULT 0 COMMENT 'Voucher phân bổ cho shop ban đầu',
@@ -345,6 +346,7 @@ CREATE TABLE shop_orders (
   cancel_reason VARCHAR(500) NULL COMMENT 'Lý do hủy',
   cancelled_at DATETIME(3) NULL COMMENT 'Thời điểm hủy',
   delivered_at DATETIME(3) NULL COMMENT 'Thời điểm nhận hàng',
+  completed_at DATETIME(3) NULL COMMENT 'Thời điểm hoàn tất đơn',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật, UTC',
   PRIMARY KEY (id),
@@ -355,7 +357,7 @@ CREATE TABLE shop_orders (
   CONSTRAINT fk_shop_orders_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
   CONSTRAINT ck_shop_orders_money CHECK (subtotal >= 0 AND shipping_fee >= 0 AND discount_amount >= 0 AND discount_amount <= subtotal AND total_amount = subtotal + shipping_fee - discount_amount),
   CONSTRAINT ck_shop_orders_cancel CHECK ((status = 'cancelled' AND cancelled_at IS NOT NULL AND cancel_reason IS NOT NULL) OR (status <> 'cancelled' AND cancelled_at IS NULL AND cancel_reason IS NULL)),
-  CONSTRAINT ck_shop_orders_delivered CHECK ((status = 'delivered' AND delivered_at IS NOT NULL) OR (status <> 'delivered' AND delivered_at IS NULL))
+  CONSTRAINT ck_shop_orders_delivered CHECK (((status IN ('delivered', 'completed') AND delivered_at IS NOT NULL) OR (status NOT IN ('delivered', 'completed') AND delivered_at IS NULL)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Phần đơn riêng của từng shop';
 
 -- Snapshot dòng hàng, thuộc đúng SKU và đúng shop
@@ -395,8 +397,8 @@ CREATE TABLE order_items (
 CREATE TABLE order_events (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID sự kiện',
   shop_order_id BIGINT UNSIGNED NOT NULL COMMENT 'Đơn con',
-  from_status ENUM('pending','confirmed','shipping','delivered','cancelled') NULL COMMENT 'Trạng thái trước; NULL khi tạo mới',
-  to_status ENUM('pending','confirmed','shipping','delivered','cancelled') NOT NULL COMMENT 'Trạng thái sau',
+  from_status ENUM('pending','confirmed','shipping','delivered','completed','cancelled') NULL COMMENT 'Trạng thái trước; NULL khi tạo mới',
+  to_status ENUM('pending','confirmed','shipping','delivered','completed','cancelled') NOT NULL COMMENT 'Trạng thái sau',
   actor_id BIGINT UNSIGNED NULL COMMENT 'Tài khoản thực hiện; NULL nếu hệ thống',
   note VARCHAR(500) NULL COMMENT 'Ghi chú',
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo, UTC',
@@ -720,3 +722,36 @@ CREATE TABLE product_boosts (
   CONSTRAINT fk_product_boosts_shop FOREIGN KEY (shop_id) REFERENCES shops (id),
   CONSTRAINT fk_product_boosts_product FOREIGN KEY (product_id) REFERENCES products (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Gói đẩy sản phẩm / quảng cáo của seller';
+
+-- Thông báo trong ứng dụng (In-app Notifications)
+CREATE TABLE notifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID thông báo',
+  user_id BIGINT UNSIGNED NOT NULL COMMENT 'Người nhận thông báo',
+  title VARCHAR(255) NOT NULL COMMENT 'Tiêu đề thông báo',
+  content TEXT NOT NULL COMMENT 'Nội dung chi tiết thông báo',
+  type VARCHAR(50) NOT NULL DEFAULT 'system' COMMENT 'Loại: order, chat, promotion, system, voucher',
+  link VARCHAR(255) NULL COMMENT 'Link điều hướng trên web/app',
+  is_read BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Trạng thái đã đọc',
+  read_at DATETIME(3) NULL COMMENT 'Thời điểm đọc',
+  metadata JSON NULL COMMENT 'Dữ liệu phụ trợ JSON (orderId, shopId, v.v.)',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm tạo UTC',
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'Thời điểm cập nhật UTC',
+  PRIMARY KEY (id),
+  KEY ix_notifications_user_read_created (user_id, is_read, created_at),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Thông báo in-app cho người dùng';
+
+-- FCM device tokens cho Push Notifications
+CREATE TABLE user_device_tokens (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID khóa chính',
+  user_id BIGINT UNSIGNED NOT NULL COMMENT 'ID người dùng',
+  token VARCHAR(500) NOT NULL COMMENT 'FCM token hoặc Web Push token',
+  device_type ENUM('web', 'android', 'ios') NOT NULL DEFAULT 'web' COMMENT 'Loại thiết bị',
+  last_used_at DATETIME(3) NULL COMMENT 'Thời gian dùng gần nhất',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_device_token (user_id, token),
+  KEY ix_device_tokens_user (user_id),
+  CONSTRAINT fk_device_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='FCM device tokens cho Push Notification';

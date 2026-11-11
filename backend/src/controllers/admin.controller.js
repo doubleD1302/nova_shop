@@ -1,5 +1,6 @@
 import { callDataApi } from '../clients/data.client.js'
 import { getEmailServiceStatus, sendViolationEmail } from '../services/email.service.js'
+import { executeJobByName } from '../jobs/cron.manager.js'
 
 const routes = {
   stats: '/internal/v1/admin/stats',
@@ -248,4 +249,25 @@ export async function listAdminShopApprovalEvents(req, res, next) {
     const data = await callDataApi(`/internal/v1/admin/shops/${encodeURIComponent(id)}/approval-events?userId=${encodeURIComponent(req.user.id)}`)
     return res.status(200).json({ success: true, data })
   } catch (err) { return next(err) }
+}
+
+export async function runCronJobManually(req, res, next) {
+  try {
+    const { jobName, options } = req.body || {}
+    if (!jobName || typeof jobName !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên job không được để trống.',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+    const result = await executeJobByName(jobName.trim(), options || {})
+    return res.status(200).json({
+      success: true,
+      message: `Đã thực thi tác vụ nền "${jobName}" thành công.`,
+      data: result,
+    })
+  } catch (err) {
+    return next(err)
+  }
 }

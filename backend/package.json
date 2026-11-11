@@ -19,7 +19,8 @@
     "test:refresh-password": "node scripts/test-refresh-token-and-change-password.mjs",
     "test:new-modules": "node scripts/test-post-sales-shipping-chat.mjs",
     "test:ai": "node scripts/test-ai-consultant.mjs",
-    "test:5-features": "node scripts/test-all-5-new-features.mjs"
+    "test:5-features": "node scripts/test-all-5-new-features.mjs",
+    "test:notifications-cron": "node scripts/test-notifications-and-cron.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

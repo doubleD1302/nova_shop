@@ -1,5 +1,6 @@
 import { callDataApi } from '../clients/data.client.js'
 import { env } from '../config/env.js'
+import { notifyUser } from '../services/notification.service.js'
 
 export async function listOrders(req, res, next) {
   try {
@@ -51,6 +52,24 @@ export async function createOrder(req, res, next) {
       body: { ...req.body, userId: req.user.id },
       headers: { 'idempotency-key': idempotencyKey },
     })
+
+    // Tự động bắn thông báo đẩy về thiết bị cho người bán khi có đơn hàng mới cần xử lý
+    const shopOrders = result?.order?.shopOrders || []
+    for (const so of shopOrders) {
+      if (so.ownerId) {
+        try {
+          await notifyUser({
+            userId: so.ownerId,
+            title: 'Đơn hàng mới cần xử lý',
+            content: `Bạn có đơn hàng mới #${so.id} (${so.shopName}). Vui lòng chuẩn bị hàng và giao cho vận chuyển.`,
+            type: 'order',
+            link: `/seller/orders`,
+            metadata: { orderId: result?.order?.id, shopOrderId: so.id, shopId: so.shopId },
+          })
+        } catch {}
+      }
+    }
+
     return res.status(201).json({ success: true, data: result })
   } catch (err) {
     return next(err)
@@ -100,6 +119,35 @@ export async function updateSellerOrderStatus(req, res, next) {
       `/internal/v1/seller/orders/${encodeURIComponent(req.params.shopOrderId)}/status`,
       { method: 'PATCH', body: { userId: req.user.id, status: req.body?.status } },
     )
+
+    // Tự động bắn thông báo đẩy về thiết bị cho người mua khi đơn hàng chuyển trạng thái
+    if (result && result.buyerId) {
+      const shopName = result.shopName || 'Gian hàng'
+      if (result.status === 'shipping') {
+        try {
+          await notifyUser({
+            userId: result.buyerId,
+            title: 'Đơn hàng đang trên đường giao',
+            content: `Đơn hàng #${result.shopOrderId} từ ${shopName} đang được giao đến bạn.`,
+            type: 'order',
+            link: `/orders/${result.orderId}`,
+            metadata: { orderId: result.orderId, shopOrderId: result.shopOrderId, status: 'shipping' },
+          })
+        } catch {}
+      } else if (result.status === 'delivered') {
+        try {
+          await notifyUser({
+            userId: result.buyerId,
+            title: 'Đơn hàng đã giao thành công',
+            content: `Đơn hàng #${result.shopOrderId} từ ${shopName} đã được giao thành công. Vui lòng kiểm tra và xác nhận nhận hàng.`,
+            type: 'order',
+            link: `/orders/${result.orderId}`,
+            metadata: { orderId: result.orderId, shopOrderId: result.shopOrderId, status: 'delivered' },
+          })
+        } catch {}
+      }
+    }
+
     return res.status(200).json({ success: true, data: result })
   } catch (err) {
     return next(err)
