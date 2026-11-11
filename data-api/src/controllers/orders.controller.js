@@ -104,7 +104,7 @@ export async function createOrder(req, res, next) {
     order.address.ward.length > 120 ||
     order.address.detail.length > 255 ||
     order.note.length > 500 ||
-    order.paymentMethod !== 'cod' ||
+    !['cod', 'momo', 'vnpay', 'zalopay'].includes(order.paymentMethod) ||
     !calculateShipping(order.shippingMethod, { subtotal: 0 }) ||
     order.voucherCode.length > 32
   ) {
@@ -887,6 +887,32 @@ export async function updateSellerOrderStatus(req, res, next) {
         shipping: ['delivered'],
       }
       if (!allowed[order.status]?.includes(status)) return { error: 'INVALID_STATUS_TRANSITION' }
+      if (status !== 'cancelled' && order.payment_method !== 'cod') {
+        const payments = await query('SELECT status FROM payments WHERE shop_order_id = ? FOR UPDATE', [shopOrderId])
+        if (payments[0]?.status !== 'paid') return { error: 'PAYMENT_REQUIRED' }
+      }
+      if (status === 'cancelled') {
+        const paid = await query('SELECT id FROM payments WHERE shop_order_id = ? AND status = \'paid\' FOR UPDATE', [shopOrderId])
+        if (paid.length) {
+          try {
+            await query('UPDATE payments SET status = \'refunded\', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = \'paid\'', [shopOrderId])
+          } catch {
+            await query('UPDATE payments SET status = \'void\', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = \'paid\'', [shopOrderId])
+          }
+          try {
+            await query('UPDATE payment_attempts SET status = \'refunded\', processed_at = UTC_TIMESTAMP(3) WHERE order_id = ? AND status = \'paid\'', [order.order_id])
+          } catch {}
+          try {
+            await query(
+              `INSERT INTO refund_records (order_id, shop_order_id, provider, amount, status, reason, actor_id, processed_at)
+               SELECT o.id, so.id, o.payment_method, p.amount, 'completed', 'Tự động hoàn tiền khi người bán hủy đơn', ?, UTC_TIMESTAMP(3)
+               FROM shop_orders so JOIN orders o ON o.id = so.order_id JOIN payments p ON p.shop_order_id = so.id
+               WHERE so.id = ?`,
+              [userId, shopOrderId],
+            )
+          } catch {}
+        }
+      }
 
       if (status === 'cancelled') {
         await query(

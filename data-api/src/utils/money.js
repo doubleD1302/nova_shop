@@ -10,6 +10,7 @@ export function isValidGatewayAmount(method, amount) {
   if (!isValidAmount(amount) || amount < 1000) return false
   if (method === 'momo') return amount <= 50000000
   if (method === 'vnpay') return amount <= 9999999999
+  if (method === 'zalopay') return amount <= 50000000
   return false
 }
 

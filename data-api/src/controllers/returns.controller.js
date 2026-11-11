@@ -324,6 +324,24 @@ export async function updateSellerReturnStatus(req, res, next) {
           [status, cleanNote, returnId],
         )
 
+        // Tự động hoàn tiền khi khiếu nại trả hàng hoàn tất thành công
+        if (status === 'completed') {
+          try {
+            await query('UPDATE payments SET status = \'refunded\', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = \'paid\'', [currentReturn.shop_order_id])
+          } catch {
+            await query('UPDATE payments SET status = \'void\', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = \'paid\'', [currentReturn.shop_order_id])
+          }
+          try {
+            await query(
+              `INSERT INTO refund_records (order_id, shop_order_id, provider, amount, status, reason, actor_id, processed_at)
+               SELECT o.id, so.id, o.payment_method, ?, 'completed', 'Tự động hoàn tiền khi trả hàng thành công', ?, UTC_TIMESTAMP(3)
+               FROM shop_orders so JOIN orders o ON o.id = so.order_id
+               WHERE so.id = ?`,
+              [currentReturn.refund_amount, userId, currentReturn.shop_order_id],
+            )
+          } catch {}
+        }
+
         // Ghi lại order event
         await query(
           `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
