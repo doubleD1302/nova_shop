@@ -76,6 +76,20 @@ class SocialAuthService {
   /// Khởi tạo Firebase từ `google-services.json` (an toàn khi chạy test hoặc desktop).
   Future<bool> ensureInitialized() async {
     try {
+      if (kIsWeb ||
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        try {
+          await FacebookAuth.instance.webAndDesktopInitialize(
+            appId: '1623775512395707',
+            cookie: true,
+            xfbml: true,
+            version: 'v18.0',
+          );
+        } catch (e) {
+          debugPrint('[SocialAuthService] Facebook web/desktop init skipped: $e');
+        }
+      }
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
       }
@@ -164,6 +178,7 @@ class SocialAuthService {
     try {
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: const ['email', 'public_profile'],
+        loginBehavior: LoginBehavior.nativeWithFallback,
       );
 
       if (result.status == LoginStatus.cancelled) {
@@ -171,21 +186,27 @@ class SocialAuthService {
       }
       if (result.status != LoginStatus.success || result.accessToken == null) {
         final message = (result.message ?? '').trim();
-        return SocialAuthTokenResult.failure(
-          message.isNotEmpty
-              ? message
-              : 'Đăng nhập Facebook không thành công. Vui lòng thử lại.',
-        );
+        return _mapFacebookLoginFailure(message);
       }
 
-      final accessToken = result.accessToken!.tokenString;
-      if (accessToken.isEmpty) {
+      final AccessToken accessToken = result.accessToken!;
+      final tokenString = accessToken.tokenString;
+      if (tokenString.isEmpty) {
         return SocialAuthTokenResult.failure(
           'Không nhận được Access Token hợp lệ từ Facebook.',
         );
       }
 
-      final credential = FacebookAuthProvider.credential(accessToken);
+      final OAuthCredential credential;
+      if (accessToken is LimitedToken) {
+        credential = OAuthProvider('facebook.com').credential(
+          idToken: tokenString,
+          rawNonce: accessToken.nonce,
+        );
+      } else {
+        credential = FacebookAuthProvider.credential(tokenString);
+      }
+
       final userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
       final firebaseIdToken = await userCredential.user?.getIdToken(true);
@@ -226,6 +247,42 @@ class SocialAuthService {
     try {
       await FacebookAuth.instance.logOut();
     } catch (_) {}
+  }
+
+  @visibleForTesting
+  SocialAuthTokenResult testMapFacebookLoginFailure(String rawMessage) =>
+      _mapFacebookLoginFailure(rawMessage);
+
+  SocialAuthTokenResult _mapFacebookLoginFailure(String rawMessage) {
+    final lower = rawMessage.toLowerCase();
+    if (lower.contains('cancel') || lower.contains('cancelled')) {
+      return SocialAuthTokenResult.cancel();
+    }
+    if (lower.contains('app not active') ||
+        lower.contains('development mode') ||
+        lower.contains('chưa hoạt động') ||
+        lower.contains('chế độ phát triển')) {
+      return SocialAuthTokenResult.failure(
+        'Ứng dụng Facebook đang ở chế độ phát triển (Đã hủy đăng). Vui lòng thêm tài khoản của bạn vào mục "Vai trò trong ứng dụng" (App Roles) trên Meta Developers hoặc chuyển ứng dụng sang Trực tiếp (Live).',
+      );
+    }
+    if (lower.contains('key hash') ||
+        lower.contains('invalid key') ||
+        lower.contains('hash')) {
+      return SocialAuthTokenResult.failure(
+        'Lỗi xác thực khóa ứng dụng (Key Hash) trên Facebook. Vui lòng kiểm tra cấu hình Key Hash trên Meta Developers.',
+      );
+    }
+    if (lower.contains('network') || lower.contains('connection')) {
+      return SocialAuthTokenResult.failure(
+        'Lỗi kết nối mạng khi liên hệ với dịch vụ Facebook. Vui lòng kiểm tra internet.',
+      );
+    }
+    return SocialAuthTokenResult.failure(
+      rawMessage.isNotEmpty
+          ? rawMessage
+          : 'Đăng nhập Facebook không thành công. Vui lòng thử lại.',
+    );
   }
 
   SocialAuthTokenResult _mapFirebaseAuthError(FirebaseAuthException error) {

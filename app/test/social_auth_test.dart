@@ -323,6 +323,27 @@ void main() {
       expect(AuthService().lastError, 'Email đã tồn tại với phương thức đăng nhập khác.');
       expect(seenRequests.where((e) => e == 'POST /api/v1/auth/facebook').length, 2);
     });
+
+    test('SocialAuthService maps Facebook failure messages with actionable Vietnamese guidance', () {
+      final resDev = SocialAuthService().testMapFacebookLoginFailure(
+        'App not active: This app is not accessible right now and the app developer is aware of this issue.',
+      );
+      expect(resDev.ok, isFalse);
+      expect(resDev.error, contains('chế độ phát triển'));
+
+      final resHash = SocialAuthService().testMapFacebookLoginFailure(
+        'Invalid key hash for Facebook login',
+      );
+      expect(resHash.ok, isFalse);
+      expect(resHash.error, contains('Key Hash'));
+
+      final resCancel = SocialAuthService().testMapFacebookLoginFailure('User cancelled');
+      expect(resCancel.cancelled, isTrue);
+
+      final resNet = SocialAuthService().testMapFacebookLoginFailure('Network connection error');
+      expect(resNet.ok, isFalse);
+      expect(resNet.error, contains('kết nối mạng'));
+    });
   });
 
   group('LoginScreen Website-Parity Google & Facebook Tests', () {
