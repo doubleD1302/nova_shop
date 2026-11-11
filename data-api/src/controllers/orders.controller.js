@@ -872,7 +872,7 @@ export async function updateSellerOrderStatus(req, res, next) {
     }
     const result = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT so.id, so.order_id, so.status, so.shop_id, so.shop_name, s.owner_id, o.buyer_id
+        `SELECT so.id, so.order_id, so.status, so.shop_id, so.shop_name, s.owner_id, o.buyer_id, o.payment_method
          FROM shop_orders so
          JOIN shops s ON s.id = so.shop_id
          JOIN orders o ON o.id = so.order_id

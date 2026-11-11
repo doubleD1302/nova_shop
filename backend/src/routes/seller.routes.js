@@ -24,6 +24,14 @@ import {
   exportSellerInventoryExcel,
 } from '../controllers/reports.controller.js'
 import { createSellerShop } from '../controllers/auth.controller.js'
+import { getSellerDashboard } from '../controllers/seller-dashboard.controller.js'
+import {
+  getSellerBankAccount,
+  saveSellerBankAccount,
+  getSellerEscrowBalance,
+  createSellerPayoutRequest,
+  listSellerPayoutHistory,
+} from '../controllers/seller-payout.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
@@ -32,6 +40,15 @@ const router = Router()
 router.post('/register-shop', authenticate, requireRole('buyer', 'seller', 'admin'), createSellerShop)
 
 router.use(authenticate, requireRole('seller', 'admin'))
+router.get('/dashboard', getSellerDashboard)
+
+// Chi trả doanh thu thực tế & Tài khoản ngân hàng (Real Payout & Escrow)
+router.get('/payout/bank-account', getSellerBankAccount)
+router.post('/payout/bank-account', saveSellerBankAccount)
+router.get('/payout/balance', getSellerEscrowBalance)
+router.post('/payout/request', createSellerPayoutRequest)
+router.get('/payout/history', listSellerPayoutHistory)
+
 router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)
 router.post('/demo-payout/withdrawals', createDemoWithdrawal)

@@ -21,6 +21,7 @@ import favoritesRouter from './routes/favorites.routes.js'
 import bannersRouter from './routes/banners.routes.js'
 import notificationsRouter from './routes/notifications.routes.js'
 import jobsRouter from './routes/jobs.routes.js'
+import sellerPayoutRouter from './routes/seller-payout.routes.js'
 import { serviceAuthMiddleware } from './middlewares/auth.middleware.js'
 import { notFoundHandler } from './middlewares/not-found.middleware.js'
 import { errorHandler } from './middlewares/error.middleware.js'
@@ -66,6 +67,7 @@ app.use(
   reportsRouter,
   notificationsRouter,
   jobsRouter,
+  sellerPayoutRouter,
 )
 
 // 4. Middleware xử lý khi client gọi route không tồn tại (404)

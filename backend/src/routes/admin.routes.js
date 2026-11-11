@@ -13,6 +13,8 @@ import {
   getEmailStatus,
   runCronJobManually,
 } from '../controllers/admin.controller.js'
+import { listAdminPayouts, updateAdminPayoutStatus } from '../controllers/seller-payout.controller.js'
+import { listAdminReturns, resolveAdminReturnDispute } from '../controllers/returns.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
@@ -49,6 +51,15 @@ router.get('/admin/shops/:shopId/registration', async (req, res, next) => {
 router.get('/admin/shops/:shopId/violations', listShopViolations)
 router.get('/admin/shops/:id/approval-events', listAdminShopApprovalEvents)
 router.post('/admin/violations/:id/retry-email', retryViolationEmail)
+
+// Quản lý chi trả doanh thu cho người bán (Admin Payouts)
+router.get('/admin/payouts', listAdminPayouts)
+router.patch('/admin/payouts/:id', updateAdminPayoutStatus)
+
+// Quản trị và phân xử khiếu nại trả hàng (Admin Returns & Disputes)
+router.get('/admin/returns', listAdminReturns)
+router.patch('/admin/returns/:returnId/resolve', resolveAdminReturnDispute)
+
 router.get('/admin/:resource', listAdminResource)
 router.patch('/admin/products/:id/approval', updateAdminProductApproval)
 router.patch('/admin/shops/:id/approval', updateAdminShopApproval)

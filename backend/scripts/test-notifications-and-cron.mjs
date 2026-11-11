@@ -195,6 +195,9 @@ async function run() {
     })
 
     const updateStatusJson = await updateStatusRes.json()
+    if (updateStatusRes.status !== 200) {
+      console.log('updateStatusRes ERROR:', updateStatusRes.status, updateStatusJson)
+    }
     assert(updateStatusRes.status === 200, 'Seller đổi trạng thái đơn sang shipping thành công')
     assert(updateStatusJson.data.status === 'shipping', 'Trạng thái phản hồi là shipping')
 

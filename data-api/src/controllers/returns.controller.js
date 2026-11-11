@@ -380,3 +380,366 @@ export async function updateSellerReturnStatus(req, res, next) {
     return next(err)
   }
 }
+
+/**
+ * Lấy tất cả yêu cầu trả hàng của một Người mua (cho màn hình Quản lý Trả hàng cá nhân)
+ */
+export async function listAllBuyerReturns(req, res, next) {
+  try {
+    const userId = req.query.userId
+    const { status } = req.query
+    const page = readPagination(req.query)
+    if (!/^[1-9]\d{0,19}$/.test(String(userId || '')) || !page ||
+        (status !== undefined && status !== '' && !['requested', 'approved', 'rejected', 'completed', 'cancelled', 'disputed'].includes(status))) {
+      return res.status(400).json({ success: false, message: 'Tham số không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const { limit, offset } = page
+
+    try {
+      const params = [userId]
+      let whereSql = 'ret.buyer_id = ?'
+      if (status) {
+        whereSql += ' AND ret.status = ?'
+        params.push(status)
+      }
+      params.push(Number(limit), Number(offset))
+
+      const rows = await executeQuery(
+        `SELECT ret.*, s.name AS shop_name, s.logo_url AS shop_logo, o.code AS order_code, so.total_amount AS shop_order_total
+         FROM order_returns ret
+         JOIN shops s ON s.id = ret.shop_id
+         JOIN orders o ON o.id = ret.order_id
+         JOIN shop_orders so ON so.id = ret.shop_order_id
+         WHERE ${whereSql}
+         ORDER BY ret.id DESC
+         LIMIT ? OFFSET ?`,
+        params,
+      )
+
+      return res.status(200).json({
+        success: true,
+        data: rows.map((r) => ({
+          id: String(r.id),
+          orderId: String(r.order_id),
+          shopOrderId: String(r.shop_order_id),
+          orderCode: r.order_code,
+          shopId: String(r.shop_id),
+          shopName: r.shop_name,
+          shopLogo: r.shop_logo,
+          reason: r.reason,
+          detail: r.detail,
+          images: typeof r.images === 'string' ? JSON.parse(r.images || '[]') : (r.images || []),
+          refundAmount: Number(r.refund_amount),
+          status: r.status,
+          sellerNote: r.seller_note,
+          adminNote: r.admin_note,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      })
+    } catch (err) {
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
+    }
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Người mua tự hủy yêu cầu trả hàng khi còn ở trạng thái 'requested'
+ */
+export async function cancelBuyerReturn(req, res, next) {
+  try {
+    const returnId = req.params.returnId
+    const { userId } = req.body || {}
+    if (!/^[1-9]\d{0,19}$/.test(returnId) || !/^[1-9]\d{0,19}$/.test(String(userId || ''))) {
+      return res.status(400).json({ success: false, message: 'Mã yêu cầu trả hàng hoặc người dùng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+
+    try {
+      const result = await executeTransaction(async (query) => {
+        const rows = await query(
+          'SELECT id, buyer_id, shop_order_id, status FROM order_returns WHERE id = ? FOR UPDATE',
+          [returnId],
+        )
+        if (!rows.length) return { error: 'RETURN_NOT_FOUND' }
+        const ret = rows[0]
+        if (String(ret.buyer_id) !== String(userId)) return { error: 'FORBIDDEN' }
+        if (ret.status !== 'requested') return { error: 'INVALID_STATUS' }
+
+        await query(
+          "UPDATE order_returns SET status = 'cancelled', updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
+          [returnId],
+        )
+
+        await query(
+          `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+           VALUES (?, 'delivered', 'delivered', ?, 'Người mua đã hủy yêu cầu trả hàng / hoàn tiền.')`,
+          [ret.shop_order_id, userId],
+        )
+
+        return { success: true }
+      })
+
+      if (result.error === 'RETURN_NOT_FOUND') {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu trả hàng.', error: { code: result.error } })
+      }
+      if (result.error === 'FORBIDDEN') {
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy yêu cầu trả hàng này.', error: { code: result.error } })
+      }
+      if (result.error === 'INVALID_STATUS') {
+        return res.status(400).json({ success: false, message: 'Chỉ có thể hủy yêu cầu trả hàng khi đang chờ người bán phản hồi.', error: { code: result.error } })
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Hủy yêu cầu trả hàng thành công.',
+        data: { id: String(returnId), status: 'cancelled' },
+      })
+    } catch (err) {
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
+    }
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Người mua gửi khiếu nại lên Admin nếu Người bán từ chối (Chuyển sang trạng thái 'disputed')
+ */
+export async function disputeBuyerReturn(req, res, next) {
+  try {
+    const returnId = req.params.returnId
+    const { userId, disputeReason } = req.body || {}
+    if (
+      !/^[1-9]\d{0,19}$/.test(returnId) ||
+      !/^[1-9]\d{0,19}$/.test(String(userId || '')) ||
+      typeof disputeReason !== 'string' ||
+      !disputeReason.trim() ||
+      disputeReason.trim().length > 1000
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lý do khiếu nại lên Admin là bắt buộc (tối đa 1000 ký tự).',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    try {
+      const cleanReason = disputeReason.trim()
+      const result = await executeTransaction(async (query) => {
+        const rows = await query(
+          'SELECT id, buyer_id, shop_order_id, status, detail FROM order_returns WHERE id = ? FOR UPDATE',
+          [returnId],
+        )
+        if (!rows.length) return { error: 'RETURN_NOT_FOUND' }
+        const ret = rows[0]
+        if (String(ret.buyer_id) !== String(userId)) return { error: 'FORBIDDEN' }
+        if (ret.status !== 'rejected') return { error: 'INVALID_STATUS' }
+
+        const updatedDetail = (ret.detail ? `${ret.detail}\n` : '') + `[Khiếu nại lên Admin]: ${cleanReason}`
+
+        await query(
+          "UPDATE order_returns SET status = 'disputed', detail = ?, updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
+          [updatedDetail, returnId],
+        )
+
+        await query(
+          `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+           VALUES (?, 'delivered', 'delivered', ?, ?)`,
+          [ret.shop_order_id, userId, `Người mua khiếu nại lên sàn Admin: ${cleanReason}`.slice(0, 500)],
+        )
+
+        return { success: true }
+      })
+
+      if (result.error === 'RETURN_NOT_FOUND') return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu trả hàng.', error: { code: result.error } })
+      if (result.error === 'FORBIDDEN') return res.status(403).json({ success: false, message: 'Bạn không có quyền khiếu nại yêu cầu này.', error: { code: result.error } })
+      if (result.error === 'INVALID_STATUS') return res.status(400).json({ success: false, message: 'Chỉ có thể gửi khiếu nại lên Admin khi yêu cầu bị Người bán từ chối.', error: { code: result.error } })
+
+      return res.status(200).json({
+        success: true,
+        message: 'Gửi khiếu nại lên Admin thành công. Ban quản trị sẽ sớm xem xét và phân xử.',
+        data: { id: String(returnId), status: 'disputed' },
+      })
+    } catch (err) {
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
+    }
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Admin lấy danh sách toàn bộ yêu cầu trả hàng trên hệ thống
+ */
+export async function listAdminReturns(req, res, next) {
+  try {
+    const { status, shopId } = req.query
+    const page = readPagination(req.query)
+    if (!page || (status !== undefined && status !== '' && !['requested', 'approved', 'rejected', 'completed', 'cancelled', 'disputed'].includes(status)) ||
+        (shopId !== undefined && shopId !== '' && !/^[1-9]\d{0,19}$/.test(shopId))) {
+      return res.status(400).json({ success: false, message: 'Bộ lọc không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const { limit, offset } = page
+
+    try {
+      const params = []
+      let whereSql = '1=1'
+      if (status) {
+        whereSql += ' AND ret.status = ?'
+        params.push(status)
+      }
+      if (shopId) {
+        whereSql += ' AND ret.shop_id = ?'
+        params.push(shopId)
+      }
+      params.push(Number(limit), Number(offset))
+
+      const rows = await executeQuery(
+        `SELECT ret.*, s.name AS shop_name, u.full_name AS buyer_name, u.phone AS buyer_phone,
+                o.code AS order_code, so.total_amount AS order_total
+         FROM order_returns ret
+         JOIN shops s ON s.id = ret.shop_id
+         JOIN users u ON u.id = ret.buyer_id
+         JOIN orders o ON o.id = ret.order_id
+         JOIN shop_orders so ON so.id = ret.shop_order_id
+         WHERE ${whereSql}
+         ORDER BY (CASE WHEN ret.status = 'disputed' THEN 1 WHEN ret.status = 'requested' THEN 2 ELSE 3 END), ret.id DESC
+         LIMIT ? OFFSET ?`,
+        params,
+      )
+
+      return res.status(200).json({
+        success: true,
+        data: rows.map((r) => ({
+          id: String(r.id),
+          orderId: String(r.order_id),
+          shopOrderId: String(r.shop_order_id),
+          orderCode: r.order_code,
+          shopId: String(r.shop_id),
+          shopName: r.shop_name,
+          buyerName: r.buyer_name,
+          buyerPhone: r.buyer_phone,
+          reason: r.reason,
+          detail: r.detail,
+          images: typeof r.images === 'string' ? JSON.parse(r.images || '[]') : (r.images || []),
+          refundAmount: Number(r.refund_amount),
+          status: r.status,
+          sellerNote: r.seller_note,
+          adminNote: r.admin_note,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        })),
+      })
+    } catch (err) {
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
+    }
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Trọng tài Admin phân xử khiếu nại trả hàng
+ */
+export async function resolveAdminReturnDispute(req, res, next) {
+  try {
+    const returnId = req.params.returnId
+    const { adminId, resolution, adminNote } = req.body || {}
+
+    if (
+      !/^[1-9]\d{0,19}$/.test(returnId) ||
+      !/^[1-9]\d{0,19}$/.test(String(adminId || '')) ||
+      !['approve', 'reject'].includes(resolution) ||
+      typeof adminNote !== 'string' ||
+      !adminNote.trim() ||
+      adminNote.trim().length > 500
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quyết định phân xử (approve/reject) và ghi chú lý do phân xử là bắt buộc (tối đa 500 ký tự).',
+        error: { code: 'VALIDATION_ERROR' },
+      })
+    }
+
+    const cleanNote = adminNote.trim()
+
+    try {
+      const result = await executeTransaction(async (query) => {
+        const rows = await query(
+          'SELECT ret.*, so.order_id FROM order_returns ret JOIN shop_orders so ON so.id = ret.shop_order_id WHERE ret.id = ? FOR UPDATE',
+          [returnId],
+        )
+        if (!rows.length) return { error: 'RETURN_NOT_FOUND' }
+        const currentReturn = rows[0]
+
+        if (!['requested', 'rejected', 'disputed'].includes(currentReturn.status)) {
+          return { error: 'CANNOT_RESOLVE' }
+        }
+
+        const nextStatus = resolution === 'approve' ? 'completed' : 'rejected'
+
+        await query(
+          'UPDATE order_returns SET status = ?, admin_note = ?, updated_at = UTC_TIMESTAMP(3) WHERE id = ?',
+          [nextStatus, cleanNote, returnId],
+        )
+
+        // Nếu Admin duyệt hoàn tiền: tự động cập nhật thanh toán và ghi bản ghi hoàn tiền
+        if (nextStatus === 'completed') {
+          try {
+            await query("UPDATE payments SET status = 'refunded', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = 'paid'", [currentReturn.shop_order_id])
+          } catch {
+            await query("UPDATE payments SET status = 'void', paid_at = NULL, updated_at = UTC_TIMESTAMP(3) WHERE shop_order_id = ? AND status = 'paid'", [currentReturn.shop_order_id])
+          }
+          try {
+            await query(
+              `INSERT INTO refund_records (order_id, shop_order_id, provider, amount, status, reason, actor_id, processed_at)
+               SELECT o.id, so.id, o.payment_method, ?, 'completed', ?, ?, UTC_TIMESTAMP(3)
+               FROM shop_orders so JOIN orders o ON o.id = so.order_id
+               WHERE so.id = ?`,
+              [currentReturn.refund_amount, `Trọng tài Admin duyệt hoàn tiền: ${cleanNote}`.slice(0, 255), adminId, currentReturn.shop_order_id],
+            )
+          } catch {}
+        }
+
+        await query(
+          `INSERT INTO order_events (shop_order_id, from_status, to_status, actor_id, note)
+           VALUES (?, 'delivered', 'delivered', ?, ?)`,
+          [currentReturn.shop_order_id, adminId, `Trọng tài Admin ${resolution === 'approve' ? 'chấp thuận hoàn tiền' : 'bác bỏ khiếu nại'}: ${cleanNote}`.slice(0, 500)],
+        )
+
+        return {
+          success: true,
+          buyerId: String(currentReturn.buyer_id),
+          shopId: String(currentReturn.shop_id),
+          refundAmount: Number(currentReturn.refund_amount),
+        }
+      })
+
+      if (result.error === 'RETURN_NOT_FOUND') return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu trả hàng.', error: { code: result.error } })
+      if (result.error === 'CANNOT_RESOLVE') return res.status(400).json({ success: false, message: 'Yêu cầu trả hàng này đã hoàn tất hoặc không thể phân xử.', error: { code: result.error } })
+
+      return res.status(200).json({
+        success: true,
+        message: resolution === 'approve' ? 'Đã phê duyệt hoàn tiền thành công.' : 'Đã bác bỏ khiếu nại trả hàng.',
+        data: {
+          id: String(returnId),
+          status: resolution === 'approve' ? 'completed' : 'rejected',
+          adminNote: cleanNote,
+          buyerId: result.buyerId,
+          shopId: result.shopId,
+        },
+      })
+    } catch (err) {
+      if (isTableMissingError(err)) return res.status(503).json({ success: false, message: 'Dữ liệu chưa sẵn sàng.', error: { code: 'DATA_STORAGE_UNAVAILABLE' } })
+      throw err
+    }
+  } catch (err) {
+    return next(err)
+  }
+}
