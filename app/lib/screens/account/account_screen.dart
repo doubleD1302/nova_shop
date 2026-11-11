@@ -4,6 +4,9 @@ import 'package:shopnova/screens/orders/orders_screen.dart';
 import 'package:shopnova/screens/auth/login_screen.dart' as shopnova_auth;
 import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/account/favorites_screen.dart';
+import 'package:shopnova/screens/account/notifications_screen.dart';
+import 'package:shopnova/screens/chat/chat_list_screen.dart';
+import 'package:shopnova/screens/orders/buyer_returns_screen.dart';
 import 'package:shopnova/screens/seller/seller_register_screen.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/services/auth_service.dart';
@@ -1712,6 +1715,78 @@ class _AccountScreenState extends State<AccountScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.notifications_none_rounded,
+              title: 'Hộp thư thông báo',
+              subtitle: 'Cập nhật trạng thái đơn hàng, khiếu nại và tin mới',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Tin nhắn với gian hàng',
+              subtitle: 'Trò chuyện trực tiếp với các shop bạn quan tâm',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.assignment_return_outlined,
+              title: 'Trả hàng & Khiếu nại',
+              subtitle: 'Theo dõi hoàn tiền, hủy yêu cầu hoặc khiếu nại lên Admin',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BuyerReturnsScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.notifications_none_rounded,
+              title: 'Hộp thư thông báo',
+              subtitle: 'Cập nhật trạng thái đơn hàng, khiếu nại và tin mới',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Tin nhắn với gian hàng',
+              subtitle: 'Trò chuyện trực tiếp với các shop bạn quan tâm',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 52, color: Color(0xFFEEEEF0)),
+            _buildSettingsTile(
+              icon: Icons.assignment_return_outlined,
+              title: 'Trả hàng & Khiếu nại',
+              subtitle: 'Theo dõi hoàn tiền, hủy yêu cầu hoặc khiếu nại lên Admin',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BuyerReturnsScreen()),
                 );
               },
             ),

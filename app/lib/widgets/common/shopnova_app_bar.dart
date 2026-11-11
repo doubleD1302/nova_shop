@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../screens/account/notifications_screen.dart';
 import '../../screens/cart/cart_screen.dart';
+import '../../screens/chat/chat_list_screen.dart';
 import '../../screens/nova_ai/nova_ai_screen.dart';
 import '../../screens/search/search_screen.dart';
 import '../../services/cart_service.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
 import 'nova_logo.dart';
 
@@ -175,7 +178,7 @@ class ShopNovaAppBar extends StatelessWidget {
                   Navigator.popUntil(context, (r) => r.isFirst);
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
 
               // Capsule Search Field
               Expanded(
@@ -183,23 +186,23 @@ class ShopNovaAppBar extends StatelessWidget {
                   onTap: () => _showSearchModal(context),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    height: 38,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: AppColors.border),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: const Row(
                       children: [
-                        Icon(Icons.search, color: AppColors.primary, size: 19),
-                        SizedBox(width: 8),
+                        Icon(Icons.search, color: AppColors.primary, size: 18),
+                        SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Tìm kiếm trên NovaShop...',
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 12.5,
+                              fontSize: 12,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -210,7 +213,7 @@ class ShopNovaAppBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Nút Nova AI
               InkWell(
@@ -222,19 +225,83 @@ class ShopNovaAppBar extends StatelessWidget {
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  width: 38,
-                  height: 38,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: AppColors.surfaceAlt,
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.border),
                   ),
                   child: const Center(
-                    child: Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 20),
+                    child: Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 18),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+
+              // Hộp thư Thông báo
+              ValueListenableBuilder<int>(
+                valueListenable: NotificationService().unreadCountNotifier,
+                builder: (context, unread, _) {
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      width: 34,
+                      height: 34,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary, size: 22),
+                          if (unread > 0)
+                            Positioned(
+                              top: 2,
+                              right: 1,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD0011B),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white, width: 1),
+                                ),
+                                constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                                child: Text(
+                                  unread > 99 ? '99+' : '$unread',
+                                  style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 2),
+
+              // Tin nhắn Shop (Live Chat)
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: Icon(Icons.chat_bubble_outline_rounded, color: AppColors.textPrimary, size: 20),
+                ),
+              ),
+              const SizedBox(width: 2),
 
               // Cart Button with counter badge
               AnimatedBuilder(
@@ -250,13 +317,13 @@ class ShopNovaAppBar extends StatelessWidget {
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: SizedBox(
-                      width: 38,
-                      height: 38,
+                      width: 34,
+                      height: 34,
                       child: Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          const Icon(Icons.shopping_cart_outlined, color: AppColors.textPrimary, size: 24),
+                          const Icon(Icons.shopping_cart_outlined, color: AppColors.textPrimary, size: 22),
                           if (count > 0)
                             Positioned(
                               top: 2,

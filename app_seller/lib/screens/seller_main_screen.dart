@@ -11,7 +11,13 @@ import '../theme/seller_theme.dart';
 import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
 import 'register_screen.dart' show kVietnamProvinces;
+import '../services/seller_feature_service.dart';
+import 'seller_chat_notifications_screen.dart';
+import 'seller_marketing_screen.dart';
+import 'seller_payout_screen.dart';
 import 'seller_product_form_screen.dart';
+import 'seller_reports_returns_screen.dart';
+import 'seller_vouchers_screen.dart';
 
 class SellerMainScreen extends StatefulWidget {
   const SellerMainScreen({super.key});
@@ -23,6 +29,7 @@ class SellerMainScreen extends StatefulWidget {
 class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerProviderStateMixin {
   final ApiClient _client = ApiClient();
   final PayoutService _payoutService = PayoutService();
+  final SellerFeatureService _featureService = SellerFeatureService();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 
   // Tabs chính của người bán
@@ -36,6 +43,8 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   List<Map<String, dynamic>> _sellerProducts = [];
   List<Map<String, dynamic>> _categories = [];
   Map<String, dynamic>? _payoutData;
+  Map<String, dynamic>? _dashboardData;
+  int _unreadNotifCount = 0;
 
   bool _isLoadingOrders = false;
   bool _isLoadingProducts = false;
@@ -86,11 +95,29 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   }
 
   void _loadAll() {
+    _loadDashboard();
     _loadProfile();
     _loadOrders();
     _loadProducts();
     _loadCategories();
     _loadPayout();
+    _loadNotifCount();
+  }
+
+  Future<void> _loadDashboard() async {
+    final data = await _featureService.getDashboard();
+    if (mounted && data != null) {
+      setState(() => _dashboardData = data);
+    }
+  }
+
+  Future<void> _loadNotifCount() async {
+    final notif = await _featureService.getNotifications(page: 1, limit: 5);
+    if (mounted) {
+      setState(() {
+        _unreadNotifCount = (notif['unreadCount'] as num?)?.toInt() ?? 0;
+      });
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -274,97 +301,88 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     }
   }
 
-  void _showPendingApiDialog(String title, String desc) {
-    showDialog(
+  Future<void> _showDispatch3PlDialog(String shopOrderId) async {
+    String selectedCarrier = 'GHN';
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SellerTheme.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFBF3E8),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.hourglass_top_rounded, color: SellerTheme.primary, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary),
-              ),
-            ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text('Đẩy Đơn Qua Đối Tác 3PL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: DropdownButtonFormField<String>(
+            value: selectedCarrier,
+            decoration: const InputDecoration(labelText: 'Đơn vị vận chuyển', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: 'GHN', child: Text('Giao Hàng Nhanh (GHN)')),
+              DropdownMenuItem(value: 'GHTK', child: Text('Giao Hàng Tiết Kiệm (GHTK)')),
+              DropdownMenuItem(value: 'ViettelPost', child: Text('Viettel Post')),
+            ],
+            onChanged: (v) => setDlg(() => selectedCarrier = v ?? 'GHN'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Tạo vận đơn 3PL')),
           ],
         ),
+      ),
+    );
+    if (confirmed != true) return;
+    final res = await _featureService.dispatchOrder3Pl(shopOrderId, carrier: selectedCarrier);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : (res.success ? 'Đã đẩy đơn qua $selectedCarrier!' : 'Đẩy đơn 3PL thất bại.')),
+        backgroundColor: res.success ? SellerTheme.success : SellerTheme.danger,
+      ),
+    );
+    if (res.success) {
+      _loadOrders();
+      _loadDashboard();
+    }
+  }
+
+  Future<void> _showManualTrackingDialog(String shopOrderId) async {
+    final codeCtrl = TextEditingController();
+    final carrierCtrl = TextEditingController(text: 'GHN');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Cập Nhật Mã Vận Đơn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.shade300),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.code_off_rounded, size: 14, color: Colors.amber.shade900),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Chưa có API Backend',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
-                  ),
-                ],
-              ),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Mã vận đơn (Tracking Code)', border: OutlineInputBorder()),
             ),
-            const SizedBox(height: 12),
-            Text(
-              desc,
-              style: const TextStyle(fontSize: 13, color: SellerTheme.textPrimary, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: SellerTheme.surfaceSubtle,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: SellerTheme.border),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Thông báo phát triển:',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: SellerTheme.primary),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '• Giao diện UI/UX đã được xây dựng đồng bộ 100% với website NovaShop.\n• Tính năng sẽ hoạt động đầy đủ ngay sau khi Backend triển khai API tương ứng.',
-                    style: TextStyle(fontSize: 11, color: SellerTheme.textSecondary, height: 1.4),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: carrierCtrl,
+              decoration: const InputDecoration(labelText: 'Đơn vị vận chuyển', border: OutlineInputBorder()),
             ),
           ],
         ),
         actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: SellerTheme.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đã hiểu'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lưu vận đơn')),
         ],
       ),
     );
+    if (confirmed != true || codeCtrl.text.trim().isEmpty) return;
+    final res = await _featureService.updateOrderTracking(
+      shopOrderId,
+      trackingCode: codeCtrl.text,
+      carrier: carrierCtrl.text,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : 'Cập nhật mã vận đơn hoàn tất.'),
+        backgroundColor: res.success ? SellerTheme.success : SellerTheme.danger,
+      ),
+    );
+    if (res.success) _loadOrders();
   }
 
   void _showRejectionReasonModal(Map<String, dynamic> product) {
@@ -561,16 +579,10 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
   Future<void> _loadPayout() async {
     setState(() => _isLoadingPayout = true);
     try {
-      final data = await _payoutService.getPayoutStatus();
+      final data = await _payoutService.getPayoutOverview();
       if (mounted) {
         setState(() {
-          if (data != null) {
-            _payoutData = data.containsKey('data') && data['data'] is Map
-                ? Map<String, dynamic>.from(data['data'])
-                : Map<String, dynamic>.from(data);
-          } else {
-            _payoutData = null;
-          }
+          _payoutData = data;
           _isLoadingPayout = false;
         });
       }
@@ -579,16 +591,10 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     }
   }
 
-  Future<void> _handleSetupPayout() async {
-    setState(() => _isSubmittingPayout = true);
-    final res = await _payoutService.setupPayout();
-    if (!mounted) return;
-    setState(() => _isSubmittingPayout = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(res['message']?.toString() ?? 'Đã kích hoạt ví người bán'),
-        backgroundColor: res['success'] == true ? SellerTheme.success : SellerTheme.danger,
-      ),
+  Future<void> _openBankPayoutScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SellerPayoutScreen()),
     );
     _loadPayout();
   }
@@ -750,37 +756,12 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     }
   }
 
-  void _showNotificationsDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: SellerTheme.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.notifications_active_outlined, color: SellerTheme.primary, size: 22),
-            const SizedBox(width: 8),
-            const Text('Thông báo gian hàng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: SellerTheme.textPrimary)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildNotificationItem('Đơn hàng mới cần xác nhận', 'Đơn hàng vừa được khách đặt và đang chờ bạn xác nhận.', '2 giờ trước'),
-            const SizedBox(height: 10),
-            _buildNotificationItem('Cảnh báo tồn kho', 'Có sản phẩm sắp hết hàng, vui lòng kiểm tra kho để nhập thêm.', '5 giờ trước'),
-            const SizedBox(height: 10),
-            _buildNotificationItem('Chương trình ưu đãi tháng này', 'Tham gia Flash Sale của NovaShop để tăng trưởng doanh số.', '1 ngày trước'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng', style: TextStyle(color: SellerTheme.primary)),
-          ),
-        ],
-      ),
+  Future<void> _showNotificationsDialog() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SellerChatNotificationsScreen(initialTab: 1)),
     );
+    _loadNotifCount();
   }
 
   Widget _buildNotificationItem(String title, String desc, String time) {
@@ -895,10 +876,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Mã giảm giá (Vouchers)', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      _showPendingApiDialog(
-                        'Mã giảm giá của Shop (Vouchers)',
-                        'Tính năng tạo & quản lý mã giảm giá riêng cho gian hàng đang được bổ sung Backend API. Hiện tại hệ thống áp dụng mã voucher toàn sàn.',
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerVouchersScreen()));
                     },
                   ),
                   ListTile(
@@ -907,10 +885,25 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Quảng cáo & Flash Sale', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      _showPendingApiDialog(
-                        'Quảng cáo & Chiến dịch Marketing',
-                        'Tính năng đăng ký chiến dịch quảng bá và mua gói đẩy sản phẩm đang chờ Backend API hoàn thiện.',
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => SellerMarketingScreen(sellerProducts: _sellerProducts)));
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.assignment_return_outlined, size: 20, color: SellerTheme.textSecondary),
+                    title: const Text('Xử lý trả hàng / hoàn tiền', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerReportsReturnsScreen(initialTab: 2)));
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.assessment_outlined, size: 20, color: SellerTheme.textSecondary),
+                    title: const Text('Báo cáo & Xuất Excel', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerReportsReturnsScreen(initialTab: 0)));
                     },
                   ),
                   ListTile(
@@ -919,10 +912,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     title: const Text('Chăm sóc khách hàng', style: TextStyle(fontSize: 13, color: SellerTheme.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      _showPendingApiDialog(
-                        'Chăm sóc khách hàng (Live Chat)',
-                        'Hệ thống nhắn tin trực tiếp WebSocket giữa Người Bán và Khách Hàng đang trong giai đoạn phát triển Backend API.',
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerChatNotificationsScreen(initialTab: 0)));
                     },
                   ),
                 ],
@@ -1014,15 +1004,16 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             clipBehavior: Clip.none,
             children: [
               const Icon(Icons.notifications_none_rounded, color: SellerTheme.textPrimary, size: 22),
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  padding: const EdgeInsets.all(3.5),
-                  decoration: const BoxDecoration(color: SellerTheme.primary, shape: BoxShape.circle),
-                  child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+              if (_unreadNotifCount > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(3.5),
+                    decoration: const BoxDecoration(color: SellerTheme.primary, shape: BoxShape.circle),
+                    child: Text('$_unreadNotifCount', style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                  ),
                 ),
-              ),
             ],
           ),
           onPressed: _showNotificationsDialog,
@@ -1045,15 +1036,30 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     final shopName = _shopProfile?['name']?.toString() ?? user?.fullName ?? 'Gian hàng của bạn';
     final shopId = _shopProfile?['id']?.toString() ?? '12345678';
 
-    // Tính toán KPI
-    final totalOrders = _sellerOrders.length;
-    final pendingOrders = _sellerOrders.where((o) => o['status'] == 'pending').length;
-    final deliveredOrders = _sellerOrders.where((o) => o['status'] == 'delivered').length;
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-    final todayOrders = _sellerOrders.where((o) => (o['createdAt']?.toString() ?? '').startsWith(todayStr)).length;
-    final revenue = _sellerOrders
-        .where((o) => o['status'] == 'delivered')
-        .fold<double>(0, (sum, o) => sum + (double.tryParse(o['totalForShop']?.toString() ?? o['totalAmount']?.toString() ?? '0') ?? 0));
+    final summary = _dashboardData?['summary'] is Map
+        ? Map<String, dynamic>.from(_dashboardData!['summary'] as Map)
+        : <String, dynamic>{};
+    final byStatus = summary['ordersByStatus'] is Map
+        ? Map<String, dynamic>.from(summary['ordersByStatus'] as Map)
+        : <String, dynamic>{};
+
+    final totalOrders = _sellerOrders.isNotEmpty
+        ? _sellerOrders.length
+        : ((byStatus['pending'] ?? 0) +
+            (byStatus['confirmed'] ?? 0) +
+            (byStatus['shipping'] ?? 0) +
+            (byStatus['delivered'] ?? 0) +
+            (byStatus['completed'] ?? 0));
+    final pendingOrders = (byStatus['pending'] as num?)?.toInt() ??
+        _sellerOrders.where((o) => o['status'] == 'pending').length;
+    final deliveredOrders = (byStatus['delivered'] as num?)?.toInt() ??
+        _sellerOrders.where((o) => o['status'] == 'delivered').length;
+    final todayOrders = (summary['todayOrders'] as num?)?.toInt() ??
+        _sellerOrders.where((o) => (o['createdAt']?.toString() ?? '').startsWith(DateTime.now().toIso8601String().substring(0, 10))).length;
+    final revenue = num.tryParse(summary['totalRevenue']?.toString() ?? '')?.toDouble() ??
+        _sellerOrders
+            .where((o) => o['status'] == 'delivered')
+            .fold<double>(0, (sum, o) => sum + (double.tryParse(o['totalForShop']?.toString() ?? o['totalAmount']?.toString() ?? '0') ?? 0));
 
     return RefreshIndicator(
       onRefresh: () async => _loadAll(),
@@ -1287,7 +1293,12 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     height: 110,
                     width: double.infinity,
                     child: CustomPaint(
-                      painter: _TrendChartPainter(orders: _sellerOrders),
+                      painter: _TrendChartPainter(
+                        orders: _sellerOrders,
+                        chartPoints: (_dashboardData?['chart'] as List?)
+                            ?.whereType<Map<String, dynamic>>()
+                            .toList(),
+                      ),
                     ),
                   ),
                   const Divider(color: SellerTheme.border, height: 20),
@@ -1328,30 +1339,20 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                   _quickToolItem(Icons.add_circle_outline_rounded, 'Thêm sản phẩm', () => _showProductDialog()),
                   _quickToolItem(Icons.inventory_2_outlined, 'Quản lý đơn', () => setState(() => _activeNav = 2)),
                   _quickToolItem(Icons.confirmation_number_outlined, 'Khuyến mãi', () {
-                    _showPendingApiDialog(
-                      'Khuyến mãi của shop',
-                      'Tính năng tạo mã giảm giá (Voucher) và thiết lập chương trình ưu đãi của gian hàng.',
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerVouchersScreen()));
                   }),
                   _quickToolItem(Icons.campaign_outlined, 'Marketing', () {
-                    _showPendingApiDialog(
-                      'Marketing & Quảng cáo',
-                      'Công cụ chạy quảng cáo tìm kiếm và tiếp thị liên kết cho sản phẩm của shop.',
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => SellerMarketingScreen(sellerProducts: _sellerProducts)));
                   }),
-                  _quickToolItem(Icons.assessment_outlined, 'Báo cáo', () => setState(() => _activeNav = 4)),
+                  _quickToolItem(Icons.assessment_outlined, 'Báo cáo', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerReportsReturnsScreen(initialTab: 0)));
+                  }),
                   _quickToolItem(Icons.headset_mic_outlined, 'CSKH', () {
-                    _showPendingApiDialog(
-                      'Chăm sóc khách hàng',
-                      'Hộp thư tin nhắn trò chuyện trực tiếp (Live Chat) và phản hồi đánh giá của người mua.',
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerChatNotificationsScreen(initialTab: 0)));
                   }),
                   _quickToolItem(Icons.storefront_outlined, 'Hồ sơ shop', () => setState(() => _activeNav = 3)),
-                  _quickToolItem(Icons.more_horiz_rounded, 'Xem thêm', () {
-                    _showPendingApiDialog(
-                      'Danh mục công cụ mở rộng',
-                      'Bao gồm Quản lý kho nâng cao, Lịch sử giao dịch ví và Tải báo cáo phân tích Excel.',
-                    );
+                  _quickToolItem(Icons.assignment_return_outlined, 'Trả hàng', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerReportsReturnsScreen(initialTab: 2)));
                   }),
                 ],
               ),
@@ -2029,25 +2030,61 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
       );
     }
     if (status == 'confirmed') {
-      return ElevatedButton.icon(
-        icon: const Icon(Icons.local_shipping_outlined, size: 14),
-        label: const Text('Giao hàng', style: TextStyle(fontSize: 11)),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          minimumSize: Size.zero,
-        ),
-        onPressed: () => _updateOrderStatus(orderId, 'shipping', 'Chuyển đơn vị giao hàng'),
+      return Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _showDispatch3PlDialog(orderId),
+            child: const Text('Đẩy 3PL', style: TextStyle(fontSize: 11)),
+          ),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _showManualTrackingDialog(orderId),
+            child: const Text('Mã vận đơn', style: TextStyle(fontSize: 11)),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.local_shipping_outlined, size: 14),
+            label: const Text('Giao hàng', style: TextStyle(fontSize: 11)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _updateOrderStatus(orderId, 'shipping', 'Chuyển đơn vị giao hàng'),
+          ),
+        ],
       );
     }
     if (status == 'shipping') {
-      return ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: SellerTheme.success,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          minimumSize: Size.zero,
-        ),
-        onPressed: () => _updateOrderStatus(orderId, 'delivered', 'Giao hàng thành công'),
-        child: const Text('Đã giao xong', style: TextStyle(fontSize: 11)),
+      return Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _showManualTrackingDialog(orderId),
+            child: const Text('Sửa vận đơn', style: TextStyle(fontSize: 11)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SellerTheme.success,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+            ),
+            onPressed: () => _updateOrderStatus(orderId, 'delivered', 'Giao hàng thành công'),
+            child: const Text('Đã giao xong', style: TextStyle(fontSize: 11)),
+          ),
+        ],
       );
     }
     return const SizedBox.shrink();
@@ -2559,7 +2596,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
       return const Center(child: CircularProgressIndicator(color: SellerTheme.primary));
     }
 
-    final hasAccount = _payoutData != null && (_payoutData!['hasAccount'] == true || _payoutData!.containsKey('balance'));
+    final hasAccount = _payoutData != null && _payoutData!['hasLinkedBank'] == true;
     final balance = double.tryParse(_payoutData?['balance']?.toString() ?? '0') ?? 0;
     final pending = double.tryParse(_payoutData?['pendingBalance']?.toString() ?? '0') ?? 0;
     final withdrawals = (_payoutData?['withdrawals'] as List?) ?? [];
@@ -2598,7 +2635,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
                         child: Text(
-                          hasAccount ? 'Đang hoạt động' : 'Chưa kích hoạt',
+                          hasAccount ? 'Đã liên kết NH' : 'Chưa liên kết NH',
                           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -2616,17 +2653,16 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Chờ quyết toán: ${_currencyFormat.format(pending)}', style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
-                      if (!hasAccount)
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: SellerTheme.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            minimumSize: Size.zero,
-                          ),
-                          onPressed: _isSubmittingPayout ? null : _handleSetupPayout,
-                          child: Text(_isSubmittingPayout ? 'Đang tạo...' : 'Kích hoạt Ví', style: const TextStyle(fontSize: 11.5)),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: SellerTheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: Size.zero,
                         ),
+                        onPressed: _openBankPayoutScreen,
+                        child: Text(hasAccount ? 'Quản lý NH & Chi tiết' : 'Liên kết Ngân Hàng', style: const TextStyle(fontSize: 11.5)),
+                      ),
                     ],
                   ),
                 ],
@@ -2681,7 +2717,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                       child: Text(
                         _isSubmittingPayout
                             ? 'ĐANG XỬ LÝ...'
-                            : (hasAccount ? 'GỬI YÊU CẦU RÚT TIỀN' : 'HÃY KÍCH HOẠT VÍ TRƯỚC KHI RÚT'),
+                            : (hasAccount ? 'GỬI YÊU CẦU RÚT TIỀN' : 'HÃY LIÊN KẾT NGÂN HÀNG TRƯỚC KHI RÚT'),
                       ),
                     ),
                   ),
@@ -2835,7 +2871,8 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
 // Painter vẽ đồ thị xu hướng 7 ngày
 class _TrendChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> orders;
-  _TrendChartPainter({required this.orders});
+  final List<Map<String, dynamic>>? chartPoints;
+  _TrendChartPainter({required this.orders, this.chartPoints});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2859,24 +2896,33 @@ class _TrendChartPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    // Tính tổng doanh thu 7 ngày gần nhất từ dữ liệu đơn hàng thực tế
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
     final dailyTotals = List<double>.filled(7, 0.0);
-
-    for (final o in orders) {
-      final status = (o['status']?.toString() ?? '').toLowerCase();
-      if (status == 'cancelled') continue;
-      final rawDate = o['createdAt'] ?? o['created_at'];
-      if (rawDate == null) continue;
-      final parsed = DateTime.tryParse(rawDate.toString())?.toLocal();
-      if (parsed == null) continue;
-      final orderDay = DateTime(parsed.year, parsed.month, parsed.day);
-      final diffDays = today.difference(orderDay).inDays;
-      if (diffDays >= 0 && diffDays < 7) {
-        final bucketIndex = 6 - diffDays;
-        final amount = double.tryParse((o['totalAmount'] ?? o['total_amount'] ?? o['subtotal'] ?? 0).toString()) ?? 0.0;
-        dailyTotals[bucketIndex] += amount;
+    if (chartPoints != null && chartPoints!.isNotEmpty) {
+      final len = chartPoints!.length;
+      final start = len > 7 ? len - 7 : 0;
+      for (int i = start; i < len; i++) {
+        final idx = (i - start) + (7 - (len - start));
+        if (idx >= 0 && idx < 7) {
+          dailyTotals[idx] = double.tryParse(chartPoints![i]['revenue']?.toString() ?? '0') ?? 0.0;
+        }
+      }
+    } else {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      for (final o in orders) {
+        final status = (o['status']?.toString() ?? '').toLowerCase();
+        if (status == 'cancelled') continue;
+        final rawDate = o['createdAt'] ?? o['created_at'];
+        if (rawDate == null) continue;
+        final parsed = DateTime.tryParse(rawDate.toString())?.toLocal();
+        if (parsed == null) continue;
+        final orderDay = DateTime(parsed.year, parsed.month, parsed.day);
+        final diffDays = today.difference(orderDay).inDays;
+        if (diffDays >= 0 && diffDays < 7) {
+          final bucketIndex = 6 - diffDays;
+          final amount = double.tryParse((o['totalAmount'] ?? o['total_amount'] ?? o['subtotal'] ?? 0).toString()) ?? 0.0;
+          dailyTotals[bucketIndex] += amount;
+        }
       }
     }
 

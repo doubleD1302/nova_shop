@@ -405,22 +405,75 @@ class OrderService {
     return null;
   }
 
-  /// Tạo yêu cầu trả hàng / hoàn tiền cho đơn hàng
+  /// Tính bảng giá cước đối tác vận chuyển 3PL (GHN, GHTK, ViettelPost)
+  /// POST /api/v1/shipping/rates-3pl
+  Future<List<Map<String, dynamic>>> calculate3PlRates({
+    String? fromProvince,
+    String? toProvince,
+    int weightGrams = 1000,
+    num subtotal = 0,
+    bool isMall = false,
+  }) async {
+    final response = await _client.post(
+      '/api/v1/shipping/rates-3pl',
+      body: {
+        if (fromProvince != null && fromProvince.trim().isNotEmpty)
+          'fromProvince': fromProvince.trim(),
+        if (toProvince != null && toProvince.trim().isNotEmpty)
+          'toProvince': toProvince.trim(),
+        'weightGrams': weightGrams,
+        'subtotal': subtotal.round(),
+        'isMall': isMall,
+      },
+    );
+    if (response.success && response.data is Map<String, dynamic>) {
+      final carriers = response.data['carriers'];
+      if (carriers is List) {
+        return carriers.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
+  }
+
+  /// Yêu cầu hoàn tiền thanh toán tự động (COD / VNPay / MoMo / ZaloPay)
+  /// POST /api/v1/payments/refund
+  Future<ApiResponse> requestPaymentRefund({
+    required String orderId,
+    String? shopOrderId,
+    num? amount,
+    String? reason,
+  }) async {
+    return await _client.post(
+      '/api/v1/payments/refund',
+      body: {
+        'orderId': orderId,
+        if (shopOrderId != null && shopOrderId.isNotEmpty)
+          'shopOrderId': shopOrderId,
+        if (amount != null && amount > 0) 'amount': amount.round(),
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
+    );
+  }
+
+  /// Tạo yêu cầu trả hàng / hoàn tiền cho một đơn hàng con
   /// POST /api/v1/orders/:orderId/returns
   Future<ApiResponse> createOrderReturn(
     String orderId, {
+    required String shopOrderId,
     required String reason,
-    String? description,
+    String? detail,
     List<String> images = const [],
-    List<Map<String, dynamic>>? items,
+    int? refundAmount,
   }) async {
     return await _client.post(
       '/api/v1/orders/$orderId/returns',
       body: {
+        'shopOrderId': shopOrderId,
         'reason': reason,
-        if (description != null && description.isNotEmpty) 'description': description,
+        if (detail != null && detail.trim().isNotEmpty) 'detail': detail.trim(),
         if (images.isNotEmpty) 'images': images,
-        if (items != null && items.isNotEmpty) 'items': items,
+        if (refundAmount != null && refundAmount > 0)
+          'refundAmount': refundAmount,
       },
     );
   }
@@ -437,5 +490,52 @@ class OrderService {
       }
     }
     return [];
+  }
+
+  /// Tra cứu toàn bộ danh sách yêu cầu trả hàng của người mua trên sàn
+  /// GET /api/v1/returns
+  Future<List<Map<String, dynamic>>> getAllBuyerReturns({
+    String? status,
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final response = await _client.get(
+      '/api/v1/returns',
+      queryParams: {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        if (status != null && status.isNotEmpty) 'status': status,
+      },
+    );
+    if (response.success && response.data != null) {
+      if (response.data is List) {
+        return (response.data as List)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      } else if (response.data is Map && response.data['items'] is List) {
+        return (response.data['items'] as List)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+    }
+    return [];
+  }
+
+  /// Hủy yêu cầu trả hàng khi đang ở trạng thái chờ duyệt ('requested')
+  /// PATCH /api/v1/returns/:returnId/cancel
+  Future<ApiResponse> cancelBuyerReturn(String returnId) async {
+    return await _client.patch('/api/v1/returns/$returnId/cancel', body: {});
+  }
+
+  /// Gửi khiếu nại lên Admin sau khi Seller từ chối yêu cầu hoàn hàng
+  /// POST /api/v1/returns/:returnId/dispute
+  Future<ApiResponse> disputeBuyerReturn(
+    String returnId, {
+    required String disputeReason,
+  }) async {
+    return await _client.post(
+      '/api/v1/returns/$returnId/dispute',
+      body: {'disputeReason': disputeReason.trim()},
+    );
   }
 }

@@ -929,6 +929,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             originalFee: 55000,
             icon: Icons.rocket_launch_rounded,
           ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _show3PlRatesSheet(subtotal),
+              icon: const Icon(Icons.local_shipping_outlined, size: 16),
+              label: const Text(
+                'Tra cứu giá cước 3PL (GHN / GHTK / ViettelPost)',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1215,7 +1227,85 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _buildPaymentRadioTile('cod', 'Thanh toán khi nhận hàng (COD)', 'Thanh toán tiền mặt cho shipper khi nhận kiện hàng', Icons.local_atm_rounded),
           _buildPaymentRadioTile('novapay', 'Ví NovaPay', 'Ưu đãi hoàn xu 10.000đ khi thanh toán qua ví ShopNova', Icons.account_balance_wallet_rounded),
           _buildPaymentRadioTile('vnpay', 'VNPay / QR Code Ngân hàng', 'Quét mã VNPAY-QR nhanh chóng bảo mật', Icons.qr_code_scanner_rounded),
+          _buildPaymentRadioTile('zalopay', 'Ví ZaloPay / QR ZaloPay', 'Thanh toán nhanh an toàn qua cổng ZaloPay', Icons.qr_code_2_rounded),
         ],
+      ),
+    );
+  }
+
+  Future<void> _show3PlRatesSheet(double subtotal) async {
+    final province = _provinceController.text.trim();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => FutureBuilder<List<Map<String, dynamic>>>(
+        future: OrderService().calculate3PlRates(
+          toProvince: province.isNotEmpty ? province : 'TP. Hồ Chí Minh',
+          subtotal: subtotal,
+        ),
+        builder: (ctx, snap) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bảng giá cước 3PL tới ',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5),
+                ),
+                const SizedBox(height: 12),
+                if (snap.connectionState == ConnectionState.waiting)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snap.data == null || snap.data!.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('Không tải được bảng giá đối tác 3PL lúc này.'),
+                  )
+                else
+                  ...snap.data!.map((c) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '\ (\)',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Dự kiến \ ngày • ',
+                                    style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              _formatVND(num.tryParse(c['fee']?.toString() ?? '0') ?? 0),
+                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      )),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

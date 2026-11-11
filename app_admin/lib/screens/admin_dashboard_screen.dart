@@ -5,6 +5,8 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../theme/admin_theme.dart';
 import '../widgets/nova_logo.dart';
+import '../services/admin_feature_service.dart';
+import 'admin_operations_sections.dart';
 import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -30,6 +32,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     {'id': 'revenue', 'label': 'Doanh thu', 'icon': Icons.account_balance_wallet_outlined, 'activeIcon': Icons.account_balance_wallet_rounded},
     {'id': 'reports', 'label': 'Báo cáo vi phạm', 'icon': Icons.flag_outlined, 'activeIcon': Icons.flag_rounded},
     {'id': 'settings', 'label': 'Cài đặt hệ thống', 'icon': Icons.settings_outlined, 'activeIcon': Icons.settings_rounded},
+    {'id': 'returns', 'label': 'Khiếu nại trả hàng', 'icon': Icons.assignment_return_outlined, 'activeIcon': Icons.assignment_return_rounded},
+    {'id': 'payouts', 'label': 'Chi trả Seller', 'icon': Icons.payments_outlined, 'activeIcon': Icons.payments_rounded},
+    {'id': 'payments', 'label': 'Đối soát thanh toán', 'icon': Icons.sync_alt_rounded, 'activeIcon': Icons.sync_alt_rounded},
   ];
 
   // Dữ liệu từ Database
@@ -42,6 +47,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _reports = [];
   Map<String, dynamic>? _emailStatus;
+  final AdminFeatureService _featureService = AdminFeatureService();
+  final TextEditingController _commissionCtrl = TextEditingController(text: '5');
+  final TextEditingController _platformFeeCtrl = TextEditingController(text: '0');
+  bool _maintenanceMode = false;
+  bool _savingSettings = false;
+  String? _runningJob;
+  int _unreadNotifCount = 0;
 
   bool _isLoading = false;
   bool _hasConnectionError = false;
@@ -91,7 +103,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
       if (activeId == 'settings') {
         await _fetchEmailStatus();
+        await _fetchAdminSettings();
       }
+      _fetchNotifCount();
     } catch (e) {
       debugPrint('[Admin] Lỗi tải dữ liệu: $e');
     } finally {
@@ -122,6 +136,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _errorMessage = res.message.isNotEmpty ? res.message : 'Không thể kết nối máy chủ Backend.';
       });
     }
+  }
+
+  Future<void> _fetchAdminSettings() async {
+    final s = await _featureService.getSettings();
+    if (mounted && s != null) {
+      setState(() {
+        _maintenanceMode = s['maintenanceMode'] == true;
+        _commissionCtrl.text = (s['commissionRate'] ?? 5).toString();
+        _platformFeeCtrl.text = (s['platformFee'] ?? 0).toString();
+      });
+    }
+  }
+
+  Future<void> _fetchNotifCount() async {
+    final notif = await _featureService.getNotifications(page: 1, limit: 5);
+    if (mounted) {
+      setState(() {
+        _unreadNotifCount = (notif['unreadCount'] as num?)?.toInt() ?? 0;
+      });
+    }
+  }
+
+  Future<void> _saveAdminSettings() async {
+    final comm = double.tryParse(_commissionCtrl.text.trim());
+    final fee = int.tryParse(_platformFeeCtrl.text.trim());
+    setState(() => _savingSettings = true);
+    final res = await _featureService.updateSettings(
+      maintenanceMode: _maintenanceMode,
+      commissionRate: comm,
+      platformFee: fee,
+    );
+    if (!mounted) return;
+    setState(() => _savingSettings = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : (res.success ? 'Lưu cấu hình hệ thống thành công!' : 'Lưu cấu hình thất bại.')),
+        backgroundColor: res.success ? AdminTheme.success : AdminTheme.danger,
+      ),
+    );
+    if (res.success) _fetchAdminSettings();
+  }
+
+  Future<void> _triggerCronJob(String jobName) async {
+    setState(() => _runningJob = jobName);
+    final res = await _featureService.runCronJob(jobName);
+    if (!mounted) return;
+    setState(() => _runningJob = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : 'Đã thực thi tác vụ $jobName.'),
+        backgroundColor: res.success ? AdminTheme.success : AdminTheme.danger,
+      ),
+    );
   }
 
   Future<void> _fetchShops() async {
@@ -1747,6 +1814,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       actions: [
         IconButton(
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications_none_rounded, color: AdminTheme.textPrimary, size: 22),
+              if (_unreadNotifCount > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(color: AdminTheme.primary, shape: BoxShape.circle),
+                    child: Text('$_unreadNotifCount', style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+            ],
+          ),
+          onPressed: () async {
+            await showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const AdminNotificationsSheet(),
+            );
+            _fetchNotifCount();
+          },
+        ),
+        IconButton(
           icon: const Icon(Icons.refresh_rounded, color: AdminTheme.textPrimary, size: 22),
           onPressed: _loadCurrentSection,
         ),
@@ -2870,7 +2964,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Tỷ lệ hoa hồng sàn & Cài đặt hệ thống
+          // Cấu hình vận hành Runtime (/api/v1/admin/settings)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -2881,36 +2975,82 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Cấu Hình Hoa Hồng Nền Tảng', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+                const Text('Cấu Hình Vận Hành Nền Tảng (Runtime)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
                 const Divider(color: AdminTheme.border, height: 20),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Tỷ lệ phí hoa hồng sàn (Commission):', style: TextStyle(fontSize: 12.5, color: AdminTheme.textPrimary)),
-                    Text('5.0%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AdminTheme.primary)),
-                  ],
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Chế độ bảo trì hệ thống', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Thông báo bảo trì toàn sàn tới người mua', style: TextStyle(fontSize: 11.5, color: AdminTheme.textSecondary)),
+                  value: _maintenanceMode,
+                  onChanged: (v) => setState(() => _maintenanceMode = v),
                 ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.shade200),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _commissionCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Tỷ lệ hoa hồng sàn (% từ 0-100)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline, size: 18, color: Colors.amber.shade900),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Chưa có API lưu cấu hình runtime - Cấu hình hệ thống hiện được đọc trực tiếp từ biến môi trường máy chủ Backend. Tính năng lưu tùy biến trực tiếp từ App sẽ được kích hoạt khi Backend hỗ trợ.',
-                          style: TextStyle(fontSize: 11.5, color: Colors.amber.shade900, height: 1.35),
-                        ),
-                      ),
-                    ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _platformFeeCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Phí nền tảng cố định mỗi đơn (₫)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
                   ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _savingSettings ? null : _saveAdminSettings,
+                    icon: const Icon(Icons.save_rounded, size: 18),
+                    label: Text(_savingSettings ? 'ĐANG LƯU...' : 'Lưu Cấu Hình Hệ Thống'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Tác vụ nền Cron Jobs (/api/v1/admin/jobs/run)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AdminTheme.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AdminTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Chạy Tác Vụ Tự Động (Cron Jobs)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+                const SizedBox(height: 6),
+                const Text('Kích hoạt thủ công các tác vụ dọn dẹp và đối soát định kỳ của hệ thống.', style: TextStyle(fontSize: 12, color: AdminTheme.textSecondary)),
+                const Divider(color: AdminTheme.border, height: 20),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ('cancel-expired-orders', 'Hủy đơn quá hạn TT'),
+                    ('auto-complete-orders', 'Tự động hoàn tất đơn'),
+                    ('expire-vouchers', 'Hết hạn Voucher'),
+                    ('clean-orphan-uploads', 'Dọn ảnh mồ côi'),
+                  ].map((job) {
+                    final isRunning = _runningJob == job.$1;
+                    return OutlinedButton.icon(
+                      onPressed: _runningJob != null ? null : () => _triggerCronJob(job.$1),
+                      icon: isRunning
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.play_arrow_rounded, size: 16),
+                      label: Text(job.$2, style: const TextStyle(fontSize: 12)),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -3008,6 +3148,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         break;
       case 7:
         content = _buildSettingsSection();
+        break;
+      case 8:
+        content = const AdminReturnsSection();
+        break;
+      case 9:
+        content = const AdminPayoutsSection();
+        break;
+      case 10:
+        content = const AdminPaymentsSection();
         break;
       case 0:
       default:

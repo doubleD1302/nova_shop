@@ -63,6 +63,10 @@ class ApiClient {
   static const Duration _defaultTimeout = Duration(seconds: 15);
   static const String _tokenKey = 'shopnova_admin_access_token';
 
+  void setHttpClientForTest(http.Client client) {
+    _client = client;
+  }
+
   void _resetClient() {
     try {
       _client.close();
@@ -135,6 +139,20 @@ class ApiClient {
       final uri = Uri.parse('${ApiConfig.baseUrl}$cleanEndpoint');
       final allHeaders = await _buildHeaders(extra: headers);
       final response = await _client.patch(
+        uri,
+        headers: allHeaders,
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(_defaultTimeout);
+      return ApiResponse.fromResponse(response);
+    });
+  }
+
+  Future<ApiResponse> put(String endpoint, {dynamic body, Map<String, String>? headers}) async {
+    return _sendRequest(() async {
+      final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+      final uri = Uri.parse('${ApiConfig.baseUrl}$cleanEndpoint');
+      final allHeaders = await _buildHeaders(extra: headers);
+      final response = await _client.put(
         uri,
         headers: allHeaders,
         body: body != null ? jsonEncode(body) : null,

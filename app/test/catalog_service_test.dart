@@ -102,11 +102,12 @@ void main() {
     });
 
     test('getBanners returns website-synced UI banners', () async {
-      final service = CatalogService();
+      final offlineClient = MockClient((_) async => http.Response('Offline', 503));
+      final service = CatalogService(client: offlineClient);
       final banners = await service.getBanners();
 
       expect(banners.isNotEmpty, true);
-      expect(WebsiteData.banners.length, banners.length);
+      expect(banners.length, WebsiteData.banners.length);
       expect(banners.first.imageUrl.startsWith('https://'), true);
       for (final b in banners) {
         expect(b.title.isNotEmpty, true);

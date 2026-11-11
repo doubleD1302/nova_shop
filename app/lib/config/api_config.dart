@@ -106,6 +106,7 @@ class ApiConfig {
   static String get readyUrl => '$baseUrl/api/v1/ready';
   static String get loginUrl => '$baseUrl/api/v1/auth/login';
   static String get googleLoginUrl => '$baseUrl/api/v1/auth/google';
+  static String get facebookLoginUrl => '$baseUrl/api/v1/auth/facebook';
   static String get registerUrl => '$baseUrl/api/v1/auth/register';
   static String get refreshUrl => '$baseUrl/api/v1/auth/refresh';
   static String get logoutUrl => '$baseUrl/api/v1/auth/logout';
@@ -122,11 +123,30 @@ class ApiConfig {
   static String get cartSelectionUrl => '$baseUrl/api/v1/cart/selection';
   static String cartItemUrl(String itemId) => '$baseUrl/api/v1/cart/items/$itemId';
   static String get ordersUrl => '$baseUrl/api/v1/orders';
+  static String get returnsUrl => '$baseUrl/api/v1/returns';
   static String get shippingCalculateUrl => '$baseUrl/api/v1/shipping/calculate';
+  static String get shippingRates3plUrl => '$baseUrl/api/v1/shipping/rates-3pl';
+  static String get paymentsRefundUrl => '$baseUrl/api/v1/payments/refund';
+  static String get bannersUrl => '$baseUrl/api/v1/banners';
+  static String get featuredProductsUrl => '$baseUrl/api/v1/products/featured';
+  static String get favoritesUrl => '$baseUrl/api/v1/favorites';
+  static String get notificationsUrl => '$baseUrl/api/v1/notifications';
+  static String get systemConfigUrl => '$baseUrl/api/v1/system/config';
   static String get updateProfileUrl => '$baseUrl/api/v1/auth/profile';
   static String get changePasswordUrl => '$baseUrl/api/v1/auth/change-password';
   static String get vouchersUrl => '$baseUrl/api/v1/vouchers';
   static String get chatConversationsUrl => '$baseUrl/api/v1/chat/conversations';
+  static String chatWsUrl(String token) {
+    final uri = Uri.parse(baseUrl);
+    final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
+    return uri
+        .replace(
+          scheme: wsScheme,
+          path: '/ws/chat',
+          queryParameters: {'token': token},
+        )
+        .toString();
+  }
   static String get aiChatUrl => '$baseUrl/api/v1/ai/chat';
   static String get aiBrainProfileUrl => '$baseUrl/api/v1/ai/brain/profile';
   static String get aiBrainFeedbackUrl => '$baseUrl/api/v1/ai/brain/feedback';

@@ -423,6 +423,69 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Đăng nhập bằng Google (POST /api/v1/auth/google)
+  Future<bool> loginWithGoogle(String idToken) => _loginWithSocialProvider(
+        url: ApiConfig.googleLoginUrl,
+        idToken: idToken,
+        fallbackError: 'Đăng nhập Google không thành công.',
+      );
+
+  /// Đăng nhập bằng Facebook (POST /api/v1/auth/facebook)
+  Future<bool> loginWithFacebook(String idToken) => _loginWithSocialProvider(
+        url: ApiConfig.facebookLoginUrl,
+        idToken: idToken,
+        fallbackError: 'Đăng nhập Facebook không thành công.',
+      );
+
+  Future<bool> _loginWithSocialProvider({
+    required String url,
+    required String idToken,
+    required String fallbackError,
+  }) async {
+    final cleanToken = idToken.trim();
+    if (cleanToken.isEmpty) {
+      _lastError = 'Vui lòng cung cấp idToken hợp lệ.';
+      notifyListeners();
+      return false;
+    }
+    final version = _beginSessionChange(clear: true);
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'idToken': cleanToken}),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (version != _sessionVersion) return false;
+      final Map<String, dynamic> body = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        final data = body['data'] as Map<String, dynamic>;
+        if (!await _acceptSession(data, version)) return false;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _lastError = body['message'] as String? ?? fallbackError;
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (_) {
+      if (version != _sessionVersion) return false;
+      _lastError = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Đăng ký tài khoản người dùng mới (Buyer hoặc Seller kèm sellerProfile)
   Future<bool> register({
     required String username,

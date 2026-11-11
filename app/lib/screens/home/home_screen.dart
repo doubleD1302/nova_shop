@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<CategoryItem> _categories = [];
   List<FlashSaleItem> _flashSaleItems = [];
   List<Product> _allProducts = [];
+  bool _maintenanceMode = false;
 
   @override
   void initState() {
@@ -52,12 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final categoriesFuture = _catalogService.getCategories();
       final flashSaleFuture = _catalogService.getFlashSaleItems();
       final productsFuture = _catalogService.getProducts();
+      final featuredFuture = _catalogService.getFeaturedShowcase();
+      final configFuture = _catalogService.getSystemConfig();
 
       final results = await Future.wait([
         bannersFuture,
         categoriesFuture,
         flashSaleFuture,
         productsFuture,
+        featuredFuture,
+        configFuture,
       ]);
 
       if (mounted) {
@@ -65,13 +70,18 @@ class _HomeScreenState extends State<HomeScreen> {
         final categories = results[1] as List<CategoryItem>;
         final flashSale = results[2] as List<FlashSaleItem>;
         final products = results[3] as List<Product>;
-        final dynamicProducts = _shuffleRecommendedProducts(products);
+        final featuredMap = results[4] as Map<String, List<Product>>;
+        final sysConfig = results[5] as Map<String, dynamic>?;
+        final featuredList = featuredMap['featuredProducts'] ?? [];
+        final merged = products.isNotEmpty ? products : featuredList;
+        final dynamicProducts = _shuffleRecommendedProducts(merged);
 
         setState(() {
           _banners = banners;
           _categories = categories;
           _flashSaleItems = flashSale;
           _allProducts = dynamicProducts;
+          _maintenanceMode = sysConfig?['maintenanceMode'] == true;
           _isLoading = false;
         });
       }
@@ -127,6 +137,29 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
+              if (_maintenanceMode)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.engineering_rounded, color: Color(0xFFB45309), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Hệ thống đang trong chế độ bảo trì định kỳ. Một số thao tác đặt hàng có thể tạm gián đoạn.',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // 1. Banner Carousel (Website Hero Banners)
               if (_banners.isNotEmpty)
                 BannerCarousel(banners: _banners)

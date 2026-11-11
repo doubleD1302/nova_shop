@@ -73,7 +73,12 @@ class ApiClient {
   ApiClient._internal();
 
   final SessionStore _sessionStore = SessionStore();
+  http.Client? _testHttpClient;
   String? _cachedToken;
+
+  void setHttpClientForTest(http.Client client) {
+    _testHttpClient = client;
+  }
   Future<bool> Function()? sessionRefresher;
   Future<bool>? _refreshing;
   int _sessionEpoch = 0;
@@ -243,8 +248,7 @@ class ApiClient {
     return _executeWithAutoReconnect(
       (reqHeaders, baseUrl) async {
         final uri = _buildUri(baseUrl, endpoint, queryParams);
-        return await http
-            .get(uri, headers: reqHeaders)
+        return await (_testHttpClient != null ? _testHttpClient!.get(uri, headers: reqHeaders) : http.get(uri, headers: reqHeaders))
             .timeout(ApiConfig.timeout);
       },
       headers: headers,
@@ -263,8 +267,7 @@ class ApiClient {
       (reqHeaders, baseUrl) async {
         final uri = _buildUri(baseUrl, endpoint);
         final jsonBody = body != null ? jsonEncode(body) : null;
-        return await http
-            .post(uri, headers: reqHeaders, body: jsonBody)
+        return await (_testHttpClient != null ? _testHttpClient!.post(uri, headers: reqHeaders, body: jsonBody) : http.post(uri, headers: reqHeaders, body: jsonBody))
             .timeout(ApiConfig.timeout);
       },
       headers: headers,
@@ -281,8 +284,7 @@ class ApiClient {
     return _executeWithAutoReconnect((reqHeaders, baseUrl) async {
       final uri = _buildUri(baseUrl, endpoint);
       final jsonBody = body != null ? jsonEncode(body) : null;
-      return await http
-          .put(uri, headers: reqHeaders, body: jsonBody)
+      return await (_testHttpClient != null ? _testHttpClient!.put(uri, headers: reqHeaders, body: jsonBody) : http.put(uri, headers: reqHeaders, body: jsonBody))
           .timeout(ApiConfig.timeout);
     }, headers: headers);
   }
@@ -290,14 +292,15 @@ class ApiClient {
   /// Gửi HTTP DELETE
   Future<ApiResponse> delete(
     String endpoint, {
+    dynamic body,
     Map<String, String>? headers,
     bool retryOnFailure = true,
   }) async {
     return _executeWithAutoReconnect(
       (reqHeaders, baseUrl) async {
         final uri = _buildUri(baseUrl, endpoint);
-        return await http
-            .delete(uri, headers: reqHeaders)
+        final jsonBody = body != null ? jsonEncode(body) : null;
+        return await (_testHttpClient != null ? _testHttpClient!.delete(uri, headers: reqHeaders, body: jsonBody) : http.delete(uri, headers: reqHeaders, body: jsonBody))
             .timeout(ApiConfig.timeout);
       },
       headers: headers,
@@ -316,8 +319,7 @@ class ApiClient {
       (reqHeaders, baseUrl) async {
         final uri = _buildUri(baseUrl, endpoint);
         final jsonBody = body != null ? jsonEncode(body) : null;
-        return await http
-            .patch(uri, headers: reqHeaders, body: jsonBody)
+        return await (_testHttpClient != null ? _testHttpClient!.patch(uri, headers: reqHeaders, body: jsonBody) : http.patch(uri, headers: reqHeaders, body: jsonBody))
             .timeout(ApiConfig.timeout);
       },
       headers: headers,

@@ -12,6 +12,7 @@ import 'package:shopnova/screens/cart/cart_screen.dart';
 import 'package:shopnova/screens/shop/shop_screen.dart';
 import 'package:shopnova/screens/shop/shop_detail_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
+import 'package:shopnova/screens/chat/chat_detail_screen.dart';
 import 'package:shopnova/widgets/common/report_content_sheet.dart';
 import 'package:shopnova/widgets/home/product_card.dart';
 import 'package:shopnova/widgets/home/flash_sale_countdown_widget.dart';
@@ -1659,9 +1660,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           height: 60,
           child: Row(
             children: [
-              // Chat AI / Shop
-              Expanded(
-                flex: 2,
+              // Nova AI
+              SizedBox(
+                width: 56,
                 child: InkWell(
                   onTap: () {
                     Navigator.push(
@@ -1677,9 +1678,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.auto_awesome, size: 20, color: primaryColor),
+                      Icon(Icons.auto_awesome, size: 19, color: primaryColor),
                       const SizedBox(height: 2),
-                      const Text('Nova AI', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      const Text('Nova AI', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 0.8, height: 36, color: Colors.grey.shade200),
+              // Chat trực tiếp với Shop
+              SizedBox(
+                width: 60,
+                child: InkWell(
+                  onTap: () {
+                    if (!AuthService().isAuthenticated) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Vui lòng đăng nhập để chat với gian hàng.')),
+                      );
+                      return;
+                    }
+                    final shopId = _product?.shopId ?? '';
+                    if (shopId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Không xác định được gian hàng của sản phẩm.')),
+                      );
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatDetailScreen(
+                          shopId: shopId,
+                          initialShopName: _product?.shopName,
+                          initialPrompt: 'Cho mình hỏi về sản phẩm "${_product?.name ?? ""}"',
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline_rounded, size: 19, color: primaryColor),
+                      const SizedBox(height: 2),
+                      const Text('Chat Shop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary)),
                     ],
                   ),
                 ),

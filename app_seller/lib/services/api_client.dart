@@ -63,6 +63,10 @@ class ApiClient {
   static const Duration _defaultTimeout = Duration(seconds: 15);
   static const String _tokenKey = 'shopnova_seller_access_token';
 
+  void setHttpClientForTest(http.Client client) {
+    _client = client;
+  }
+
   void _resetClient() {
     try {
       _client.close();
@@ -157,14 +161,37 @@ class ApiClient {
     });
   }
 
-  Future<ApiResponse> delete(String endpoint, {Map<String, String>? headers}) async {
+  Future<ApiResponse> delete(String endpoint, {dynamic body, Map<String, String>? headers}) async {
     return _sendRequest(() async {
       final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
       final uri = Uri.parse('${ApiConfig.baseUrl}$cleanEndpoint');
       final allHeaders = await _buildHeaders(extra: headers);
-      final response = await _client.delete(uri, headers: allHeaders).timeout(_defaultTimeout);
+      final response = await _client
+          .delete(
+            uri,
+            headers: allHeaders,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_defaultTimeout);
       return ApiResponse.fromResponse(response);
     });
+  }
+
+  /// Tải dữ liệu nhị phân (Excel .xlsx / file đính kèm)
+  Future<List<int>?> getBytes(String endpoint, {Map<String, String>? queryParams}) async {
+    try {
+      final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+      var uri = Uri.parse('${ApiConfig.baseUrl}$cleanEndpoint');
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: queryParams);
+      }
+      final allHeaders = await _buildHeaders(extra: {'Accept': '*/*'});
+      final response = await _client.get(uri, headers: allHeaders).timeout(_defaultTimeout);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response.bodyBytes;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<ApiResponse> _sendRequest(Future<ApiResponse> Function() requestFn) async {

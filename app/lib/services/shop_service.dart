@@ -151,9 +151,34 @@ class ShopService {
     return ProductListResult(products: [], total: 0, page: page, limit: limit, totalPages: 1);
   }
 
-  /// Kiểm tra trạng thái theo dõi gian hàng
+  Future<bool> _hasAuthToken() async {
+    final token = await _client.getToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  /// Kiểm tra trạng thái theo dõi gian hàng (GET /api/v1/shops/:shopId/follow)
   Future<bool> getFollowStatus(String shopId) async {
     try {
+      if (await _hasAuthToken()) {
+        final response = await _client.get('/api/v1/shops/$shopId/follow');
+        if (response.success && response.data is Map) {
+          final map = response.data as Map;
+          final following =
+              map['isFollowing'] == true || map['isFollowed'] == true;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final list = prefs.getStringList(_followedShopsKey) ?? [];
+            if (following && !list.contains(shopId)) {
+              list.add(shopId);
+              await prefs.setStringList(_followedShopsKey, list);
+            } else if (!following && list.contains(shopId)) {
+              list.remove(shopId);
+              await prefs.setStringList(_followedShopsKey, list);
+            }
+          } catch (_) {}
+          return following;
+        }
+      }
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_followedShopsKey) ?? [];
       return list.contains(shopId);
@@ -162,9 +187,16 @@ class ShopService {
     }
   }
 
-  /// Theo dõi gian hàng
+  /// Theo dõi gian hàng (POST /api/v1/shops/:shopId/follow)
   Future<bool> followShop(String shopId) async {
     try {
+      if (await _hasAuthToken()) {
+        final response = await _client.post(
+          '/api/v1/shops/$shopId/follow',
+          body: {},
+        );
+        if (!response.success) return false;
+      }
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_followedShopsKey) ?? [];
       if (!list.contains(shopId)) {
@@ -177,9 +209,13 @@ class ShopService {
     }
   }
 
-  /// Hủy theo dõi gian hàng
+  /// Hủy theo dõi gian hàng (DELETE /api/v1/shops/:shopId/follow)
   Future<bool> unfollowShop(String shopId) async {
     try {
+      if (await _hasAuthToken()) {
+        final response = await _client.delete('/api/v1/shops/$shopId/follow');
+        if (!response.success) return false;
+      }
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_followedShopsKey) ?? [];
       list.remove(shopId);

@@ -5,6 +5,7 @@ class BannerItem {
   final String imageUrl;
   final String title;
   final String subtitle;
+  final String linkUrl;
   final Color backgroundColor;
 
   const BannerItem({
@@ -12,6 +13,7 @@ class BannerItem {
     required this.imageUrl,
     required this.title,
     required this.subtitle,
+    this.linkUrl = '',
     required this.backgroundColor,
   });
 
@@ -31,6 +33,7 @@ class BannerItem {
       imageUrl: json['imageUrl']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       subtitle: json['subtitle']?.toString() ?? '',
+      linkUrl: json['linkUrl']?.toString() ?? '',
       backgroundColor: bg,
     );
   }

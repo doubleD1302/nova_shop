@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/order_service.dart';
 import '../../services/review_service.dart';
 import '../../services/upload_service.dart';
+import 'buyer_returns_screen.dart';
 import '../../theme/app_colors.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -328,6 +329,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.assignment_return_outlined, color: AppColors.primary),
+            tooltip: 'Trả hàng & Khiếu nại',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BuyerReturnsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF555770)),
             tooltip: 'Làm mới đơn hàng',
@@ -673,8 +684,12 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                     ),
                   ],
                 ),
-                Row(
-                  children: [
+                Flexible(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
                     // Nút Hủy đơn (khi đơn còn đang chờ)
                     if (status == 'pending' || status == 'created' || status.isEmpty) ...[
                       OutlinedButton(
@@ -705,22 +720,56 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(width: 8),
                     ],
-                    // Nút Đánh Giá Sản Phẩm (Chỉ hiển thị khi đơn đã giao thành công)
+                    if (status == 'confirmed' || status == 'processing' || status == 'shipping' || status == 'in_transit' || canReview)
+                      OutlinedButton.icon(
+                        onPressed: () => _showOrderTrackingSheet(order['id']?.toString() ?? ''),
+                        icon: const Icon(Icons.local_shipping_outlined, size: 14),
+                        label: const Text('Hành trình', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2563EB),
+                          side: const BorderSide(color: Color(0xFF93C5FD)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: const Size(0, 34),
+                        ),
+                      ),
                     if (canReview) ...[
+                      OutlinedButton(
+                        onPressed: () => _showOrderReturnDialog(order),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFB45309),
+                          side: const BorderSide(color: Color(0xFFFCD34D)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: const Size(0, 34),
+                        ),
+                        child: const Text('Trả hàng', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
                       ElevatedButton.icon(
                         onPressed: () => _showOrderReviewDialog(order, items),
-                        icon: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
+                        icon: const Icon(Icons.star_rounded, size: 15, color: Colors.white),
                         label: const Text('Đánh giá', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           minimumSize: const Size(0, 34),
                         ),
                       ),
-                      const SizedBox(width: 8),
                     ],
+                    if (status == 'cancelled' || status == 'returned')
+                      OutlinedButton(
+                        onPressed: () => _requestRefund(order['id']?.toString() ?? '', num.tryParse(totalAmount.toString())),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F766E),
+                          side: const BorderSide(color: Color(0xFF5EEAD4)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: const Size(0, 34),
+                        ),
+                        child: const Text('Hoàn tiền', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
                     OutlinedButton(
                       onPressed: () {
                         showDialog(
@@ -763,7 +812,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       ),
                       child: const Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -814,6 +864,156 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         }
       }
     }
+  }
+
+  Future<void> _showOrderTrackingSheet(String orderId) async {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => FutureBuilder<Map<String, dynamic>?>(
+        future: OrderService().getOrderTracking(orderId),
+        builder: (ctx, snap) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Hành trình đơn #$orderId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                if (snap.connectionState == ConnectionState.waiting)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snap.data == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Text('Chưa có thông tin vận đơn 3PL cho đơn hàng này.'),
+                  )
+                else ...[
+                  if (snap.data!['carrier'] != null)
+                    Text('Đơn vị vận chuyển: ${snap.data!["carrier"]}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (snap.data!['trackingCode'] != null)
+                    Text('Mã vận đơn: ${snap.data!["trackingCode"]}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  if (snap.data!['events'] is List)
+                    ...(snap.data!['events'] as List).whereType<Map>().take(6).map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.fiber_manual_record, size: 10, color: AppColors.primary),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text('${e["description"] ?? e["status"] ?? ""} (${e["timestamp"] ?? ""})', style: const TextStyle(fontSize: 12.5))),
+                            ],
+                          ),
+                        )),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showOrderReturnDialog(Map<String, dynamic> order) async {
+    final shopOrders = order['shopOrders'] is List
+        ? (order['shopOrders'] as List).whereType<Map>().toList()
+        : <Map>[];
+    String selectedShopOrderId = shopOrders.isNotEmpty
+        ? (shopOrders.first['id']?.toString() ?? '')
+        : (order['shopOrderId']?.toString() ?? order['id']?.toString() ?? '');
+    String selectedReason = 'Sản phẩm bị lỗi / hư hỏng';
+    final detailCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Yêu cầu Trả hàng / Hoàn tiền', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (shopOrders.length > 1)
+                  DropdownButtonFormField<String>(
+                    value: selectedShopOrderId,
+                    decoration: const InputDecoration(labelText: 'Chọn kiện hàng Shop', border: OutlineInputBorder()),
+                    items: shopOrders
+                        .map((so) => DropdownMenuItem(
+                              value: so['id']?.toString() ?? '',
+                              child: Text('${so["shopName"] ?? "Shop"} (#${so["id"]})'),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDlg(() => selectedShopOrderId = v ?? selectedShopOrderId),
+                  ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedReason,
+                  decoration: const InputDecoration(labelText: 'Lý do trả hàng', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'Sản phẩm bị lỗi / hư hỏng', child: Text('Sản phẩm bị lỗi / hư hỏng')),
+                    DropdownMenuItem(value: 'Giao sai sản phẩm / thiếu hàng', child: Text('Giao sai sản phẩm / thiếu hàng')),
+                    DropdownMenuItem(value: 'Không đúng mô tả', child: Text('Không đúng mô tả')),
+                    DropdownMenuItem(value: 'Đổi ý / không còn nhu cầu', child: Text('Đổi ý / không còn nhu cầu')),
+                  ],
+                  onChanged: (v) => setDlg(() => selectedReason = v ?? selectedReason),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: detailCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Mô tả chi tiết tình trạng',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+              child: const Text('Gửi yêu cầu'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    final res = await OrderService().createOrderReturn(
+      order['id']?.toString() ?? '',
+      shopOrderId: selectedShopOrderId,
+      reason: selectedReason,
+      detail: detailCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : (res.success ? 'Đã gửi yêu cầu trả hàng!' : 'Không thể gửi yêu cầu trả hàng.')),
+        backgroundColor: res.success ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+      ),
+    );
+  }
+
+  Future<void> _requestRefund(String orderId, num? amount) async {
+    final res = await OrderService().requestPaymentRefund(
+      orderId: orderId,
+      amount: amount,
+      reason: 'Người mua yêu cầu hoàn tiền đơn hàng #$orderId',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(res.message.isNotEmpty ? res.message : (res.success ? 'Hoàn tiền thành công!' : 'Không thể xử lý hoàn tiền.')),
+        backgroundColor: res.success ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+      ),
+    );
   }
 
   Future<void> _cancelOrder(String orderId) async {

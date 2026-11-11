@@ -583,18 +583,25 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Expanded(
                 child: _buildSocialButton(
+                  onTap: () => _showSocialTokenLoginSheet(provider: 'google', label: 'Google'),
                   child: const Text('G', style: TextStyle(color: Color(0xFFEA4335), fontWeight: FontWeight.w900, fontSize: 20)),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildSocialButton(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Đăng nhập Apple ID hiện chỉ hỗ trợ trên thiết bị iOS.')),
+                    );
+                  },
                   child: const Icon(Icons.apple_rounded, color: Colors.black, size: 24),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildSocialButton(
+                  onTap: () => _showSocialTokenLoginSheet(provider: 'facebook', label: 'Facebook'),
                   child: const Icon(Icons.facebook_rounded, color: Color(0xFF1877F2), size: 24),
                 ),
               ),
@@ -605,18 +612,85 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEF0)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2))
+  Future<void> _showSocialTokenLoginSheet({
+    required String provider,
+    required String label,
+  }) async {
+    final tokenCtrl = TextEditingController();
+    final idToken = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Đăng nhập bằng $label', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Nhập Firebase ID Token từ phiên $label để xác thực với máy chủ (/api/v1/auth/$provider):',
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF555770)),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: tokenCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Firebase ID Token',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, tokenCtrl.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: Text('Đăng nhập $label'),
+          ),
         ],
       ),
-      child: Center(child: child),
+    );
+    if (idToken == null || idToken.isEmpty) return;
+
+    final ok = provider == 'google'
+        ? await AuthService().loginWithGoogle(idToken)
+        : await AuthService().loginWithFacebook(idToken);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng nhập $label thành công!'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService().lastError ?? 'Đăng nhập $label thất bại.'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
+  }
+
+  Widget _buildSocialButton({required Widget child, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEEEEF0)),
+          boxShadow: const [
+            BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2))
+          ],
+        ),
+        child: Center(child: child),
+      ),
     );
   }
 

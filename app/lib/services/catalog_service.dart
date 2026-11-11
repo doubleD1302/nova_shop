@@ -64,7 +64,7 @@ class CatalogService {
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(res.body);
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'categories');
           return list
@@ -113,7 +113,7 @@ class CatalogService {
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(res.body);
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'products');
           result = list
@@ -239,8 +239,30 @@ class CatalogService {
     return ProductListResult(products: [], page: page, limit: limit, total: 0, totalPages: 0);
   }
 
-  /// Lấy danh sách banner điều hướng giao diện chuẩn của Website
+  /// Lấy danh sách banner quảng cáo từ Backend API (GET /api/v1/banners)
   Future<List<BannerItem>> getBanners() async {
+    try {
+      final res = await _client
+          .get(
+            Uri.parse(ApiConfig.bannersUrl),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body['success'] == true && body['data'] != null) {
+          final list = _extractList(body['data'], 'banners');
+          final parsed = list
+              .whereType<Map<String, dynamic>>()
+              .map((e) => BannerItem.fromJson(e))
+              .toList();
+          if (parsed.isNotEmpty) return parsed;
+        }
+      }
+    } catch (e) {
+      debugPrint('[CatalogService] getBanners error: $e');
+    }
     return WebsiteData.banners;
   }
 
@@ -266,7 +288,7 @@ class CatalogService {
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(res.body);
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
         if (body['success'] == true && body['data'] is Map) {
           return Product.fromJson(body['data'] as Map<String, dynamic>);
         }
@@ -286,7 +308,7 @@ class CatalogService {
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(res.body);
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
         if (body['success'] == true && body['data'] != null) {
           final list = _extractList(body['data'], 'shops');
           return list.whereType<Map<String, dynamic>>().toList();
@@ -298,19 +320,72 @@ class CatalogService {
     return [];
   }
 
-  /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ
+  /// Lấy dữ liệu sản phẩm nổi bật & Flash Sale cho trang chủ từ GET /api/v1/products/featured
   Future<Map<String, dynamic>> getFeaturedHomeData() async {
     try {
-      final flashSale = await getProducts(isFlashSale: true);
-      final all = await getProducts();
-      final featured = all.where((p) => p.isFeatured).toList();
-      return {
-        'flashSale': flashSale.map((p) => p.toJson()).toList(),
-        'featuredProducts': (featured.isNotEmpty ? featured : all).map((p) => p.toJson()).toList(),
-      };
-    } catch (_) {
-      return {'flashSale': [], 'featuredProducts': []};
+      final res = await _client
+          .get(
+            Uri.parse(ApiConfig.featuredProductsUrl),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body['success'] == true && body['data'] is Map) {
+          final data = body['data'] as Map<String, dynamic>;
+          return {
+            'flashSale': data['flashSale'] is List ? data['flashSale'] : [],
+            'featuredProducts': data['featuredProducts'] is List
+                ? data['featuredProducts']
+                : [],
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('[CatalogService] getFeaturedHomeData error: $e');
     }
+    return {'flashSale': [], 'featuredProducts': []};
+  }
+
+  /// Lấy danh sách sản phẩm nổi bật & Flash Sale đã parse thành Product model
+  Future<Map<String, List<Product>>> getFeaturedShowcase() async {
+    final raw = await getFeaturedHomeData();
+    List<Product> parseProducts(dynamic list) {
+      if (list is! List) return [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map((e) => Product.fromJson(e))
+          .toList();
+    }
+
+    return {
+      'flashSale': parseProducts(raw['flashSale']),
+      'featuredProducts': parseProducts(raw['featuredProducts']),
+    };
+  }
+
+  /// Lấy cấu hình hệ thống công khai (chế độ bảo trì, phí nền tảng)
+  /// GET /api/v1/system/config
+  Future<Map<String, dynamic>?> getSystemConfig() async {
+    try {
+      final res = await _client
+          .get(
+            Uri.parse(ApiConfig.systemConfigUrl),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(res.bodyBytes));
+        if (body['success'] == true && body['data'] is Map<String, dynamic>) {
+          return body['data'] as Map<String, dynamic>;
+        }
+      }
+    } catch (e) {
+      debugPrint('[CatalogService] getSystemConfig error: $e');
+    }
+    return null;
   }
 
   /// Lấy 8 tiện ích nhanh (QuickLinks) như trên Website

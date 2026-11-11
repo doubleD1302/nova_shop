@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/shop_service.dart';
 import '../cart/cart_screen.dart';
+import '../chat/chat_detail_screen.dart';
 import '../product_detail/product_detail_screen.dart';
 import '../../theme/app_colors.dart';
 
@@ -339,6 +340,62 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Nút Chat Shop
+                    OutlinedButton(
+                      onPressed: () {
+                        if (!AuthService().isAuthenticated) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng đăng nhập để chat với gian hàng.')),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatDetailScreen(
+                              shopId: widget.shopId,
+                              initialShopName: displayName,
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        side: BorderSide(color: primaryColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Icon(Icons.chat_bubble_outline_rounded, size: 15, color: primaryColor),
+                    ),
+                    const SizedBox(width: 6),
+                    // Nút Chat Shop
+                    OutlinedButton(
+                      onPressed: () {
+                        if (!AuthService().isAuthenticated) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng đăng nhập để chat với gian hàng.')),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatDetailScreen(
+                              shopId: widget.shopId,
+                              initialShopName: displayName,
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        side: BorderSide(color: primaryColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Icon(Icons.chat_bubble_outline_rounded, size: 15, color: primaryColor),
+                    ),
+                    const SizedBox(width: 6),
                     // Nút Theo Dõi
                     OutlinedButton(
                       onPressed: _toggleFollow,
