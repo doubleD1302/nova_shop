@@ -11,16 +11,7 @@ import {
 
 const QUICK_PROMPTS = []
 
-const INITIAL_MESSAGES = [
-  {
-    id: 'm1',
-    isUser: false,
-    text: 'Xin chào! Mình là Nova AI ✨ – Trợ lý mua sắm thông minh có bộ não tự học (AI Brain). Mình có thể ghi nhớ gu thẩm mỹ, kích cỡ, ngân sách quen thuộc và lịch sử tìm kiếm của bạn để ngày càng hiểu bạn hơn. Bạn cần mình tư vấn gì hôm nay?',
-    time: 'Vừa xong',
-    intentMatch: 'AI Brain Kích Hoạt 100%',
-    suggestions: QUICK_PROMPTS,
-  },
-]
+const INITIAL_MESSAGES = []
 
 export default function NovaAiCopilot({ initialOpen = false, fullPage = false }) {
   const [isOpen, setIsOpen] = useState(initialOpen || fullPage)
@@ -359,6 +350,20 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   )
 
   function renderChatMessages() {
+    if (messages.length === 0) {
+      return (
+        <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center select-none">
+          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#A95532] to-[#BD6E49] text-white shadow-md">
+            <span className="text-2xl">✨</span>
+          </div>
+          <h3 className="text-base font-bold text-[#49352D]">Tôi có thể giúp gì cho bạn?</h3>
+          <p className="mt-1.5 max-w-[280px] text-xs text-[#8B7566] leading-relaxed">
+            Hỏi bất kỳ điều gì về sản phẩm, tư vấn chọn size, gợi ý phối đồ hoặc tra cứu tình trạng đơn hàng của bạn.
+          </p>
+        </div>
+      )
+    }
+
     return (
       <>
         {messages.map((m) => (
@@ -588,7 +593,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={isListening ? 'Đang lắng nghe giọng nói...' : 'Nhập: size của mình là M, thích màu pastel...'}
+            placeholder={isListening ? 'Đang lắng nghe giọng nói...' : 'Nhắn tin với Nova AI...'}
             disabled={isLoading}
             className="flex-1 rounded-full border border-[#E6D5C2] bg-[#FAF4EB] px-4 py-2 text-[13px] text-[#49352D] placeholder-gray-400 focus:border-[#BD6E49] focus:bg-white focus:outline-none"
           />
