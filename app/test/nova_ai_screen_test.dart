@@ -1,9 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
+import 'package:shopnova/services/api_client.dart';
+import 'package:shopnova/services/auth_service.dart';
+import 'package:shopnova/theme/app_colors.dart';
 
 final Uint8List _transparentImage = Uint8List.fromList(<int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
@@ -16,14 +24,7 @@ final Uint8List _transparentImage = Uint8List.fromList(<int>[
 
 class _MockHttpOverrides extends HttpOverrides {
   @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return _createMockHttpClient();
-  }
-}
-
-HttpClient _createMockHttpClient() {
-  final client = _MockHttpClient();
-  return client;
+  HttpClient createHttpClient(SecurityContext? context) => _MockHttpClient();
 }
 
 class _MockHttpClient implements HttpClient {
@@ -111,6 +112,19 @@ class _MockHttpClientResponse implements HttpClientResponse {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
+
+class _EmptyAddressHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final bytes = utf8.encode('{"success":true,"data":{"addresses":[]}}');
+    return http.StreamedResponse(
+      Stream<List<int>>.value(bytes),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+}
+
 void main() {
   setUpAll(() {
     HttpOverrides.global = _MockHttpOverrides();
@@ -121,10 +135,13 @@ void main() {
   });
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     NovaAIScreen.resetSession();
   });
 
-  testWidgets('NovaAIScreen renders header, quick prompts, and chat input without AI brain/memory elements', (WidgetTester tester) async {
+  testWidgets('NovaAIScreen renders clean real AI assistant without static prompt suggestions or fake welcome bubble', (WidgetTester tester) async {
+    await tester.runAsync(() => AuthService().logout());
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -135,43 +152,58 @@ void main() {
         home: NovaAIScreen(isStandalone: false),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
-    // Verify AI Header
     expect(find.text('Nova AI'), findsOneWidget);
     expect(find.text('24/7'), findsOneWidget);
-    expect(find.text('Trực tuyến • Trợ lý mua sắm ShopNova'), findsOneWidget);
-    expect(find.text('Trí nhớ AI'), findsNothing);
-    expect(find.text('AI BRAIN'), findsNothing);
+    expect(find.text('Trực tuyến • Trợ lý AI thông minh'), findsOneWidget);
+    expect(find.text('Tôi có thể giúp gì cho bạn?'), findsOneWidget);
+    expect(find.text('Nhắn tin với Nova AI...'), findsOneWidget);
 
-    // Verify Quick Prompts Bar
-    expect(find.text('Gợi ý:'), findsOneWidget);
-    expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsAtLeastNWidgets(1));
-
-    // Verify Input Panel
-    expect(find.text('Nhập: size của mình là M, thích màu pastel...'), findsOneWidget);
+    // Ensure static suggestions, canned welcome bubble & static hints are absent
+    expect(find.text('Gợi ý:'), findsNothing);
+    expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsNothing);
+    expect(find.text('📦 Tra cứu đơn hàng của tôi'), findsNothing);
+    expect(find.text('Gợi ý có hữu ích?'), findsNothing);
+    expect(find.text('Nhập: size của mình là M, thích màu pastel...'), findsNothing);
   });
 
-  testWidgets('NovaAIScreen renders clean intelligent greeting by default without static mock data', (WidgetTester tester) async {
+  testWidgets('AddressesScreen Add Address bottom sheet uses warm ShopNova theme cleanly without overflow', (WidgetTester tester) async {
+    ApiClient().setHttpClientForTest(_EmptyAddressHttpClient());
+    await tester.runAsync(() => AuthService().logout());
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: NovaAIScreen(isStandalone: false),
-      ),
+    await tester.pumpWidget(const MaterialApp(home: AddressesScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 50),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 3),
     );
-    await tester.pumpAndSettle();
+    expect(find.text('Chưa có địa chỉ nhận hàng nào'), findsOneWidget);
 
-    expect(find.text('Nova AI'), findsOneWidget);
-    expect(find.text('Trợ lý Nova AI'), findsOneWidget);
-    expect(find.text('Trực tuyến 24/7'), findsOneWidget);
-    expect(find.text('Trí nhớ AI'), findsNothing);
-    // Ensure static mock prompt does NOT appear by default
-    expect(find.textContaining('Tìm giúp mình set đồ dạo phố mùa hè'), findsNothing);
-    expect(find.text('Ướm thử ảo'), findsNothing);
-    expect(find.text('So sánh giá'), findsNothing);
+    await tester.tap(find.text('Thêm Địa Chỉ Mới'));
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 50),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 3),
+    );
+
+    expect(find.text('Thêm địa chỉ nhận hàng mới'), findsOneWidget);
+    expect(find.text('Họ và tên người nhận *'), findsOneWidget);
+    expect(find.text('Lưu Địa Chỉ'), findsOneWidget);
+
+    final material = tester.widget<Material>(
+      find.ancestor(
+        of: find.text('Thêm địa chỉ nhận hàng mới'),
+        matching: find.byType(Material),
+      ).first,
+    );
+    expect(material.color, AppColors.surface);
   });
 }

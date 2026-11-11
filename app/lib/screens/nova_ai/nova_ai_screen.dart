@@ -48,13 +48,9 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
   static const Color colorTertiary = Color(0xFF00BFA5);
   static const Color colorTertiaryContainer = Color(0xFF008654);
 
-  static const Color colorSurface = Color(0xFFF6F6F9);
-  static const Color colorSurfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color colorSurfaceContainerLow = Color(0xFFF1F3F5);
-  static const Color colorSurfaceContainer = Color(0xFFE9ECEF);
-  static const Color colorSurfaceContainerHigh = Color(0xFFDEE2E6);
-
-  static const Color colorOnSurface = Color(0xFF1E2022);
+  static const Color colorSurface = AppColors.background;
+  static const Color colorSurfaceContainerLow = AppColors.surfaceAlt;
+  static const Color colorOnSurface = AppColors.textPrimary;
 
   // Controllers
   final TextEditingController _textController = TextEditingController();
@@ -83,26 +79,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     _sessionMessages.clear();
   }
 
-  static const List<String> _quickPrompts = [
-    '👗 Phối đồ đi tiệc < 500k',
-    '📦 Tra cứu đơn hàng của tôi',
-    '⚡ Săn deal hỏa tốc hôm nay',
-    '🎧 So sánh tai nghe chống ồn',
-    '🎁 Gợi ý quà sinh nhật bạn gái',
-  ];
 
-  static _AiChatMessage _buildInitialGreeting() {
-    return _AiChatMessage(
-      id: 'init_${DateTime.now().millisecondsSinceEpoch}',
-      isUser: false,
-      text:
-          'Xin chào! Mình là Nova AI ✨ – Trợ lý mua sắm thông minh của ShopNova. Mình có thể hỗ trợ tìm kiếm sản phẩm, tư vấn phong cách, gợi ý deal hot và giải đáp thắc mắc của bạn. Bạn cần mình tư vấn gì hôm nay?',
-      time: 'Vừa xong',
-      intentTitle: 'Trợ lý Nova AI',
-      intentMatch: 'Trực tuyến 24/7',
-      suggestions: _quickPrompts,
-    );
-  }
 
   @override
   void initState() {
@@ -113,9 +90,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     }
     AuthService().addListener(_onAuthChanged);
 
-    if (_sessionMessages.isEmpty) {
-      _sessionMessages.add(_buildInitialGreeting());
-    }
+
 
     _loadBrainProfile();
 
@@ -141,7 +116,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
     if (!mounted) return;
     setState(() {
       _sessionMessages.clear();
-      _sessionMessages.add(_buildInitialGreeting());
       _isThinking = false;
       _learnedFacts = [];
       _preferredStyles = [];
@@ -166,7 +140,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200 && mounted) {
-        final decoded = jsonDecode(res.body);
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
         final data = decoded['data'] as Map<String, dynamic>?;
         if (data != null) {
           final profile = data['profile'] as Map<String, dynamic>? ?? data;
@@ -210,7 +184,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       ).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200 && mounted) {
-        final decoded = jsonDecode(res.body);
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes));
         final stats = decoded['data']?['stats'] as Map<String, dynamic>?;
         if (stats != null) {
           setState(() {
@@ -244,20 +218,15 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       _learnedLocation = null;
       _totalInteractions = 0;
       _acceptedRecommendations = 0;
+      _feedbackGivenMap.clear();
       _sessionMessages.clear();
-      _sessionMessages.add(
-        _AiChatMessage(
-          id: 'reset_${DateTime.now().millisecondsSinceEpoch}',
-          isUser: false,
-          text:
-              '🌱 Nova đã làm mới bộ não! Hãy tiếp tục trò chuyện, mình sẽ học lại các sở thích và phong cách mới của bạn.',
-          time: 'Vừa xong',
-          intentTitle: 'Trợ lý Nova AI',
-          intentMatch: 'Khởi Tạo Mới',
-          suggestions: _quickPrompts,
-        ),
-      );
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã làm mới cuộc trò chuyện và bộ nhớ AI.'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -435,7 +404,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         } catch (_) {}
       }
 
-      final Map<String, dynamic> decoded = jsonDecode(res.body);
+      final Map<String, dynamic> decoded = jsonDecode(utf8.decode(res.bodyBytes));
       if (res.statusCode == 200 && decoded['success'] == true) {
         final data = decoded['data'] as Map<String, dynamic>?;
         if (data != null) {
@@ -459,16 +428,10 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
               })
               .toList();
 
-          final rawSuggestions = data['suggestions'] as List<dynamic>?;
-          final List<String> suggestions = rawSuggestions != null && rawSuggestions.isNotEmpty
-              ? rawSuggestions.map((s) => s.toString()).toList()
-              : <String>[
-                  if (data['catalogHasMore'] == true || (data['pagination'] is Map && data['pagination']['hasMore'] == true))
-                    'Xem trang ${((data['catalogPage'] ?? data['pagination']?['page'] ?? 1) as num).toInt() + 1}',
-                  '✨ Gợi ý thêm sản phẩm tương tự',
-                  '🚚 Xem chính sách đổi trả & freeship',
-                  '⚡ Deal sốc hôm nay',
-                ];
+          final nextPageNum = ((data['catalogPage'] ?? data['pagination']?['page'] ?? 1) as num).toInt() + 1;
+          final hasMore = data['catalogHasMore'] == true ||
+              (data['pagination'] is Map && data['pagination']['hasMore'] == true);
+          final List<String> suggestions = hasMore ? ['Xem trang $nextPageNum'] : const [];
 
           // Cập nhật dữ liệu AI Brain từ response
           final brain = data['brain'] as Map<String, dynamic>?;
@@ -508,7 +471,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
           text: serverMsg,
           time: timeStr,
           intentTitle: 'Nova AI',
-          suggestions: _quickPrompts,
         );
       }
     } catch (_) {
@@ -518,7 +480,6 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         text: 'Nova AI hiện không kết nối được với máy chủ. Bạn vui lòng thử lại sau.',
         time: timeStr,
         intentTitle: 'Thông Báo Kết Nối',
-        suggestions: _quickPrompts,
       );
     }
 
@@ -547,8 +508,8 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
         preferredSize: const Size.fromHeight(60),
         child: Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Color(0xFFEEEEF0))),
+            color: AppColors.surface,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
           child: SafeArea(
             child: Padding(
@@ -668,20 +629,21 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
       body: Column(
         children: [
           _buildAiStatusHeader(),
-          _buildQuickPromptsBar(),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-              itemCount: _messages.length + (_isThinking ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return _buildThinkingBubble();
-                }
-                final msg = _messages[index];
-                return msg.isUser ? _buildUserMessage(msg) : _buildAiResponseUnit(msg);
-              },
-            ),
+            child: (_messages.isEmpty && !_isThinking)
+                ? _buildEmptyAiCanvas()
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                    itemCount: _messages.length + (_isThinking ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _messages.length) {
+                        return _buildThinkingBubble();
+                      }
+                      final msg = _messages[index];
+                      return msg.isUser ? _buildUserMessage(msg) : _buildAiResponseUnit(msg);
+                    },
+                  ),
           ),
           Padding(
             padding: EdgeInsets.only(bottom: bottomInset),
@@ -755,7 +717,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                     const SizedBox(width: 5),
                     const Flexible(
                       child: Text(
-                        'Trực tuyến • Trợ lý mua sắm ShopNova',
+                        'Trực tuyến • Trợ lý AI thông minh',
                         style: TextStyle(color: Color(0xFF8B7566), fontSize: 11),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -765,58 +727,127 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
               ],
             ),
           ),
+          if (_learnedFacts.isNotEmpty || _preferredStyles.isNotEmpty || _learnedLocation != null || _totalInteractions > 0)
+            IconButton(
+              tooltip: 'Ngữ cảnh AI đã học',
+              visualDensity: VisualDensity.compact,
+              onPressed: _showBrainProfileModal,
+              icon: const Icon(Icons.psychology_outlined, color: AppColors.earth, size: 20),
+            ),
+          if (_messages.isNotEmpty)
+            IconButton(
+              tooltip: 'Cuộc trò chuyện mới',
+              visualDensity: VisualDensity.compact,
+              onPressed: _resetBrainProfile,
+              icon: const Icon(Icons.refresh_rounded, color: AppColors.primary, size: 20),
+            ),
         ],
       ),
     );
   }
 
-  /// Thanh câu hỏi gợi ý nhanh
-  Widget _buildQuickPromptsBar() {
-    return Container(
-      height: 46,
-      color: colorSurface,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        itemCount: _quickPrompts.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return const Row(
-              children: [
-                Icon(Icons.lightbulb_outline, color: colorPrimary, size: 17),
-                SizedBox(width: 4),
-                Text('Gợi ý:', style: TextStyle(color: colorPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
-                SizedBox(width: 8),
-              ],
-            );
-          }
-          final prompt = _quickPrompts[index - 1];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              onTap: () => _handleSendMessage(prompt),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE6D5C2)),
-                ),
-                child: Center(
-                  child: Text(
-                    prompt,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF49352D),
-                    ),
-                  ),
-                ),
+  void _showBrainProfileModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ngữ cảnh cá nhân hóa (AI Brain)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Số tương tác: $_totalInteractions • Đề xuất đã chọn: $_acceptedRecommendations',
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+            if (_learnedLocation != null && _learnedLocation!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('Khu vực: $_learnedLocation', style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+            ],
+            if (_preferredStyles.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('Phong cách: ${_preferredStyles.join(", ")}', style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+            ],
+            if (_learnedFacts.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('Thông tin đã ghi nhớ: ${_learnedFacts.join(" • ")}', style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _resetBrainProfile();
+                },
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.flashSaleRed),
+                label: const Text('Đặt lại cuộc trò chuyện & ký ức', style: TextStyle(color: AppColors.flashSaleRed)),
               ),
             ),
-          );
-        },
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Trạng thái trống tự nhiên trước khi người dùng đặt câu hỏi với AI
+  Widget _buildEmptyAiCanvas() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.earth],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.22),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 32),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tôi có thể giúp gì cho bạn?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Hỏi bất kỳ điều gì về sản phẩm, tư vấn chọn size, so sánh mức giá hoặc tra cứu tình trạng đơn hàng của bạn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -996,7 +1027,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                               children: [
                                 const Flexible(
                                   child: Text(
-                                    'Gợi ý có hữu ích?',
+                                    'Phản hồi:',
                                     style: TextStyle(fontSize: 10.5, color: Colors.grey),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1377,7 +1408,7 @@ class _NovaAIScreenState extends State<NovaAIScreen> with TickerProviderStateMix
                 onSubmitted: _handleSendMessage,
                 style: const TextStyle(fontSize: 13.5, color: Color(0xFF49352D)),
                 decoration: const InputDecoration(
-                  hintText: 'Nhập: size của mình là M, thích màu pastel...',
+                  hintText: 'Nhắn tin với Nova AI...',
                   hintStyle: TextStyle(fontSize: 12.5, color: Colors.grey),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 8),
