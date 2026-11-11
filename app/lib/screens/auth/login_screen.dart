@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../../services/social_auth_service.dart';
 import '../../config/api_config.dart';
 import '../../widgets/common/nova_logo.dart';
 import 'register_screen.dart';
@@ -19,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = true;
   bool _isCheckingBackend = false;
   bool _backendOnline = false;
+  bool _googleLoading = false;
+  bool _facebookLoading = false;
   String _backendStatusText = 'Đang kiểm tra kết nối...';
 
   @override
@@ -57,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (_googleLoading || _facebookLoading || AuthService().isLoading) return;
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
@@ -93,6 +97,78 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: const Color(0xFFD0011B),
         ),
       );
+    }
+  }
+
+  Future<void> _handleSocialLogin({required bool isGoogle}) async {
+    if (_googleLoading || _facebookLoading || AuthService().isLoading) return;
+    final providerLabel = isGoogle ? 'Google' : 'Facebook';
+    setState(() {
+      if (isGoogle) {
+        _googleLoading = true;
+      } else {
+        _facebookLoading = true;
+      }
+    });
+
+    try {
+      final tokenResult = isGoogle
+          ? await SocialAuthService().authenticateWithGoogle()
+          : await SocialAuthService().authenticateWithFacebook();
+      if (!mounted) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      if (!tokenResult.ok || tokenResult.idToken == null) {
+        final msg = tokenResult.error ?? 'Không thể hoàn tất đăng nhập $providerLabel.';
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: tokenResult.cancelled
+                ? const Color(0xFFD97706)
+                : const Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
+
+      final ok = isGoogle
+          ? await AuthService().loginWithGoogle(tokenResult.idToken!)
+          : await AuthService().loginWithFacebook(tokenResult.idToken!);
+      if (!mounted) return;
+
+      if (ok) {
+        final user = AuthService().currentUser;
+        final fullName = user?.fullName.trim() ?? '';
+        final displayName = fullName.isNotEmpty ? fullName : (user?.username ?? '');
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Xin chào $displayName! Đăng nhập $providerLabel thành công.'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              AuthService().lastError ??
+                  'Backend không thể xác thực và lưu tài khoản $providerLabel.',
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (isGoogle) {
+            _googleLoading = false;
+          } else {
+            _facebookLoading = false;
+          }
+        });
+      }
     }
   }
 
@@ -486,30 +562,49 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 24, height: 24,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          onChanged: (val) {
-                            setState(() { _rememberMe = val ?? true; });
-                          },
-                          activeColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 24, height: 24,
+                          child: Checkbox(
+                            value: _rememberMe,
+                            onChanged: (val) {
+                              setState(() { _rememberMe = val ?? true; });
+                            },
+                            activeColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('Ghi nhớ đăng nhập', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    ],
+                        const SizedBox(width: 6),
+                        const Flexible(
+                          child: Text(
+                            'Ghi nhớ đăng nhập',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  Row(
-                    children: const [
-                      Icon(Icons.sms_outlined, color: AppColors.primary, size: 16),
-                      SizedBox(width: 4),
-                      Text('Đăng nhập OTP / Zalo', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
-                  )
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.sms_outlined, color: AppColors.primary, size: 16),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Đăng nhập OTP / Zalo',
+                            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -529,7 +624,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: auth.isLoading ? null : _handleLogin,
+                  onPressed: (auth.isLoading || _googleLoading || _facebookLoading) ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -546,10 +641,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : Row(
+                      : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Text('Đăng Nhập Ngay', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Đăng Nhập Ngay',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             SizedBox(width: 8),
                             Icon(Icons.arrow_forward_rounded, size: 20),
                           ],
@@ -564,132 +666,133 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildSocialLogin() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Column(
-        children: [
-          Row(
+    return AnimatedBuilder(
+      animation: AuthService(),
+      builder: (context, _) {
+        final bool isBusy =
+            AuthService().isLoading || _googleLoading || _facebookLoading;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Column(
             children: [
-              Expanded(child: Container(height: 1, color: const Color(0xFFEEEEF0))),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('Hoặc đăng nhập nhanh bằng', style: TextStyle(color: Color(0xFF8F90A6), fontSize: 12)),
+              Row(
+                children: [
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'Hoặc đăng nhập bằng',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                  ),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                ],
               ),
-              Expanded(child: Container(height: 1, color: const Color(0xFFEEEEF0))),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSocialButton(
+                      key: const ValueKey('google_login_btn'),
+                      enabled: !isBusy,
+                      loading: _googleLoading,
+                      spinnerColor: AppColors.primary,
+                      icon: const _GoogleLogoMark(size: 18),
+                      label: _googleLoading
+                          ? 'Đang kết nối...'
+                          : 'Tiếp tục với Google',
+                      onTap: () => _handleSocialLogin(isGoogle: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildSocialButton(
+                      key: const ValueKey('facebook_login_btn'),
+                      enabled: !isBusy,
+                      loading: _facebookLoading,
+                      spinnerColor: const Color(0xFF1877F2),
+                      icon: const Icon(
+                        Icons.facebook_rounded,
+                        color: Color(0xFF1877F2),
+                        size: 20,
+                      ),
+                      label: _facebookLoading
+                          ? 'Đang kết nối...'
+                          : 'Tiếp tục với Facebook',
+                      onTap: () => _handleSocialLogin(isGoogle: false),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSocialButton(
-                  onTap: () => _showSocialTokenLoginSheet(provider: 'google', label: 'Google'),
-                  child: const Text('G', style: TextStyle(color: Color(0xFFEA4335), fontWeight: FontWeight.w900, fontSize: 20)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildSocialButton(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đăng nhập Apple ID hiện chỉ hỗ trợ trên thiết bị iOS.')),
-                    );
-                  },
-                  child: const Icon(Icons.apple_rounded, color: Colors.black, size: 24),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildSocialButton(
-                  onTap: () => _showSocialTokenLoginSheet(provider: 'facebook', label: 'Facebook'),
-                  child: const Icon(Icons.facebook_rounded, color: Color(0xFF1877F2), size: 24),
-                ),
-              ),
-            ],
-          )
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _showSocialTokenLoginSheet({
-    required String provider,
+  Widget _buildSocialButton({
+    Key? key,
+    required bool enabled,
+    required bool loading,
+    required Color spinnerColor,
+    required Widget icon,
     required String label,
-  }) async {
-    final tokenCtrl = TextEditingController();
-    final idToken = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Đăng nhập bằng $label', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Nhập Firebase ID Token từ phiên $label để xác thực với máy chủ (/api/v1/auth/$provider):',
-              style: const TextStyle(fontSize: 12.5, color: Color(0xFF555770)),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: tokenCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Firebase ID Token',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, tokenCtrl.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            child: Text('Đăng nhập $label'),
-          ),
-        ],
-      ),
-    );
-    if (idToken == null || idToken.isEmpty) return;
-
-    final ok = provider == 'google'
-        ? await AuthService().loginWithGoogle(idToken)
-        : await AuthService().loginWithFacebook(idToken);
-    if (!mounted) return;
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng nhập $label thành công!'),
-          backgroundColor: const Color(0xFF16A34A),
-        ),
-      );
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService().lastError ?? 'Đăng nhập $label thất bại.'),
-          backgroundColor: const Color(0xFFDC2626),
-        ),
-      );
-    }
-  }
-
-  Widget _buildSocialButton({required Widget child, VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
+    required VoidCallback onTap,
+  }) {
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.6,
+      child: Material(
+        key: key,
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEEEF0)),
-          boxShadow: const [
-            BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2))
-          ],
+          splashColor: AppColors.surfaceAlt,
+          highlightColor: AppColors.surfaceAlt.withValues(alpha: 0.6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+              boxShadow: const [
+                BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (loading)
+                  SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(spinnerColor),
+                    ),
+                  )
+                else
+                  icon,
+                const SizedBox(width: 7),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: Center(child: child),
       ),
     );
   }
@@ -699,8 +802,9 @@ class _LoginScreenState extends State<LoginScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text('Bạn chưa có tài khoản? ', style: TextStyle(color: Color(0xFF555770), fontSize: 13)),
               GestureDetector(
@@ -736,4 +840,60 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+class _GoogleLogoMark extends StatelessWidget {
+  final double size;
+  const _GoogleLogoMark({this.size = 18});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _GoogleLogoPainter(),
+    );
+  }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = size.width * 0.21;
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height / 2),
+      radius: (size.width - stroke) / 2,
+    );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    // Red (top-right to left)
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawArc(rect, -2.55, 1.85, false, paint);
+    // Yellow (left)
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(rect, 2.55, 1.18, false, paint);
+    // Green (bottom)
+    paint.color = const Color(0xFF34A853);
+    canvas.drawArc(rect, 0.55, 2.02, false, paint);
+    // Blue (right bottom to crossbar)
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawArc(rect, -0.05, 0.65, false, paint);
+
+    // Crossbar for "G"
+    final barPaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+    final cy = size.height / 2;
+    canvas.drawLine(
+      Offset(size.width * 0.52, cy),
+      Offset(size.width * 0.96, cy),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

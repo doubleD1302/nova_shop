@@ -6,6 +6,7 @@ import 'package:shopnova/theme/app_theme.dart';
 import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/config/api_config.dart';
 import 'package:shopnova/services/cart_service.dart';
+import 'package:shopnova/services/social_auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ void main() async {
     ApiConfig.autoDetectBaseUrl(),
     CartService().loadFromPrefs(),
     AuthService().restoreSession(),
+    SocialAuthService().ensureInitialized(),
   ]);
   runApp(const ShopNovaApp());
 }

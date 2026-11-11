@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'session_store.dart';
+import 'social_auth_service.dart';
 import '../config/api_config.dart';
 
 /// Service xử lý xác thực tài khoản (Đăng nhập, Đăng ký, Hồ sơ cá nhân)
@@ -188,7 +190,7 @@ class AuthService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 8));
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
+      final Map<String, dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
       if (response.statusCode == 200 &&
           body['success'] == true &&
           body['data'] is Map<String, dynamic>) {
@@ -967,6 +969,7 @@ class AuthService extends ChangeNotifier {
           .timeout(const Duration(seconds: 8))
           .catchError((_) => http.Response('', 500));
     }
+    unawaited(SocialAuthService().signOutProviders());
     notifyListeners();
     return _pendingPersistence;
   }

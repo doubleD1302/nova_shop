@@ -39,6 +39,10 @@ dependencies:
   shared_preferences: ^2.2.2
   image_picker: ^1.2.4
   flutter_secure_storage: ^11.2.0
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  google_sign_in: 6.2.1
+  flutter_facebook_auth: 7.3.3
 
 
 dev_dependencies:
