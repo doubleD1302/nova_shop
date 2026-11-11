@@ -27,6 +27,7 @@ class QuickLinksSection extends StatelessWidget {
         ],
       ),
       child: GridView.builder(
+        padding: EdgeInsets.zero,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -52,21 +53,22 @@ class QuickLinksSection extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceAlt,
+                    color: item.backgroundColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border, width: 0.5),
+                    border: Border.all(color: item.borderColor, width: 0.8),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x0680513B),
+                        color: Color(0x0880513B),
                         blurRadius: 6,
                         offset: Offset(0, 2),
                       ),
                     ],
                   ),
                   child: Center(
-                    child: Text(
-                      item.emoji,
-                      style: const TextStyle(fontSize: 22),
+                    child: Icon(
+                      item.icon,
+                      size: 23,
+                      color: item.iconColor,
                     ),
                   ),
                 ),

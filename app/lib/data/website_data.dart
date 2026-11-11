@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/banner_item.dart';
+import '../theme/app_colors.dart';
 
 /// Cấu hình điều hướng & bố cục giao diện trang chủ (tương ứng src/data/homeContent.js trên Website).
 /// Hoàn toàn KHÔNG chứa dữ liệu sản phẩm, danh mục, gian hàng hay tài khoản tĩnh.
@@ -7,14 +8,20 @@ class QuickLinkItem {
   final String id;
   final String label;
   final String emoji;
+  final IconData icon;
+  final Color iconColor;
   final Color backgroundColor;
+  final Color borderColor;
   final String link;
 
   const QuickLinkItem({
     required this.id,
     required this.label,
     required this.emoji,
+    required this.icon,
+    required this.iconColor,
     required this.backgroundColor,
+    this.borderColor = AppColors.border,
     required this.link,
   });
 }
@@ -80,57 +87,81 @@ class WebsiteData {
     QuickLinkItem(
       id: 'flash',
       label: 'Flash Sale',
-      emoji: '⚡',
-      backgroundColor: Color(0xFFF5E7D4),
+      emoji: '',
+      icon: Icons.bolt_rounded,
+      iconColor: AppColors.flashSaleRed,
+      backgroundColor: Color(0xFFFAECE7),
+      borderColor: Color(0xFFF0CCC2),
       link: '/tim-kiem?flash=1',
     ),
     QuickLinkItem(
       id: 'voucher',
       label: 'Đang giảm giá',
-      emoji: '🎟️',
-      backgroundColor: Color(0xFFF4E6D2),
+      emoji: '',
+      icon: Icons.confirmation_number_outlined,
+      iconColor: AppColors.primary,
+      backgroundColor: Color(0xFFF7EADF),
+      borderColor: AppColors.border,
       link: '/tim-kiem?sort=discount',
     ),
     QuickLinkItem(
       id: 'freeship',
       label: 'Sản phẩm\nFreeship',
-      emoji: '🚚',
-      backgroundColor: Color(0xFFF5E7D4),
+      emoji: '',
+      icon: Icons.local_shipping_outlined,
+      iconColor: AppColors.freeshipGreen,
+      backgroundColor: Color(0xFFEDF3EA),
+      borderColor: Color(0xFFCDE0C8),
       link: '/tim-kiem?freeship=1',
     ),
     QuickLinkItem(
       id: 'mall',
       label: 'Gian hàng\nMall',
-      emoji: '💎',
-      backgroundColor: Color(0xFFF4E6D2),
+      emoji: '',
+      icon: Icons.verified_outlined,
+      iconColor: AppColors.primaryDark,
+      backgroundColor: Color(0xFFF9EDE2),
+      borderColor: Color(0xFFE7CEBA),
       link: '/tim-kiem?mall=1',
     ),
     QuickLinkItem(
       id: 'global',
       label: 'Hàng mới\nnhất',
-      emoji: '✨',
-      backgroundColor: Color(0xFFF5E7D4),
+      emoji: '',
+      icon: Icons.auto_awesome_outlined,
+      iconColor: Color(0xFFC07F24),
+      backgroundColor: Color(0xFFFCF2DD),
+      borderColor: Color(0xFFEFDAB0),
       link: '/tim-kiem?sort=newest',
     ),
     QuickLinkItem(
       id: 'topup',
       label: 'Công nghệ',
-      emoji: '📱',
-      backgroundColor: Color(0xFFF4E6D2),
+      emoji: '',
+      icon: Icons.devices_rounded,
+      iconColor: AppColors.earth,
+      backgroundColor: Color(0xFFF3E6DA),
+      borderColor: Color(0xFFE0CBB8),
       link: '/tim-kiem?category=phu-kien-cong-nghe',
     ),
     QuickLinkItem(
       id: 'budget',
       label: 'Giá thấp\ntrước',
-      emoji: '🛒',
-      backgroundColor: Color(0xFFF5E7D4),
+      emoji: '',
+      icon: Icons.savings_outlined,
+      iconColor: AppColors.primary,
+      backgroundColor: Color(0xFFF8EDE2),
+      borderColor: AppColors.border,
       link: '/tim-kiem?sort=price-asc',
     ),
     QuickLinkItem(
       id: 'trend',
       label: 'Phổ biến',
-      emoji: '🔎',
-      backgroundColor: Color(0xFFF4E6D2),
+      emoji: '',
+      icon: Icons.local_fire_department_outlined,
+      iconColor: AppColors.flashSaleRed,
+      backgroundColor: Color(0xFFFBECE6),
+      borderColor: Color(0xFFF0CDC3),
       link: '/tim-kiem?sort=popular',
     ),
   ];
