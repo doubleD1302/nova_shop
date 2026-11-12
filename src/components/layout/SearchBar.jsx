@@ -7,7 +7,7 @@ import SearchSuggestions from './SearchSuggestions'
 /** Ô tìm kiếm bo tròn pill - Phong cách Terracotta + Cream */
 export default function SearchBar() {
   const navigate = useNavigate()
-  const { loadProducts, loadShops } = useCatalog()
+  const { loadProducts, loadShops, shops } = useCatalog()
   const [keyword, setKeyword] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
   const [productHits, setProductHits] = useState([])
@@ -50,10 +50,19 @@ export default function SearchBar() {
     ]).then(([products, shopResults]) => {
       if (!current) return
       setProductHits(products.products)
-      setShopHits(shopResults.shops)
+
+      // Đề xuất shop sở hữu các món đồ vừa tìm thấy
+      const directShops = shopResults.shops || []
+      const productShopIds = [...new Set((products.products || []).map((p) => String(p.shopId)).filter(Boolean))]
+      const itemShops = productShopIds
+        .map((id) => (shops || []).find((s) => String(s.id) === id))
+        .filter((s) => Boolean(s) && !directShops.some((ds) => String(ds.id) === String(s.id)))
+
+      const allShops = [...directShops, ...itemShops].slice(0, 3)
+      setShopHits(allShops)
     }).catch((error) => { if (error.name !== 'AbortError') console.error('Could not load search suggestions:', error) })
     return () => { current = false; controller.abort() }
-  }, [debouncedKeyword, open, loadProducts, loadShops])
+  }, [debouncedKeyword, open, loadProducts, loadShops, shops])
 
   const go = (path) => {
     setOpen(false)

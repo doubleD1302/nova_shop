@@ -6,6 +6,7 @@ import Breadcrumb from '../components/ui/Breadcrumb'
 import EmptyState from '../components/ui/EmptyState'
 import Paginator from '../components/ui/Paginator'
 import ProductCard from '../components/product/ProductCard'
+import RecommendedShopCard from '../components/search/RecommendedShopCard'
 import SearchFilterSidebar from '../components/search/SearchFilterSidebar'
 import SortBar from '../components/search/SortBar'
 import { PAGE_SIZE, SORT_OPTIONS, makeBulkParamSetter, makeParamSetter, parseSearchParams } from '../components/search/searchConfig'
@@ -14,11 +15,16 @@ export default function SearchPage() {
   const [params, setParams] = useSearchParams()
   const { categories, shops, loadCategories, loadShops, loadProducts, getCategory } = useCatalog()
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const [selectedShopId, setSelectedShopId] = useState(null)
   const [result, setResult] = useState({ products: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const paramsKey = params.toString()
+
+  useEffect(() => {
+    setSelectedShopId(null)
+  }, [paramsKey])
   const query = useMemo(() => parseSearchParams(new URLSearchParams(paramsKey)), [paramsKey])
   const setParam = useMemo(() => makeParamSetter(new URLSearchParams(paramsKey), setParams), [paramsKey, setParams])
   const setParamsBulk = useMemo(
@@ -101,6 +107,107 @@ export default function SearchPage() {
     onClearAll: () => setParams(new URLSearchParams()),
   }
 
+  // Tính toán shop đề xuất tốt nhất cho món đồ đang tìm kiếm
+  const { recommendedShop, recommendedShopProducts, otherRecommendedShops } = useMemo(() => {
+    if (!shops || shops.length === 0) {
+      return { recommendedShop: null, recommendedShopProducts: [], otherRecommendedShops: [] }
+    }
+
+    // 1. Phân nhóm các sản phẩm tìm được theo shopId
+    const productsByShopId = new Map()
+    result.products.forEach((p) => {
+      const sid = String(p.shopId)
+      if (!productsByShopId.has(sid)) productsByShopId.set(sid, [])
+      productsByShopId.get(sid).push(p)
+    })
+
+    const qNorm = (query.q || '').trim().toLowerCase()
+    const catNorm = (query.category || '').trim().toLowerCase()
+
+    // 2. Chấm điểm từng shop
+    const scoredShops = shops.map((s) => {
+      const sId = String(s.id)
+      const matchedProducts = productsByShopId.get(sId) || []
+      let score = 0
+
+      // Ưu tiên shop có nhiều sản phẩm khớp với tìm kiếm
+      score += matchedProducts.length * 15
+
+      // Ưu tiên theo tổng lượt bán của sản phẩm khớp
+      const totalSold = matchedProducts.reduce((sum, p) => sum + (Number(p.sold) || 0), 0)
+      score += Math.min(totalSold, 50)
+
+      // Ưu tiên shop Mall và sao đánh giá cao
+      if (s.mall) score += 20
+      score += (Number(s.rating) || 0) * 4
+      score += Math.min((Number(s.followers) || 0) / 400, 10)
+
+      // Ưu tiên tên shop hoặc tagline có chứa từ khoá tìm kiếm
+      const sName = (s.name || '').toLowerCase()
+      const sTagline = (s.tagline || '').toLowerCase()
+      if (qNorm && (sName.includes(qNorm) || sTagline.includes(qNorm))) {
+        score += 35
+      }
+
+      if (catNorm && matchedProducts.some((p) => String(p.categoryId).toLowerCase() === catNorm)) {
+        score += 25
+      }
+
+      return {
+        shop: s,
+        matchedProducts,
+        score,
+      }
+    })
+
+    // Lọc các shop có sản phẩm khớp
+    const shopsWithProducts = scoredShops
+      .filter((item) => item.matchedProducts.length > 0)
+      .sort((a, b) => b.score - a.score)
+
+    let bestItem = null
+    let others = []
+
+    if (selectedShopId) {
+      bestItem = scoredShops.find((item) => String(item.shop.id) === String(selectedShopId))
+    }
+
+    if (!bestItem) {
+      bestItem = shopsWithProducts.length > 0 ? shopsWithProducts[0] : (scoredShops[0] || null)
+    }
+
+    if (shopsWithProducts.length > 0) {
+      others = shopsWithProducts
+        .filter((item) => String(item.shop.id) !== String(bestItem?.shop?.id))
+        .map((item) => item.shop)
+        .slice(0, 3)
+    } else {
+      others = scoredShops
+        .filter((item) => String(item.shop.id) !== String(bestItem?.shop?.id))
+        .slice(0, 3)
+        .map((item) => item.shop)
+    }
+
+    if (!bestItem) {
+      return { recommendedShop: null, recommendedShopProducts: [], otherRecommendedShops: [] }
+    }
+
+    // Đảm bảo danh sách sản phẩm hiển thị đủ 3-4 món của shop
+    let showcaseProducts = [...bestItem.matchedProducts]
+    if (showcaseProducts.length < 4) {
+      const moreProducts = result.products.filter(
+        (p) => String(p.shopId) === String(bestItem.shop.id) && !showcaseProducts.some((sp) => sp.id === p.id),
+      )
+      showcaseProducts.push(...moreProducts.slice(0, 4 - showcaseProducts.length))
+    }
+
+    return {
+      recommendedShop: bestItem.shop,
+      recommendedShopProducts: showcaseProducts,
+      otherRecommendedShops: others,
+    }
+  }, [shops, result.products, query.q, query.category, selectedShopId])
+
   return (
     <div>
       <Breadcrumb
@@ -140,6 +247,18 @@ export default function SearchPage() {
         ) : null}
 
         <div className="min-w-0 flex-1">
+          {/* Shop đề xuất của món đồ đang tìm kiếm */}
+          {recommendedShop ? (
+            <RecommendedShopCard
+              shop={recommendedShop}
+              products={recommendedShopProducts}
+              searchKeyword={query.q}
+              categoryName={currentCategory?.name}
+              otherShops={otherRecommendedShops}
+              onSelectShop={(id) => setSelectedShopId(id)}
+            />
+          ) : null}
+
           <SortBar
             query={query}
             setParam={setParam}

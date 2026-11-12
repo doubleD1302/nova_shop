@@ -57,18 +57,63 @@ export default function SearchSuggestions({ keyword, productHits, shopHits, onPi
       ) : null}
 
       {shopHits.length ? (
-        <div className="border-b border-line py-1">
-          <p className="px-3 py-1 text-[11px] font-semibold uppercase text-muted">Gian hàng</p>
+        <div className="border-b border-line bg-[#FFFAF5]/50 py-1.5">
+          <div className="flex items-center justify-between px-3 py-1 text-[11px] font-bold text-[#BD6E49]">
+            <span className="flex items-center gap-1.5 uppercase tracking-wide">
+              <span>🏪</span> Shop đề xuất cho “{keyword}”
+            </span>
+            <span className="rounded-full bg-[#BD6E49]/10 px-2 py-0.5 text-[9px] font-semibold text-[#BD6E49]">
+              Chính hãng & uy tín
+            </span>
+          </div>
           {shopHits.map((s) => (
             <button
               key={s.id}
               type="button"
               onClick={() => onPickShop(s)}
-              className="flex w-full items-center gap-3 px-3 py-1.5 text-left transition hover:bg-page"
+              className="flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-[#FAF3EA] cursor-pointer"
             >
-              <SmartImage src={s.avatar} fallback={s.avatar} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-              <span className="line-clamp-1 flex-1 text-[13px] text-ink">{s.name}</span>
-              <span className="shrink-0 text-[12px] text-muted">{s.productCount} sản phẩm</span>
+              <div className="relative">
+                <SmartImage
+                  src={s.avatar || s.logoUrl}
+                  fallback={s.avatar || s.logoUrl}
+                  alt=""
+                  className="h-9 w-9 shrink-0 rounded-full object-cover border border-[#E6D5C2]"
+                />
+                {s.mall ? (
+                  <span className="absolute -bottom-1 -right-1 rounded-full bg-red-600 px-1 text-[8px] font-bold text-white leading-tight">
+                    Mall
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[13px] font-bold text-[#49352D]">{s.name}</span>
+                  {s.mall ? (
+                    <span className="rounded-[2px] bg-red-600 px-1 py-[1px] text-[8px] font-bold text-white">
+                      MALL
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-[#8B7566]">
+                  {s.rating ? (
+                    <span className="flex items-center text-amber-600 font-medium">
+                      ★ {s.rating}
+                    </span>
+                  ) : null}
+                  <span>•</span>
+                  <span>{s.productCount ? `${s.productCount} sản phẩm` : 'Shop uy tín'}</span>
+                  {s.location ? (
+                    <>
+                      <span>•</span>
+                      <span className="truncate max-w-[100px]">{s.location}</span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full bg-[#BD6E49] px-3 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-[#A95532]">
+                Vào Shop
+              </span>
             </button>
           ))}
         </div>

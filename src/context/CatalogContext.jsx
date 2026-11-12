@@ -265,7 +265,17 @@ export function CatalogProvider({ children }) {
       if (error?.name === 'AbortError') throw error
       // Dự phòng an toàn: lấy gian hàng từ bộ nhớ cache hoặc mẫu mặc định
       const cached = getCached('novashop_cache_shops_v1', DEFAULT_SHOPS)
-      const list = (cached && cached.length ? cached : DEFAULT_SHOPS).map((shop) => normalizeShop(shop, followedShopIds))
+      let list = (cached && cached.length ? cached : DEFAULT_SHOPS).map((shop) => normalizeShop(shop, followedShopIds))
+      if (options.q) {
+        const qNorm = normalize(options.q)
+        const cachedProducts = getCached('novashop_cache_products_v1', DEFAULT_PRODUCTS)
+        list = list.filter((shop) => {
+          if (normalize(shop.name).includes(qNorm) || normalize(shop.tagline).includes(qNorm)) return true
+          return cachedProducts.some(
+            (p) => String(p.shopId) === String(shop.id) && (normalize(p.name).includes(qNorm) || normalize(p.categoryName).includes(qNorm)),
+          )
+        })
+      }
       setDatabaseShops((current) => {
         const byId = new Map(current.map((shop) => [String(shop.id), shop]))
         list.forEach((shop) => byId.set(String(shop.id), { ...byId.get(String(shop.id)), ...shop }))

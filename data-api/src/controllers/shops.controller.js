@@ -108,12 +108,25 @@ export async function listShops(req, res, next) {
     const where = ["s.status = 'active'"]
     const params = []
     const query = String(req.query.q || '').trim().slice(0, 120)
-    if (query) { where.push('(s.name LIKE ? OR s.tagline LIKE ?)'); params.push(`%${query}%`, `%${query}%`) }
+    if (query) {
+      where.push(`(
+        s.name LIKE ? OR s.tagline LIKE ?
+        OR EXISTS (
+          SELECT 1 FROM products p
+          WHERE p.shop_id = s.id AND p.status = 'active'
+            AND (p.name LIKE ? OR p.description LIKE ?)
+        )
+      )`)
+      params.push(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`)
+    }
     if (['1', 'true'].includes(req.query.mall) || ['1', 'true'].includes(req.query.featured)) where.push('s.is_mall = 1')
     const whereSql = where.join(' AND ')
     const select = await getShopSelect()
+    const orderBy = query
+      ? 's.is_mall DESC, s.created_at DESC, s.id DESC'
+      : 's.created_at DESC, s.id DESC'
     const [rows, countRows] = await Promise.all([
-      executeQuery(`${select} WHERE ${whereSql} ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?`, [...params, limit, offset]),
+      executeQuery(`${select} WHERE ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`, [...params, limit, offset]),
       executeQuery(`SELECT COUNT(*) AS total FROM shops s WHERE ${whereSql}`, params),
     ])
     return res.status(200).json({ success: true, data: { shops: rows.map(serializeShop), total: Number(countRows[0]?.total || 0), limit, offset } })
