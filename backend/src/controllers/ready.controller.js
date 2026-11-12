@@ -1,4 +1,5 @@
 import { fetchDataApiReady, DataApiClientError } from '../clients/data.client.js'
+import { env } from '../config/env.js'
 
 /**
  * Controller kiểm tra tính sẵn sàng của Backend và các phụ thuộc (Readiness check).
@@ -23,6 +24,8 @@ export async function getReady(req, res, next) {
         status: 'ready',
         dataApi: 'connected',
         database: 'connected',
+        storage: env.uploadStorage,
+        s3Ready: env.uploadStorage === 's3' ? Boolean(env.s3Bucket && env.s3AccessKeyId && env.s3SecretAccessKey) : undefined,
       },
     })
   } catch (err) {

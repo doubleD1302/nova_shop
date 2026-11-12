@@ -97,6 +97,7 @@ export async function serveUploadedImage(req, res, next) {
     ) {
       return res.status(404).end()
     }
-    return next(err)
+    console.error(`[Uploads] Không thể tải ảnh ${filename}:`, err?.name || err?.message)
+    return res.status(404).end()
   }
 }

@@ -4,7 +4,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    autoDeployTrigger: "off"
+    autoDeployTrigger: "true"
     buildCommand: npm --prefix backend ci --omit=dev && npm --prefix data-api ci --omit=dev
     startCommand: npm run start:hosting
     healthCheckPath: /api/v1/ready
@@ -44,11 +44,11 @@ services:
       - key: UPLOAD_STORAGE
         value: s3
       - key: S3_ENDPOINT
-        sync: false
+        value: https://b22e8e960cbcf735cefc1ecea1aa5cd7.r2.cloudflarestorage.com
       - key: S3_REGION
-        sync: false
+        value: auto
       - key: S3_BUCKET
-        sync: false
+        value: shopnova-media
       - key: S3_ACCESS_KEY_ID
         sync: false
       - key: S3_SECRET_ACCESS_KEY

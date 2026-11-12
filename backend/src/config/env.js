@@ -175,11 +175,11 @@ function parseAndValidateEnv() {
     process.env.VITE_FIREBASE_PROJECT_ID ||
     ''
   ).trim()
-  const s3Bucket = (process.env.S3_BUCKET || '').trim()
-  const s3Region = (process.env.S3_REGION || 'us-east-1').trim()
+  const s3Bucket = (process.env.S3_BUCKET || 'shopnova-media').trim()
+  const s3Region = (process.env.S3_REGION || 'auto').trim()
   const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID
   const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY
-  const rawS3Endpoint = (process.env.S3_ENDPOINT || '').trim()
+  const rawS3Endpoint = (process.env.S3_ENDPOINT || 'https://b22e8e960cbcf735cefc1ecea1aa5cd7.r2.cloudflarestorage.com').trim()
   const rawForcePathStyle = (process.env.S3_FORCE_PATH_STYLE || 'false').trim().toLowerCase()
 
   if (rawForcePathStyle !== 'true' && rawForcePathStyle !== 'false') {
