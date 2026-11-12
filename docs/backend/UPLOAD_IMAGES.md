@@ -32,3 +32,17 @@ Backend hỗ trợ lưu trữ đám mây S3/Cloudflare R2 qua AWS SDK v3 (`@aws-
 
 Kiểm tra kết nối và tính sẵn sàng của Object Storage bằng script:
 `node backend/scripts/test-cloudflare-r2.mjs`
+
+## Kiểm tra và khôi phục ảnh bị thiếu
+
+Danh sách sản phẩm và file ảnh được lưu ở hai nơi khác nhau. URL còn trong database không chứng minh file còn trong bucket. Tương tự, `s3Ready` trong `/api/v1/ready` chỉ kiểm tra sự hiện diện của cấu hình; cần đọc một ảnh thật để xác nhận quyền truy cập kho ảnh.
+
+Khi ảnh không hiển thị:
+
+1. Đọc danh sách sản phẩm qua Backend với `fullImages=true`, phân trang bằng `limit` và `offset`. Kiểm tra từng URL ảnh, gồm các ảnh phụ và logo/banner shop dùng chung file.
+2. Đối chiếu URL lỗi với đúng key trong bucket. Nếu object tồn tại nhưng Backend không đọc được, kiểm tra cấu hình và quyền R2 trên môi trường đang chạy. Nếu object không tồn tại, cần khôi phục file; thay khóa không tạo lại ảnh đã mất.
+3. Tìm bản sao hoặc nguồn ảnh đã ghi nhận cho đúng sản phẩm. Đối chiếu mã/tên sản phẩm và thứ tự ảnh; kiểm tra MIME, khả năng giải mã, kích thước và checksum trước khi lưu. Không lấy ảnh sản phẩm khác để lấp chỗ trống.
+4. Khôi phục file thiếu vào đúng key đang được tham chiếu. Với R2, dùng `PutObject` cùng `If-None-Match: *` để chỉ tạo object chưa có. Nếu nhận 412, object đã tồn tại: giữ nguyên và kiểm tra lại, không chuyển sang ghi đè. Xem [conditional operations của R2](https://developers.cloudflare.com/r2/api/s3/conditional-operations/).
+5. Đọc lại ảnh qua Backend và domain web, xác nhận HTTP 200, Content-Type ảnh và nội dung khớp checksum đã chuẩn bị. Kiểm tra đủ ảnh của các sản phẩm liên quan, sau đó tải lại trang với cache bị vô hiệu hóa nếu trình duyệt còn giữ kết quả lỗi.
+
+Giữ bản sao ảnh và bảng đối chiếu URL/key/nguồn/checksum trong nơi lưu trữ phù hợp. Không đưa credential, database dump hoặc bộ ảnh người dùng vào Git hay ZIP source. Thay đổi cấu hình kho ảnh không tự sao chép file từ filesystem hoặc bucket cũ.
