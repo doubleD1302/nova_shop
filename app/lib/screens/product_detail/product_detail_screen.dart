@@ -73,6 +73,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     super.initState();
     _pageController = PageController();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && mounted) {
+        setState(() {});
+      }
+    });
     _product = widget.initialProduct;
 
     if (_product != null) {
@@ -658,9 +663,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               children: [
                 Icon(Icons.verified_outlined, size: 15, color: AppColors.primary),
                 SizedBox(width: 6),
-                Text(
-                  'HÀNG CHÍNH HÃNG 100% • ĐỔI TRẢ MIỄN PHÍ 15 NGÀY',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 0.2),
+                Expanded(
+                  child: Text(
+                    'HÀNG CHÍNH HÃNG 100% • ĐỔI TRẢ MIỄN PHÍ 15 NGÀY',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 0.2),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -887,26 +895,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         : (computedDisc > 0 ? computedDisc : (p?.discount ?? 0));
 
     return Container(
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Text(
                 _formatVND(price),
                 style: TextStyle(color: primaryColor, fontSize: 24, fontWeight: FontWeight.w900),
               ),
               if (origPrice > price) ...[
-                const SizedBox(width: 8),
                 Text(
                   _formatVND(origPrice),
                   style: const TextStyle(color: Colors.grey, fontSize: 14, decoration: TextDecoration.lineThrough),
                 ),
-                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(4)),
@@ -969,9 +988,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final stock = _product?.stock ?? 120;
 
     return Container(
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -979,7 +1009,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Phân loại & Tùy chọn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text('Kho hàng: $stock sản phẩm', style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5)),
+              Flexible(
+                child: Text('Kho hàng: $stock sản phẩm', style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5), overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
           // Group 1
@@ -1127,17 +1159,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final location = p?.location ?? 'TP. Hồ Chí Minh';
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
+          // Shop avatar & name row
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.surfaceAlt,
-                child: const Icon(Icons.storefront_outlined, color: AppColors.primary, size: 26),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surfaceAlt,
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.storefront_outlined, color: AppColors.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1147,68 +1196,112 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     Row(
                       children: [
                         Flexible(
-                          child: Text(sName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5), overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            sName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: AppColors.textPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         if (isMall) ...[
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(color: const Color(0xFF28313F), borderRadius: BorderRadius.circular(3)),
-                            child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: const Text('MALL', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    Text('📍 Kho hàng tại $location', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              OutlinedButton(
-                onPressed: () {
-                  final sId = p?.shopId;
-                  if (sId != null && sId.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ShopDetailScreen(shopId: sId, initialShopName: sName),
-                      ),
-                    );
-                  } else {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.grey.shade400),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(0, 32),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Action buttons: Xem Shop & Theo Dõi
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final sId = p?.shopId;
+                    if (sId != null && sId.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ShopDetailScreen(shopId: sId, initialShopName: sName),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopScreen()));
+                    }
+                  },
+                  icon: const Icon(Icons.storefront_outlined, size: 14, color: AppColors.textPrimary),
+                  label: const Text('Xem Shop', style: TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.border),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: const Size(0, 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-                child: const Text('Xem Shop', style: TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _toggleFollowShop,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isFollowing ? Colors.grey.shade200 : primaryColor,
-                  foregroundColor: _isFollowing ? Colors.black87 : Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(0, 32),
-                  elevation: 0,
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _toggleFollowShop,
+                  icon: Icon(_isFollowing ? Icons.check : Icons.add, size: 14),
+                  label: Text(
+                    _isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isFollowing ? AppColors.surfaceAlt : AppColors.primary,
+                    foregroundColor: _isFollowing ? AppColors.textPrimary : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: const Size(0, 32),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-                child: Text(_isFollowing ? '✓ Đã theo dõi' : '+ Theo dõi', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(height: 1),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildShopStat('${_avgRating.toStringAsFixed(1)}/5.0', 'Đánh giá shop'),
-              _buildShopStat('99%', 'Tỷ lệ phản hồi'),
-              _buildShopStat('100%', 'Hàng chính hãng'),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border.withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _buildShopStat('${_avgRating.toStringAsFixed(1)}/5.0', 'Đánh giá shop')),
+                Container(height: 20, width: 1, color: AppColors.border),
+                Expanded(child: _buildShopStat('99%', 'Tỷ lệ phản hồi')),
+                Container(height: 20, width: 1, color: AppColors.border),
+                Expanded(child: _buildShopStat('100%', 'Hàng chính hãng')),
+              ],
+            ),
           ),
         ],
       ),
@@ -1218,9 +1311,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   Widget _buildShopStat(String title, String subtitle) {
     return Column(
       children: [
-        Text(title, style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 13.5)),
-        const SizedBox(height: 3),
-        Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
+        Text(title, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13.5)),
+        const SizedBox(height: 2),
+        Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
       ],
     );
   }
@@ -1228,134 +1321,333 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   // 6. TABS CHI TIẾT SẢN PHẨM, THÔNG SỐ VÀ CHÍNH SÁCH
   Widget _buildProductTabsSection() {
     final p = _product;
-    final specs = p?.specs ?? {};
     final categoryName = p?.categoryName.isNotEmpty == true
         ? p!.categoryName
         : CatalogService.getCategoryName(p?.categoryId);
 
     return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TabBar(
-            controller: _tabController,
-            labelColor: primaryColor,
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: primaryColor,
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            tabs: const [
-              Tab(text: 'Chi Tiết & Mô Tả'),
-              Tab(text: 'Thông Số Kỹ Thuật'),
-              Tab(text: 'Vận Chuyển & Đổi Trả'),
-            ],
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: [
-              // Tab 1: Mô tả
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow('Ngành hàng', categoryName),
-                  _buildDetailRow('Gian hàng', p?.shopName ?? 'ShopNova Official'),
-                  _buildDetailRow('Tồn kho', '${p?.stock ?? 120} sản phẩm sẵn có'),
-                  _buildDetailRow('Khu vực gửi hàng', p?.location ?? 'TP. Hồ Chí Minh'),
-                  const SizedBox(height: 12),
-                  const Text('Mô tả sản phẩm:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                  const SizedBox(height: 8),
-                  Text(
-                    p?.description.isNotEmpty == true
-                        ? p!.description
-                        : 'Sản phẩm chính hãng ShopNova được kiểm định chất lượng nghiêm ngặt, nguồn gốc rõ ràng và cam kết bảo hành uy tín.',
-                    style: const TextStyle(fontSize: 13, height: 1.55, color: Color(0xFF2D3748)),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _buildTagChip('#ChinhHang100%'),
-                      _buildTagChip('#FreeshipXtra'),
-                      _buildTagChip('#Giao2H'),
-                      _buildTagChip('#DoiTra15Ngay'),
-                    ],
-                  ),
-                ],
-              ),
-              // Tab 2: Thông số & Thuộc tính ngành hàng
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_categoryAttributes.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFC8E6C9)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified_rounded, color: Color(0xFF2E7D32), size: 14),
-                          SizedBox(width: 6),
-                          Text('Thuộc tính ngành hàng xác thực API', style: TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                    ..._categoryAttributes.entries.map((e) {
-                      return _buildDetailRow(_formatAttributeLabel(e.key), '${e.value}');
-                    }),
-                    const SizedBox(height: 8),
-                  ],
-                  if (specs.isNotEmpty)
-                    ...specs.entries.map((e) => Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 130,
-                                child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.black87)),
-                              ),
-                              Expanded(
-                                child: Text('${e.value}', style: TextStyle(fontSize: 12.5, color: Colors.grey.shade800)),
-                              ),
-                            ],
-                          ),
-                        ))
-                  else if (_categoryAttributes.isEmpty) ...[
-                    _buildDetailRow('Thương hiệu', p?.shopName ?? 'ShopNova'),
-                    _buildDetailRow('Xuất xứ', 'Chính hãng Việt Nam / Nhập khẩu'),
-                    _buildDetailRow('Bảo hành', '12 tháng chính hãng'),
-                    _buildDetailRow('Quy cách đóng gói', 'Hộp nguyên seal đầy đủ phụ kiện'),
-                  ],
-                ],
-              ),
-              // Tab 3: Vận chuyển
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPolicyTile(Icons.local_shipping_outlined, 'Vận chuyển hỏa tốc 2H', 'Hỗ trợ giao nhanh trong 2 giờ tại nội thành Hà Nội & TP.HCM.'),
-                  _buildPolicyTile(Icons.sync_alt_rounded, 'Đổi trả miễn phí 15 ngày', 'Đổi mới miễn phí nếu phát sinh lỗi nhà sản xuất hoặc sai phân loại.'),
-                  _buildPolicyTile(Icons.verified_user_outlined, 'Bảo đảm hàng chính hãng', 'Hoàn tiền 100% nếu phát hiện hàng giả, hàng nhái.'),
-                ],
-              ),
-            ][_tabController.index],
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar containing TabBar matching Web
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceAlt,
+              border: Border(
+                bottom: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.tab,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+              tabs: const [
+                Tab(text: 'Chi Tiết'),
+                Tab(text: 'Thông Số'),
+                Tab(text: 'Vận Chuyển'),
+              ],
+              onTap: (index) {
+                setState(() {});
+              },
+            ),
+          ),
+          // Tab Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildSelectedTabContent(p, categoryName),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedTabContent(Product? p, String categoryName) {
+    switch (_tabController.index) {
+      case 1:
+        return _buildSpecsTab(p);
+      case 2:
+        return _buildShippingTab();
+      case 0:
+      default:
+        return _buildDetailTab(p, categoryName);
+    }
+  }
+
+  // TAB 1: CHI TIẾT SẢN PHẨM & MÔ TẢ
+  Widget _buildDetailTab(Product? p, String categoryName) {
+    final stock = p?.stock ?? 120;
+    final formattedStock = NumberFormat('#,###', 'vi_VN').format(stock);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Bảng metadata thông tin cơ bản
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border.withOpacity(0.7)),
+          ),
+          child: Column(
+            children: [
+              _buildInfoRow('Danh Mục', categoryName.isNotEmpty ? categoryName : 'Điện thoại và phụ kiện'),
+              const Divider(height: 16, color: AppColors.border),
+              _buildInfoRow('Gian hàng', p?.shopName ?? 'ShopNova Official Store'),
+              const Divider(height: 16, color: AppColors.border),
+              _buildInfoRow('Kho hàng', '$formattedStock sản phẩm có sẵn'),
+              const Divider(height: 16, color: AppColors.border),
+              _buildInfoRow('Gửi từ', p?.location ?? 'TP. Hồ Chí Minh'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Tiêu đề Mô tả sản phẩm
+        Row(
+          children: [
+            Container(
+              width: 3.5,
+              height: 15,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Mô Tả Sản Phẩm',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          p?.description.isNotEmpty == true
+              ? p!.description
+              : 'Sản phẩm chính hãng ShopNova với chất lượng kiểm định nghiêm ngặt, đóng gói cẩn thận và hỗ trợ bảo hành chính hãng toàn quốc.',
+          style: const TextStyle(
+            fontSize: 13.5,
+            height: 1.6,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Badge tags
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildTagChip('#ChínhHãng100%'),
+            _buildTagChip('#FreeshipExtra'),
+            _buildTagChip('#ĐổiTrả15Ngày'),
+            _buildTagChip('#GiaoHỏaTốc2H'),
+            if (p?.badges != null)
+              ...p!.badges.where((b) => b.isNotEmpty).map((t) => _buildTagChip(t.startsWith('#') ? t : '#$t')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // TAB 2: THÔNG SỐ KỸ THUẬT (Dạng bảng sọc Web)
+  Widget _buildSpecsTab(Product? p) {
+    final entries = <MapEntry<String, String>>[];
+
+    // 1. Thêm thuộc tính ngành hàng đã xác thực
+    for (final e in _categoryAttributes.entries) {
+      final val = e.value?.toString().trim() ?? '';
+      if (val.isNotEmpty) {
+        entries.add(MapEntry(_formatAttributeLabel(e.key), val));
+      }
+    }
+
+    // 2. Thêm thông số sản phẩm
+    if (p?.specs != null) {
+      for (final e in p!.specs.entries) {
+        final val = e.value?.toString().trim() ?? '';
+        if (val.isNotEmpty && !entries.any((existing) => existing.key.toLowerCase() == e.key.toLowerCase())) {
+          entries.add(MapEntry(e.key, val));
+        }
+      }
+    }
+
+    // 3. Fallback thông số chuẩn nếu danh sách rỗng
+    if (entries.isEmpty) {
+      entries.addAll([
+        MapEntry('Thương hiệu', p?.shopName ?? 'ShopNova'),
+        const MapEntry('Xuất xứ', 'Chính hãng Việt Nam / Nhập khẩu'),
+        const MapEntry('Bảo hành', '12 tháng chính hãng'),
+        const MapEntry('Tiêu chuẩn chất lượng', 'Đạt chuẩn sàn thương mại điện tử NovaShop'),
+        const MapEntry('Quy cách đóng gói', 'Nguyên seal, đầy đủ phụ kiện từ nhà sản xuất'),
+      ]);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (int i = 0; i < entries.length; i++) ...[
+            Container(
+              color: i.isEven ? const Color(0xFFFDF9F3) : AppColors.surface,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 125,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: AppColors.border, width: 0.8),
+                      ),
+                    ),
+                    child: Text(
+                      entries[i].key,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Text(
+                        entries[i].value,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (i < entries.length - 1)
+              const Divider(height: 1, thickness: 0.8, color: AppColors.border),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // TAB 3: VẬN CHUYỂN & ĐỔI TRẢ
+  Widget _buildShippingTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildPolicyBlock(
+          icon: Icons.local_shipping_outlined,
+          title: 'Phí Vận Chuyển & Giao Hàng',
+          items: const [
+            'Miễn phí vận chuyển cho đơn hàng từ 1.000.000₫ (Freeship Extra).',
+            'Phí giao hàng tiêu chuẩn 16.500₫ cho mỗi gian hàng trong đơn.',
+            'Hỗ trợ giao nhanh hỏa tốc trong 2 giờ tại nội thành Hà Nội & TP. Hồ Chí Minh.',
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(height: 1, color: AppColors.border),
+        const SizedBox(height: 16),
+        _buildPolicyBlock(
+          icon: Icons.sync_alt_rounded,
+          title: 'Chính Sách Đổi Trả & Bảo Hành',
+          items: const [
+            'Đổi trả miễn phí trong 15 ngày kể từ khi nhận hàng thành công.',
+            'Hoàn tiền 100% nếu sản phẩm không đúng mô tả hoặc phát sinh lỗi nhà sản xuất.',
+            'Người bán chịu toàn bộ phí vận chuyển hai chiều đối với sản phẩm lỗi.',
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPolicyBlock({
+    required IconData icon,
+    required String title,
+    required List<String> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: AppColors.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(left: 6, bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Icon(Icons.circle, size: 5, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        )),
+      ],
     );
   }
 
@@ -1376,51 +1668,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     }
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildTagChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(12)),
-      child: Text(label, style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildPolicyTile(IconData icon, String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: primaryColor, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: Colors.grey.shade700, fontSize: 12, height: 1.35)),
-              ],
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1432,42 +1723,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         : _reviews.where((r) => r.rating == _selectedStarFilter).toList();
 
     return Container(
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('ĐÁNH GIÁ SẢN PHẨM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        _avgRating.toStringAsFixed(1),
-                        style: TextStyle(color: primaryColor, fontSize: 16, fontWeight: FontWeight.w900),
-                      ),
-                      const SizedBox(width: 4),
-                      Row(
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < _avgRating.round() ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 16,
-                          );
-                        }),
-                      ),
-                      const SizedBox(width: 6),
-                      Text('($_totalReviews đánh giá)', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('ĐÁNH GIÁ SẢN PHẨM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          _avgRating.toStringAsFixed(1),
+                          style: TextStyle(color: primaryColor, fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(width: 4),
+                        Row(
+                          children: List.generate(5, (index) {
+                            return Icon(
+                              index < _avgRating.round() ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 16,
+                            );
+                          }),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text('($_totalReviews đánh giá)', style: TextStyle(fontSize: 12, color: Colors.grey.shade600), overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _showAddReviewDialog,
                 icon: Icon(Icons.rate_review_outlined, size: 14, color: primaryColor),
@@ -1584,13 +1891,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final isSelected = _selectedStarFilter == star;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: ChoiceChip(
-        label: Text(label, style: TextStyle(fontSize: 11.5, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.white : Colors.black87)),
-        selected: isSelected,
-        selectedColor: primaryColor,
-        backgroundColor: Colors.grey.shade100,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onSelected: (_) => setState(() => _selectedStarFilter = star),
+      child: InkWell(
+        onTap: () => setState(() => _selectedStarFilter = star),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSelected) ...[
+                const Icon(Icons.check, size: 13, color: Colors.white),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1658,6 +1986,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   // 9. SẢN PHẨM KHÁC CỦA SHOP & CÓ THỂ BẠN CŨNG THÍCH
   Widget _buildRelatedProductsSection() {
+    if (_isLoadingRelated) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2)),
+      );
+    }
     return Column(
       children: [
         if (_sameShopProducts.isNotEmpty) ...[
