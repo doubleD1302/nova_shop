@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { IconArrowRight, IconCart, IconCheck, IconClose, IconExpand, IconMic, IconPackage, IconSearch, IconSend, IconThumbsDown, IconThumbsUp } from '../ui/Icons'
 import { useCart } from '../../context/CartContext'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -31,6 +32,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const launcherRef = useRef(null)
   const { addItem } = useCart()
   const { user } = useAuth()
   const sessionKey = `${user?.id || 'guest'}:${user?.role || 'guest'}`
@@ -63,6 +65,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   useEffect(() => {
     const handleOpenEvent = (e) => {
       setIsOpen(true)
+      inputRef.current?.focus()
       if (e?.detail?.query) {
         setTimeout(() => handleSendMessage(e.detail.query), 150)
       }
@@ -132,9 +135,9 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         orderInfo: aiData.orderInfo,
         newlyLearned: aiData.brain?.newlyLearned || [],
         suggestions: aiData.suggestions || [
-          '✨ Gợi ý thêm sản phẩm tương tự',
-          '🚚 Xem chính sách đổi trả & freeship',
-          '⚡ Deal sốc hôm nay',
+          'Xem thêm sản phẩm tương tự',
+          'Chính sách đổi trả và vận chuyển',
+          'Sản phẩm đang giảm giá',
         ],
       }
 
@@ -254,312 +257,191 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
     }
   }
 
+  const closeChat = () => {
+    setIsOpen(false)
+    setTimeout(() => launcherRef.current?.focus(), 0)
+  }
+
   return (
     <>
-      {/* 1. NÚT NỔI LAUNCHER GÓC PHẢI DƯỚI */}
-      {!isOpen && !fullPage && (
-        <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 rounded-full border border-[#E6D5C2] bg-[#FFFCF7] px-3.5 py-1.5 shadow-lg text-xs font-semibold text-[#49352D] animate-bounce">
-            <span>✨ Hỏi Nova AI phối đồ & tra cứu đơn!</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsOpen(true)}
-            aria-label="Mở Trợ lý Nova AI"
-            className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-[#A95532] to-[#BD6E49] text-white shadow-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl focus:outline-none"
-          >
-            <span className="absolute -top-1 -right-1 flex h-4 w-4">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500 text-[9px] font-extrabold text-white items-center justify-center">AI</span>
-            </span>
-            <span className="text-2xl transition-transform duration-300 group-hover:rotate-12">✨</span>
-          </button>
-        </div>
-      )}
-
-      {/* 2. CHAT DRAWER / FULLPAGE */}
-      {(isOpen || fullPage) && (
-        <div
-          className={
-            fullPage
-              ? 'mx-auto flex h-[calc(100vh-140px)] max-w-4xl flex-col rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-xl overflow-hidden'
-              : 'fixed bottom-4 right-4 z-50 flex h-[600px] w-[95vw] sm:w-[430px] max-w-full flex-col rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-200'
-          }
+      {!isOpen && !fullPage ? (
+        <button
+          ref={launcherRef}
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-label="Mở trợ lý Nova"
+          className="nova-launcher"
         >
-          {/* Header Drawer */}
-          <div className="flex items-center justify-between border-b border-[#E6D5C2] bg-[#F5E7D4] px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#BD6E49] text-white shadow">
-                <span className="text-lg">✨</span>
+          <img src="/images/nova-mark.svg" alt="" className="h-7 w-7" />
+          <span>Hỏi Nova</span>
+        </button>
+      ) : null}
+
+      {isOpen || fullPage ? (
+        <section
+          role={fullPage ? 'region' : 'dialog'}
+          aria-label="Trợ lý mua sắm Nova"
+          className={fullPage ? 'nova-workspace' : 'nova-drawer'}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !fullPage) closeChat()
+          }}
+        >
+          {fullPage ? (
+            <aside className="nova-sidebar">
+              <Link to="/" className="nova-back"><IconArrowRight className="h-4 w-4 rotate-180" /> Về cửa hàng</Link>
+              <div className="nova-sidebar-intro">
+                <img src="/images/nova-mark.svg" alt="" className="h-12 w-12" />
+                <p className="nova-eyebrow">NOVA · TRỢ LÝ MUA SẮM</p>
+                <h1>Tìm đúng món<br />bạn đang cần.</h1>
+                <p>Từ một ý tưởng đến một lựa chọn phù hợp. Cùng Nova xem những gì ShopNova đang có.</p>
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[15px] font-black text-[#49352D]">Nova AI</span>
-                  <span className="rounded bg-[#BD6E49] px-1.5 py-0.2 text-[10px] font-bold text-white">24/7</span>
+              <div className="nova-capabilities">
+                <div><IconSearch className="h-4 w-4" /><span>Tìm theo nhu cầu, ngân sách</span></div>
+                <div><IconCart className="h-4 w-4" /><span>Cân nhắc các lựa chọn</span></div>
+                <div><IconPackage className="h-4 w-4" /><span>Hỏi về đơn hàng của bạn</span></div>
+              </div>
+              <p className="nova-sidebar-note">Một cuộc trò chuyện, thêm một góc nhìn trước khi chọn mua.</p>
+            </aside>
+          ) : null}
+
+          <div className="nova-conversation">
+            <header className="nova-header">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="nova-avatar"><img src="/images/nova-mark.svg" alt="" className="h-7 w-7" /></span>
+                <div>
+                  <h2 className="text-sm font-semibold text-ink">Nova <span className="nova-ai-label">AI</span></h2>
+                  <p className="mt-0.5 text-xs text-muted">Trợ lý mua sắm của ShopNova</p>
                 </div>
-                <p className="text-[11px] text-[#8B7566] flex items-center gap-1">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Trực tuyến • Trợ lý mua sắm ShopNova
-                </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              
-
-              {!fullPage && (
-                <>
-                  <Link
-                    to="/nova-ai"
-                    target="_blank"
-                    title="Mở toàn màn hình"
-                    className="rounded-lg p-1.5 text-[#8B7566] hover:bg-[#E6D5C2] transition"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
+              {!fullPage ? (
+                <div className="flex items-center gap-1">
+                  <Link to="/nova-ai" aria-label="Mở trang trò chuyện" title="Mở trang trò chuyện" className="nova-icon-button">
+                    <IconExpand className="h-[18px] w-[18px]" />
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => setIsOpen(false)}
-                    title="Đóng trợ lý"
-                    className="rounded-lg p-1.5 text-[#8B7566] hover:bg-[#E6D5C2] transition"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  <button type="button" onClick={closeChat} aria-label="Đóng trợ lý" className="nova-icon-button">
+                    <IconClose className="h-[18px] w-[18px]" />
                   </button>
-                </>
-              )}
+                </div>
+              ) : null}
+            </header>
+            <div className="nova-messages thin-scroll" role="log" aria-label="Nội dung trò chuyện" aria-live="polite" aria-relevant="additions text">
+              {renderChatMessages()}
             </div>
+            {renderInputBar()}
           </div>
-
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-[#FAF4EB]">
-            {renderChatMessages()}
-          </div>
-
-          {/* Input Bar */}
-          {renderInputBar()}
-        </div>
-      )}
-
-      {/* 3. MODAL XEM CHI TIẾT BỘ NÃO AI (AI BRAIN INSPECTOR) */}
-      </>
+        </section>
+      ) : null}
+    </>
   )
 
   function renderChatMessages() {
     if (messages.length === 0) {
       return (
-        <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-6 text-center select-none">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#A95532] to-[#BD6E49] text-white shadow-md">
-            <span className="text-2xl">✨</span>
-          </div>
-          <h3 className="text-base font-bold text-[#49352D]">Tôi có thể giúp gì cho bạn?</h3>
-          <p className="mt-1.5 max-w-[280px] text-xs text-[#8B7566] leading-relaxed">
-            Hỏi bất kỳ điều gì về sản phẩm, tư vấn chọn size, gợi ý phối đồ hoặc tra cứu tình trạng đơn hàng của bạn.
-          </p>
+        <div className="nova-empty">
+          <img src="/images/nova-notes.svg" alt="" className="nova-empty-art" />
+          <p className="nova-eyebrow">BẮT ĐẦU TỪ ĐIỀU BẠN CẦN</p>
+          <h3>Bạn đang tìm gì hôm nay?</h3>
+          <p>Mô tả món đồ, ngân sách hoặc điều bạn muốn biết. Nova sẽ cùng bạn tìm trong ShopNova.</p>
         </div>
       )
     }
 
     return (
       <>
-        {messages.map((m) => (
-          <div key={m.id} className={`flex flex-col ${m.isUser ? 'items-end' : 'items-start'}`}>
-            {m.isUser ? (
-              <div className="max-w-[85%] rounded-2xl rounded-tr-none bg-gradient-to-r from-[#BD6E49] to-[#A95532] px-4 py-2.5 text-[13.5px] text-white shadow-sm">
-                <p className="leading-relaxed">{m.text}</p>
-                <span className="mt-1 block text-right text-[10px] text-amber-100 opacity-80">{m.time}</span>
-              </div>
+        {messages.map((message) => (
+          <div key={message.id} className={`nova-message ${message.isUser ? 'nova-message-user' : ''}`}>
+            {message.isUser ? (
+              <>
+                <div className="nova-user-bubble"><p>{message.text}</p></div>
+                <span className="nova-time">{message.time}</span>
+              </>
             ) : (
-              <div className="max-w-[95%] space-y-2">
-                <div className="rounded-2xl rounded-tl-none border border-[#E6D5C2] bg-[#FFFCF7] p-3.5 shadow-sm text-[#49352D]">
-                  {m.intentTitle && (
-                    <div className="mb-2 flex items-center justify-between border-b border-[#F0E2D2] pb-1.5">
-                      <span className="text-[12px] font-bold text-[#80513B] flex items-center gap-1.5">
-                        <span>✨</span> {m.intentTitle}
-                      </span>
-                      {m.intentMatch && (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
-                          {m.intentMatch}
-                        </span>
-                      )}
+              <div className="nova-reply">
+                <div className="nova-reply-heading"><img src="/images/nova-mark.svg" alt="" className="h-5 w-5" /><span>Nova</span></div>
+                {message.intentTitle ? <p className="nova-intent">{message.intentTitle}</p> : null}
+                <p className="nova-reply-text">{message.text}</p>
+
+                {message.orderInfo ? (
+                  <div className="nova-detail-card">
+                    <div className="flex items-center justify-between gap-2 text-xs font-semibold text-ink">
+                      <span className="flex items-center gap-2"><IconPackage className="h-4 w-4" />{message.orderInfo.code}</span>
+                      <span className="text-earth">{message.orderInfo.statusText}</span>
                     </div>
-                  )}
+                    <dl className="nova-order-details">
+                      {message.orderInfo.location ? <div><dt>Vị trí</dt><dd>{message.orderInfo.location}</dd></div> : null}
+                      {message.orderInfo.eta ? <div><dt>Dự kiến giao</dt><dd>{message.orderInfo.eta}</dd></div> : null}
+                      {message.orderInfo.shipper ? <div><dt>Người giao</dt><dd>{message.orderInfo.shipper}</dd></div> : null}
+                    </dl>
+                    <Link to="/don-hang" className="nova-text-link">Xem đơn hàng <IconArrowRight className="h-3.5 w-3.5" /></Link>
+                  </div>
+                ) : null}
 
-                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{m.text}</p>
-
-                  {/* TH1: Thẻ theo dõi đơn hàng thời gian thực */}
-                  {m.orderInfo && (
-                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-[#49352D]">
-                      <div className="flex items-center justify-between font-bold text-[#BD6E49]">
-                        <span>📦 Đơn hàng: {m.orderInfo.code}</span>
-                        <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">
-                          {m.orderInfo.statusText}
-                        </span>
-                      </div>
-                      <div className="mt-2 space-y-1 text-[#8B7566]">
-                        <p>📍 {m.orderInfo.location}</p>
-                        <p>⏰ {m.orderInfo.eta}</p>
-                        <p>🛵 Bưu tá: {m.orderInfo.shipper}</p>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <Link
-                          to="/don-hang"
-                          className="flex-1 rounded-lg bg-[#BD6E49] py-1.5 text-center font-bold text-white hover:bg-[#A95532] transition"
-                        >
-                          Xem chi tiết đơn
-                        </Link>
-                      </div>
+                {message.budget ? (
+                  <div className="nova-detail-card">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span>Tổng các món gợi ý</span><strong className="text-sm text-earth">{formatVND(message.budget.total)}</strong>
                     </div>
-                  )}
+                    {message.budget.saved > 0 ? <p className="mt-1.5 text-xs text-success">Tiết kiệm {formatVND(message.budget.saved)} so với giá niêm yết</p> : null}
+                    {message.products?.length > 0 ? (
+                      <button type="button" onClick={() => handleAddAllOutfit(message.products)} className="nova-text-link mt-3">
+                        <IconCart className="h-4 w-4" /> Thêm {message.products.length} món vào giỏ
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
 
-                  {/* TH2: Bảng ngân sách & combo phối đồ */}
-                  {m.budget && (
-                    <div className="mt-3 rounded-xl border border-[#E6D5C2] bg-[#F5E7D4] p-2.5 text-xs">
-                      <div className="flex items-center justify-between font-bold text-[#49352D]">
-                        <span>Tổng set đồ gợi ý:</span>
-                        <span className="text-sm text-[#BD6E49] font-extrabold">{formatVND(m.budget.total)}</span>
-                      </div>
-                      {m.budget.saved > 0 && (
-                        <p className="text-[11px] font-medium text-emerald-700 mt-0.5">
-                          🎉 Đã tiết kiệm {formatVND(m.budget.saved)} so với giá niêm yết
-                        </p>
-                      )}
-                      {m.products && m.products.length > 0 && (
+                {message.products?.length > 0 ? (
+                  <div className="nova-products">
+                    {message.products.map((product) => (
+                      <div key={product.id} className="nova-product">
+                        <img src={product.imageUrl} alt={product.name} className="h-16 w-16 shrink-0 rounded-md bg-white object-contain" />
+                        <div className="min-w-0 flex-1">
+                          {product.tag ? <span className="text-[10px] text-muted">{product.tag}</span> : null}
+                          <h4 className="line-clamp-2 text-xs font-medium leading-5 text-ink">{product.name}</h4>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2">
+                            <span className="text-xs font-semibold text-earth">{formatVND(product.price)}</span>
+                            {product.originalPrice > product.price ? <span className="text-[10px] text-muted line-through">{formatVND(product.originalPrice)}</span> : null}
+                          </div>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => handleAddAllOutfit(m.products)}
-                          className="mt-2.5 w-full rounded-lg bg-[#BD6E49] py-1.5 text-center font-bold text-white shadow hover:bg-[#A95532] transition flex items-center justify-center gap-1.5"
+                          onClick={() => handleAddProductToCart(product)}
+                          aria-label={addedComboMap[product.id] ? `Đã thêm ${product.name}` : `Thêm ${product.name} vào giỏ`}
+                          aria-pressed={Boolean(addedComboMap[product.id])}
+                          className={`nova-icon-button shrink-0 ${addedComboMap[product.id] ? 'text-success' : 'text-earth'}`}
                         >
-                          <span>🛒</span> Thêm trọn bộ {m.products.length} món vào giỏ
+                          {addedComboMap[product.id] ? <IconCheck className="h-[18px] w-[18px]" /> : <IconCart className="h-[18px] w-[18px]" />}
                         </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TH3: Danh sách sản phẩm gợi ý */}
-                  {m.products && m.products.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-[11px] font-bold text-[#80513B] uppercase tracking-wider">
-                        Sản phẩm đề xuất:
-                      </p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {m.products.map((p) => {
-                          const isAdded = addedComboMap[p.id]
-                          return (
-                            <div
-                              key={p.id}
-                              className="flex items-center gap-2.5 rounded-xl border border-[#E6D5C2] bg-white p-2 hover:border-[#BD6E49] transition shadow-2xs"
-                            >
-                              <img
-                                src={p.imageUrl}
-                                alt={p.name}
-                                className="h-14 w-14 shrink-0 rounded-lg object-cover bg-amber-50"
-                              />
-                              <div className="flex-1 min-w-0">
-                                {p.tag && (
-                                  <span className="inline-block rounded bg-[#F5E7D4] px-1.5 py-0.2 text-[9.5px] font-bold text-[#BD6E49]">
-                                    {p.tag}
-                                  </span>
-                                )}
-                                <h4 className="text-[12px] font-semibold text-[#49352D] line-clamp-1 mt-0.5">
-                                  {p.name}
-                                </h4>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-[12px] font-black text-[#BD6E49]">
-                                    {formatVND(p.price)}
-                                  </span>
-                                  {p.originalPrice && p.originalPrice > p.price && (
-                                    <span className="text-[10px] text-gray-400 line-through">
-                                      {formatVND(p.originalPrice)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleAddProductToCart(p)}
-                                title="Thêm vào giỏ hàng"
-                                className={`shrink-0 rounded-lg p-2 text-xs font-bold transition ${
-                                  isAdded
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-[#F5E7D4] text-[#BD6E49] hover:bg-[#BD6E49] hover:text-white'
-                                }`}
-                              >
-                                {isAdded ? '✓ Đã thêm' : '+ Giỏ'}
-                              </button>
-                            </div>
-                          )
-                        })}
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                ) : null}
 
-                  {/* Thanh Phản Hồi Học Hỏi Dành Cho AI (Feedback Learning) */}
-                  <div className="mt-2.5 flex items-center justify-between border-t border-[#F0E2D2] pt-2 text-[11px] text-[#8B7566]">
-                    <span className="text-[10px] text-gray-400">{m.time}</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-gray-400 mr-1">Gợi ý có hữu ích?</span>
-                      <button
-                        type="button"
-                        onClick={() => handleFeedback(m.id, true)}
-                        className={`rounded px-1.5 py-0.5 transition ${
-                          feedbackGiven[m.id] === true
-                            ? 'bg-emerald-100 text-emerald-700 font-bold'
-                            : 'hover:bg-gray-100'
-                        }`}
-                        title="Hữu ích"
-                      >
-                        👍
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleFeedback(m.id, false)}
-                        className={`rounded px-1.5 py-0.5 transition ${
-                          feedbackGiven[m.id] === false
-                            ? 'bg-red-100 text-red-700 font-bold'
-                            : 'hover:bg-gray-100'
-                        }`}
-                        title="Chưa hài lòng"
-                      >
-                        👎
-                      </button>
-                    </div>
+                <div className="nova-feedback">
+                  <span className="nova-time">{message.time}</span>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => handleFeedback(message.id, true)} aria-label="Câu trả lời hữu ích" aria-pressed={feedbackGiven[message.id] === true} className="nova-icon-button nova-feedback-button">
+                      <IconThumbsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => handleFeedback(message.id, false)} aria-label="Câu trả lời chưa hữu ích" aria-pressed={feedbackGiven[message.id] === false} className="nova-icon-button nova-feedback-button">
+                      <IconThumbsDown className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                {m.suggestions && m.suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {m.suggestions.map((sug, sIdx) => (
-                      <button
-                        key={sIdx}
-                        type="button"
-                        onClick={() => handleSendMessage(sug)}
-                        className="rounded-full border border-[#E6D5C2] bg-white px-2.5 py-1 text-[11px] font-medium text-[#80513B] shadow-2xs hover:border-[#BD6E49] hover:bg-[#F5E7D4] transition"
-                      >
-                        {sug}
+                {message.suggestions?.length > 0 ? (
+                  <div className="nova-suggestions">
+                    {message.suggestions.map((suggestion, index) => (
+                      <button key={index} type="button" onClick={() => handleSendMessage(suggestion)} disabled={isLoading}>
+                        {suggestion}<IconArrowRight className="h-3 w-3 shrink-0" />
                       </button>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
         ))}
-
-        {isLoading && (
-          <div className="flex items-center gap-2 rounded-2xl rounded-tl-none border border-[#E6D5C2] bg-[#FFFCF7] px-3.5 py-2.5 text-xs text-[#8B7566] shadow-sm w-fit">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#BD6E49] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#BD6E49]"></span>
-            </span>
-            <span className="font-medium animate-pulse">Nova AI đang suy nghĩ & tìm kiếm sản phẩm phù hợp...</span>
-          </div>
-        )}
-
+        {isLoading ? <div role="status" className="nova-loading"><span className="nova-loading-dot" />Đang trả lời…</div> : null}
         <div ref={messagesEndRef} />
       </>
     )
@@ -567,47 +449,25 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
 
   function renderInputBar() {
     return (
-      <div className="border-t border-[#E6D5C2] bg-white p-3">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            handleSendMessage()
-          }}
-          className="flex items-center gap-2"
-        >
-          <button
-            type="button"
-            onClick={handleToggleVoice}
-            title={isListening ? 'Đang lắng nghe... bấm để dừng' : 'Nói để tìm kiếm bằng giọng nói'}
-            className={`rounded-full p-2 transition ${
-              isListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8B7566] hover:bg-[#F5E7D4]'
-            }`}
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-          </button>
-
+      <div className="nova-composer">
+        <form onSubmit={(event) => { event.preventDefault(); handleSendMessage() }} className="nova-input-wrap">
           <input
             ref={inputRef}
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={isListening ? 'Đang lắng nghe giọng nói...' : 'Nhắn tin với Nova AI...'}
+            onChange={(event) => setInputText(event.target.value)}
+            aria-label="Tin nhắn cho Nova"
+            placeholder={isListening ? 'Đang nghe bạn nói…' : 'Bạn cần tìm gì?'}
             disabled={isLoading}
-            className="flex-1 rounded-full border border-[#E6D5C2] bg-[#FAF4EB] px-4 py-2 text-[13px] text-[#49352D] placeholder-gray-400 focus:border-[#BD6E49] focus:bg-white focus:outline-none"
           />
-
-          <button
-            type="submit"
-            disabled={!inputText.trim() || isLoading}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#BD6E49] text-white transition hover:bg-[#A95532] disabled:opacity-40"
-          >
-            <svg className="h-4 w-4 rotate-90" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
+          <button type="button" onClick={handleToggleVoice} aria-label={isListening ? 'Dừng nhập giọng nói' : 'Nhập bằng giọng nói'} aria-pressed={isListening} className={`nova-icon-button ${isListening ? 'text-error' : ''}`}>
+            <IconMic className="h-[18px] w-[18px]" />
+          </button>
+          <button type="submit" disabled={!inputText.trim() || isLoading} aria-label="Gửi tin nhắn" className="nova-send">
+            <IconSend className="h-[18px] w-[18px]" />
           </button>
         </form>
+        <p className="nova-input-note">Nova sử dụng AI. Bạn có thể kiểm tra lại thông tin tại trang sản phẩm.</p>
       </div>
     )
   }

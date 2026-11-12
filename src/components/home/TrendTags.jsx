@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCatalog } from '../../context/CatalogContext'
-import { categoryImage } from '../../utils/image'
-import { IconChevronRight, IconSparkle } from '../ui/Icons'
-import SmartImage from '../ui/SmartImage'
+import { IconChevronRight, IconStore } from '../ui/Icons'
+import CategoryIcon from '../ui/CategoryIcon'
 
 export default function TrendTags() {
   const { categories, shops, loadCategories, loadShops } = useCatalog()
@@ -33,7 +32,7 @@ export default function TrendTags() {
     <section className="mt-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-5">
         <div className="flex items-center gap-2">
-          <IconSparkle className="h-5 w-5 text-brand" />
+          <IconStore className="h-5 w-5 text-brand" />
           <h2 className="text-base font-bold uppercase tracking-tight text-ink sm:text-lg">
             Khám phá gian hàng & ngành hàng
           </h2>
@@ -56,12 +55,9 @@ export default function TrendTags() {
                 to={`/tim-kiem?category=${category.id}`}
                 className="group flex min-h-28 flex-col items-center justify-center gap-2 rounded-xl border border-line px-2 py-3 text-center transition hover:border-orange-200 hover:bg-orange-50/50"
               >
-                <SmartImage
-                  src={category.image}
-                  fallback={category.fallbackImage || categoryImage(category)}
-                  alt=""
-                  className="h-12 w-12 rounded-xl object-cover transition group-hover:-translate-y-0.5"
-                />
+                <span className="category-symbol category-symbol-small">
+                  <CategoryIcon slug={category.slug || category.id} className="h-6 w-6" />
+                </span>
                 <span className="line-clamp-2 text-xs leading-4 text-ink-soft group-hover:text-brand">{category.name}</span>
               </Link>
             ))}

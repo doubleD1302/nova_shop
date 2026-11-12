@@ -40,10 +40,11 @@ export default function MainHeader() {
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('open-nova-ai'))}
             title="Trợ lý mua sắm Nova AI"
-            className="flex items-center gap-1.5 rounded-full border border-[#E6D5C2] bg-[#F5E7D4] px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-[#80513B] shadow-2xs transition-all duration-200 hover:border-[#BD6E49] hover:bg-[#BD6E49] hover:text-white cursor-pointer"
+            aria-label="Mở trợ lý Nova"
+            className="flex h-10 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-earth transition hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
-            <span className="text-sm">✨</span>
-            <span className="hidden sm:inline">Nova AI</span>
+            <img src="/images/nova-mark.svg" alt="" className="h-6 w-6" />
+            <span className="hidden sm:inline">Hỏi Nova</span>
           </button>
 
           <NotificationBell />

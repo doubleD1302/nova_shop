@@ -17,6 +17,7 @@ function ScrollToTop() {
 
 /** Layout dành cho người mua: TopBar + Header + Nav danh mục + Nội dung + Footer */
 export default function MainLayout() {
+  const { pathname } = useLocation()
   return (
     <div className="flex min-h-screen flex-col bg-page">
       <ScrollToTop />
@@ -28,7 +29,7 @@ export default function MainLayout() {
       <main className="container-shop flex-1 pb-6 pt-4">
         <Outlet />
       </main>
-      <NovaAiCopilot />
+      {pathname.replace(/\/+$/, '') !== '/nova-ai' ? <NovaAiCopilot /> : null}
       <Footer />
     </div>
   )
