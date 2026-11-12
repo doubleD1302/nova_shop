@@ -251,6 +251,7 @@ export function getLocalDatabase() {
 
     CREATE TABLE IF NOT EXISTS vouchers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_id INTEGER DEFAULT NULL,
       code TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
       discount_amount REAL NOT NULL,
@@ -261,6 +262,7 @@ export function getLocalDatabase() {
       per_user_limit INTEGER DEFAULT 1,
       used_count INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'active',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );

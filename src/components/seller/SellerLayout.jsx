@@ -74,8 +74,8 @@ const MENU_GROUPS = [
     label: 'Khuyến mãi',
     icon: IconTicketPercent,
     items: [
+      { to: '/nguoi-ban/vouchers', label: 'Mã giảm giá của shop' },
       { action: 'promotions', label: 'Chương trình khuyến mãi' },
-      { action: 'vouchers', label: 'Mã giảm giá của shop' },
       { action: 'flash_sale', label: 'Flash Sale của shop' },
     ],
   },

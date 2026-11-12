@@ -9,7 +9,7 @@ const additions = {
   order_items: { shop_id: 'INTEGER', product_slug: 'TEXT', variant_attributes: 'TEXT', sku: 'TEXT', image_url: 'TEXT', unit_price: 'REAL', original_price: 'REAL', line_total: 'REAL' },
   reviews: { order_item_id: 'INTEGER', seller_reply: 'TEXT', replied_by: 'INTEGER', replied_at: 'TEXT' },
   abuse_reports: { evidence_url: 'TEXT', resolved_by: 'INTEGER', resolved_at: 'TEXT' },
-  vouchers: { used_count: 'INTEGER', updated_at: 'TEXT' },
+  vouchers: { shop_id: 'INTEGER', status: 'TEXT', used_count: 'INTEGER', updated_at: 'TEXT' },
   cart_items: { qty: 'INTEGER' },
   demo_seller_payouts: { created_at: 'TEXT' },
   demo_payout_withdrawals: { request_key: 'TEXT' },

@@ -21,6 +21,10 @@ import {
   updateViolationEmailStatus,
   getShopViolations,
   getViolationDetail,
+  listAdminVouchers,
+  createAdminVoucher,
+  updateAdminVoucherStatus,
+  deleteAdminVoucher,
 } from '../controllers/admin.controller.js'
 
 const router = Router()
@@ -43,6 +47,10 @@ router.get('/admin/reviews', listAdminReviews)
 router.patch('/admin/reviews/:reviewId/status', updateAdminReviewStatus)
 router.get('/admin/reports', listAdminReports)
 router.patch('/admin/reports/:reportId/status', updateAdminReportStatus)
+router.get('/admin/vouchers', listAdminVouchers)
+router.post('/admin/vouchers', createAdminVoucher)
+router.patch('/admin/vouchers/:voucherId/status', updateAdminVoucherStatus)
+router.delete('/admin/vouchers/:voucherId', deleteAdminVoucher)
 router.get('/admin/violations/:violationId', getViolationDetail)
 router.patch('/admin/violations/:violationId/email-status', updateViolationEmailStatus)
 router.post('/reports', createReport)

@@ -22,6 +22,7 @@ const SellerOrdersPage = lazy(() => import('./pages/seller/SellerOrdersPage'))
 const SellerProductFormPage = lazy(() => import('./pages/seller/SellerProductFormPage'))
 const SellerProductsPage = lazy(() => import('./pages/seller/SellerProductsPage'))
 const SellerShopPage = lazy(() => import('./pages/seller/SellerShopPage'))
+const SellerVouchersPage = lazy(() => import('./pages/seller/SellerVouchersPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const NovaAiPage = lazy(() => import('./pages/NovaAiPage'))
 const FlashSalePage = lazy(() => import('./pages/FlashSalePage'))
@@ -67,6 +68,8 @@ export default function App() {
           <Route path="san-pham/them-moi" element={<SellerProductFormPage />} />
           <Route path="san-pham/:productId" element={<SellerProductFormPage />} />
           <Route path="don-hang" element={<SellerOrdersPage />} />
+          <Route path="vouchers" element={<SellerVouchersPage />} />
+          <Route path="khuyen-mai" element={<Navigate to="/nguoi-ban/vouchers" replace />} />
           <Route path="gian-hang" element={<SellerShopPage />} />
           <Route path="*" element={<Navigate to="/nguoi-ban" replace />} />
         </Route>

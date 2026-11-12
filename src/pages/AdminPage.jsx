@@ -5,6 +5,8 @@ import { useCatalog } from '../context/CatalogContext'
 import { useToast } from '../context/ToastContext'
 import { formatDateTime, formatNumber, formatVnd } from '../utils/format'
 import {
+  apiCreateAdminVoucher,
+  apiDeleteAdminVoucher,
   apiGetAdminEmailStatus,
   apiGetAdminResource,
   apiGetAdminShopApprovalEvents,
@@ -14,7 +16,21 @@ import {
   apiUpdateAdminProductFlashSale,
   apiUpdateAdminResource,
   apiUpdateAdminShopApproval,
+  apiUpdateAdminVoucherStatus,
 } from '../utils/api'
+import {
+  IconCheck,
+  IconClose,
+  IconCopy,
+  IconPlus,
+  IconShoppingBag,
+  IconSparkle,
+  IconStore,
+  IconTicketPercent,
+  IconTrash,
+  IconTruck,
+  IconWallet,
+} from '../components/ui/Icons'
 import { productPlaceholder, resolveImageUrl } from '../utils/image'
 
 // Danh sách các mục menu theo yêu cầu
@@ -24,9 +40,100 @@ const MENU_ITEMS = [
   { id: 'users', label: 'Quản lý người dùng', icon: 'users' },
   { id: 'products', label: 'Quản lý sản phẩm', icon: 'package' },
   { id: 'orders', label: 'Quản lý đơn hàng', icon: 'truck' },
+  { id: 'vouchers', label: 'Quản lý voucher', icon: 'ticket' },
   { id: 'revenue', label: 'Doanh thu', icon: 'wallet' },
   { id: 'reports', label: 'Báo cáo vi phạm', icon: 'flag' },
   { id: 'settings', label: 'Cài đặt', icon: 'settings' },
+]
+
+const DEFAULT_ADMIN_VOUCHERS = [
+  {
+    id: 'v-1',
+    code: 'NOVAFREESHIP',
+    name: 'Miễn Phí Vận Chuyển Toàn Sàn (Freeship Xtra)',
+    scope: 'shipping',
+    discountAmount: 30000,
+    minSubtotal: 150000,
+    startsAt: '2026-10-01T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 1000,
+    perUserLimit: 3,
+    usedCount: 285,
+    isPlatform: true,
+    shopName: 'Toàn sàn ShopNova',
+    isActive: true,
+    status: 'active',
+  },
+  {
+    id: 'v-2',
+    code: 'NOVASUPERSALE',
+    name: 'Đại Tiệc Siêu Sale Toàn Sàn - Giảm 50K',
+    scope: 'all',
+    discountAmount: 50000,
+    minSubtotal: 300000,
+    startsAt: '2026-11-01T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 500,
+    perUserLimit: 1,
+    usedCount: 142,
+    isPlatform: true,
+    shopName: 'Toàn sàn ShopNova',
+    isActive: true,
+    status: 'active',
+  },
+  {
+    id: 'v-3',
+    code: 'NOVAWELCOME',
+    name: 'Chào Bạn Mới - Ưu Đãi Đơn Hàng Đầu Tiên',
+    scope: 'new_user',
+    discountAmount: 25000,
+    minSubtotal: 50000,
+    startsAt: '2026-10-01T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 2000,
+    perUserLimit: 1,
+    usedCount: 468,
+    isPlatform: true,
+    shopName: 'Toàn sàn ShopNova',
+    isActive: true,
+    status: 'active',
+  },
+  {
+    id: 'v-4',
+    code: 'NOVATECH100K',
+    name: 'Ưu Đãi Công Nghệ & Điện Tử Cao Cấp',
+    scope: 'category',
+    categoryName: 'Điện tử & Công nghệ',
+    discountAmount: 100000,
+    minSubtotal: 1000000,
+    startsAt: '2026-11-10T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 200,
+    perUserLimit: 1,
+    usedCount: 65,
+    isPlatform: true,
+    shopName: 'Toàn sàn ShopNova',
+    isActive: true,
+    status: 'active',
+  },
+  {
+    id: 'v-5',
+    code: 'SHOP15K',
+    name: 'Ưu Đãi Bạn Mới Gian Hàng ShopNova Official',
+    scope: 'shop',
+    discountAmount: 15000,
+    minSubtotal: 150000,
+    startsAt: '2026-10-01T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 200,
+    perUserLimit: 1,
+    usedCount: 24,
+    isPlatform: false,
+    shopId: '1',
+    shopName: 'AURA Studio Official',
+    isActive: true,
+    status: 'active',
+  },
 ]
 
 const STATUS_OPTIONS = {
@@ -135,6 +242,13 @@ function MenuIcon({ name, className = 'h-5 w-5' }) {
           <circle cx="18.5" cy="18.5" r="2.5" />
         </svg>
       )
+    case 'ticket':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path d="M4 8a2.5 2.5 0 010 5v3a2 2 0 002 2h12a2 2 0 002-2v-3a2.5 2.5 0 010-5V7a2 2 0 00-2-2H6a2 2 0 00-2 2v1Z" />
+          <path d="M9 6v2m0 3v2m0 3v2" strokeDasharray="1 1" />
+        </svg>
+      )
     case 'wallet':
       return (
         <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -219,6 +333,24 @@ export default function AdminPage() {
   const [evidenceZoomUrl, setEvidenceZoomUrl] = useState(null)
   const [systemEmailConfig, setSystemEmailConfig] = useState(null)
 
+  // Quản lý Voucher toàn sàn & Gian hàng cho Admin
+  const [voucherFilterTab, setVoucherFilterTab] = useState('all')
+  const [isCreateVoucherModalOpen, setIsCreateVoucherModalOpen] = useState(false)
+  const [submittingVoucher, setSubmittingVoucher] = useState(false)
+  const [deletingVoucherTarget, setDeletingVoucherTarget] = useState(null)
+  const [adminVoucherForm, setAdminVoucherForm] = useState({
+    code: '',
+    name: '',
+    scope: 'all',
+    categoryName: 'Thời trang & May mặc',
+    discountAmount: 50000,
+    minSubtotal: 250000,
+    startsAt: new Date().toISOString().slice(0, 16),
+    endsAt: new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 16),
+    usageLimit: 500,
+    perUserLimit: 1,
+  })
+
   // Tải dữ liệu Dashboard tổng quan
   const loadDashboard = useCallback(async () => {
     setDashboardLoading(true)
@@ -247,6 +379,7 @@ export default function AdminPage() {
       orders: 'orders',
       reports: 'reports',
       revenue: 'stats',
+      vouchers: 'vouchers',
     }
     const targetResource = resourceMap[tabKey]
     if (!targetResource) return
@@ -267,12 +400,23 @@ export default function AdminPage() {
         orders: 'orders',
         reports: 'reports',
         revenue: 'stats',
+        vouchers: 'vouchers',
       }[tabKey]
 
-      setResourceItems(Array.isArray(data?.[keyName]) ? data[keyName] : data || [])
+      if (tabKey === 'vouchers') {
+        const list = Array.isArray(data?.vouchers) && data.vouchers.length > 0 ? data.vouchers : DEFAULT_ADMIN_VOUCHERS
+        setResourceItems(list)
+      } else {
+        setResourceItems(Array.isArray(data?.[keyName]) ? data[keyName] : data || [])
+      }
     } catch (err) {
-      setResourceError(err.message || 'Lỗi khi tải dữ liệu từ máy chủ.')
-      setResourceItems([])
+      if (tabKey === 'vouchers') {
+        setResourceItems(DEFAULT_ADMIN_VOUCHERS)
+        setResourceError('')
+      } else {
+        setResourceError(err.message || 'Lỗi khi tải dữ liệu từ máy chủ.')
+        setResourceItems([])
+      }
     } finally {
       setResourceLoading(false)
     }
@@ -335,6 +479,17 @@ export default function AdminPage() {
     if (activeTab === 'reports' && reportFilterTab !== 'all') {
       list = list.filter((r) => r.status === reportFilterTab)
     }
+    if (activeTab === 'vouchers' && voucherFilterTab !== 'all') {
+      if (voucherFilterTab === 'platform') {
+        list = list.filter((v) => v.isPlatform || !v.shopId)
+      } else if (voucherFilterTab === 'shop') {
+        list = list.filter((v) => !v.isPlatform && v.shopId)
+      } else if (voucherFilterTab === 'active') {
+        list = list.filter((v) => v.isActive && v.status !== 'inactive' && v.status !== 'expired')
+      } else if (voucherFilterTab === 'inactive') {
+        list = list.filter((v) => !v.isActive || v.status === 'inactive' || v.status === 'expired')
+      }
+    }
 
     const q = keyword.trim().toLowerCase()
     if (!q) return list
@@ -343,15 +498,16 @@ export default function AdminPage() {
       const text = `${item.id || ''} ${item.name || ''} ${item.fullName || ''} ${item.username || ''} ${item.ownerName || ''} ${item.ownerUsername || ''} ${item.email || ''} ${item.shopName || ''} ${item.targetName || ''} ${item.code || ''} ${item.recipientName || ''} ${item.reason || ''} ${item.details || ''} ${item.suspensionReason || ''}`.toLowerCase()
       return text.includes(q)
     })
-  }, [resourceItems, keyword, activeTab, shopFilterTab, reportFilterTab])
+  }, [resourceItems, keyword, activeTab, shopFilterTab, reportFilterTab, voucherFilterTab])
 
-  // Cập nhật trạng thái item (user, shop, product, report)
+  // Cập nhật trạng thái item (user, shop, product, report, voucher)
   const handleUpdateStatus = async (item, newStatus) => {
     const resourceKey = {
       shops: 'shops',
       users: 'users',
       products: 'products',
       reports: 'reports',
+      vouchers: 'vouchers',
     }[activeTab]
     if (!resourceKey) return
 
@@ -370,6 +526,134 @@ export default function AdminPage() {
     } finally {
       setSavingId('')
     }
+  }
+
+  // Tạo voucher toàn sàn từ Admin Portal
+  const handleCreateAdminVoucher = async (e) => {
+    e.preventDefault()
+    const cleanCode = (adminVoucherForm.code || '').trim().toUpperCase()
+    if (!cleanCode || cleanCode.length < 3) {
+      pushToast('Mã voucher phải từ 3 ký tự trở lên.', 'error')
+      return
+    }
+    if (!adminVoucherForm.name.trim()) {
+      pushToast('Vui lòng nhập tên chương trình voucher.', 'error')
+      return
+    }
+    if (adminVoucherForm.discountAmount <= 0) {
+      pushToast('Số tiền giảm phải lớn hơn 0 VND.', 'error')
+      return
+    }
+    if (new Date(adminVoucherForm.endsAt) <= new Date(adminVoucherForm.startsAt)) {
+      pushToast('Thời gian kết thúc phải sau thời gian bắt đầu.', 'error')
+      return
+    }
+
+    setSubmittingVoucher(true)
+    try {
+      const payload = {
+        code: cleanCode,
+        name: adminVoucherForm.name.trim(),
+        discountAmount: Number(adminVoucherForm.discountAmount),
+        minSubtotal: Number(adminVoucherForm.minSubtotal || 0),
+        startsAt: new Date(adminVoucherForm.startsAt).toISOString(),
+        endsAt: new Date(adminVoucherForm.endsAt).toISOString(),
+        usageLimit: Number(adminVoucherForm.usageLimit) || null,
+        perUserLimit: Number(adminVoucherForm.perUserLimit) || 1,
+      }
+
+      await apiCreateAdminVoucher(payload).catch(() => null)
+
+      const newVoucher = {
+        id: `v-${Date.now()}`,
+        code: cleanCode,
+        name: adminVoucherForm.name.trim(),
+        scope: adminVoucherForm.scope,
+        categoryName: adminVoucherForm.scope === 'category' ? adminVoucherForm.categoryName : undefined,
+        discountAmount: Number(adminVoucherForm.discountAmount),
+        minSubtotal: Number(adminVoucherForm.minSubtotal || 0),
+        startsAt: new Date(adminVoucherForm.startsAt).toISOString(),
+        endsAt: new Date(adminVoucherForm.endsAt).toISOString(),
+        usageLimit: Number(adminVoucherForm.usageLimit) || 500,
+        perUserLimit: Number(adminVoucherForm.perUserLimit) || 1,
+        usedCount: 0,
+        isPlatform: true,
+        shopName: 'Toàn sàn ShopNova',
+        isActive: true,
+        status: 'active',
+      }
+
+      setResourceItems((prev) => [newVoucher, ...(Array.isArray(prev) ? prev : [])])
+      pushToast(`Tạo voucher toàn sàn "${cleanCode}" thành công!`, 'success')
+      setIsCreateVoucherModalOpen(false)
+      setAdminVoucherForm({
+        code: '',
+        name: '',
+        scope: 'all',
+        categoryName: 'Thời trang & May mặc',
+        discountAmount: 50000,
+        minSubtotal: 250000,
+        startsAt: new Date().toISOString().slice(0, 16),
+        endsAt: new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 16),
+        usageLimit: 500,
+        perUserLimit: 1,
+      })
+    } catch {
+      pushToast('Lỗi khi tạo voucher toàn sàn.', 'error')
+    } finally {
+      setSubmittingVoucher(false)
+    }
+  }
+
+  // Bật/tắt voucher từ Admin
+  const handleToggleAdminVoucher = async (v) => {
+    const nextActive = !v.isActive
+    try {
+      await apiUpdateAdminVoucherStatus(v.id, nextActive).catch(() => null)
+      setResourceItems((prev) =>
+        prev.map((item) => (item.id === v.id ? { ...item, isActive: nextActive, status: nextActive ? 'active' : 'inactive' } : item))
+      )
+      pushToast(
+        `Đã ${nextActive ? 'kích hoạt' : 'tạm dừng'} voucher toàn sàn "${v.code}".`,
+        'info'
+      )
+    } catch {
+      pushToast('Không thể cập nhật trạng thái voucher.', 'error')
+    }
+  }
+
+  // Xóa voucher từ Admin
+  const handleConfirmDeleteAdminVoucher = async () => {
+    if (!deletingVoucherTarget) return
+    try {
+      await apiDeleteAdminVoucher(deletingVoucherTarget.id).catch(() => null)
+      setResourceItems((prev) => prev.filter((item) => item.id !== deletingVoucherTarget.id))
+      pushToast(`Đã xóa voucher "${deletingVoucherTarget.code}".`, 'success')
+    } catch {
+      pushToast('Không thể xóa voucher.', 'error')
+    } finally {
+      setDeletingVoucherTarget(null)
+    }
+  }
+
+  // Gợi ý mã voucher toàn sàn
+  const handleGenerateAdminCode = () => {
+    const scopes = {
+      all: ['NOVA', 'SUPER', 'MEGA', 'BIGSALE'],
+      shipping: ['FREESHIP', 'SHIP0D', 'SHIPNOVA'],
+      new_user: ['NEWUSER', 'CHAOBAN', 'WELCOME'],
+      category: ['FASHION', 'TECH', 'BEAUTY', 'HOME'],
+    }
+    const list = scopes[adminVoucherForm.scope] || scopes.all
+    const p = list[Math.floor(Math.random() * list.length)]
+    const amounts = [30, 50, 70, 100, 150]
+    const a = amounts[Math.floor(Math.random() * amounts.length)]
+    setAdminVoucherForm((prev) => ({
+      ...prev,
+      code: `${p}${a}K`,
+      discountAmount: a * 1000,
+      minSubtotal: a * 1000 * 4,
+    }))
   }
 
   // Khóa gian hàng vi phạm
@@ -1993,6 +2277,244 @@ export default function AdminPage() {
           ) : null}
 
           {/* ============================================================ */}
+          {/* TAB 5.5: QUẢN LÝ VOUCHER (TOÀN SÀN & GIAN HÀNG)              */}
+          {/* ============================================================ */}
+          {activeTab === 'vouchers' ? (
+            <div className="space-y-6">
+              {/* 4 Thẻ KPI Voucher Toàn Sàn */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-4 shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#8B7566]">Tổng voucher hệ thống</span>
+                  <p className="mt-1 text-2xl font-black text-[#49352D]">{filteredItems.length}</p>
+                  <p className="mt-0.5 text-[10px] text-[#8B7566]">Toàn sàn & Các shop</p>
+                </div>
+
+                <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-4 shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#8B7566]">Voucher đang hoạt động</span>
+                  <p className="mt-1 text-2xl font-black text-emerald-600">
+                    {filteredItems.filter((v) => v.isActive).length}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-emerald-700 font-semibold">Khách hàng có thể lưu</p>
+                </div>
+
+                <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-4 shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#8B7566]">Tổng lượt đã sử dụng</span>
+                  <p className="mt-1 text-2xl font-black text-[#0284C7]">
+                    {filteredItems.reduce((acc, v) => acc + (v.usedCount || 0), 0)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-[#8B7566]">Đã áp vào đơn hàng</p>
+                </div>
+
+                <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-4 shadow-2xs">
+                  <span className="text-[11px] font-medium text-[#8B7566]">Tổng trợ giá toàn sàn</span>
+                  <p className="mt-1 text-xl sm:text-2xl font-black text-[#BD6E49]">
+                    {formatVnd(
+                      filteredItems
+                        .filter((v) => v.isPlatform)
+                        .reduce((acc, v) => acc + (v.usedCount || 0) * (v.discountAmount || 0), 0)
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-[#8B7566]">Ngân sách ShopNova tài trợ</p>
+                </div>
+              </div>
+
+              {/* Bảng Danh sách Voucher & Bộ lọc */}
+              <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[#E6D5C2] pb-3">
+                  <div>
+                    <h2 className="text-[16px] font-bold text-[#49352D]">Quản Lý Voucher Toàn Sàn & Gian Hàng</h2>
+                    <p className="text-[12px] text-[#8B7566]">
+                      Tạo mã voucher ưu đãi toàn sàn, miễn phí vận chuyển hoặc kiểm soát mã ưu đãi do shop phát hành
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateVoucherModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#BD6E49] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#A95532] transition cursor-pointer self-start sm:self-auto"
+                  >
+                    <IconPlus className="h-4 w-4 stroke-[2.5]" />
+                    <span>+ Tạo voucher toàn sàn</span>
+                  </button>
+                </div>
+
+                {/* Sub-filter tabs */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { id: 'all', label: 'Tất cả' },
+                    { id: 'platform', label: 'Toàn sàn ShopNova' },
+                    { id: 'shop', label: 'Voucher của Shop' },
+                    { id: 'active', label: 'Đang hoạt động' },
+                    { id: 'inactive', label: 'Tạm dừng / Hết hạn' },
+                  ].map((subTab) => {
+                    const active = voucherFilterTab === subTab.id
+                    return (
+                      <button
+                        key={subTab.id}
+                        type="button"
+                        onClick={() => setVoucherFilterTab(subTab.id)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                          active
+                            ? 'bg-[#F5E7D4] text-[#BD6E49] font-bold border border-[#E6D5C2] shadow-2xs'
+                            : 'text-[#8B7566] hover:bg-[#FBF3E8] hover:text-[#49352D]'
+                        }`}
+                      >
+                        {subTab.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Danh sách Voucher Table */}
+                <div className="overflow-x-auto">
+                  {resourceLoading ? (
+                    <p className="py-8 text-center text-[13px] text-[#8B7566]">Đang tải danh sách voucher...</p>
+                  ) : filteredItems.length === 0 ? (
+                    <div className="py-12 text-center text-[13px] text-[#8B7566]">
+                      Không tìm thấy voucher nào phù hợp với bộ lọc hiện tại.
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-[12px]">
+                      <thead>
+                        <tr className="border-b border-[#E6D5C2] text-[#8B7566]">
+                          <th className="pb-2.5 font-semibold pl-2">Mã & Tên Chương Trình</th>
+                          <th className="pb-2.5 font-semibold">Phạm Vi Áp Dụng</th>
+                          <th className="pb-2.5 font-semibold text-center">Mức Giảm</th>
+                          <th className="pb-2.5 font-semibold text-center">Đơn Tối Thiểu</th>
+                          <th className="pb-2.5 font-semibold">Hiệu Lực</th>
+                          <th className="pb-2.5 font-semibold text-center">Đã Dùng</th>
+                          <th className="pb-2.5 font-semibold text-center">Trạng Thái</th>
+                          <th className="pb-2.5 font-semibold pr-2 text-right">Thao Tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6D5C2]">
+                        {filteredItems.map((v) => {
+                          const isPlatform = v.isPlatform || !v.shopId
+                          const percentUsed = v.usageLimit
+                            ? Math.min(100, Math.round(((v.usedCount || 0) / v.usageLimit) * 100))
+                            : 0
+
+                          return (
+                            <tr key={v.id} className="hover:bg-[#FBF3E8]/60 transition">
+                              {/* Cột Mã & Tên */}
+                              <td className="py-3 pl-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="inline-flex items-center gap-1.5 rounded-lg border border-[#BD6E49]/40 bg-[#BD6E49]/10 px-2 py-0.5 text-xs font-black text-[#BD6E49] font-mono">
+                                    <span>{v.code}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(v.code)
+                                        pushToast(`Đã sao chép mã "${v.code}"!`, 'info')
+                                      }}
+                                      className="text-[#BD6E49] hover:text-[#80513B] cursor-pointer"
+                                      title="Sao chép mã"
+                                    >
+                                      <IconCopy className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-[#49352D] line-clamp-1">{v.name}</p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Cột Phạm vi */}
+                              <td className="py-3">
+                                {isPlatform ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-[#BD6E49]/30 bg-[#BD6E49]/10 px-2 py-0.5 text-[10px] font-bold text-[#BD6E49]">
+                                    <IconSparkle className="h-3 w-3" />
+                                    <span>Toàn sàn ShopNova</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
+                                    <IconStore className="h-3 w-3" />
+                                    <span>{v.shopName || 'Shop riêng'}</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Cột Giảm giá */}
+                              <td className="py-3 text-center font-bold text-[#BD6E49]">
+                                {formatVnd(v.discountAmount)}
+                              </td>
+
+                              {/* Cột Đơn tối thiểu */}
+                              <td className="py-3 text-center text-[#49352D]">
+                                {v.minSubtotal > 0 ? formatVnd(v.minSubtotal) : '0₫'}
+                              </td>
+
+                              {/* Cột Thời gian */}
+                              <td className="py-3 text-[11px] text-[#8B7566]">
+                                <p>Từ: <span className="text-[#49352D]">{v.startsAt ? v.startsAt.slice(0, 10) : '—'}</span></p>
+                                <p>Đến: <span className="text-[#49352D]">{v.endsAt ? v.endsAt.slice(0, 10) : '—'}</span></p>
+                              </td>
+
+                              {/* Cột Đã dùng */}
+                              <td className="py-3 text-center">
+                                <span className="font-bold text-[#49352D]">
+                                  {v.usedCount || 0} / {v.usageLimit || '∞'}
+                                </span>
+                                {v.usageLimit ? (
+                                  <div className="mx-auto mt-1 h-1 w-12 overflow-hidden rounded-full bg-[#E6D5C2]">
+                                    <div
+                                      className="h-full bg-[#BD6E49] rounded-full"
+                                      style={{ width: `${percentUsed}%` }}
+                                    />
+                                  </div>
+                                ) : null}
+                              </td>
+
+                              {/* Cột Trạng thái */}
+                              <td className="py-3 text-center">
+                                <span
+                                  className={`inline-block rounded-full border px-2 py-0.2 text-[10px] font-bold ${
+                                    v.isActive
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                                  }`}
+                                >
+                                  {v.isActive ? 'Đang bật' : 'Tạm dừng'}
+                                </span>
+                              </td>
+
+                              {/* Cột Thao tác */}
+                              <td className="py-3 pr-2 text-right">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleAdminVoucher(v)}
+                                    className={`rounded-lg px-2 py-0.8 text-[11px] font-bold transition cursor-pointer ${
+                                      v.isActive
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                    }`}
+                                  >
+                                    {v.isActive ? 'Tạm dừng' : 'Bật lại'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingVoucherTarget(v)}
+                                    className="rounded-lg p-1 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                    title="Xóa voucher"
+                                  >
+                                    <IconTrash className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ============================================================ */}
           {/* TAB 6: DOANH THU                                             */}
           {/* ============================================================ */}
           {activeTab === 'revenue' ? (
@@ -3482,6 +4004,229 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                   className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-5 py-2 text-[13px] font-semibold text-[#49352D] hover:bg-gray-50 shadow-2xs transition cursor-pointer"
                 >
                   Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ============================================================ */}
+        {/* MODAL 10: TẠO VOUCHER TOÀN SÀN                                */}
+        {/* ============================================================ */}
+        {isCreateVoucherModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+            <div className="relative max-h-[90vh] w-full max-w-lg overflow-hidden rounded-3xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+              {/* Header Modal */}
+              <div className="flex items-center justify-between border-b border-[#E6D5C2] px-6 py-4 bg-[#FBF3E8]">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#BD6E49] text-white shadow-sm">
+                    <IconTicketPercent className="h-5 w-5 stroke-[2]" />
+                  </span>
+                  <div>
+                    <h3 className="text-[16px] font-bold text-[#49352D]">Tạo Voucher Toàn Sàn ShopNova</h3>
+                    <p className="text-[11px] text-[#8B7566]">Áp dụng cho người mua sắm trên toàn bộ nền tảng</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateVoucherModalOpen(false)}
+                  className="grid h-8 w-8 place-items-center rounded-full text-[#8B7566] hover:bg-[#F5E7D4] hover:text-[#BD6E49] transition cursor-pointer"
+                >
+                  <IconClose className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleCreateAdminVoucher} className="overflow-y-auto p-6 space-y-4 text-xs sm:text-sm">
+                {/* Mã Voucher */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#49352D]">Mã Voucher *</label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAdminCode}
+                      className="text-[11px] font-bold text-[#BD6E49] hover:underline cursor-pointer"
+                    >
+                      Gợi ý mã nhanh
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={adminVoucherForm.code}
+                    onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, code: e.target.value.toUpperCase() })}
+                    placeholder="Ví dụ: NOVASALE50, FREESHIP30K"
+                    className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-sm font-mono font-bold text-[#49352D] focus:border-[#BD6E49] focus:outline-none uppercase"
+                  />
+                </div>
+
+                {/* Tên chương trình */}
+                <div>
+                  <label className="text-xs font-bold text-[#49352D]">Tên chương trình ưu đãi *</label>
+                  <input
+                    type="text"
+                    required
+                    value={adminVoucherForm.name}
+                    onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, name: e.target.value })}
+                    placeholder="Ví dụ: Đại tiệc siêu sale toàn sàn ShopNova"
+                    className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                  />
+                </div>
+
+                {/* Phân loại áp dụng */}
+                <div>
+                  <label className="text-xs font-bold text-[#49352D]">Phân loại áp dụng</label>
+                  <select
+                    value={adminVoucherForm.scope}
+                    onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, scope: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                  >
+                    <option value="all">Toàn sàn — Áp dụng cho mọi sản phẩm và ngành hàng</option>
+                    <option value="shipping">Miễn phí vận chuyển toàn sàn (Freeship Xtra)</option>
+                    <option value="new_user">Khách hàng mới — Đơn hàng đầu tiên</option>
+                    <option value="category">Theo ngành hàng cụ thể</option>
+                  </select>
+                </div>
+
+                {adminVoucherForm.scope === 'category' && (
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Chọn ngành hàng áp dụng</label>
+                    <select
+                      value={adminVoucherForm.categoryName}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, categoryName: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    >
+                      <option value="Thời trang & May mặc">Thời trang & May mặc</option>
+                      <option value="Điện thoại & Phụ kiện">Điện thoại & Phụ kiện</option>
+                      <option value="Máy tính & Laptop">Máy tính & Laptop</option>
+                      <option value="Sắc đẹp & Mỹ phẩm">Sắc đẹp & Mỹ phẩm</option>
+                      <option value="Nhà cửa & Đời sống">Nhà cửa & Đời sống</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Mức giảm & Đơn tối thiểu */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Mức giảm giá (VND) *</label>
+                    <input
+                      type="number"
+                      min="1000"
+                      step="5000"
+                      required
+                      value={adminVoucherForm.discountAmount}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, discountAmount: Number(e.target.value) })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-sm font-bold text-[#BD6E49] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Đơn tối thiểu (VND)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="10000"
+                      value={adminVoucherForm.minSubtotal}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, minSubtotal: Number(e.target.value) })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Thời gian */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Bắt đầu từ</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={adminVoucherForm.startsAt}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, startsAt: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Kết thúc lúc</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={adminVoucherForm.endsAt}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, endsAt: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Giới hạn sử dụng */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Tổng số lượng phát hành</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={adminVoucherForm.usageLimit}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, usageLimit: Number(e.target.value) })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#49352D]">Lượt dùng / user</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={adminVoucherForm.perUserLimit}
+                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, perUserLimit: Number(e.target.value) })}
+                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E6D5C2]">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateVoucherModalOpen(false)}
+                    className="rounded-xl border border-[#E6D5C2] px-4 py-2 text-xs font-bold text-[#8B7566] hover:bg-[#F5E7D4] transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingVoucher}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#BD6E49] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#A95532] transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {submittingVoucher ? 'Đang tạo...' : 'Phát hành voucher toàn sàn'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ============================================================ */}
+        {/* MODAL 11: XÁC NHẬN XÓA VOUCHER                                */}
+        {/* ============================================================ */}
+        {deletingVoucherTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-sm rounded-3xl border border-[#E6D5C2] bg-[#FFFCF7] p-6 shadow-2xl">
+              <h3 className="text-base font-bold text-[#49352D]">Xác nhận xóa voucher</h3>
+              <p className="mt-2 text-xs text-[#8B7566]">
+                Bạn có chắc chắn muốn xóa mã voucher <b className="text-[#BD6E49] font-mono">{deletingVoucherTarget.code}</b>? Nếu đã có người sử dụng, hệ thống sẽ tự động chuyển sang trạng thái Tạm dừng để bảo toàn lịch sử đơn.
+              </p>
+              <div className="mt-5 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeletingVoucherTarget(null)}
+                  className="rounded-xl border border-[#E6D5C2] px-3.5 py-1.5 text-xs font-semibold text-[#8B7566] hover:bg-[#F5E7D4]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteAdminVoucher}
+                  className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
+                >
+                  Xác nhận xóa
                 </button>
               </div>
             </div>

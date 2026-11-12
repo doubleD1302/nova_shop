@@ -10,6 +10,7 @@ const routes = {
   products: '/internal/v1/admin/products',
   reviews: '/internal/v1/admin/reviews',
   reports: '/internal/v1/admin/reports',
+  vouchers: '/internal/v1/admin/vouchers',
 }
 
 // Bộ nhớ chống trùng lặp gửi email khi người dùng nhấn nút nhiều lần đồng thời
@@ -267,6 +268,29 @@ export async function runCronJobManually(req, res, next) {
       message: `Đã thực thi tác vụ nền "${jobName}" thành công.`,
       data: result,
     })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export async function createAdminVoucher(req, res, next) {
+  try {
+    const data = await callDataApi('/internal/v1/admin/vouchers', {
+      method: 'POST',
+      body: req.body,
+    })
+    return res.status(201).json({ success: true, data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export async function deleteAdminVoucher(req, res, next) {
+  try {
+    const data = await callDataApi(`/internal/v1/admin/vouchers/${encodeURIComponent(req.params.id)}`, {
+      method: 'DELETE',
+    })
+    return res.status(200).json({ success: true, data })
   } catch (err) {
     return next(err)
   }

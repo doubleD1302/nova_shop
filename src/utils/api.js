@@ -655,3 +655,63 @@ export function apiSaveVoucherToWallet(code, options = {}) {
     ...options,
   })
 }
+
+/**
+ * 4.1 Quản trị Voucher toàn sàn (Admin Vouchers)
+ */
+export function apiGetAdminVouchers(options = {}) {
+  return apiRequest('/admin/vouchers', options)
+}
+
+export function apiCreateAdminVoucher(voucherData, options = {}) {
+  return apiRequest('/admin/vouchers', {
+    method: 'POST',
+    body: voucherData,
+    ...options,
+  })
+}
+
+export function apiUpdateAdminVoucherStatus(id, isActive, options = {}) {
+  return apiRequest(`/admin/vouchers/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: { isActive },
+    ...options,
+  })
+}
+
+export function apiDeleteAdminVoucher(id, options = {}) {
+  return apiRequest(`/admin/vouchers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...options,
+  })
+}
+
+/**
+ * 4.2 Quản lý Voucher của Người Bán (Seller Vouchers)
+ */
+export function apiGetSellerVouchers(options = {}) {
+  return apiRequest('/seller/vouchers', options)
+}
+
+export function apiCreateSellerVoucher(voucherData, options = {}) {
+  return apiRequest('/seller/vouchers', {
+    method: 'POST',
+    body: voucherData,
+    ...options,
+  })
+}
+
+export function apiUpdateSellerVoucherStatus(id, isActive, options = {}) {
+  return apiRequest(`/seller/vouchers/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: { isActive },
+    ...options,
+  })
+}
+
+export function apiDeleteSellerVoucher(id, options = {}) {
+  return apiRequest(`/seller/vouchers/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...options,
+  })
+}

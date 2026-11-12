@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -17,6 +17,7 @@ import {
   IconBolt,
   IconSearch,
   IconHelpCircle,
+  IconChevronLeft,
   IconChevronRight,
   IconWallet,
   IconMedalCheck,
@@ -242,6 +243,71 @@ export default function VouchersPage() {
   const [modalVoucher, setModalVoucher] = useState(null)
   const [vouchersList, setVouchersList] = useState(DEFAULT_VOUCHER_TEMPLATES)
   const [loading, setLoading] = useState(true)
+
+  // Quản lý trượt thanh danh mục voucher mượt mà (kéo chuột, nút bấm, vuốt cảm ứng)
+  const tabNavRef = useRef(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartX = useRef(0)
+  const dragScrollLeft = useRef(0)
+  const hasDragged = useRef(false)
+
+  const checkScroll = useCallback(() => {
+    const el = tabNavRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 6)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 6)
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    const el = tabNavRef.current
+    if (!el) return
+    el.addEventListener('scroll', checkScroll, { passive: true })
+    window.addEventListener('resize', checkScroll)
+    return () => {
+      el.removeEventListener('scroll', checkScroll)
+      window.removeEventListener('resize', checkScroll)
+    }
+  }, [checkScroll])
+
+  const scrollTabs = (direction) => {
+    const el = tabNavRef.current
+    if (!el) return
+    const amount = direction === 'left' ? -220 : 220
+    el.scrollBy({ left: amount, behavior: 'smooth' })
+  }
+
+  const handleMouseDown = (e) => {
+    const el = tabNavRef.current
+    if (!el) return
+    setIsDragging(true)
+    hasDragged.current = false
+    dragStartX.current = e.pageX - el.offsetLeft
+    dragScrollLeft.current = el.scrollLeft
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return
+    const el = tabNavRef.current
+    if (!el) return
+    e.preventDefault()
+    const x = e.pageX - el.offsetLeft
+    const walk = (x - dragStartX.current) * 1.3
+    if (Math.abs(walk) > 4) hasDragged.current = true
+    el.scrollLeft = dragScrollLeft.current - walk
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+  }
+
+  const handleSelectTab = (tabId, e) => {
+    if (hasDragged.current) return
+    setActiveTab(tabId)
+    e?.currentTarget?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }
 
   // Lưu trữ mã voucher đã lưu vào ví (đồng bộ giữa API và localStorage)
   const [savedCodes, setSavedCodes] = useState(() => {
@@ -486,10 +552,36 @@ export default function VouchersPage() {
         </div>
       </section>
 
-      {/* Tabs phân loại Voucher với Icon chuyên nghiệp */}
+      {/* Tabs phân loại Voucher với thanh trượt ngang chuyên nghiệp */}
       <section className="container-shop mb-6">
-        <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-2.5 shadow-2xs">
-          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
+        <div className="relative rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-2 sm:p-2.5 shadow-2xs">
+          {/* Nút cuộn trái */}
+          {canScrollLeft && (
+            <>
+              <button
+                type="button"
+                onClick={() => scrollTabs('left')}
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 grid h-8 w-8 place-items-center rounded-full bg-white text-[#49352D] shadow-md border border-[#E6D5C2] hover:bg-[#F5E7D4] hover:text-[#BD6E49] transition cursor-pointer"
+                title="Cuộn sang trái"
+                aria-label="Cuộn sang trái"
+              >
+                <IconChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#FFFCF7] via-[#FFFCF7]/80 to-transparent rounded-l-2xl z-5" />
+            </>
+          )}
+
+          {/* Container trượt ngang hỗ trợ kéo chuột mượt mà */}
+          <div
+            ref={tabNavRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            className={`no-scrollbar flex items-center gap-2 overflow-x-auto scroll-smooth px-1 py-0.5 select-none ${
+              isDragging ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
+          >
             {VOUCHER_TABS.map((tab) => {
               const active = activeTab === tab.id
               const TabIcon = tab.icon
@@ -504,7 +596,7 @@ export default function VouchersPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={(e) => handleSelectTab(tab.id, e)}
                   className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold transition cursor-pointer ${
                     active
                       ? 'bg-[#BD6E49] text-white shadow-sm -translate-y-0.5'
@@ -512,7 +604,7 @@ export default function VouchersPage() {
                   }`}
                 >
                   <TabIcon className="h-4 w-4" />
-                  <span>{tab.label}</span>
+                  <span className="whitespace-nowrap">{tab.label}</span>
                   <span
                     className={`rounded-full px-2 py-0.2 text-[10.5px] font-bold ${
                       active ? 'bg-white/20 text-white' : 'bg-[#E6D5C2] text-[#49352D]'
@@ -524,6 +616,22 @@ export default function VouchersPage() {
               )
             })}
           </div>
+
+          {/* Nút cuộn phải */}
+          {canScrollRight && (
+            <>
+              <button
+                type="button"
+                onClick={() => scrollTabs('right')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 grid h-8 w-8 place-items-center rounded-full bg-white text-[#49352D] shadow-md border border-[#E6D5C2] hover:bg-[#F5E7D4] hover:text-[#BD6E49] transition cursor-pointer"
+                title="Cuộn sang phải"
+                aria-label="Cuộn sang phải"
+              >
+                <IconChevronRight className="h-4 w-4" />
+              </button>
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#FFFCF7] via-[#FFFCF7]/80 to-transparent rounded-r-2xl z-5" />
+            </>
+          )}
         </div>
       </section>
 

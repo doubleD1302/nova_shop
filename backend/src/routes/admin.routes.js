@@ -12,6 +12,8 @@ import {
   listShopViolations,
   getEmailStatus,
   runCronJobManually,
+  createAdminVoucher,
+  deleteAdminVoucher,
 } from '../controllers/admin.controller.js'
 import { listAdminPayouts, updateAdminPayoutStatus } from '../controllers/seller-payout.controller.js'
 import { listAdminReturns, resolveAdminReturnDispute } from '../controllers/returns.controller.js'
@@ -59,6 +61,10 @@ router.patch('/admin/payouts/:id', updateAdminPayoutStatus)
 // Quản trị và phân xử khiếu nại trả hàng (Admin Returns & Disputes)
 router.get('/admin/returns', listAdminReturns)
 router.patch('/admin/returns/:returnId/resolve', resolveAdminReturnDispute)
+
+// Quản lý voucher toàn sàn & hệ thống
+router.post('/admin/vouchers', createAdminVoucher)
+router.delete('/admin/vouchers/:id', deleteAdminVoucher)
 
 router.get('/admin/:resource', listAdminResource)
 router.patch('/admin/products/:id/approval', updateAdminProductApproval)

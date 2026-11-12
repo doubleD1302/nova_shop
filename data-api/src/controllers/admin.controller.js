@@ -934,3 +934,198 @@ export async function updateAdminProductApproval(req, res, next) {
     return next(err)
   }
 }
+
+/**
+ * Lấy danh sách toàn bộ voucher trên hệ thống cho Admin (Toàn sàn & Gian hàng)
+ */
+export async function listAdminVouchers(req, res, next) {
+  try {
+    const rows = await executeQuery(`
+      SELECT v.id, v.shop_id, v.code, v.name, v.discount_amount, v.min_subtotal,
+             v.starts_at, v.ends_at, v.usage_limit, v.per_user_limit, v.used_count,
+             v.is_active, v.status, v.created_at,
+             s.name AS shop_name, s.slug AS shop_slug
+      FROM vouchers v
+      LEFT JOIN shops s ON s.id = v.shop_id
+      ORDER BY v.id DESC
+      LIMIT 200
+    `)
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        vouchers: rows.map((r) => ({
+          id: String(r.id),
+          shopId: r.shop_id ? String(r.shop_id) : null,
+          shopName: r.shop_name || 'Toàn sàn ShopNova',
+          shopSlug: r.shop_slug || null,
+          isPlatform: !r.shop_id,
+          code: r.code,
+          name: r.name,
+          discountAmount: Number(r.discount_amount),
+          minSubtotal: Number(r.min_subtotal),
+          startsAt: r.starts_at instanceof Date ? r.starts_at.toISOString() : String(r.starts_at),
+          endsAt: r.ends_at instanceof Date ? r.ends_at.toISOString() : String(r.ends_at),
+          usageLimit: r.usage_limit ? Number(r.usage_limit) : null,
+          perUserLimit: Number(r.per_user_limit || 1),
+          usedCount: Number(r.used_count || 0),
+          isActive: Boolean(r.is_active),
+          status: r.status || (r.is_active ? 'active' : 'inactive'),
+          createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+        })),
+      },
+    })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Tạo voucher mới (toàn sàn hoặc cấp cho shop) từ Admin Portal
+ */
+export async function createAdminVoucher(req, res, next) {
+  try {
+    const {
+      code,
+      name,
+      discountAmount,
+      minSubtotal = 0,
+      startsAt,
+      endsAt,
+      usageLimit = null,
+      perUserLimit = 1,
+      shopId = null,
+    } = req.body || {}
+
+    if (typeof code !== 'string' || !/^[A-Za-z0-9_-]{3,32}$/.test(code.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mã voucher phải từ 3 đến 32 ký tự chữ hoặc số.',
+      })
+    }
+
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên chương trình voucher không được để trống và tối đa 120 ký tự.',
+      })
+    }
+
+    const normDiscount = Number(discountAmount)
+    if (isNaN(normDiscount) || normDiscount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Số tiền giảm giá phải lớn hơn 0 VND.',
+      })
+    }
+
+    const normMinSubtotal = Math.max(0, Number(minSubtotal || 0))
+    const normStartsAt = startsAt ? new Date(startsAt) : new Date()
+    const normEndsAt = endsAt ? new Date(endsAt) : new Date(Date.now() + 30 * 86400000)
+
+    if (normEndsAt <= normStartsAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thời gian kết thúc phải sau thời gian bắt đầu.',
+      })
+    }
+
+    const normCode = code.trim().toUpperCase()
+    const existing = await executeQuery('SELECT id FROM vouchers WHERE code = ?', [normCode])
+    if (existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Mã voucher "${normCode}" đã tồn tại trên hệ thống.`,
+      })
+    }
+
+    const targetShopId = shopId && validId(shopId) ? shopId : null
+
+    const result = await executeQuery(
+      `INSERT INTO vouchers
+        (shop_id, code, name, discount_amount, min_subtotal, starts_at, ends_at,
+         usage_limit, per_user_limit, used_count, is_active, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 'active')`,
+      [
+        targetShopId,
+        normCode,
+        name.trim(),
+        normDiscount,
+        normMinSubtotal,
+        normStartsAt,
+        normEndsAt,
+        usageLimit ? Number(usageLimit) : null,
+        perUserLimit ? Number(perUserLimit) : 1,
+      ]
+    )
+
+    return res.status(201).json({
+      success: true,
+      message: 'Tạo mã voucher thành công.',
+      data: { id: String(result.insertId), code: normCode },
+    })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Cập nhật trạng thái Bật/Tắt hoạt động của voucher
+ */
+export async function updateAdminVoucherStatus(req, res, next) {
+  try {
+    const { voucherId } = req.params
+    if (!validId(voucherId)) {
+      return res.status(400).json({ success: false, message: 'ID voucher không hợp lệ.' })
+    }
+
+    const { isActive, status } = req.body || {}
+    const rows = await executeQuery('SELECT id, is_active, status FROM vouchers WHERE id = ?', [voucherId])
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Voucher không tồn tại.' })
+    }
+
+    const newActive = isActive !== undefined ? (isActive ? 1 : 0) : (rows[0].is_active ? 0 : 1)
+    const newStatus = status || (newActive ? 'active' : 'inactive')
+
+    await executeQuery('UPDATE vouchers SET is_active = ?, status = ? WHERE id = ?', [newActive, newStatus, voucherId])
+
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật trạng thái voucher thành công.',
+      data: { id: String(voucherId), isActive: Boolean(newActive), status: newStatus },
+    })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Xóa voucher khỏi hệ thống (nếu chưa dùng thì xóa, đã dùng thì chuyển sang inactive)
+ */
+export async function deleteAdminVoucher(req, res, next) {
+  try {
+    const { voucherId } = req.params
+    if (!validId(voucherId)) {
+      return res.status(400).json({ success: false, message: 'ID voucher không hợp lệ.' })
+    }
+
+    const rows = await executeQuery('SELECT id, used_count FROM vouchers WHERE id = ?', [voucherId])
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Voucher không tồn tại.' })
+    }
+
+    if (rows[0].used_count > 0) {
+      await executeQuery("UPDATE vouchers SET is_active = 0, status = 'inactive' WHERE id = ?", [voucherId])
+      return res.status(200).json({
+        success: true,
+        message: 'Voucher đã phát sinh lượt sử dụng nên đã được chuyển sang trạng thái Tạm dừng (Ẩn) để bảo toàn dữ liệu đơn hàng.',
+      })
+    }
+
+    await executeQuery('DELETE FROM vouchers WHERE id = ?', [voucherId])
+    return res.status(200).json({ success: true, message: 'Đã xóa voucher thành công.' })
+  } catch (err) {
+    return next(err)
+  }
+}
