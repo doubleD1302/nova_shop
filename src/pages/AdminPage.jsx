@@ -22,10 +22,13 @@ import {
   IconCheck,
   IconClose,
   IconCopy,
+  IconPackage,
   IconPlus,
+  IconShieldCheck,
   IconShoppingBag,
   IconSparkle,
   IconStore,
+  IconTag,
   IconTicketPercent,
   IconTrash,
   IconTruck,
@@ -134,7 +137,88 @@ const DEFAULT_ADMIN_VOUCHERS = [
     isActive: true,
     status: 'active',
   },
+  {
+    id: 'v-6',
+    code: 'PRODTSHIRT30K',
+    name: 'Ưu Đãi Mặt Hàng: Áo Thun Nam Cotton Compact',
+    scope: 'product',
+    productName: 'Áo thun nam Cotton Compact',
+    discountAmount: 30000,
+    minSubtotal: 150000,
+    startsAt: '2026-11-01T00:00:00.000Z',
+    endsAt: '2028-12-31T23:59:59.000Z',
+    usageLimit: 400,
+    perUserLimit: 1,
+    usedCount: 112,
+    isPlatform: true,
+    shopName: 'Toàn sàn ShopNova',
+    isActive: true,
+    status: 'active',
+  },
 ]
+
+// Danh sách gợi ý Cửa hàng / Nhãn hàng để Admin gắn voucher
+const PRESET_ADMIN_SHOPS = [
+  { id: '1', name: 'DEMO - Shop mẫu A (AURA Studio)' },
+  { id: '2', name: 'DEMO - Shop mẫu B (TechNova Store)' },
+  { id: '401507', name: 'Nova Fashion - Cửa hàng thời trang' },
+  { id: '401508', name: 'Nova Beauty - Mỹ phẩm mẫu' },
+  { id: '431507', name: 'Shop Nova Chính Hãng' },
+  { id: '521507', name: 'Mây Nhỏ Mẹ & Bé' },
+  { id: '521508', name: 'An Nhiên Bách Hóa' },
+  { id: '521509', name: 'Năng Động Sports' },
+  { id: '551507', name: 'Sao Mai Mobile' },
+  { id: '551508', name: 'Bước Êm Giày Dép' },
+  { id: '551509', name: 'Mộc Túi Xách' },
+  { id: '551510', name: 'Nhà Xinh Living' },
+  { id: '551511', name: 'Kết Nối Tech' },
+]
+
+// Danh sách gợi ý Mặt hàng / Sản phẩm để Admin gắn voucher
+const PRESET_ADMIN_PRODUCTS = [
+  { id: '1', name: 'DEMO - Áo thun nam Cotton Compact' },
+  { id: '2', name: 'DEMO - Củ sạc nhanh GaN 65W' },
+  { id: '3', name: 'DEMO - Giày Sneaker thể thao Nova' },
+  { id: '4', name: 'DEMO - Túi vải Canvas thời trang' },
+  { id: '5', name: 'DEMO - Kem dưỡng ẩm trắng da' },
+  { id: '6', name: 'DEMO - Đèn bàn LED chống cận' },
+  { id: '7', name: 'DEMO - Tai nghe Bluetooth ANC' },
+  { id: '8', name: 'DEMO - Áo khoác gió nữ chống nước' },
+  { id: '30002', name: 'Áo sơ mi nam kẻ caro xanh đen' },
+  { id: '30007', name: 'Đầm nữ dáng xòe công sở thanh lịch' },
+]
+
+// Helper xác định phạm vi hiển thị voucher (hỗ trợ cả dữ liệu state lẫn tên chuẩn hóa từ DB)
+function getVoucherScopeInfo(v) {
+  if (v.scope === 'product' || v.productName) {
+    return { type: 'product', label: v.productName || 'Mặt hàng chỉ định' }
+  }
+  const prodMatch = v.name?.match(/\[Mặt hàng:\s*([^\]]+)\]/i)
+  if (prodMatch) {
+    return { type: 'product', label: prodMatch[1] }
+  }
+  if (v.scope === 'shop' || (v.shopId && v.shopName && v.shopName !== 'Toàn sàn ShopNova')) {
+    return { type: 'shop', label: v.shopName || 'Cửa hàng đối tác' }
+  }
+  const shopMatch = v.name?.match(/\[(?:Cửa hàng|Nhãn hàng|Gian hàng):\s*([^\]]+)\]/i)
+  if (shopMatch) {
+    return { type: 'shop', label: shopMatch[1] }
+  }
+  if (v.scope === 'category' || v.categoryName) {
+    return { type: 'category', label: v.categoryName || 'Ngành hàng' }
+  }
+  const catMatch = v.name?.match(/\[Ngành hàng:\s*([^\]]+)\]/i)
+  if (catMatch) {
+    return { type: 'category', label: catMatch[1] }
+  }
+  if (v.scope === 'shipping') {
+    return { type: 'shipping', label: 'Freeship Xtra' }
+  }
+  if (v.scope === 'new_user') {
+    return { type: 'new_user', label: 'Khách hàng mới' }
+  }
+  return { type: 'all', label: 'Toàn sàn ShopNova' }
+}
 
 const STATUS_OPTIONS = {
   users: ['active', 'blocked'],
@@ -343,6 +427,9 @@ export default function AdminPage() {
     name: '',
     scope: 'all',
     categoryName: 'Thời trang & May mặc',
+    productName: '',
+    shopName: '',
+    shopId: '',
     discountAmount: 50000,
     minSubtotal: 250000,
     startsAt: new Date().toISOString().slice(0, 16),
@@ -480,22 +567,22 @@ export default function AdminPage() {
       list = list.filter((r) => r.status === reportFilterTab)
     }
     if (activeTab === 'vouchers' && voucherFilterTab !== 'all') {
-      if (voucherFilterTab === 'platform') {
-        list = list.filter((v) => v.isPlatform || !v.shopId)
-      } else if (voucherFilterTab === 'shop') {
-        list = list.filter((v) => !v.isPlatform && v.shopId)
-      } else if (voucherFilterTab === 'active') {
-        list = list.filter((v) => v.isActive && v.status !== 'inactive' && v.status !== 'expired')
-      } else if (voucherFilterTab === 'inactive') {
-        list = list.filter((v) => !v.isActive || v.status === 'inactive' || v.status === 'expired')
-      }
+      list = list.filter((v) => {
+        const info = getVoucherScopeInfo(v)
+        if (voucherFilterTab === 'platform') return info.type === 'all' || info.type === 'shipping' || info.type === 'new_user'
+        if (voucherFilterTab === 'shop') return info.type === 'shop'
+        if (voucherFilterTab === 'product') return info.type === 'product'
+        if (voucherFilterTab === 'active') return v.isActive && v.status !== 'inactive' && v.status !== 'expired'
+        if (voucherFilterTab === 'inactive') return !v.isActive || v.status === 'inactive' || v.status === 'expired'
+        return true
+      })
     }
 
     const q = keyword.trim().toLowerCase()
     if (!q) return list
 
     return list.filter((item) => {
-      const text = `${item.id || ''} ${item.name || ''} ${item.fullName || ''} ${item.username || ''} ${item.ownerName || ''} ${item.ownerUsername || ''} ${item.email || ''} ${item.shopName || ''} ${item.targetName || ''} ${item.code || ''} ${item.recipientName || ''} ${item.reason || ''} ${item.details || ''} ${item.suspensionReason || ''}`.toLowerCase()
+      const text = `${item.id || ''} ${item.name || ''} ${item.fullName || ''} ${item.username || ''} ${item.ownerName || ''} ${item.ownerUsername || ''} ${item.email || ''} ${item.shopName || ''} ${item.productName || ''} ${item.categoryName || ''} ${item.targetName || ''} ${item.code || ''} ${item.recipientName || ''} ${item.reason || ''} ${item.details || ''} ${item.suspensionReason || ''}`.toLowerCase()
       return text.includes(q)
     })
   }, [resourceItems, keyword, activeTab, shopFilterTab, reportFilterTab, voucherFilterTab])
@@ -528,7 +615,7 @@ export default function AdminPage() {
     }
   }
 
-  // Tạo voucher toàn sàn từ Admin Portal
+  // Tạo voucher toàn sàn / cửa hàng / mặt hàng từ Admin Portal
   const handleCreateAdminVoucher = async (e) => {
     e.preventDefault()
     const cleanCode = (adminVoucherForm.code || '').trim().toUpperCase()
@@ -538,6 +625,14 @@ export default function AdminPage() {
     }
     if (!adminVoucherForm.name.trim()) {
       pushToast('Vui lòng nhập tên chương trình voucher.', 'error')
+      return
+    }
+    if (adminVoucherForm.scope === 'shop' && !adminVoucherForm.shopName.trim()) {
+      pushToast('Vui lòng chọn hoặc nhập tên nhãn hàng / cửa hàng áp dụng.', 'error')
+      return
+    }
+    if (adminVoucherForm.scope === 'product' && !adminVoucherForm.productName.trim()) {
+      pushToast('Vui lòng chọn hoặc nhập tên mặt hàng áp dụng.', 'error')
       return
     }
     if (adminVoucherForm.discountAmount <= 0) {
@@ -551,25 +646,55 @@ export default function AdminPage() {
 
     setSubmittingVoucher(true)
     try {
+      // Chuẩn hóa tên chương trình có tiền tố nhận diện rõ ràng phạm vi áp dụng
+      let formattedName = adminVoucherForm.name.trim()
+      if (adminVoucherForm.scope === 'product' && adminVoucherForm.productName.trim()) {
+        const prodPrefix = `[Mặt hàng: ${adminVoucherForm.productName.trim()}] `
+        if (!formattedName.startsWith('[Mặt hàng:')) {
+          formattedName = `${prodPrefix}${formattedName}`.slice(0, 120)
+        }
+      } else if (adminVoucherForm.scope === 'shop' && adminVoucherForm.shopName.trim()) {
+        const shopPrefix = `[Cửa hàng: ${adminVoucherForm.shopName.trim()}] `
+        if (!formattedName.startsWith('[Cửa hàng:')) {
+          formattedName = `${shopPrefix}${formattedName}`.slice(0, 120)
+        }
+      } else if (adminVoucherForm.scope === 'category' && adminVoucherForm.categoryName.trim()) {
+        const catPrefix = `[Ngành hàng: ${adminVoucherForm.categoryName.trim()}] `
+        if (!formattedName.startsWith('[Ngành hàng:')) {
+          formattedName = `${catPrefix}${formattedName}`.slice(0, 120)
+        }
+      }
+
+      const isStoreScope = adminVoucherForm.scope === 'shop'
+      const assignedShopId = isStoreScope && adminVoucherForm.shopId ? adminVoucherForm.shopId : null
+      const assignedShopName = isStoreScope && adminVoucherForm.shopName.trim() ? adminVoucherForm.shopName.trim() : 'Toàn sàn ShopNova'
+
       const payload = {
         code: cleanCode,
-        name: adminVoucherForm.name.trim(),
+        name: formattedName,
         discountAmount: Number(adminVoucherForm.discountAmount),
         minSubtotal: Number(adminVoucherForm.minSubtotal || 0),
         startsAt: new Date(adminVoucherForm.startsAt).toISOString(),
         endsAt: new Date(adminVoucherForm.endsAt).toISOString(),
         usageLimit: Number(adminVoucherForm.usageLimit) || null,
         perUserLimit: Number(adminVoucherForm.perUserLimit) || 1,
+        shopId: assignedShopId,
       }
 
-      await apiCreateAdminVoucher(payload).catch(() => null)
+      const res = await apiCreateAdminVoucher(payload).catch(() => null)
+      const resData = res ? await res.json().catch(() => null) : null
+      const createdId = resData?.data?.id || resData?.id
 
       const newVoucher = {
-        id: `v-${Date.now()}`,
+        id: createdId ? String(createdId) : `v-${Date.now()}`,
         code: cleanCode,
-        name: adminVoucherForm.name.trim(),
+        name: formattedName,
         scope: adminVoucherForm.scope,
         categoryName: adminVoucherForm.scope === 'category' ? adminVoucherForm.categoryName : undefined,
+        productName: adminVoucherForm.scope === 'product' ? adminVoucherForm.productName.trim() : undefined,
+        shopId: assignedShopId ? String(assignedShopId) : null,
+        shopName: assignedShopName,
+        isPlatform: !isStoreScope || !assignedShopId,
         discountAmount: Number(adminVoucherForm.discountAmount),
         minSubtotal: Number(adminVoucherForm.minSubtotal || 0),
         startsAt: new Date(adminVoucherForm.startsAt).toISOString(),
@@ -577,20 +702,22 @@ export default function AdminPage() {
         usageLimit: Number(adminVoucherForm.usageLimit) || 500,
         perUserLimit: Number(adminVoucherForm.perUserLimit) || 1,
         usedCount: 0,
-        isPlatform: true,
-        shopName: 'Toàn sàn ShopNova',
         isActive: true,
         status: 'active',
+        createdAt: new Date().toISOString(),
       }
 
       setResourceItems((prev) => [newVoucher, ...(Array.isArray(prev) ? prev : [])])
-      pushToast(`Tạo voucher toàn sàn "${cleanCode}" thành công!`, 'success')
+      pushToast(`Tạo thành công voucher "${cleanCode}"!`, 'success')
       setIsCreateVoucherModalOpen(false)
       setAdminVoucherForm({
         code: '',
         name: '',
         scope: 'all',
         categoryName: 'Thời trang & May mặc',
+        productName: '',
+        shopName: '',
+        shopId: '',
         discountAmount: 50000,
         minSubtotal: 250000,
         startsAt: new Date().toISOString().slice(0, 16),
@@ -599,7 +726,7 @@ export default function AdminPage() {
         perUserLimit: 1,
       })
     } catch {
-      pushToast('Lỗi khi tạo voucher toàn sàn.', 'error')
+      pushToast('Lỗi khi tạo voucher.', 'error')
     } finally {
       setSubmittingVoucher(false)
     }
@@ -614,7 +741,7 @@ export default function AdminPage() {
         prev.map((item) => (item.id === v.id ? { ...item, isActive: nextActive, status: nextActive ? 'active' : 'inactive' } : item))
       )
       pushToast(
-        `Đã ${nextActive ? 'kích hoạt' : 'tạm dừng'} voucher toàn sàn "${v.code}".`,
+        `Đã ${nextActive ? 'kích hoạt' : 'tạm dừng'} voucher "${v.code}".`,
         'info'
       )
     } catch {
@@ -636,13 +763,15 @@ export default function AdminPage() {
     }
   }
 
-  // Gợi ý mã voucher toàn sàn
+  // Gợi ý mã voucher toàn sàn / cửa hàng / mặt hàng
   const handleGenerateAdminCode = () => {
     const scopes = {
       all: ['NOVA', 'SUPER', 'MEGA', 'BIGSALE'],
       shipping: ['FREESHIP', 'SHIP0D', 'SHIPNOVA'],
       new_user: ['NEWUSER', 'CHAOBAN', 'WELCOME'],
       category: ['FASHION', 'TECH', 'BEAUTY', 'HOME'],
+      shop: ['BRAND', 'STORE', 'SHOPVIP', 'MALL'],
+      product: ['PROD', 'ITEM', 'DEALHOT', 'COMBO'],
     }
     const list = scopes[adminVoucherForm.scope] || scopes.all
     const p = list[Math.floor(Math.random() * list.length)]
@@ -2334,7 +2463,7 @@ export default function AdminPage() {
                     className="inline-flex items-center gap-2 rounded-xl bg-[#BD6E49] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#A95532] transition cursor-pointer self-start sm:self-auto"
                   >
                     <IconPlus className="h-4 w-4 stroke-[2.5]" />
-                    <span>+ Tạo voucher toàn sàn</span>
+                    <span>+ Tạo voucher mới</span>
                   </button>
                 </div>
 
@@ -2342,8 +2471,9 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {[
                     { id: 'all', label: 'Tất cả' },
-                    { id: 'platform', label: 'Toàn sàn ShopNova' },
-                    { id: 'shop', label: 'Voucher của Shop' },
+                    { id: 'platform', label: 'Toàn sàn' },
+                    { id: 'shop', label: 'Nhãn hàng / Cửa hàng' },
+                    { id: 'product', label: 'Theo mặt hàng' },
                     { id: 'active', label: 'Đang hoạt động' },
                     { id: 'inactive', label: 'Tạm dừng / Hết hạn' },
                   ].map((subTab) => {
@@ -2421,17 +2551,64 @@ export default function AdminPage() {
 
                               {/* Cột Phạm vi */}
                               <td className="py-3">
-                                {isPlatform ? (
-                                  <span className="inline-flex items-center gap-1 rounded-md border border-[#BD6E49]/30 bg-[#BD6E49]/10 px-2 py-0.5 text-[10px] font-bold text-[#BD6E49]">
-                                    <IconSparkle className="h-3 w-3" />
-                                    <span>Toàn sàn ShopNova</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
-                                    <IconStore className="h-3 w-3" />
-                                    <span>{v.shopName || 'Shop riêng'}</span>
-                                  </span>
-                                )}
+                                {(() => {
+                                  const scopeInfo = getVoucherScopeInfo(v)
+                                  if (scopeInfo.type === 'product') {
+                                    return (
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 max-w-[170px]"
+                                        title={`Mặt hàng: ${scopeInfo.label}`}
+                                      >
+                                        <IconPackage className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Mặt hàng: {scopeInfo.label}</span>
+                                      </span>
+                                    )
+                                  }
+                                  if (scopeInfo.type === 'shop') {
+                                    return (
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 max-w-[170px]"
+                                        title={`Cửa hàng / Nhãn hàng: ${scopeInfo.label}`}
+                                      >
+                                        <IconStore className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Cửa hàng: {scopeInfo.label}</span>
+                                      </span>
+                                    )
+                                  }
+                                  if (scopeInfo.type === 'category') {
+                                    return (
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 max-w-[170px]"
+                                        title={`Ngành hàng: ${scopeInfo.label}`}
+                                      >
+                                        <IconTag className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Ngành: {scopeInfo.label}</span>
+                                      </span>
+                                    )
+                                  }
+                                  if (scopeInfo.type === 'shipping') {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                        <IconTruck className="h-3 w-3 shrink-0" />
+                                        <span>Freeship Xtra</span>
+                                      </span>
+                                    )
+                                  }
+                                  if (scopeInfo.type === 'new_user') {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+                                        <IconShieldCheck className="h-3 w-3 shrink-0" />
+                                        <span>Khách hàng mới</span>
+                                      </span>
+                                    )
+                                  }
+                                  return (
+                                    <span className="inline-flex items-center gap-1 rounded-md border border-[#BD6E49]/30 bg-[#BD6E49]/10 px-2 py-0.5 text-[10px] font-bold text-[#BD6E49]">
+                                      <IconSparkle className="h-3 w-3 shrink-0" />
+                                      <span>Toàn sàn ShopNova</span>
+                                    </span>
+                                  )
+                                })()}
                               </td>
 
                               {/* Cột Giảm giá */}
@@ -4023,8 +4200,8 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                     <IconTicketPercent className="h-5 w-5 stroke-[2]" />
                   </span>
                   <div>
-                    <h3 className="text-[16px] font-bold text-[#49352D]">Tạo Voucher Toàn Sàn ShopNova</h3>
-                    <p className="text-[11px] text-[#8B7566]">Áp dụng cho người mua sắm trên toàn bộ nền tảng</p>
+                    <h3 className="text-[16px] font-bold text-[#49352D]">Tạo Voucher Khuyến Mãi Mới</h3>
+                    <p className="text-[11px] text-[#8B7566]">Áp dụng toàn sàn, theo ngành hàng, nhãn hàng (cửa hàng) hoặc mặt hàng chỉ định</p>
                   </div>
                 </div>
                 <button
@@ -4055,10 +4232,181 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                     required
                     value={adminVoucherForm.code}
                     onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, code: e.target.value.toUpperCase() })}
-                    placeholder="Ví dụ: NOVASALE50, FREESHIP30K"
+                    placeholder="Ví dụ: NOVASALE50, FREESHIP30K, BRAND50K, PROD30K"
                     className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-sm font-mono font-bold text-[#49352D] focus:border-[#BD6E49] focus:outline-none uppercase"
                   />
                 </div>
+
+                {/* Phân loại áp dụng */}
+                <div>
+                  <label className="text-xs font-bold text-[#49352D]">Phân loại áp dụng ưu đãi</label>
+                  <select
+                    value={adminVoucherForm.scope}
+                    onChange={(e) => {
+                      const newScope = e.target.value
+                      let newName = adminVoucherForm.name
+                      let newShopName = adminVoucherForm.shopName
+                      let newShopId = adminVoucherForm.shopId
+                      let newProdName = adminVoucherForm.productName
+                      if (newScope === 'shop') {
+                        newShopName = newShopName || PRESET_ADMIN_SHOPS[0]?.name || 'AURA Studio Official'
+                        newShopId = newShopId || PRESET_ADMIN_SHOPS[0]?.id || '1'
+                        newName = `Ưu đãi nhãn hàng ${newShopName}`
+                      } else if (newScope === 'product') {
+                        newProdName = newProdName || PRESET_ADMIN_PRODUCTS[0]?.name || 'Áo thun nam Cotton Compact'
+                        newName = `Ưu đãi mặt hàng: ${newProdName}`
+                      } else if (newScope === 'category') {
+                        newName = `Ưu đãi ngành hàng ${adminVoucherForm.categoryName}`
+                      } else if (newScope === 'shipping') {
+                        newName = 'Miễn Phí Vận Chuyển Toàn Sàn (Freeship Xtra)'
+                      } else if (newScope === 'new_user') {
+                        newName = 'Chào Bạn Mới - Đơn Hàng Đầu Tiên'
+                      } else {
+                        newName = 'Đại Tiệc Siêu Sale Toàn Sàn ShopNova'
+                      }
+                      setAdminVoucherForm({
+                        ...adminVoucherForm,
+                        scope: newScope,
+                        name: newName,
+                        shopName: newShopName,
+                        shopId: newShopId,
+                        productName: newProdName,
+                      })
+                    }}
+                    className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                  >
+                    <option value="all">Toàn sàn — Áp dụng cho mọi sản phẩm và đơn hàng</option>
+                    <option value="shipping">Miễn phí vận chuyển toàn sàn (Freeship Xtra)</option>
+                    <option value="new_user">Khách hàng mới — Đơn hàng đầu tiên</option>
+                    <option value="category">Theo ngành hàng cụ thể</option>
+                    <option value="shop">Theo nhãn hàng / cửa hàng (gian hàng) chỉ định</option>
+                    <option value="product">Theo mặt hàng / sản phẩm cụ thể</option>
+                  </select>
+                </div>
+
+                {/* Tùy chọn theo Cửa hàng / Nhãn hàng */}
+                {adminVoucherForm.scope === 'shop' && (
+                  <div className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-sky-800">
+                      <IconStore className="h-4 w-4" />
+                      <span>Chỉ định nhãn hàng / cửa hàng (gian hàng)</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#49352D]">Chọn cửa hàng từ danh mục hệ thống</label>
+                      <select
+                        value={adminVoucherForm.shopId || ''}
+                        onChange={(e) => {
+                          const sId = e.target.value
+                          const found = PRESET_ADMIN_SHOPS.find((s) => String(s.id) === String(sId))
+                          const sName = found ? found.name : ''
+                          setAdminVoucherForm({
+                            ...adminVoucherForm,
+                            shopId: sId,
+                            shopName: sName || adminVoucherForm.shopName,
+                            name: sName ? `Ưu đãi nhãn hàng ${sName}` : adminVoucherForm.name,
+                          })
+                        }}
+                        className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                      >
+                        <option value="">-- Chọn nhãn hàng / gian hàng gợi ý --</option>
+                        {PRESET_ADMIN_SHOPS.map((shop) => (
+                          <option key={shop.id} value={shop.id}>
+                            {shop.name} {shop.id ? `(ID: #${shop.id})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#49352D]">Tên nhãn hàng / cửa hàng áp dụng *</label>
+                      <input
+                        type="text"
+                        required
+                        value={adminVoucherForm.shopName}
+                        onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, shopName: e.target.value })}
+                        placeholder="Ví dụ: AURA Studio Official, TechNova, Nova Fashion..."
+                        className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Tùy chọn theo Mặt hàng / Sản phẩm */}
+                {adminVoucherForm.scope === 'product' && (
+                  <div className="space-y-3 rounded-2xl border border-purple-200 bg-purple-50/70 p-3.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-800">
+                      <IconPackage className="h-4 w-4" />
+                      <span>Chỉ định mặt hàng / sản phẩm cụ thể</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#49352D]">Chọn mặt hàng từ danh mục sản phẩm</label>
+                      <select
+                        value={adminVoucherForm.productName || ''}
+                        onChange={(e) => {
+                          const pName = e.target.value
+                          setAdminVoucherForm({
+                            ...adminVoucherForm,
+                            productName: pName,
+                            name: pName ? `Ưu đãi mặt hàng: ${pName}` : adminVoucherForm.name,
+                          })
+                        }}
+                        className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                      >
+                        <option value="">-- Chọn mặt hàng gợi ý có sẵn --</option>
+                        {PRESET_ADMIN_PRODUCTS.map((prod) => (
+                          <option key={prod.id || prod.name} value={prod.name}>
+                            {prod.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#49352D]">Tên mặt hàng / sản phẩm cụ thể *</label>
+                      <input
+                        type="text"
+                        required
+                        value={adminVoucherForm.productName}
+                        onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, productName: e.target.value })}
+                        placeholder="Ví dụ: Áo thun nam Cotton Compact, iPhone 15 Pro Max, Giày Sneaker Nova..."
+                        className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3 py-1.5 text-xs text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Tùy chọn theo Ngành hàng */}
+                {adminVoucherForm.scope === 'category' && (
+                  <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                      <IconTag className="h-4 w-4" />
+                      <span>Chỉ định ngành hàng áp dụng</span>
+                    </div>
+                    <select
+                      value={adminVoucherForm.categoryName}
+                      onChange={(e) => {
+                        const cat = e.target.value
+                        setAdminVoucherForm({
+                          ...adminVoucherForm,
+                          categoryName: cat,
+                          name: `Ưu đãi ngành hàng ${cat}`,
+                        })
+                      }}
+                      className="w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
+                    >
+                      <option value="Thời trang & May mặc">Thời trang & May mặc</option>
+                      <option value="Điện thoại & Phụ kiện">Điện thoại & Phụ kiện</option>
+                      <option value="Máy tính & Laptop">Máy tính & Laptop</option>
+                      <option value="Sắc đẹp & Mỹ phẩm">Sắc đẹp & Mỹ phẩm</option>
+                      <option value="Nhà cửa & Đời sống">Nhà cửa & Đời sống</option>
+                      <option value="Giày dép & Túi xách">Giày dép & Túi xách</option>
+                      <option value="Mẹ & Bé">Mẹ & Bé</option>
+                      <option value="Thể thao & Du lịch">Thể thao & Du lịch</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* Tên chương trình */}
                 <div>
@@ -4072,38 +4420,6 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                     className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
                   />
                 </div>
-
-                {/* Phân loại áp dụng */}
-                <div>
-                  <label className="text-xs font-bold text-[#49352D]">Phân loại áp dụng</label>
-                  <select
-                    value={adminVoucherForm.scope}
-                    onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, scope: e.target.value })}
-                    className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
-                  >
-                    <option value="all">Toàn sàn — Áp dụng cho mọi sản phẩm và ngành hàng</option>
-                    <option value="shipping">Miễn phí vận chuyển toàn sàn (Freeship Xtra)</option>
-                    <option value="new_user">Khách hàng mới — Đơn hàng đầu tiên</option>
-                    <option value="category">Theo ngành hàng cụ thể</option>
-                  </select>
-                </div>
-
-                {adminVoucherForm.scope === 'category' && (
-                  <div>
-                    <label className="text-xs font-bold text-[#49352D]">Chọn ngành hàng áp dụng</label>
-                    <select
-                      value={adminVoucherForm.categoryName}
-                      onChange={(e) => setAdminVoucherForm({ ...adminVoucherForm, categoryName: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-[#E6D5C2] bg-white px-3.5 py-2 text-xs sm:text-sm text-[#49352D] focus:border-[#BD6E49] focus:outline-none"
-                    >
-                      <option value="Thời trang & May mặc">Thời trang & May mặc</option>
-                      <option value="Điện thoại & Phụ kiện">Điện thoại & Phụ kiện</option>
-                      <option value="Máy tính & Laptop">Máy tính & Laptop</option>
-                      <option value="Sắc đẹp & Mỹ phẩm">Sắc đẹp & Mỹ phẩm</option>
-                      <option value="Nhà cửa & Đời sống">Nhà cửa & Đời sống</option>
-                    </select>
-                  </div>
-                )}
 
                 {/* Mức giảm & Đơn tối thiểu */}
                 <div className="grid grid-cols-2 gap-3">
