@@ -168,7 +168,7 @@ void main() {
       expect(find.text('Xem tất cả'), findsOneWidget);
       expect(find.text('-50%'), findsNWidgets(2));
       expect(find.text('VỪA MỞ BÁN'), findsOneWidget);
-      expect(find.text('SẮP CHÁY HÀNG 92%'), findsOneWidget);
+      expect(find.text('SẮP CHÁY HÀNG 92%'), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
     });
   });

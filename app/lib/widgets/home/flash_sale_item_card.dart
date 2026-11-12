@@ -231,7 +231,32 @@ class _SoldProgressBar extends StatelessWidget {
       );
     }
 
-    final Color fgColor = clamped >= 0.5 ? AppColors.surface : AppColors.earth;
+    final double fillFactor = clamped.clamp(0.12, 1.0);
+
+    Widget buildLabel(Color color) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.local_fire_department_rounded, color: color, size: 12),
+              const SizedBox(width: 2),
+              Text(
+                soldLabel,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 9.5,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -246,7 +271,7 @@ class _SoldProgressBar extends StatelessWidget {
         alignment: Alignment.centerLeft,
         children: [
           FractionallySizedBox(
-            widthFactor: clamped.clamp(0.12, 1.0),
+            widthFactor: fillFactor,
             child: Container(
               height: double.infinity,
               decoration: BoxDecoration(
@@ -259,27 +284,12 @@ class _SoldProgressBar extends StatelessWidget {
               ),
             ),
           ),
+          Positioned.fill(child: buildLabel(AppColors.earth)),
           Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.local_fire_department_rounded, color: fgColor, size: 12),
-                    const SizedBox(width: 2),
-                    Text(
-                      soldLabel,
-                      style: TextStyle(
-                        color: fgColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 9.5,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                  ],
-                ),
+            child: ExcludeSemantics(
+              child: ClipRect(
+                clipper: _ProgressFractionClipper(fillFactor),
+                child: buildLabel(AppColors.surface),
               ),
             ),
           ),
@@ -287,4 +297,18 @@ class _SoldProgressBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProgressFractionClipper extends CustomClipper<Rect> {
+  final double fraction;
+
+  const _ProgressFractionClipper(this.fraction);
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTWH(0, 0, size.width * fraction.clamp(0.0, 1.0), size.height);
+
+  @override
+  bool shouldReclip(_ProgressFractionClipper oldClipper) =>
+      oldClipper.fraction != fraction;
 }
