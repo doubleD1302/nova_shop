@@ -7,6 +7,7 @@ class CategoryItem {
   final Color? backgroundColor;
   final String? imageUrl;
   final String? slug;
+  final int productCount;
 
   const CategoryItem({
     required this.id,
@@ -15,29 +16,51 @@ class CategoryItem {
     this.backgroundColor,
     this.imageUrl,
     this.slug,
+    this.productCount = 0,
   });
 
   factory CategoryItem.fromJson(Map<String, dynamic> json) {
     final slug = json['slug']?.toString() ?? '';
     final name = json['name']?.toString() ?? '';
+    final countRaw = json['productCount'] ?? json['product_count'];
+    final productCount = (countRaw is num)
+        ? countRaw.toInt()
+        : (int.tryParse(countRaw?.toString() ?? '') ?? 0);
 
+    final key = slug.toLowerCase();
     IconData icon = Icons.category_outlined;
-    if (slug.contains('thoi-trang-nam')) {
+    if (key.contains('thoi-trang-nam')) {
       icon = Icons.checkroom;
-    } else if (slug.contains('dien-thoai')) {
-      icon = Icons.phone_android;
-    } else if (slug.contains('may-tinh')) {
-      icon = Icons.laptop_chromebook;
-    } else if (slug.contains('gia-dung')) {
-      icon = Icons.kitchen;
-    } else if (slug.contains('sac-dep')) {
-      icon = Icons.spa;
-    } else if (slug.contains('thoi-trang-nu')) {
+    } else if (key.contains('thoi-trang-nu')) {
       icon = Icons.woman;
-    } else if (slug.contains('nha-cua')) {
+    } else if (key.contains('dien-thoai')) {
+      icon = Icons.phone_android;
+    } else if (key.contains('may-tinh')) {
+      icon = Icons.laptop_chromebook;
+    } else if (key.contains('phu-kien-cong-nghe') || key.contains('cong-nghe')) {
+      icon = Icons.headphones;
+    } else if (key.contains('gia-dung')) {
+      icon = Icons.kitchen;
+    } else if (key.contains('sac-dep') || key.contains('my-pham')) {
+      icon = Icons.spa;
+    } else if (key.contains('nha-cua')) {
       icon = Icons.chair;
-    } else if (slug.contains('me-be')) {
+    } else if (key.contains('me-be')) {
       icon = Icons.child_care;
+    } else if (key.contains('giay')) {
+      icon = Icons.ice_skating_outlined;
+    } else if (key.contains('tui')) {
+      icon = Icons.work_outline;
+    } else if (key.contains('bach-hoa')) {
+      icon = Icons.shopping_basket_outlined;
+    } else if (key.contains('the-thao')) {
+      icon = Icons.sports_soccer_outlined;
+    } else if (key.contains('dong-ho')) {
+      icon = Icons.watch_outlined;
+    } else if (key.contains('may-anh')) {
+      icon = Icons.camera_alt_outlined;
+    } else if (key.contains('o-to') || key.contains('xe')) {
+      icon = Icons.directions_car_outlined;
     }
 
     return CategoryItem(
@@ -46,6 +69,7 @@ class CategoryItem {
       icon: icon,
       imageUrl: json['imageUrl']?.toString(),
       slug: slug,
+      productCount: productCount,
     );
   }
 }

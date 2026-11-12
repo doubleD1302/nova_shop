@@ -70,6 +70,16 @@ class Product {
         name: name,
       );
 
+  /// S\u1ed1 l\u01b0\u1ee3ng \u0111\u00e3 b\u00e1n d\u1ea1ng s\u1ed1 \u0111\u1ec3 s\u1eafp x\u1ebfp ch\u00ednh x\u00e1c (v\u00ed d\u1ee5 "\u0110\u00e3 b\u00e1n 1.2k" -> 1200)
+  int get soldNumeric {
+    final text = soldCount.toLowerCase().trim();
+    final match = RegExp(r'([\d.,]+)\s*(k?)').firstMatch(text);
+    if (match == null) return 0;
+    final raw = match.group(1)?.replaceAll(',', '.') ?? '0';
+    final numVal = double.tryParse(raw) ?? 0;
+    return (match.group(2) == 'k') ? (numVal * 1000).round() : numVal.round();
+  }
+
   Product copyWith({
     String? id,
     String? name,
@@ -131,17 +141,22 @@ class Product {
     final origVal = (rawOrig is num) ? rawOrig.toDouble() : double.tryParse(rawOrig?.toString() ?? '0') ?? priceVal;
 
     final rawSold = json['soldCount'] ?? json['sold'];
-    String soldStr = '0';
+    String soldStr = 'Đã bán 0';
+    int soldNum = 0;
     if (rawSold is num) {
+      soldNum = rawSold.toInt();
       if (rawSold >= 1000) {
         soldStr = 'Đã bán ${(rawSold / 1000).toStringAsFixed(1)}k';
       } else {
-        soldStr = 'Đã bán $rawSold';
+        soldStr = 'Đã bán $soldNum';
       }
     } else if (rawSold != null) {
       soldStr = rawSold.toString();
-    } else {
-      soldStr = 'Đã bán 1.2k';
+      final m = RegExp(r'([\d.,]+)\s*(k?)').firstMatch(soldStr.toLowerCase());
+      if (m != null) {
+        final v = double.tryParse((m.group(1) ?? '0').replaceAll(',', '.')) ?? 0;
+        soldNum = m.group(2) == 'k' ? (v * 1000).round() : v.round();
+      }
     }
 
     final rawBadges = json['badges'];
@@ -188,8 +203,18 @@ class Product {
     final rawStock = json['stock'];
     final stockVal = (rawStock is num) ? rawStock.toInt() : (int.tryParse(rawStock?.toString() ?? '') ?? 120);
 
-    final discount = (json['discount'] as num?)?.toInt() ?? 0;
+    final effectiveOrig = origVal > 0 ? origVal : priceVal;
+    final rawDiscount = (json['discount'] as num?)?.toInt();
+    final discount = (rawDiscount != null && rawDiscount > 0)
+        ? rawDiscount
+        : (effectiveOrig > priceVal && effectiveOrig > 0
+            ? (((effectiveOrig - priceVal) / effectiveOrig) * 100).round()
+            : 0);
     final rating = (json['rating'] as num?)?.toDouble() ?? 4.9;
+    final totalQty = soldNum + stockVal;
+    final computedSoldPercent = (json['soldPercent'] is num)
+        ? (json['soldPercent'] as num).toInt().clamp(0, 100)
+        : (totalQty > 0 ? ((soldNum / totalQty) * 100).round().clamp(0, 100) : 0);
     
     final shopObj = json['shop'];
     final sName = (shopObj is Map && shopObj['name'] != null)
@@ -243,7 +268,7 @@ class Product {
       specs: specs,
       emoji: json['emoji']?.toString() ?? '🛍️',
       location: loc,
-      soldPercent: (json['soldPercent'] as num?)?.toInt() ?? 50,
+      soldPercent: computedSoldPercent,
       categoryId: cId,
       shopId: sId,
       stock: stockVal,

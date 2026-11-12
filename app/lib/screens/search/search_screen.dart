@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/category_item.dart';
 import '../../models/product.dart';
 import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
+import '../../utils/flash_sale_rotator.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/home/product_card.dart';
 import '../cart/cart_screen.dart';
@@ -16,6 +18,7 @@ class SearchScreen extends StatefulWidget {
   final bool filterFreeship;
   final bool filterFlashSale;
   final String initialSort;
+  final CatalogService? catalogService;
 
   const SearchScreen({
     super.key,
@@ -27,6 +30,7 @@ class SearchScreen extends StatefulWidget {
     this.filterFreeship = false,
     this.filterFlashSale = false,
     this.initialSort = 'relevance',
+    this.catalogService,
   });
 
   @override
@@ -36,7 +40,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  final CatalogService _catalogService = CatalogService();
+  late final CatalogService _catalogService =
+      widget.catalogService ?? CatalogService();
 
   String _currentQuery = '';
   bool _isLoading = false;
@@ -54,6 +59,7 @@ class _SearchScreenState extends State<SearchScreen> {
   static const String _recentSearchPrefsKey = 'shopnova_recent_searches';
   List<String> _recentSearches = [];
   List<String> _popularTags = [];
+  List<CategoryItem> _categories = [];
 
   bool get _isBrowsingMode =>
       _pageTitle != null ||
@@ -71,7 +77,8 @@ class _SearchScreenState extends State<SearchScreen> {
     _filterMall = widget.filterMall;
     _filterFreeship = widget.filterFreeship;
     _filterFlashSale = widget.filterFlashSale;
-    _categoryId = widget.categoryId;
+    final resolvedInitCat = CatalogService.resolveCategorySlug(widget.categoryId);
+    _categoryId = resolvedInitCat.isNotEmpty ? resolvedInitCat : null;
     _categoryName = widget.initialCategory;
     _pageTitle = widget.title;
     _loadRecentSearches();
@@ -109,7 +116,19 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final cats = await _catalogService.getCategories();
       if (mounted && cats.isNotEmpty) {
+        String? resolvedName = _categoryName;
+        if (_categoryId != null && (resolvedName == null || resolvedName.isEmpty)) {
+          for (final cat in cats) {
+            if (CatalogService.resolveCategorySlug(cat.slug ?? cat.id) == _categoryId) {
+              resolvedName = cat.name;
+              break;
+            }
+          }
+          resolvedName ??= CatalogService.getCategoryName(_categoryId);
+        }
         setState(() {
+          _categories = cats;
+          _categoryName = resolvedName;
           _popularTags = cats.take(8).map((cat) => cat.name).where((name) => name.isNotEmpty).toList();
         });
       }
@@ -129,26 +148,36 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      List<Product> list = [];
+      final result = await _catalogService.searchProducts(
+        _currentQuery,
+        categoryId: _categoryId ?? _categoryName,
+        mall: _filterMall ? true : null,
+        freeship: _filterFreeship ? true : null,
+        flash: _filterFlashSale ? true : null,
+        sort: _selectedSort,
+      );
+      List<Product> list = List<Product>.from(result.products);
 
-      if (_filterFlashSale) {
-        list = await _catalogService.getProducts(isFlashSale: true);
-      } else {
-        final result = await _catalogService.searchProducts(
-          _currentQuery,
-          categoryId: _categoryId ?? _categoryName,
+      // Nếu đang xem Flash Sale mà API chưa gắn cờ trên DB, dùng xoay tua sản phẩm thật đồng bộ Website
+      if (_filterFlashSale && list.isEmpty && _currentQuery.isEmpty && _categoryId == null) {
+        final fallbackResult = await _catalogService.searchProducts(
+          '',
           mall: _filterMall ? true : null,
           freeship: _filterFreeship ? true : null,
-          sort: _selectedSort,
         );
-        list = result.products;
+        if (fallbackResult.products.isNotEmpty) {
+          list = FlashSaleRotator.rotateProducts(
+            apiProducts: fallbackResult.products,
+            count: fallbackResult.products.length > 12 ? 12 : fallbackResult.products.length,
+          );
+        }
       }
 
-      // Áp dụng bộ lọc sắp xếp
+      // Áp dụng bộ lọc sắp xếp bổ sung theo thứ tự hiển thị
       if (_selectedSort == 'discount') {
         list.sort((a, b) {
-          final discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : 0;
-          final discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : 0;
+          final discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : a.discount / 100.0;
+          final discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : b.discount / 100.0;
           return discB.compareTo(discA);
         });
       } else if (_selectedSort == 'price_asc') {
@@ -156,7 +185,7 @@ class _SearchScreenState extends State<SearchScreen> {
       } else if (_selectedSort == 'price_desc') {
         list.sort((a, b) => b.price.compareTo(a.price));
       } else if (_selectedSort == 'popular') {
-        list.sort((a, b) => b.soldCount.compareTo(a.soldCount));
+        list.sort((a, b) => b.soldNumeric.compareTo(a.soldNumeric));
       } else if (_selectedSort == 'newest') {
         list = list.reversed.toList();
       }
@@ -199,6 +228,7 @@ class _SearchScreenState extends State<SearchScreen> {
         sort: _selectedSort,
         mall: _filterMall ? true : null,
         freeship: _filterFreeship ? true : null,
+        flash: _filterFlashSale ? true : null,
         categoryId: _categoryId ?? _categoryName,
       );
 
@@ -611,7 +641,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () => _performSearch(_currentQuery),
+      onRefresh: () => _currentQuery.isNotEmpty
+          ? _performSearch(_currentQuery)
+          : _loadBrowsingProducts(),
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
@@ -719,12 +751,70 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  void _selectSuggestedCategory(CategoryItem cat) {
+    final slug = CatalogService.resolveCategorySlug(cat.slug ?? cat.id);
+    setState(() {
+      _categoryId = slug.isNotEmpty ? slug : cat.id;
+      _categoryName = cat.name;
+      _pageTitle = 'Ngành hàng: ${cat.name}';
+      _currentQuery = '';
+      _searchController.clear();
+    });
+    _loadBrowsingProducts();
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _categoryId = null;
+      _categoryName = null;
+      _pageTitle = null;
+      _currentQuery = '';
+      _searchController.clear();
+      _filterMall = false;
+      _filterFreeship = false;
+      _filterFlashSale = false;
+      _selectedSort = 'relevance';
+    });
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SearchScreen(
+          title: 'Toàn bộ sản phẩm ShopNova',
+          initialSort: 'popular',
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
+    final isCategoryEmpty = _categoryId != null || _categoryName != null;
+    final catDisplay = _categoryName ?? CatalogService.getCategoryName(_categoryId);
+    final availableCategories = _categories.where((c) => c.productCount > 0).take(5).toList();
+    final fallbackCats = availableCategories.isNotEmpty
+        ? availableCategories
+        : _categories.take(5).toList();
+
+    final IconData emptyIcon = isCategoryEmpty
+        ? Icons.inventory_2_outlined
+        : (_currentQuery.isNotEmpty ? Icons.search_off_rounded : Icons.shopping_bag_outlined);
+
+    final String titleText = isCategoryEmpty
+        ? 'Ngành hàng “$catDisplay” hiện đang cập nhật sản phẩm'
+        : (_currentQuery.isNotEmpty
+            ? 'Không tìm thấy sản phẩm cho từ khoá “$_currentQuery”'
+            : 'Không có sản phẩm nào khớp với bộ lọc đã chọn');
+
+    final String descText = isCategoryEmpty
+        ? 'Hiện chưa có sản phẩm nào thuộc ngành hàng này được đăng bán. Mời bạn khám phá các ngành hàng đang có sẵn hoặc xem toàn bộ sản phẩm trên sàn.'
+        : (_currentQuery.isNotEmpty
+            ? 'Hãy thử kiểm tra lại chính tả hoặc tìm kiếm bằng từ khoá ngắn gọn, phổ biến hơn.'
+            : 'Hãy thử xoá bớt một số bộ lọc để xem nhiều sản phẩm hơn.');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 28),
           Container(
             width: 80,
             height: 80,
@@ -732,28 +822,55 @@ class _SearchScreenState extends State<SearchScreen> {
               color: AppColors.surfaceAlt,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.search_off_rounded, size: 40, color: AppColors.primary),
+            child: Icon(emptyIcon, size: 38, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
-            Text(
-              _currentQuery.isNotEmpty
-                  ? 'Không tìm thấy sản phẩm nào cho "$_currentQuery"'
-                  : (_categoryName != null ? 'Chưa có sản phẩm trong ngành hàng "$_categoryName"' : 'Chưa tìm thấy sản phẩm phù hợp'),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E2022)),
-              textAlign: TextAlign.center,
+          Text(
+            titleText,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            descText,
+            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.45),
+            textAlign: TextAlign.center,
+          ),
+          if (isCategoryEmpty && fallbackCats.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'Ngành hàng đang có sẵn sản phẩm:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _categoryName != null
-                  ? 'Bạn có thể bấm bỏ lọc ngành hàng bên trên để xem toàn bộ sản phẩm trên sàn ShopNova.'
-                  : 'Hãy thử kiểm tra lại chính tả hoặc tìm kiếm bằng từ khóa khác.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF8F90A6), height: 1.4),
-              textAlign: TextAlign.center,
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: fallbackCats.map((cat) {
+                final chipText = cat.productCount > 0 ? '${cat.name} (${cat.productCount})' : cat.name;
+                return InkWell(
+                  onTap: () => _selectSuggestedCategory(cat),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      chipText,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
-          if (_popularTags.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            const Text('Danh mục gợi ý:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E2022))),
-            const SizedBox(height: 12),
+          ] else if (!isCategoryEmpty && _popularTags.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text('Danh mục gợi ý:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: AppColors.textPrimary)),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -768,19 +885,63 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFEEEEF0)),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: Text(
                       tag,
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF1E2022), fontWeight: FontWeight.w500),
+                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
                     ),
                   ),
                 );
               }).toList(),
             ),
           ],
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              if (!isCategoryEmpty && _currentQuery.isNotEmpty)
+                ElevatedButton(
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _currentQuery = '');
+                    if (_isBrowsingMode) _loadBrowsingProducts();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  child: const Text('Xoá từ khoá tìm kiếm', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                ),
+              ElevatedButton(
+                onPressed: _clearAllFilters,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: (isCategoryEmpty || _currentQuery.isEmpty) ? AppColors.primary : AppColors.surface,
+                  foregroundColor: (isCategoryEmpty || _currentQuery.isEmpty) ? Colors.white : AppColors.textPrimary,
+                  side: (isCategoryEmpty || _currentQuery.isEmpty) ? null : const BorderSide(color: AppColors.border),
+                  elevation: 0,
+                ),
+                child: Text(
+                  (!isCategoryEmpty && _currentQuery.isEmpty) ? 'Xoá tất cả bộ lọc' : 'Xem toàn bộ sản phẩm',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                ),
+              ),
+              if (isCategoryEmpty)
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  child: const Text('Về trang chủ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                ),
+            ],
+          ),
         ],
       ),
     );

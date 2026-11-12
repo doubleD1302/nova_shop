@@ -13,6 +13,7 @@ import 'package:shopnova/models/category_item.dart';
 import 'package:shopnova/models/flash_sale_item.dart';
 import 'package:shopnova/models/product.dart';
 import 'package:shopnova/services/catalog_service.dart';
+import 'package:shopnova/utils/flash_sale_rotator.dart';
 import 'package:shopnova/screens/wallet/deposit_screen.dart';
 import 'package:shopnova/theme/app_colors.dart';
 import '../search/search_screen.dart';
@@ -51,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final bannersFuture = _catalogService.getBanners();
       final categoriesFuture = _catalogService.getCategories();
-      final flashSaleFuture = _catalogService.getFlashSaleItems();
       final productsFuture = _catalogService.getProducts();
       final featuredFuture = _catalogService.getFeaturedShowcase();
       final configFuture = _catalogService.getSystemConfig();
@@ -59,7 +59,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final results = await Future.wait([
         bannersFuture,
         categoriesFuture,
-        flashSaleFuture,
         productsFuture,
         featuredFuture,
         configFuture,
@@ -68,12 +67,18 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         final banners = results[0] as List<BannerItem>;
         final categories = results[1] as List<CategoryItem>;
-        final flashSale = results[2] as List<FlashSaleItem>;
-        final products = results[3] as List<Product>;
-        final featuredMap = results[4] as Map<String, List<Product>>;
-        final sysConfig = results[5] as Map<String, dynamic>?;
+        final products = results[2] as List<Product>;
+        final featuredMap = results[3] as Map<String, List<Product>>;
+        final sysConfig = results[4] as Map<String, dynamic>?;
         final featuredList = featuredMap['featuredProducts'] ?? [];
         final merged = products.isNotEmpty ? products : featuredList;
+        final flashPool = merged.isNotEmpty
+            ? merged
+            : (featuredMap['flashSale'] ?? const <Product>[]);
+        final flashSale = FlashSaleRotator.rotateItems(
+          apiProducts: flashPool,
+          count: 6,
+        );
         final dynamicProducts = _shuffleRecommendedProducts(merged);
 
         setState(() {
@@ -211,10 +216,32 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     );
-                  } else if (link.contains('category=dien-thoai') || link.contains('topup')) {
+                  } else if (link.contains('topup')) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const DepositScreen()),
+                    );
+                  } else if (link.contains('category=')) {
+                    final uri = Uri.tryParse(link);
+                    final rawCat = uri?.queryParameters['category'] ?? '';
+                    final resolvedCat = CatalogService.resolveCategorySlug(rawCat);
+                    final matchedCat = _categories.where(
+                      (c) =>
+                          CatalogService.resolveCategorySlug(c.slug ?? c.id) ==
+                          resolvedCat,
+                    );
+                    final catLabel = matchedCat.isNotEmpty
+                        ? matchedCat.first.name
+                        : CatalogService.getCategoryName(resolvedCat);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SearchScreen(
+                          initialCategory: catLabel,
+                          categoryId: resolvedCat,
+                          title: 'Ngành hàng: $catLabel',
+                        ),
+                      ),
                     );
                   } else if (link.contains('discount')) {
                     Navigator.push(

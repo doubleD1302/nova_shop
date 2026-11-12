@@ -4,6 +4,7 @@ import '../../models/product.dart';
 import '../../models/shop.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
+import '../../services/catalog_service.dart';
 import '../../services/shop_service.dart';
 import '../cart/cart_screen.dart';
 import '../chat/chat_detail_screen.dart';
@@ -34,6 +35,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   bool _isLoading = true;
   bool _isFollowing = false;
   String _selectedSort = 'popular'; // 'popular', 'newest', 'price_asc', 'price_desc'
+  String _selectedCategoryId = '';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -99,8 +101,27 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     }
   }
 
+  List<MapEntry<String, String>> _getShopCategories() {
+    final map = <String, String>{};
+    for (final p in _products) {
+      final cid = p.categoryId.trim();
+      if (cid.isEmpty) continue;
+      final label = p.categoryName.isNotEmpty
+          ? p.categoryName
+          : CatalogService.getCategoryName(cid);
+      map.putIfAbsent(cid, () => label);
+    }
+    return map.entries.toList();
+  }
+
   List<Product> _getFilteredProducts() {
     List<Product> list = List.from(_products);
+
+    if (_selectedCategoryId.isNotEmpty) {
+      list = list
+          .where((p) => CatalogService.matchesCategory(p, _selectedCategoryId))
+          .toList();
+    }
 
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.toLowerCase();
@@ -368,34 +389,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                       child: Icon(Icons.chat_bubble_outline_rounded, size: 15, color: primaryColor),
                     ),
                     const SizedBox(width: 6),
-                    // Nút Chat Shop
-                    OutlinedButton(
-                      onPressed: () {
-                        if (!AuthService().isAuthenticated) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng đăng nhập để chat với gian hàng.')),
-                          );
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatDetailScreen(
-                              shopId: widget.shopId,
-                              initialShopName: displayName,
-                            ),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        minimumSize: const Size(0, 32),
-                        side: BorderSide(color: primaryColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: Icon(Icons.chat_bubble_outline_rounded, size: 15, color: primaryColor),
-                    ),
-                    const SizedBox(width: 6),
                     // Nút Theo Dõi
                     OutlinedButton(
                       onPressed: _toggleFollow,
@@ -456,6 +449,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   }
 
   Widget _buildSortBar() {
+    final shopCategories = _getShopCategories();
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -463,18 +458,66 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         color: Colors.white,
         border: Border.symmetric(horizontal: BorderSide(color: Color(0xFFEEEEF0))),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Sắp xếp:', style: TextStyle(fontSize: 12, color: Color(0xFF555770), fontWeight: FontWeight.bold)),
-          const SizedBox(width: 10),
-          _buildSortChip('Phổ biến', 'popular'),
-          const SizedBox(width: 6),
-          _buildSortChip('Mới nhất', 'newest'),
-          const SizedBox(width: 6),
-          _buildSortChip('Giá ↑', 'price_asc'),
-          const SizedBox(width: 6),
-          _buildSortChip('Giá ↓', 'price_desc'),
+          Row(
+            children: [
+              const Text('Sắp xếp:', style: TextStyle(fontSize: 12, color: Color(0xFF555770), fontWeight: FontWeight.bold)),
+              const SizedBox(width: 10),
+              _buildSortChip('Phổ biến', 'popular'),
+              const SizedBox(width: 6),
+              _buildSortChip('Mới nhất', 'newest'),
+              const SizedBox(width: 6),
+              _buildSortChip('Giá ↑', 'price_asc'),
+              const SizedBox(width: 6),
+              _buildSortChip('Giá ↓', 'price_desc'),
+            ],
+          ),
+          if (shopCategories.length > 1) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 28,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _buildCategoryChip('Tất cả', ''),
+                  for (final entry in shopCategories) ...[
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(entry.value, entry.key),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String label, String categoryId) {
+    final isSelected = _selectedCategoryId == categoryId;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategoryId = categoryId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.surfaceAlt : const Color(0xFFF5F5F7),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? primaryColor : const Color(0xFFE6D5C2),
+            width: 0.9,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? primaryColor : const Color(0xFF555770),
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -542,7 +585,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         itemCount: products.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.65,
+          childAspectRatio: 0.60,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -630,11 +673,23 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        if (p.originalPrice > p.price)
+                          Text(
+                            NumberFormat.currency(locale: 'vi_VN', symbol: '\u20ab', decimalDigits: 0).format(p.originalPrice),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('⭐ ${p.rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6))),
-                            Text('Đã bán ${p.soldCount}', style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6))),
+                            Text(
+                              p.soldCount.isNotEmpty ? p.soldCount : 'Đã bán 0',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF8F90A6)),
+                            ),
                           ],
                         ),
                       ],

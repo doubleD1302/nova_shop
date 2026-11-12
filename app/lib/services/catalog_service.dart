@@ -28,6 +28,81 @@ class ProductListResult {
 }
 
 class CatalogService {
+  /// Bảng ánh xạ slug danh mục thông minh đồng bộ 1:1 với Backend & Website (`searchConfig.js`)
+  static const Map<String, String> categoryAliases = {
+    'tui-vi': 'tui-xach',
+    'vi': 'tui-xach',
+    'balo': 'tui-xach',
+    'tui-deo-cheo': 'tui-xach',
+    'cap-sach': 'tui-xach',
+    'sac-dep': 'my-pham',
+    'lam-dep': 'my-pham',
+    'cham-soc-da': 'my-pham',
+    'trang-diem': 'my-pham',
+    'son-moi': 'my-pham',
+    'dien-tu': 'phu-kien-cong-nghe',
+    'cong-nghe': 'phu-kien-cong-nghe',
+    'tai-nghe': 'phu-kien-cong-nghe',
+    'may-tinh': 'dien-thoai',
+    'laptop': 'dien-thoai',
+    'smartphone': 'dien-thoai',
+    'dien-thoai-phu-kien': 'dien-thoai',
+    'nha-cua': 'nha-cua-doi-song',
+    'noi-that': 'nha-cua-doi-song',
+    'gia-dung': 'nha-cua-doi-song',
+    'thiet-bi-gia-dung': 'nha-cua-doi-song',
+    'giay': 'giay-dep',
+    'dep': 'giay-dep',
+    'sneaker': 'giay-dep',
+    'sandal': 'giay-dep',
+    'quan-ao-nam': 'thoi-trang-nam',
+    'ao-nam': 'thoi-trang-nam',
+    'nam': 'thoi-trang-nam',
+    'quan-ao-nu': 'thoi-trang-nu',
+    'ao-nu': 'thoi-trang-nu',
+    'vay': 'thoi-trang-nu',
+    'dam': 'thoi-trang-nu',
+    'nu': 'thoi-trang-nu',
+  };
+
+  static const Map<String, String> _categoryNames = {
+    'thoi-trang-nam': 'Thời trang nam',
+    'thoi-trang-nu': 'Thời trang nữ',
+    'dien-thoai': 'Điện thoại & Phụ kiện',
+    'may-tinh': 'Máy tính & Laptop',
+    'phu-kien-cong-nghe': 'Phụ kiện công nghệ',
+    'thiet-bi-gia-dung': 'Thiết bị gia dụng',
+    'sac-dep': 'Sắc đẹp & Chăm sóc da',
+    'my-pham': 'Mỹ phẩm & Làm đẹp',
+    'nha-cua': 'Nhà cửa & Đời sống',
+    'nha-cua-doi-song': 'Nhà cửa & Đời sống',
+    'me-be': 'Mẹ & Bé yêu',
+    'bach-hoa': 'Bách hóa Online',
+    'the-thao': 'Thể thao & Du lịch',
+    'o-to-xe-may': 'Ô tô & Xe máy',
+    'may-anh': 'Máy ảnh & Máy quay',
+    'giay-dep': 'Giày dép',
+    'tui-xach': 'Túi xách',
+    'dong-ho': 'Đồng hồ',
+  };
+
+  /// Chuẩn hóa slug ngành hàng (quy đổi alias về slug chuẩn của hệ thống)
+  static String resolveCategorySlug(String? rawSlug) {
+    if (rawSlug == null) return '';
+    final normalized = rawSlug.trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    return categoryAliases[normalized] ?? normalized;
+  }
+
+  /// Trả về tên hiển thị ngành hàng theo slug hoặc fallback an toàn
+  static String getCategoryName(String? categoryId) {
+    final key = categoryId?.trim().toLowerCase() ?? '';
+    if (key.isEmpty) return 'Ngành hàng ShopNova';
+    return _categoryNames[key] ??
+        _categoryNames[resolveCategorySlug(key)] ??
+        'Ngành hàng ShopNova';
+  }
+
   List<dynamic> _extractList(dynamic data, String preferredKey) {
     if (data is List) return data;
     if (data is Map) {
@@ -100,9 +175,11 @@ class CatalogService {
   }) async {
     List<Product> result = [];
 
+    final resolvedCategoryId = resolveCategorySlug(categoryId);
+
     try {
       final uri = Uri.parse(ApiConfig.productsUrl).replace(queryParameters: {
-        if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
+        if (resolvedCategoryId.isNotEmpty) 'categoryId': resolvedCategoryId,
         if (isFlashSale == true) 'flash': '1',
         'limit': '100',
       });
@@ -168,6 +245,7 @@ class CatalogService {
     String? province,
     bool? mall,
     bool? freeship,
+    bool? flash,
   }) async {
     final safePage = page > 0 ? page : 1;
     final offset = (safePage - 1) * limit;
@@ -176,7 +254,8 @@ class CatalogService {
       'limit': limit.toString(),
     };
 
-    if (categoryId != null && categoryId.isNotEmpty) queryParams['categoryId'] = categoryId;
+    final resolvedCategory = resolveCategorySlug(categoryId);
+    if (resolvedCategory.isNotEmpty) queryParams['categoryId'] = resolvedCategory;
     if (shopId != null && shopId.isNotEmpty) queryParams['shopId'] = shopId;
     if (q != null && q.trim().isNotEmpty) queryParams['q'] = q.trim();
     if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
@@ -185,6 +264,7 @@ class CatalogService {
     if (province != null && province.isNotEmpty) queryParams['location'] = province;
     if (mall == true) queryParams['mall'] = '1';
     if (freeship == true) queryParams['freeship'] = '1';
+    if (flash == true) queryParams['flash'] = '1';
 
     dynamic responseData;
     Map<String, dynamic>? responseMeta;
@@ -398,16 +478,25 @@ class CatalogService {
     return WebsiteData.commitments;
   }
 
-  /// So khớp sản phẩm với ngành hàng / danh mục
+  /// So khớp sản phẩm với ngành hàng / danh mục (hỗ trợ alias)
   static bool matchesCategory(Product p, String categoryTarget) {
     final target = categoryTarget.trim().toLowerCase();
     if (target.isEmpty) return true;
+    final resolvedTarget = resolveCategorySlug(target);
 
     final pCatId = p.categoryId.trim().toLowerCase();
+    final resolvedProdCat = resolveCategorySlug(pCatId);
     final pCatName = p.categoryName.trim().toLowerCase();
 
-    if (pCatId == target || pCatName == target) return true;
-    if (pCatName.contains(target) || target.contains(pCatName)) return true;
+    if (pCatId == target ||
+        resolvedProdCat == resolvedTarget ||
+        pCatName == target) {
+      return true;
+    }
+    if (pCatName.isNotEmpty &&
+        (pCatName.contains(target) || target.contains(pCatName))) {
+      return true;
+    }
 
     return false;
   }
@@ -418,16 +507,19 @@ class CatalogService {
     String? sort,
     bool? mall,
     bool? freeship,
+    bool? flash,
     String? categoryId,
   }) async {
     final q = query.trim();
+    final resolvedCategory = resolveCategorySlug(categoryId);
     try {
       final apiResult = await getProductsPaginated(
         q: q.isNotEmpty ? q : null,
         sort: sort,
         mall: mall,
         freeship: freeship,
-        categoryId: categoryId,
+        flash: flash,
+        categoryId: resolvedCategory.isNotEmpty ? resolvedCategory : null,
         limit: 60,
       );
 

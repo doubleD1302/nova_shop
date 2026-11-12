@@ -147,6 +147,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     });
   }
 
+  Map<String, dynamic>? _findSelectedVariant([Product? product]) {
+    final p = product ?? _product;
+    if (p == null || p.variants.isEmpty) return null;
+    final selectedParts = [_selectedOption1, _selectedOption2]
+        .where((s) => s.trim().isNotEmpty)
+        .map((s) => s.trim().toLowerCase())
+        .toList();
+    if (selectedParts.isEmpty) return p.variants.first;
+    for (final v in p.variants) {
+      final name = (v['name']?.toString() ?? '').toLowerCase();
+      if (selectedParts.every((part) => name.contains(part))) {
+        return v;
+      }
+    }
+    return p.variants.first;
+  }
+
+  double _displayedPrice(Product? p, Map<String, dynamic>? sku) {
+    final rawSkuPrice = sku?['price'];
+    final skuPrice = (rawSkuPrice is num)
+        ? rawSkuPrice.toDouble()
+        : double.tryParse(rawSkuPrice?.toString() ?? '');
+    if (skuPrice != null && skuPrice > 0) return skuPrice;
+    return p?.price ?? 150000.0;
+  }
+
+  double _displayedOriginalPrice(
+    Product? p,
+    Map<String, dynamic>? sku,
+    double displayedPrice,
+  ) {
+    final rawSkuOrig = sku?['originalPrice'];
+    final skuOrig = (rawSkuOrig is num)
+        ? rawSkuOrig.toDouble()
+        : double.tryParse(rawSkuOrig?.toString() ?? '');
+    if (skuOrig != null && skuOrig > displayedPrice) return skuOrig;
+    final prodOrig = p?.originalPrice ?? 0.0;
+    if (prodOrig > displayedPrice) return prodOrig;
+    return 0.0;
+  }
+
   Future<void> _loadProduct(String id) async {
     setState(() => _isLoading = _product == null);
     final p = await _catalogService.getProductDetail(id);
@@ -156,14 +197,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         _categoryAttributes = Map<String, dynamic>.from(attrRes['values'] as Map);
       });
     }
-    if (mounted && p != null) {
+    if (mounted && p != null) {
+      final initial = widget.initialProduct;
+      Product resolved = p;
+      if (initial != null &&
+          initial.isFlashSale &&
+          !p.isFlashSale &&
+          p.price > initial.price) {
+        final disc = initial.discount;
+        final mergedVariants = p.variants.isNotEmpty
+            ? p.variants.map((v) {
+                final rawV = v['price'];
+                final rawVOrig = v['originalPrice'];
+                final double vRaw = (rawV is num)
+                    ? rawV.toDouble()
+                    : (double.tryParse(rawV?.toString() ?? '') ?? p.price);
+                final double vOrigCand = (rawVOrig is num)
+                    ? rawVOrig.toDouble()
+                    : (double.tryParse(rawVOrig?.toString() ?? '') ?? 0.0);
+                final double vOrig = vOrigCand > vRaw ? vOrigCand : vRaw;
+                final double vFlash =
+                    ((vOrig * (1 - disc / 100.0)) / 1000.0).round() * 1000.0;
+                return {
+                  ...v,
+                  'price': vFlash > 0 && vFlash < vOrig ? vFlash : initial.price,
+                  'originalPrice': vOrig,
+                };
+              }).toList()
+            : initial.variants;
+        resolved = p.copyWith(
+          price: initial.price,
+          originalPrice: initial.originalPrice > initial.price
+              ? initial.originalPrice
+              : p.price,
+          discount: disc,
+          isFlashSale: true,
+          soldPercent: initial.soldPercent,
+          variants: mergedVariants,
+        );
+      }
+
       setState(() {
-        _product = p;
+        _product = resolved;
         _isLoading = false;
       });
-      _initDynamicVariants(p);
-      _loadReviewsAndSocial(p.id);
-      _loadRelatedProducts(p);
+      _initDynamicVariants(resolved);
+      _loadReviewsAndSocial(resolved.id);
+      _loadRelatedProducts(resolved);
     } else if (mounted) {
       setState(() => _isLoading = false);
       if (_product != null) {
@@ -796,9 +876,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   // 3. GIÁ, TIÊU ĐỀ & ĐÁNH GIÁ CHÍNH
   Widget _buildPriceAndTitleSection() {
     final p = _product;
-    final price = p?.price ?? 150000.0;
-    final origPrice = p?.originalPrice ?? (price * 1.3);
-    final discount = p?.discount ?? (origPrice > price ? (((origPrice - price) / origPrice) * 100).round() : 0);
+    final sku = _findSelectedVariant(p);
+    final price = _displayedPrice(p, sku);
+    final origPrice = _displayedOriginalPrice(p, sku, price);
+    final computedDisc = (origPrice > price && origPrice > 0)
+        ? (((origPrice - price) / origPrice) * 100).round()
+        : 0;
+    final discount = (p != null && p.discount > 0 && sku == null)
+        ? p.discount
+        : (computedDisc > 0 ? computedDisc : (p?.discount ?? 0));
 
     return Container(
       color: Colors.white,
@@ -1143,7 +1229,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   Widget _buildProductTabsSection() {
     final p = _product;
     final specs = p?.specs ?? {};
-    final categoryName = p?.categoryName.isNotEmpty == true ? p!.categoryName : 'Ngành hàng ShopNova';
+    final categoryName = p?.categoryName.isNotEmpty == true
+        ? p!.categoryName
+        : CatalogService.getCategoryName(p?.categoryId);
 
     return Container(
       color: Colors.white,
@@ -1740,14 +1828,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
                     final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.effectiveImageUrl ?? '');
 
+                    final sku = _findSelectedVariant(p);
+                    final cartPrice = _displayedPrice(p, sku);
+                    final cartOrig = _displayedOriginalPrice(p, sku, cartPrice);
+
                     await CartService().addToCart(
                       productId: pId,
                       productName: p?.name ?? 'Sản phẩm ShopNova',
                       productSlug: p?.id ?? pId,
-                      variantId: vId,
+                      variantId: sku?['id']?.toString() ?? vId,
                       variantName: vName.isNotEmpty ? vName : 'Tiêu chuẩn',
-                      price: p?.price ?? 180000,
-                      originalPrice: p?.originalPrice,
+                      price: cartPrice,
+                      originalPrice: cartOrig > cartPrice ? cartOrig : null,
                       qty: _quantity,
                       shopId: sId,
                       shopName: sName,
@@ -1788,14 +1880,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     final sMall = p?.badges.any((b) => b.toUpperCase().contains('MALL')) == true;
                     final img = (p?.images != null && p!.images.isNotEmpty) ? p.images.first : (p?.effectiveImageUrl ?? '');
 
+                    final sku = _findSelectedVariant(p);
+                    final buyPrice = _displayedPrice(p, sku);
+                    final buyOrig = _displayedOriginalPrice(p, sku, buyPrice);
+
                     await CartService().addToCart(
                       productId: pId,
                       productName: p?.name ?? 'Sản phẩm ShopNova',
                       productSlug: p?.id ?? pId,
-                      variantId: vId,
+                      variantId: sku?['id']?.toString() ?? vId,
                       variantName: vName.isNotEmpty ? vName : 'Tiêu chuẩn',
-                      price: p?.price ?? 180000,
-                      originalPrice: p?.originalPrice,
+                      price: buyPrice,
+                      originalPrice: buyOrig > buyPrice ? buyOrig : null,
                       qty: _quantity,
                       shopId: sId,
                       shopName: sName,
