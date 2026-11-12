@@ -12,7 +12,7 @@ void main() {
     // Verify bottom navigation is displayed.
     expect(find.text('Trang chủ'), findsOneWidget);
     expect(find.text('Gian hàng'), findsOneWidget);
-    expect(find.text('Nova AI'), findsOneWidget);
+    expect(find.text('Nova'), findsOneWidget);
     expect(find.text('Giỏ hàng'), findsOneWidget);
     expect(find.text('Tài khoản'), findsOneWidget);
   });

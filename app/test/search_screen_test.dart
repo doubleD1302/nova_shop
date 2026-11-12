@@ -15,8 +15,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Liên quan'), findsOneWidget);
-    expect(find.text('Bán chạy'), findsOneWidget);
+    expect(find.text('Phổ biến'), findsOneWidget);
     expect(find.text('Mới nhất'), findsOneWidget);
+    expect(find.text('Đánh giá cao'), findsOneWidget);
   });
 }

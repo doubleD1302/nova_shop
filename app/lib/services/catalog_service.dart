@@ -68,14 +68,14 @@ class CatalogService {
   static const Map<String, String> _categoryNames = {
     'thoi-trang-nam': 'Thời trang nam',
     'thoi-trang-nu': 'Thời trang nữ',
-    'dien-thoai': 'Điện thoại & Phụ kiện',
+    'dien-thoai': 'Điện thoại và phụ kiện',
     'may-tinh': 'Máy tính & Laptop',
     'phu-kien-cong-nghe': 'Phụ kiện công nghệ',
     'thiet-bi-gia-dung': 'Thiết bị gia dụng',
     'sac-dep': 'Sắc đẹp & Chăm sóc da',
-    'my-pham': 'Mỹ phẩm & Làm đẹp',
+    'my-pham': 'Mỹ phẩm',
     'nha-cua': 'Nhà cửa & Đời sống',
-    'nha-cua-doi-song': 'Nhà cửa & Đời sống',
+    'nha-cua-doi-song': 'Nhà cửa & đời sống',
     'me-be': 'Mẹ & Bé yêu',
     'bach-hoa': 'Bách hóa Online',
     'the-thao': 'Thể thao & Du lịch',
@@ -85,6 +85,24 @@ class CatalogService {
     'tui-xach': 'Túi xách',
     'dong-ho': 'Đồng hồ',
   };
+
+  static const Set<String> validSortKeys = {
+    'popular',
+    'newest',
+    'price-asc',
+    'price-desc',
+    'price_asc',
+    'price_desc',
+    'rating',
+    'discount',
+  };
+
+  /// Chuẩn hóa sort key đồng bộ với Backend & Website (mặc định 'popular')
+  static String resolveSortKey(String? sort) {
+    final normalized = sort?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty || normalized == 'relevance') return 'popular';
+    return validSortKeys.contains(normalized) ? normalized : 'popular';
+  }
 
   /// Chuẩn hóa slug ngành hàng (quy đổi alias về slug chuẩn của hệ thống)
   static String resolveCategorySlug(String? rawSlug) {
@@ -258,7 +276,7 @@ class CatalogService {
     if (resolvedCategory.isNotEmpty) queryParams['categoryId'] = resolvedCategory;
     if (shopId != null && shopId.isNotEmpty) queryParams['shopId'] = shopId;
     if (q != null && q.trim().isNotEmpty) queryParams['q'] = q.trim();
-    if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
+    if (sort != null && sort.trim().isNotEmpty) queryParams['sort'] = resolveSortKey(sort);
     if (minPrice != null && minPrice >= 0) queryParams['minPrice'] = minPrice.toInt().toString();
     if (maxPrice != null && maxPrice > 0) queryParams['maxPrice'] = maxPrice.toInt().toString();
     if (province != null && province.isNotEmpty) queryParams['location'] = province;
@@ -520,7 +538,7 @@ class CatalogService {
         freeship: freeship,
         flash: flash,
         categoryId: resolvedCategory.isNotEmpty ? resolvedCategory : null,
-        limit: 60,
+        limit: 100,
       );
 
       return SearchResult(

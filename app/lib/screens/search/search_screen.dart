@@ -29,7 +29,7 @@ class SearchScreen extends StatefulWidget {
     this.filterMall = false,
     this.filterFreeship = false,
     this.filterFlashSale = false,
-    this.initialSort = 'relevance',
+    this.initialSort = 'popular',
     this.catalogService,
   });
 
@@ -68,12 +68,12 @@ class _SearchScreenState extends State<SearchScreen> {
       _filterFlashSale ||
       _filterMall ||
       _filterFreeship ||
-      _selectedSort != 'relevance';
+      _selectedSort != 'popular';
 
   @override
   void initState() {
     super.initState();
-    _selectedSort = widget.initialSort;
+    _selectedSort = CatalogService.resolveSortKey(widget.initialSort);
     _filterMall = widget.filterMall;
     _filterFreeship = widget.filterFreeship;
     _filterFlashSale = widget.filterFlashSale;
@@ -173,21 +173,22 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
 
-      // Áp dụng bộ lọc sắp xếp bổ sung theo thứ tự hiển thị
-      if (_selectedSort == 'discount') {
-        list.sort((a, b) {
-          final discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : a.discount / 100.0;
-          final discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : b.discount / 100.0;
-          return discB.compareTo(discA);
-        });
-      } else if (_selectedSort == 'price_asc') {
-        list.sort((a, b) => a.price.compareTo(b.price));
-      } else if (_selectedSort == 'price_desc') {
-        list.sort((a, b) => b.price.compareTo(a.price));
-      } else if (_selectedSort == 'popular') {
-        list.sort((a, b) => b.soldNumeric.compareTo(a.soldNumeric));
-      } else if (_selectedSort == 'newest') {
-        list = list.reversed.toList();
+      // Chỉ sắp xếp bổ sung phía client khi dùng dữ liệu xoay tua Flash Sale;
+      // các truy vấn API khác giữ nguyên thứ tự sắp xếp chuẩn từ Backend SQL (giống Website).
+      if (_filterFlashSale && result.products.isEmpty && list.isNotEmpty) {
+        if (_selectedSort == 'discount') {
+          list.sort((a, b) {
+            final discA = a.originalPrice > a.price ? (a.originalPrice - a.price) / a.originalPrice : a.discount / 100.0;
+            final discB = b.originalPrice > b.price ? (b.originalPrice - b.price) / b.originalPrice : b.discount / 100.0;
+            return discB.compareTo(discA);
+          });
+        } else if (_selectedSort == 'price_asc') {
+          list.sort((a, b) => a.price.compareTo(b.price));
+        } else if (_selectedSort == 'price_desc') {
+          list.sort((a, b) => b.price.compareTo(a.price));
+        } else if (_selectedSort == 'rating') {
+          list.sort((a, b) => b.rating.compareTo(a.rating));
+        }
       }
 
       if (mounted) {
@@ -471,7 +472,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 setState(() {
                   _categoryId = null;
                   _categoryName = null;
-                  _pageTitle = null;
+                  _pageTitle = 'Toàn bộ sản phẩm ShopNova';
                 });
                 if (_currentQuery.isNotEmpty) {
                   _performSearch(_currentQuery);
@@ -517,13 +518,13 @@ class _SearchScreenState extends State<SearchScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         children: [
-          _buildSortChip('Liên quan', 'relevance'),
-          const SizedBox(width: 6),
-          _buildSortChip('Giảm sốc', 'discount'),
+          _buildSortChip('Phổ biến', 'popular'),
           const SizedBox(width: 6),
           _buildSortChip('Mới nhất', 'newest'),
           const SizedBox(width: 6),
-          _buildSortChip('Bán chạy', 'popular'),
+          _buildSortChip('Giảm sốc', 'discount'),
+          const SizedBox(width: 6),
+          _buildSortChip('Đánh giá cao', 'rating'),
           const SizedBox(width: 6),
           _buildSortChip('Giá thấp', 'price_asc'),
           const SizedBox(width: 6),
@@ -773,7 +774,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _filterMall = false;
       _filterFreeship = false;
       _filterFlashSale = false;
-      _selectedSort = 'relevance';
+      _selectedSort = 'popular';
     });
     Navigator.pushReplacement(
       context,

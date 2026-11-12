@@ -277,5 +277,60 @@ void main() {
       expect(requestedCategories, contains('giay-dep'));
       expect(find.text('Giày Chạy Bộ Bước Êm'), findsOneWidget);
     });
+
+    testWidgets('SearchScreen defaults to popular sort matching Website instead of invalid relevance sort', (tester) async {
+      expect(CatalogService.resolveSortKey('relevance'), 'popular');
+      expect(CatalogService.resolveSortKey(''), 'popular');
+      expect(CatalogService.resolveSortKey('rating'), 'rating');
+      expect(CatalogService.resolveSortKey('discount'), 'discount');
+      expect(CatalogService.resolveSortKey('unknown_sort'), 'popular');
+
+      Uri? capturedSearchUri;
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/api/v1/categories') {
+          return _jsonRes({'success': true, 'data': []});
+        }
+        if (request.url.path == '/api/v1/products') {
+          capturedSearchUri = request.url;
+          if (request.url.queryParameters['sort'] == 'relevance') {
+            return http.Response('{"success":false,"message":"Bộ lọc sản phẩm không hợp lệ."}', 400);
+          }
+          return _jsonRes({
+            'success': true,
+            'data': {
+              'products': [
+                {
+                  'id': 'tech-1',
+                  'name': 'Loa Bluetooth JBL Go 4',
+                  'price': 320000,
+                  'originalPrice': 890000,
+                  'categoryId': 'phu-kien-cong-nghe',
+                  'categoryName': 'Phụ kiện công nghệ',
+                },
+              ],
+              'total': 1,
+            },
+          });
+        }
+        return _jsonRes({'success': true, 'data': {}});
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(
+            categoryId: 'phu-kien-cong-nghe',
+            initialCategory: 'Phụ kiện công nghệ',
+            catalogService: CatalogService(client: mockClient),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(capturedSearchUri?.queryParameters['categoryId'], 'phu-kien-cong-nghe');
+      expect(capturedSearchUri?.queryParameters['sort'], 'popular');
+      expect(find.text('Loa Bluetooth JBL Go 4'), findsOneWidget);
+    });
   });
 }

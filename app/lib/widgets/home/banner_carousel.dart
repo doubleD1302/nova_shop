@@ -69,13 +69,36 @@ class _BannerCarouselState extends State<BannerCarousel> {
               return GestureDetector(
                 onTap: () {
                   final title = banner.title.toLowerCase();
-                  if (title.contains('mega') || title.contains('sale')) {
+                  if (title.contains('flash') || title.contains('mega') || title.contains('sale')) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => SearchScreen(
                           title: banner.title,
+                          filterFlashSale: true,
                           initialSort: 'discount',
+                        ),
+                      ),
+                    );
+                  } else if (title.contains('thời trang')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SearchScreen(
+                          title: 'Ngành hàng: Thời trang nam',
+                          initialCategory: 'Thời trang nam',
+                          categoryId: 'thoi-trang-nam',
+                        ),
+                      ),
+                    );
+                  } else if (title.contains('làm đẹp')) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SearchScreen(
+                          title: 'Ngành hàng: Mỹ phẩm',
+                          initialCategory: 'Mỹ phẩm',
+                          categoryId: 'my-pham',
                         ),
                       ),
                     );
@@ -105,7 +128,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                       MaterialPageRoute(
                         builder: (_) => SearchScreen(
                           title: banner.title,
-                          initialSort: 'newest',
+                          initialSort: 'popular',
                         ),
                       ),
                     );
