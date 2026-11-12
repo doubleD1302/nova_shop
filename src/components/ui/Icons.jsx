@@ -348,9 +348,76 @@ export const IconHeadphones = (p) => (
 
 export const IconBeautyCosmetics = (p) => (
   <Svg {...p}>
-    <path d="m12 3 1.5 3.5L17 8l-3.5 1.5L12 13l-1.5-3.5L7 8l3.5-1.5z" />
-    <path d="M19 14l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" />
-    <path d="M5 16l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" />
+    <rect x="4" y="10" width="7" height="11" rx="1.5" />
+    <path d="M5.5 10V5h4v5M6 5V3h3v2" />
+    <rect x="15" y="12" width="5" height="9" rx="1" />
+    <path d="M16 12V6l3-2v8M4 15h7" />
+  </Svg>
+)
+
+export const IconHandbag = (p) => (
+  <Svg {...p}>
+    <path d="M5 8h14l2 12H3L5 8Z" />
+    <path d="M8 9V6a4 4 0 0 1 8 0v3M8 12v1m8-1v1" />
+  </Svg>
+)
+
+export const IconBasket = (p) => (
+  <Svg {...p}>
+    <path d="M3 9h18l-2 11H5L3 9ZM7 9l4-6m6 6-4-6M9 13v3m6-3v3" />
+  </Svg>
+)
+
+export const IconBall = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m12 8 4 3-1.5 4h-5L8 11l4-3ZM12 8V3m4 8 4.5-1.5m-6 5.5 3 4.5m-8-4.5-3 4.5M8 11 3.5 9.5" />
+  </Svg>
+)
+
+export const IconCamera = (p) => (
+  <Svg {...p}>
+    <path d="M8 6l2-3h4l2 3h4a1 1 0 0 1 1 1v12H3V7a1 1 0 0 1 1-1h4Z" />
+    <circle cx="12" cy="12" r="4" />
+  </Svg>
+)
+
+export const IconCar = (p) => (
+  <Svg {...p}>
+    <path d="m5 10 2-6h10l2 6M3 10h18v8H3v-8ZM5 18v3m14-3v3M6 14h2m8 0h2" />
+  </Svg>
+)
+
+export const IconMic = (p) => (
+  <Svg {...p}>
+    <rect x="9" y="2" width="6" height="13" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0m-7 7v4m-4 0h8" />
+  </Svg>
+)
+
+export const IconExpand = (p) => (
+  <Svg {...p}>
+    <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+  </Svg>
+)
+
+export const IconThumbsUp = (p) => (
+  <Svg {...p}>
+    <path d="M8 10 12 3c2 0 3 1 2 4l-1 3h6a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H8V10ZM3 10h5v11H3V10Z" />
+  </Svg>
+)
+
+export const IconThumbsDown = (p) => (
+  <Svg {...p}>
+    <g transform="rotate(180 12 12)">
+      <path d="M8 10 12 3c2 0 3 1 2 4l-1 3h6a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H8V10ZM3 10h5v11H3V10Z" />
+    </g>
+  </Svg>
+)
+
+export const IconSend = (p) => (
+  <Svg {...p}>
+    <path d="M12 20V4m-6 6 6-6 6 6" />
   </Svg>
 )
 
@@ -447,5 +514,30 @@ export const IconDotsHorizontal = (p) => (
     <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
     <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
     <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  </Svg>
+)
+
+export const IconFlame = ({ className = 'h-4 w-4', filled = true, ...rest }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth={filled ? 0 : 1.75}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    {...rest}
+  >
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-.7-.28-1.34-.74-1.8L12 12l-.76.7c-.46.46-.74 1.1-.74 1.8z" />
+    <path d="M12 2c1.1 2.9 3.5 5 5 7.5 1.5 2.5 2 5.5 1 8.5-1.5 4.5-6.5 6-10 4-3-1.8-4.5-5.5-3.5-9 1-3.5 4-6 5.5-8.5.5-.8 1.4-1.7 2-2.5z" />
+  </svg>
+)
+
+export const IconTag = (p) => (
+  <Svg {...p}>
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
   </Svg>
 )

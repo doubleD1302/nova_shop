@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { DiscountBadge, ProductBadgeStack } from '../ui/Badge'
-import { IconBolt, IconCart, IconShieldCheck } from '../ui/Icons'
+import { IconBolt, IconCart, IconFlame, IconShieldCheck } from '../ui/Icons'
 import Price, { OldPrice } from '../ui/Price'
 import { RatingRow } from '../ui/Rating'
 import SmartImage from '../ui/SmartImage'
@@ -14,7 +14,7 @@ function SoldProgress({ percent = 0 }) {
     return (
       <div className="relative mt-2 flex h-[20px] items-center justify-center overflow-hidden rounded-full border border-[#E6D5C2] bg-[#F5E7D4]">
         <span className="flex items-center gap-1 text-[10.5px] font-bold tracking-wide text-[#BD6E49]">
-          <span className="inline-block animate-pulse text-[11px]">⚡</span>
+          <IconBolt className="h-3 w-3 fill-[#BD6E49] text-[#BD6E49] animate-pulse" />
           VỪA MỞ BÁN
         </span>
       </div>
@@ -33,7 +33,7 @@ function SoldProgress({ percent = 0 }) {
             p >= 50 ? 'text-[#FFFCF7]' : 'text-[#80513B]'
           }`}
         >
-          <span>🔥</span>
+          <IconFlame className={`h-3 w-3 ${p >= 50 ? 'fill-amber-300 text-amber-300' : 'fill-[#B93832] text-[#B93832]'}`} />
           {hot ? `SẮP CHÁY HÀNG ${p}%` : `ĐÃ BÁN ${p}%`}
         </span>
       </div>

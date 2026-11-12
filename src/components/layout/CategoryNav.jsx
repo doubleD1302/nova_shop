@@ -15,6 +15,11 @@ function isNavActive(linkTo, location) {
     return false
   }
 
+  // Đối với các trang riêng biệt (như /flash-sale, /ma-giam-gia), chỉ cần khớp pathname
+  if (targetPath !== '/tim-kiem') {
+    return true
+  }
+
   if (!targetSearch) {
     return !location.search
   }

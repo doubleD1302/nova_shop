@@ -83,7 +83,61 @@ export function getSessionLabel() {
   return `${startStr}:00 - ${endStr}:00 · ${title}`
 }
 
-export function rotateFlashProducts(products = [], count = 6) {
+export function getFlashSessions() {
+  const now = new Date()
+  const currentHour = now.getHours()
+  const currentSlot = Math.floor(currentHour / 2) * 2
+
+  const slotNames = {
+    0: 'Đêm Cuồng Nhiệt',
+    2: 'Săn Deal Nửa Đêm',
+    4: 'Bình Minh Đón Deal',
+    6: 'Khởi Đầu Ngày Mới',
+    8: 'Hàng Hiệu Buổi Sáng',
+    10: 'Giờ Vàng Giá Rẻ',
+    12: 'Nửa Ngày Săn Sale',
+    14: 'Deal Chớp Nhoáng',
+    16: 'Giờ Vàng Công Nghệ',
+    18: 'Top Deal Bán Chạy',
+    20: 'Đại Tiệc Tối Siêu Giảm',
+    22: 'Xả Kho Cuối Ngày',
+  }
+
+  const slots = []
+  for (let offset = -1; offset <= 3; offset++) {
+    const rawStart = (currentSlot + offset * 2) % 24
+    const start = rawStart < 0 ? rawStart + 24 : rawStart
+    const end = (start + 2) % 24
+    const startStr = String(start).padStart(2, '0')
+    const endStr = String(end).padStart(2, '0')
+
+    let status = 'upcoming'
+    let statusText = 'Sắp diễn ra'
+    if (offset < 0) {
+      status = 'ended'
+      statusText = 'Đã kết thúc'
+    } else if (offset === 0) {
+      status = 'active'
+      statusText = 'Đang diễn ra'
+    }
+
+    slots.push({
+      id: `slot_${start}`,
+      startHour: start,
+      endHour: end,
+      timeLabel: `${startStr}:00`,
+      rangeLabel: `${startStr}:00 - ${endStr}:00`,
+      title: slotNames[start] || 'Deal Chớp Nhoáng',
+      status,
+      statusText,
+      isActive: offset === 0,
+    })
+  }
+
+  return slots
+}
+
+export function rotateFlashProducts(products = [], count = 6, specificSlot = null) {
   if (!Array.isArray(products) || !products.length) return []
 
   const validProducts = products.filter((p) => {
@@ -95,8 +149,9 @@ export function rotateFlashProducts(products = [], count = 6) {
 
   const now = new Date()
   const daySeed = now.getFullYear() * 372 + (now.getMonth() + 1) * 31 + now.getDate()
-  const slot = Math.floor(now.getHours() / 2)
+  const slot = specificSlot !== null ? Math.floor(Number(specificSlot) / 2) : Math.floor(now.getHours() / 2)
   const sessionSeed = daySeed * 12 + slot
+
 
   const offset = sessionSeed % validProducts.length
   const selected = []

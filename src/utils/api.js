@@ -636,3 +636,22 @@ export function apiSendChatMessage(conversationId, payload, options = {}) {
     ...options,
   })
 }
+
+/**
+ * 4. Mã giảm giá (Vouchers) & Ví voucher
+ */
+export function apiGetPublicVouchers(options = {}) {
+  return apiRequest('/vouchers', options)
+}
+
+export function apiGetVoucherWallet(page = 1, options = {}) {
+  return apiRequest(`/vouchers/wallet?page=${encodeURIComponent(page)}`, options)
+}
+
+export function apiSaveVoucherToWallet(code, options = {}) {
+  return apiRequest('/vouchers/wallet', {
+    method: 'POST',
+    body: { code },
+    ...options,
+  })
+}

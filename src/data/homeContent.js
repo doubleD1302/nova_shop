@@ -5,8 +5,8 @@
 export const navLinks = [
   { label: 'Trang Chủ', to: '/' },
   { label: 'Nova Mall', to: '/tim-kiem?mall=1' },
-  { label: 'Flash Sale', to: '/tim-kiem?flash=1' },
-  { label: 'Mã Giảm Giá', to: '/tim-kiem?sort=discount' },
+  { label: 'Flash Sale', to: '/flash-sale' },
+  { label: 'Mã Giảm Giá', to: '/ma-giam-gia' },
   { label: 'Thời Trang', to: '/tim-kiem?category=thoi-trang-nam' },
   { label: 'Điện Tử & Công Nghệ', to: '/tim-kiem?category=dien-thoai' },
   { label: 'Nhà Cửa & Đời Sống', to: '/tim-kiem?category=nha-cua-doi-song' },
@@ -63,14 +63,14 @@ export const heroBanners = [
     to: '#A95532',
     emojis: '⚡',
     image: 'https://images.unsplash.com/photo-1607083206968-13611e3d76db?auto=format&fit=crop&w=600&q=85',
-    to_link: '/tim-kiem?flash=1',
+    to_link: '/flash-sale',
   },
 ]
 
 /** Icon tiện ích ngay dưới banner */
 export const quickLinks = [
-  { id: 'flash', label: 'Flash Sale', emoji: '⚡', bg: 'bg-[#F5E7D4]', to: '/tim-kiem?flash=1' },
-  { id: 'voucher', label: 'Đang giảm giá', emoji: '🎟️', bg: 'bg-[#F4E6D2]', to: '/tim-kiem?sort=discount' },
+  { id: 'flash', label: 'Flash Sale', emoji: '⚡', bg: 'bg-[#F5E7D4]', to: '/flash-sale' },
+  { id: 'voucher', label: 'Mã Giảm Giá', emoji: '🎟️', bg: 'bg-[#F4E6D2]', to: '/ma-giam-gia' },
   { id: 'freeship', label: 'Sản phẩm Freeship', emoji: '🚚', bg: 'bg-[#F5E7D4]', to: '/tim-kiem?freeship=1' },
   { id: 'mall', label: 'Gian hàng Mall', emoji: '💎', bg: 'bg-[#F4E6D2]', to: '/tim-kiem?mall=1' },
   { id: 'global', label: 'Hàng mới nhất', emoji: '✨', bg: 'bg-[#F5E7D4]', to: '/tim-kiem?sort=newest' },

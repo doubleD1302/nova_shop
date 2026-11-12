@@ -97,7 +97,7 @@ export default function FlashSale() {
           </span>
         </div>
         <Link
-          to="/tim-kiem?flash=1"
+          to="/flash-sale"
           className="group flex items-center gap-1 text-[13px] font-semibold text-[#BD6E49] transition hover:text-[#A95532]"
         >
           <span>Xem tất cả</span>

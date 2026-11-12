@@ -24,6 +24,8 @@ const SellerProductsPage = lazy(() => import('./pages/seller/SellerProductsPage'
 const SellerShopPage = lazy(() => import('./pages/seller/SellerShopPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const NovaAiPage = lazy(() => import('./pages/NovaAiPage'))
+const FlashSalePage = lazy(() => import('./pages/FlashSalePage'))
+const VouchersPage = lazy(() => import('./pages/VouchersPage'))
 
 function PageLoading() {
   return <div className="container-shop py-12 text-center text-sm text-muted">Đang mở trang...</div>
@@ -35,6 +37,11 @@ export default function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/flash-sale" element={<FlashSalePage />} />
+          <Route path="/ma-giam-gia" element={<VouchersPage />} />
+          <Route path="/voucher" element={<Navigate to="/ma-giam-gia" replace />} />
+          <Route path="/vouchers" element={<Navigate to="/ma-giam-gia" replace />} />
+          <Route path="/kho-voucher" element={<Navigate to="/ma-giam-gia" replace />} />
           <Route path="/tim-kiem" element={<SearchPage />} />
           <Route path="/san-pham/:slug" element={<ProductDetailPage />} />
           <Route path="/shop" element={<ShopsPage />} />
