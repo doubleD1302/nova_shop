@@ -13,13 +13,13 @@ import SmartImage from '../components/ui/SmartImage'
 import { isValidEmail, normalizeEmail } from '../utils/validation'
 
 const TABS = [
-  { id: 'profile', label: 'Há»“ sÆ¡', icon: <IconUser className="h-4 w-4" /> },
-  { id: 'address', label: 'Äá»‹a chá»‰ nháº­n hĂ ng', icon: <IconPackage className="h-4 w-4" /> },
+  { id: 'profile', label: 'Hồ sơ', icon: <IconUser className="h-4 w-4" /> },
+  { id: 'address', label: 'Địa chỉ nhận hàng', icon: <IconPackage className="h-4 w-4" /> },
   { id: 'password', label: 'Đổi mật khẩu', icon: <IconLock className="h-4 w-4" /> },
-  { id: 'shop', label: 'Gian hĂ ng cá»§a tĂ´i', icon: <IconStore className="h-4 w-4" /> },
+  { id: 'shop', label: 'Gian hàng của tôi', icon: <IconStore className="h-4 w-4" /> },
 ]
 
-/** TRANG TĂ€I KHOáº¢N â€” há»“ sÆ¡, Ä‘á»‹a chá»‰, thĂ´ng tin gian hĂ ng (náº¿u lĂ  ngÆ°á»i bĂ¡n) */
+/** TRANG TÀI KHOẢN — hồ sơ, địa chỉ, thông tin gian hàng (nếu là người bán) */
 export default function AccountPage() {
   const { user, avatar, updateProfile, changePassword } = useAuth()
   const [passwordDraft, setPasswordDraft] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -53,12 +53,12 @@ export default function AccountPage() {
   if (!user) {
     return (
       <div className="rounded-sm border border-line bg-white px-6 py-16 text-center">
-        <p className="text-[15px] font-semibold text-ink">Báº¡n chÆ°a Ä‘Äƒng nháº­p</p>
+        <p className="text-[15px] font-semibold text-ink">Bạn chưa đăng nhập</p>
         <Link
           to="/dang-nhap"
           className="mt-4 inline-block rounded-sm bg-brand px-5 py-2.5 text-[13px] font-medium text-white"
         >
-          ÄÄƒng nháº­p ngay
+          Đăng nhập ngay
         </Link>
       </div>
     )
@@ -72,11 +72,11 @@ export default function AccountPage() {
 
   const saveProfile = async () => {
     if (!profileDraft.fullName.trim()) {
-      pushToast('Vui lĂ²ng nháº­p há» vĂ  tĂªn.', 'error')
+      pushToast('Vui lòng nhập họ và tên.', 'error')
       return
     }
     if (!isValidEmail(profileDraft.email)) {
-      setEmailError('Vui lĂ²ng nháº­p email Ä‘Ăºng Ä‘á»‹nh dáº¡ng.')
+      setEmailError('Vui lòng nhập email đúng định dạng.')
       return
     }
     setSaving(true)
@@ -84,11 +84,11 @@ export default function AccountPage() {
     setSaving(false)
     if (!result.ok) {
       if (result.error?.toLowerCase().includes('email')) setEmailError(result.error)
-      else pushToast(result.error || 'KhĂ´ng thá»ƒ cáº­p nháº­t há»“ sÆ¡.', 'error')
+      else pushToast(result.error || 'Không thể cập nhật hồ sơ.', 'error')
       return
     }
     setEmailError('')
-    pushToast('ÄĂ£ cáº­p nháº­t há»“ sÆ¡.', 'success')
+    pushToast('Đã cập nhật hồ sơ.', 'success')
   }
 
   const savePassword = async (e) => {
@@ -133,15 +133,21 @@ export default function AccountPage() {
     const result = await updateProfile({ address: addressDraft })
     setSaving(false)
     if (!result.ok) {
-      pushToast(result.error || 'KhĂ´ng thá»ƒ lÆ°u Ä‘á»‹a chá»‰.', 'error')
+      pushToast(result.error || 'Không thể lưu địa chỉ.', 'error')
       return
     }
-    pushToast('ÄĂ£ lÆ°u Ä‘á»‹a chá»‰ nháº­n hĂ ng.', 'success')
+    pushToast('Đã lưu địa chỉ nhận hàng.', 'success')
   }
+
+  const subtitleParts = [
+    `@${user.username}`,
+    user.email,
+    user.role === 'seller' || user.shopId ? 'Kênh Người Bán' : 'Đăng ký bán hàng',
+  ].filter(Boolean)
 
   return (
     <div>
-      <Breadcrumb className="mb-2" items={[{ label: 'Trang chá»§', to: '/' }, { label: 'TĂ i khoáº£n cá»§a tĂ´i' }]} />
+      <Breadcrumb className="mb-2" items={[{ label: 'Trang chủ', to: '/' }, { label: 'Tài khoản của tôi' }]} />
 
       <div className="flex flex-wrap items-center gap-4 rounded-sm bg-white px-4 py-4">
         <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border border-line">
@@ -150,7 +156,7 @@ export default function AccountPage() {
         <div className="min-w-0">
           <p className="text-[16px] font-semibold text-ink">{user.fullName}</p>
           <p className="text-[12px] text-muted">
-            @{user.username} Â· {user.email} Â· {user.role === 'seller' || user.shopId ? 'Kênh Người Bán' : 'Đăng ký bán hàng'}
+            {subtitleParts.join(' · ')}
           </p>
           <span className="mt-1 inline-block rounded-sm bg-brand-soft px-2 py-[2px] text-[11px] text-brand">
             {user.rank}
@@ -160,18 +166,18 @@ export default function AccountPage() {
         <div className="ml-auto grid grid-cols-3 gap-4 text-center">
           <span>
             <b className="block text-[16px] text-brand">{buyerOrdersSummary.orderCount}</b>
-            <span className="text-[11px] text-muted">ÄÆ¡n hĂ ng</span>
+            <span className="text-[11px] text-muted">Đơn hàng</span>
           </span>
           <span>
             <b className="block text-[16px] text-brand">{formatVnd(spent)}</b>
-            <span className="text-[11px] text-muted">ÄĂ£ chi tiĂªu</span>
+            <span className="text-[11px] text-muted">Đã chi tiêu</span>
           </span>
           <span>
             <b className="flex items-center justify-center gap-1 text-[16px] text-brand">
               <IconHeart className="h-4 w-4" />
               {followedShopIds.length}
             </b>
-            <span className="text-[11px] text-muted">Shop theo dĂµi</span>
+            <span className="text-[11px] text-muted">Shop theo dõi</span>
           </span>
         </div>
       </div>
@@ -196,14 +202,14 @@ export default function AccountPage() {
             className="mt-1 flex w-full items-center gap-2 rounded-sm px-3 py-2 text-[13px] text-ink-soft transition hover:text-brand"
           >
             <IconStore className="h-4 w-4" />
-            {user.role === 'seller' ? 'KĂªnh NgÆ°á»i BĂ¡n' : 'ÄÄƒng kĂ½ bĂ¡n hĂ ng'}
+            {user.role === 'seller' ? 'Kênh Người Bán' : 'Đăng ký bán hàng'}
           </Link>
         </aside>
 
         <section className="rounded-sm border border-line bg-white p-4">
           {tab === 'profile' ? (
             <div className="max-w-[720px] space-y-4">
-              {/* Äá»”I áº¢NH Äáº I DIá»†N */}
+              {/* ĐỔI ẢNH ĐẠI DIỆN */}
               <AvatarPicker
                 value={{
                   avatarUrl: user.avatarUrl,
@@ -214,16 +220,16 @@ export default function AccountPage() {
                 purpose="avatar"
                 onChange={(patch) => {
                   updateProfile(patch).then((result) => {
-                    pushToast(result.ok ? 'ÄĂ£ cáº­p nháº­t áº£nh Ä‘áº¡i diá»‡n.' : result.error, result.ok ? 'success' : 'error')
+                    pushToast(result.ok ? 'Đã cập nhật ảnh đại diện.' : result.error, result.ok ? 'success' : 'error')
                   })
                 }}
-                title="áº¢nh Ä‘áº¡i diá»‡n cá»§a báº¡n"
-                note="Táº£i áº£nh Ä‘áº¡i diá»‡n tháº­t lĂªn mĂ¡y chá»§. áº¢nh sáº½ hiá»ƒn thá»‹ trĂªn header vĂ  Ä‘Æ¡n hĂ ng."
+                title="Ảnh đại diện của bạn"
+                note="Tải ảnh đại diện thật lên máy chủ. Ảnh sẽ hiển thị trên header và đơn hàng."
               />
 
               <div className="grid gap-3 md:grid-cols-2">
               <label className="text-[12px] text-muted">
-                Há» vĂ  tĂªn
+                Họ và tên
                 <input
                   value={profileDraft.fullName}
                   onChange={(e) => setProfileDraft((current) => ({ ...current, fullName: e.target.value }))}
@@ -231,7 +237,7 @@ export default function AccountPage() {
                 />
               </label>
               <label className="text-[12px] text-muted">
-                Sá»‘ Ä‘iá»‡n thoáº¡i
+                Số điện thoại
                 <input
                   value={profileDraft.phone}
                   onChange={(e) => setProfileDraft((current) => ({ ...current, phone: e.target.value }))}
@@ -249,7 +255,7 @@ export default function AccountPage() {
                     setEmailError('')
                   }}
                   onBlur={() => {
-                    if (!isValidEmail(profileDraft.email)) setEmailError('Vui lĂ²ng nháº­p email Ä‘Ăºng Ä‘á»‹nh dáº¡ng.')
+                    if (!isValidEmail(profileDraft.email)) setEmailError('Vui lòng nhập email đúng định dạng.')
                   }}
                   aria-invalid={Boolean(emailError)}
                   className={`mt-1 ${inputClass} ${emailError ? 'border-rose-500' : ''}`}
@@ -263,7 +269,7 @@ export default function AccountPage() {
                   disabled={saving}
                   className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105 disabled:opacity-50"
                 >
-                  {saving ? 'Äang lÆ°u...' : 'LÆ°u thay Ä‘á»•i'}
+                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
               </div>
@@ -273,7 +279,7 @@ export default function AccountPage() {
           {tab === 'address' ? (
             <div className="grid max-w-[720px] gap-3 md:grid-cols-2">
               <label className="text-[12px] text-muted">
-                NgÆ°á»i nháº­n
+                Người nhận
                 <input
                   value={address.fullName || ''}
                   onChange={setAddressField('fullName')}
@@ -281,17 +287,17 @@ export default function AccountPage() {
                 />
               </label>
               <label className="text-[12px] text-muted">
-                Sá»‘ Ä‘iá»‡n thoáº¡i
+                Số điện thoại
                 <input value={address.phone || ''} onChange={setAddressField('phone')} className={`mt-1 ${inputClass}`} />
               </label>
               <label className="text-[12px] text-muted">
-                Tá»‰nh / ThĂ nh phá»‘
+                Tỉnh / Thành phố
                 <select
                   value={address.province || ''}
                   onChange={setAddressField('province')}
                   className={`mt-1 ${inputClass}`}
                 >
-                  <option value="">Chá»n Tá»‰nh / ThĂ nh phá»‘</option>
+                  <option value="">Chọn Tỉnh / Thành phố</option>
                   {vietnamProvinces.map((p) => (
                     <option key={p.name} value={p.name}>
                       {p.name}
@@ -300,7 +306,7 @@ export default function AccountPage() {
                 </select>
               </label>
               <label className="text-[12px] text-muted">
-                Quáº­n / Huyá»‡n
+                Quận / Huyện
                 <input
                   value={address.district || ''}
                   onChange={setAddressField('district')}
@@ -308,11 +314,11 @@ export default function AccountPage() {
                 />
               </label>
               <label className="text-[12px] text-muted">
-                PhÆ°á»ng / XĂ£
+                Phường / Xã
                 <input value={address.ward || ''} onChange={setAddressField('ward')} className={`mt-1 ${inputClass}`} />
               </label>
               <label className="text-[12px] text-muted">
-                Äá»‹a chá»‰ chi tiáº¿t
+                Địa chỉ chi tiết
                 <input
                   value={address.detail || ''}
                   onChange={setAddressField('detail')}
@@ -326,7 +332,7 @@ export default function AccountPage() {
                   disabled={saving}
                   className="rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  LÆ°u Ä‘á»‹a chá»‰
+                  Lưu địa chỉ
                 </button>
               </div>
             </div>
@@ -347,14 +353,14 @@ export default function AccountPage() {
                     to={`/shop/${shop.id}`}
                     className="ml-auto rounded-sm border border-line px-3 py-1.5 text-[13px] text-ink-soft transition hover:border-brand hover:text-brand"
                   >
-                    Xem gian hĂ ng
+                    Xem gian hàng
                   </Link>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: 'Sáº£n pháº©m Ä‘ang bĂ¡n', value: formatNumber(shop.productCount) },
-                    { label: 'NgÆ°á»i theo dĂµi', value: formatNumber(shop.followers) },
-                    { label: 'ÄĂ¡nh giĂ¡ shop', value: `${shop.rating}/5` },
+                    { label: 'Sản phẩm đang bán', value: formatNumber(shop.productCount) },
+                    { label: 'Người theo dõi', value: formatNumber(shop.followers) },
+                    { label: 'Đánh giá shop', value: `${shop.rating}/5` },
                   ].map((s) => (
                     <div key={s.label} className="rounded-sm border border-line bg-page/60 px-3 py-2">
                       <p className="text-[16px] font-semibold text-brand">{s.value}</p>
@@ -366,20 +372,20 @@ export default function AccountPage() {
                   to="/nguoi-ban"
                   className="mt-4 inline-block rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  VĂ o KĂªnh NgÆ°á»i BĂ¡n
+                  Vào Kênh Người Bán
                 </Link>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-[14px] font-medium text-ink">Báº¡n chÆ°a cĂ³ gian hĂ ng</p>
+                <p className="text-[14px] font-medium text-ink">Bạn chưa có gian hàng</p>
                 <p className="mt-1 text-[13px] text-muted">
-                  NĂ¢ng cáº¥p tĂ i khoáº£n thĂ nh ngÆ°á»i bĂ¡n Ä‘á»ƒ báº¯t Ä‘áº§u Ä‘Äƒng sáº£n pháº©m vĂ  nháº­n Ä‘Æ¡n hĂ ng.
+                  Nâng cấp tài khoản thành người bán để bắt đầu đăng sản phẩm và nhận đơn hàng.
                 </p>
                 <Link
                   to="/nguoi-ban"
                   className="mt-4 inline-block rounded-sm bg-brand px-5 py-2 text-[13px] font-medium text-white transition hover:brightness-105"
                 >
-                  ÄÄƒng kĂ½ bĂ¡n hĂ ng
+                  Đăng ký bán hàng
                 </Link>
               </div>
             )
@@ -464,8 +470,7 @@ export default function AccountPage() {
         </section>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-muted">ThĂ´ng tin há»“ sÆ¡ Ä‘Æ°á»£c Ä‘á»“ng bá»™ vá»›i tĂ i khoáº£n ShopNova cá»§a báº¡n.</p>
+      <p className="mt-3 text-center text-[11px] text-muted">Thông tin hồ sơ được đồng bộ với tài khoản ShopNova của bạn.</p>
     </div>
   )
 }
-
