@@ -72,7 +72,9 @@ export async function uploadSellerImage(req, res, next) {
   }
 }
 
-export async function serveUploadedImage(req, res, next) {
+export async function serveUploadedImage(req, res) {
+  // Không cache lỗi: cấu hình kho ảnh có thể được sửa mà URL ảnh vẫn giữ nguyên.
+  res.set('Cache-Control', 'no-store')
   const filename = req.params.filename
   if (!/^(?:(?:avatar|review|product)-[1-9]\d{0,19}-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpg|webp)$/i.test(filename)) {
     return res.status(404).end()
@@ -90,14 +92,18 @@ export async function serveUploadedImage(req, res, next) {
     if (
       err?.name === 'NoSuchKey' ||
       err?.name === 'NotFound' ||
-      err?.name === 'AccessDenied' ||
-      err?.$metadata?.httpStatusCode === 404 ||
-      err?.$metadata?.httpStatusCode === 403 ||
       err?.Code === 'NoSuchKey'
     ) {
       return res.status(404).end()
     }
-    console.error(`[Uploads] Không thể tải ảnh ${filename}:`, err?.name || err?.message)
-    return res.status(404).end()
+    // Chỉ ghi mã lỗi và HTTP status; không ghi message/stack có thể chứa credential.
+    const code = /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(err?.name || '') ? err.name : 'UnknownError'
+    const status = err?.$metadata?.httpStatusCode
+    console.error(`[Uploads] Không thể tải ảnh ${filename}: code=${code}, status=${Number.isInteger(status) ? status : 'unknown'}`)
+    return res.status(503).json({
+      success: false,
+      message: 'Kho ảnh tạm thời không khả dụng.',
+      error: { code: 'IMAGE_STORAGE_UNAVAILABLE' },
+    })
   }
 }
