@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shopnova/widgets/common/nova_assets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shopnova/screens/account/addresses_screen.dart';
 import 'package:shopnova/screens/nova_ai/nova_ai_screen.dart';
@@ -14,12 +17,73 @@ import 'package:shopnova/services/auth_service.dart';
 import 'package:shopnova/theme/app_colors.dart';
 
 final Uint8List _transparentImage = Uint8List.fromList(<int>[
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
-  0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06,
-  0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44,
-  0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D,
-  0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42,
-  0x60, 0x82,
+  0x89,
+  0x50,
+  0x4E,
+  0x47,
+  0x0D,
+  0x0A,
+  0x1A,
+  0x0A,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x48,
+  0x44,
+  0x52,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1F,
+  0x15,
+  0xC4,
+  0x89,
+  0x00,
+  0x00,
+  0x00,
+  0x0A,
+  0x49,
+  0x44,
+  0x41,
+  0x54,
+  0x78,
+  0x9C,
+  0x63,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x05,
+  0x00,
+  0x01,
+  0x0D,
+  0x0A,
+  0x2D,
+  0xB4,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4E,
+  0x44,
+  0xAE,
+  0x42,
+  0x60,
+  0x82,
 ]);
 
 class _MockHttpOverrides extends HttpOverrides {
@@ -40,15 +104,31 @@ class _MockHttpClient implements HttpClient {
   String? userAgent;
 
   @override
-  void addCredentials(Uri url, String realm, HttpClientCredentials credentials) {}
+  void addCredentials(
+    Uri url,
+    String realm,
+    HttpClientCredentials credentials,
+  ) {}
   @override
-  void addProxyCredentials(String host, int port, String realm, HttpClientCredentials credentials) {}
+  void addProxyCredentials(
+    String host,
+    int port,
+    String realm,
+    HttpClientCredentials credentials,
+  ) {}
   @override
-  set authenticate(Future<bool> Function(Uri url, String scheme, String? realm)? f) {}
+  set authenticate(
+    Future<bool> Function(Uri url, String scheme, String? realm)? f,
+  ) {}
   @override
-  set authenticateProxy(Future<bool> Function(String host, int port, String scheme, String? realm)? f) {}
+  set authenticateProxy(
+    Future<bool> Function(String host, int port, String scheme, String? realm)?
+    f,
+  ) {}
   @override
-  set badCertificateCallback(bool Function(X509Certificate cert, String host, int port)? callback) {}
+  set badCertificateCallback(
+    bool Function(X509Certificate cert, String host, int port)? callback,
+  ) {}
   @override
   void close({bool force = false}) {}
   @override
@@ -57,7 +137,8 @@ class _MockHttpClient implements HttpClient {
   @override
   Future<HttpClientRequest> getUrl(Uri url) => openUrl('GET', url);
   @override
-  Future<HttpClientRequest> openUrl(String method, Uri url) async => _MockHttpClientRequest();
+  Future<HttpClientRequest> openUrl(String method, Uri url) async =>
+      _MockHttpClientRequest();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
@@ -89,7 +170,8 @@ class _MockHttpClientResponse implements HttpClientResponse {
   @override
   int get contentLength => _transparentImage.length;
   @override
-  HttpClientResponseCompressionState get compressionState => HttpClientResponseCompressionState.notCompressed;
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
   @override
   final HttpHeaders headers = _MockHttpHeaders();
 
@@ -111,7 +193,6 @@ class _MockHttpClientResponse implements HttpClientResponse {
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
-
 
 class _EmptyAddressHttpClient extends http.BaseClient {
   @override
@@ -140,70 +221,205 @@ void main() {
     NovaAIScreen.resetSession();
   });
 
-  testWidgets('NovaAIScreen renders clean real AI assistant without static prompt suggestions or fake welcome bubble', (WidgetTester tester) async {
-    await tester.runAsync(() => AuthService().logout());
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'NovaAIScreen renders clean real AI assistant without static prompt suggestions or fake welcome bubble',
+    (WidgetTester tester) async {
+      await tester.runAsync(() => AuthService().logout());
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: NovaAIScreen(isStandalone: false),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpWidget(
+        const MaterialApp(home: NovaAIScreen(isStandalone: false)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Nova AI'), findsOneWidget);
-    expect(find.text('24/7'), findsOneWidget);
-    expect(find.text('Trực tuyến • Trợ lý AI thông minh'), findsOneWidget);
-    expect(find.text('Tôi có thể giúp gì cho bạn?'), findsOneWidget);
-    expect(find.text('Nhắn tin với Nova AI...'), findsOneWidget);
+      expect(find.text('Nova'), findsOneWidget);
+      expect(find.byType(NovaNotes), findsOneWidget);
+      expect(find.text('24/7'), findsNothing);
+      expect(find.text('Trực tuyến • Trợ lý AI thông minh'), findsNothing);
+      expect(find.text('Trợ lý mua sắm ShopNova'), findsOneWidget);
+      expect(find.text('Bạn đang tìm gì hôm nay?'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.arrow_upward_rounded),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
 
-    // Ensure static suggestions, canned welcome bubble & static hints are absent
-    expect(find.text('Gợi ý:'), findsNothing);
-    expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsNothing);
-    expect(find.text('📦 Tra cứu đơn hàng của tôi'), findsNothing);
-    expect(find.text('Gợi ý có hữu ích?'), findsNothing);
-    expect(find.text('Nhập: size của mình là M, thích màu pastel...'), findsNothing);
-  });
+      // Ensure static suggestions, canned welcome bubble & static hints are absent
+      expect(find.text('Gợi ý:'), findsNothing);
+      expect(find.text('👗 Phối đồ đi tiệc < 500k'), findsNothing);
+      expect(find.text('📦 Tra cứu đơn hàng của tôi'), findsNothing);
+      expect(find.text('Gợi ý có hữu ích?'), findsNothing);
+      expect(
+        find.text('Nhập: size của mình là M, thích màu pastel...'),
+        findsNothing,
+      );
+    },
+  );
 
-  testWidgets('AddressesScreen Add Address bottom sheet uses warm ShopNova theme cleanly without overflow', (WidgetTester tester) async {
-    ApiClient().setHttpClientForTest(_EmptyAddressHttpClient());
-    await tester.runAsync(() => AuthService().logout());
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'Nova keeps composer visible with keyboard and large text on a small screen',
+    (tester) async {
+      await tester.runAsync(() => AuthService().logout());
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(1.6)),
+            child: child!,
+          ),
+          home: const NovaAIScreen(isStandalone: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final composer = tester.getRect(find.byType(TextField));
+      expect(composer.bottom, lessThanOrEqualTo(348));
+      expect(composer.top, greaterThanOrEqualTo(0));
+      expect(find.byTooltip('Quay lại'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-    await tester.pumpWidget(const MaterialApp(home: AddressesScreen()));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 50),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(seconds: 3),
-    );
-    expect(find.text('Chưa có địa chỉ nhận hàng nào'), findsOneWidget);
+  testWidgets(
+    'Nova renders HTTP response cards, sends page history and recovers from an error',
+    (tester) async {
+      await tester.runAsync(() => AuthService().logout());
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final requests = <Map<String, dynamic>>[];
+      final pending = Completer<http.Response>();
+      final client = MockClient((request) async {
+        requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+        if (requests.length == 1) return pending.future;
+        return http.Response(
+          jsonEncode({
+            'success': false,
+            'message': 'Chưa kết nối được. Bạn thử lại sau.',
+          }),
+          503,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      addTearDown(client.close);
+      await tester.pumpWidget(
+        MaterialApp(home: NovaAIScreen(httpClient: client)),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField),
+        'Tìm điện thoại dưới 10 triệu',
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('Gửi tin nhắn'));
+      await tester.pump();
+      expect(find.text('Đang trả lời…'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+      pending.complete(
+        http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'reply': 'Đây là lựa chọn trong ngân sách của bạn.',
+              'budget': {'total': 7300000},
+              'products': [
+                {
+                  'id': 'demo-phone',
+                  'name': 'Điện thoại mẫu',
+                  'price': 7300000,
+                  'imageUrl': '',
+                },
+              ],
+              'orderInfo': {'code': 'TEST-001', 'statusText': 'Đang giao'},
+              'catalogHasMore': true,
+              'catalogPage': 1,
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Đây là lựa chọn trong ngân sách của bạn.'),
+        findsOneWidget,
+      );
+      expect(find.text('Điện thoại mẫu'), findsOneWidget);
+      expect(find.text('Tổng các món gợi ý'), findsOneWidget);
+      expect(find.text('Đơn hàng: TEST-001'), findsOneWidget);
+      expect(find.byTooltip('Câu trả lời hữu ích'), findsOneWidget);
+      await tester.ensureVisible(find.text('Xem trang 2'));
+      await tester.tap(find.text('Xem trang 2'));
+      await tester.pumpAndSettle();
+      expect(requests.length, 2);
+      expect(requests.last['message'], 'Xem trang 2');
+      expect(
+        (requests.last['context']['history'] as List).any(
+          (m) => m['text'] == 'Tìm điện thoại dưới 10 triệu',
+        ),
+        isTrue,
+      );
+      expect(find.text('Chưa kết nối được. Bạn thử lại sau.'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-    await tester.tap(find.text('Thêm Địa Chỉ Mới'));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 50),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(seconds: 3),
-    );
+  testWidgets(
+    'AddressesScreen Add Address bottom sheet uses warm ShopNova theme cleanly without overflow',
+    (WidgetTester tester) async {
+      ApiClient().setHttpClientForTest(_EmptyAddressHttpClient());
+      await tester.runAsync(() => AuthService().logout());
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    expect(find.text('Thêm địa chỉ nhận hàng mới'), findsOneWidget);
-    expect(find.text('Họ và tên người nhận *'), findsOneWidget);
-    expect(find.text('Lưu Địa Chỉ'), findsOneWidget);
+      await tester.pumpWidget(const MaterialApp(home: AddressesScreen()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 50),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 3),
+      );
+      expect(find.text('Chưa có địa chỉ nhận hàng nào'), findsOneWidget);
 
-    final material = tester.widget<Material>(
-      find.ancestor(
-        of: find.text('Thêm địa chỉ nhận hàng mới'),
-        matching: find.byType(Material),
-      ).first,
-    );
-    expect(material.color, AppColors.surface);
-  });
+      await tester.tap(find.text('Thêm Địa Chỉ Mới'));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 50),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 3),
+      );
+
+      expect(find.text('Thêm địa chỉ nhận hàng mới'), findsOneWidget);
+      expect(find.text('Họ và tên người nhận *'), findsOneWidget);
+      expect(find.text('Lưu Địa Chỉ'), findsOneWidget);
+
+      final material = tester.widget<Material>(
+        find
+            .ancestor(
+              of: find.text('Thêm địa chỉ nhận hàng mới'),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(material.color, AppColors.surface);
+    },
+  );
 }

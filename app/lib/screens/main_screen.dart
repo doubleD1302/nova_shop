@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/common/nova_assets.dart';
+
 import 'package:shopnova/screens/home/home_screen.dart';
 import 'package:shopnova/screens/shop/shop_screen.dart';
 import 'package:shopnova/screens/cart/cart_screen.dart';
@@ -23,7 +26,8 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Column(
         children: [
-          if (_currentTabIndex == 0) const ShopNovaAppBar(), // Only show custom appbar on Home screen
+          if (_currentTabIndex == 0)
+            const ShopNovaAppBar(), // Only show custom appbar on Home screen
           Expanded(
             child: IndexedStack(
               index: _currentTabIndex,
@@ -73,27 +77,9 @@ class _MainScreenState extends State<MainScreen> {
               activeIcon: Icon(Icons.storefront_rounded),
               label: 'Gian hàng',
             ),
-            BottomNavigationBarItem(
-              icon: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.earth],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
-              ),
-              label: 'Nova AI',
+            const BottomNavigationBarItem(
+              icon: NovaMark(size: 28),
+              label: 'Nova',
             ),
             BottomNavigationBarItem(
               icon: AnimatedBuilder(
@@ -109,15 +95,25 @@ class _MainScreenState extends State<MainScreen> {
                           right: -6,
                           top: -4,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                            constraints: const BoxConstraints(
+                              minWidth: 15,
+                              minHeight: 15,
+                            ),
                             child: Text(
                               count > 99 ? '99+' : '$count',
-                              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -139,15 +135,25 @@ class _MainScreenState extends State<MainScreen> {
                           right: -6,
                           top: -4,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                            constraints: const BoxConstraints(
+                              minWidth: 15,
+                              minHeight: 15,
+                            ),
                             child: Text(
                               count > 99 ? '99+' : '$count',
-                              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),

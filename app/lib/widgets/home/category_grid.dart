@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shopnova/models/category_item.dart';
 import 'package:shopnova/theme/app_colors.dart';
+
 import '../../screens/search/search_screen.dart';
+import '../common/category_icon.dart';
 
 class CategoryGrid extends StatelessWidget {
   final List<CategoryItem> categories;
@@ -26,12 +28,16 @@ class CategoryGrid extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Tất Cả Danh Mục',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                const Expanded(
+                  child: Text(
+                    'Tất cả danh mục',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -44,11 +50,12 @@ class CategoryGrid extends StatelessWidget {
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.85,
+                  mainAxisExtent:
+                      68 + MediaQuery.textScalerOf(context).scale(12) * 3,
                 ),
                 itemCount: categories.length,
                 itemBuilder: (c, idx) {
@@ -62,7 +69,10 @@ class CategoryGrid extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => SearchScreen(
                             initialCategory: cat.name,
-                            categoryId: (cat.slug != null && cat.slug!.isNotEmpty) ? cat.slug : cat.id,
+                            categoryId:
+                                (cat.slug != null && cat.slug!.isNotEmpty)
+                                ? cat.slug
+                                : cat.id,
                             title: 'Ngành hàng: ${cat.name}',
                           ),
                         ),
@@ -75,16 +85,25 @@ class CategoryGrid extends StatelessWidget {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
+                            color: const Color(0xFFF5EFE7),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border, width: 0.8),
+                            border: Border.all(
+                              color: AppColors.border,
+                              width: 0.8,
+                            ),
                           ),
-                          child: Icon(cat.icon, color: AppColors.primary, size: 26),
+                          child: Center(
+                            child: CategoryIcon(slug: cat.slug ?? cat.id),
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           cat.name,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -114,56 +133,38 @@ class CategoryGrid extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'DANH MỤC NGÀNH HÀNG',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: () => _showAllCategoriesModal(context),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Text(
-                    'Xem tất cả >',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+              const Text(
+                'Khám phá danh mục',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
+              ),
+              TextButton(
+                onPressed: () => _showAllCategoriesModal(context),
+                style: TextButton.styleFrom(foregroundColor: AppColors.earth),
+                child: const Text('Xem tất cả', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          GridView.count(
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 8,
-            childAspectRatio: 0.88,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 8,
+              mainAxisExtent:
+                  68 + MediaQuery.textScalerOf(context).scale(12) * 3,
+            ),
             children: categories.map((category) {
               return InkWell(
                 borderRadius: BorderRadius.circular(12),
@@ -173,7 +174,10 @@ class CategoryGrid extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => SearchScreen(
                         initialCategory: category.name,
-                        categoryId: (category.slug != null && category.slug!.isNotEmpty) ? category.slug : category.id,
+                        categoryId:
+                            (category.slug != null && category.slug!.isNotEmpty)
+                            ? category.slug
+                            : category.id,
                         title: 'Ngành hàng: ${category.name}',
                       ),
                     ),
@@ -186,11 +190,13 @@ class CategoryGrid extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
+                        color: const Color(0xFFF5EFE7),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: AppColors.border, width: 0.8),
                       ),
-                      child: Icon(category.icon, color: AppColors.primary, size: 24),
+                      child: Center(
+                        child: CategoryIcon(slug: category.slug ?? category.id),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -201,7 +207,7 @@ class CategoryGrid extends StatelessWidget {
                         color: AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
