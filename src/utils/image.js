@@ -3,6 +3,8 @@
  * from the catalog API or the seller's uploaded/licensed product images.
  */
 
+import { API_BASE_URL } from './api'
+
 function esc(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -107,7 +109,7 @@ export function resolveImageUrl(url) {
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
   if (trimmed.startsWith('/')) {
-    return `http://localhost:3000${trimmed}`
+    return API_BASE_URL ? `${API_BASE_URL}${trimmed}` : trimmed
   }
   return trimmed
 }

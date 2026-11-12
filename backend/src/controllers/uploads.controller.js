@@ -87,7 +87,14 @@ export async function serveUploadedImage(req, res, next) {
     })
     return res.status(200).send(image.body)
   } catch (err) {
-    if (err?.name === 'NoSuchKey' || err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) {
+    if (
+      err?.name === 'NoSuchKey' ||
+      err?.name === 'NotFound' ||
+      err?.name === 'AccessDenied' ||
+      err?.$metadata?.httpStatusCode === 404 ||
+      err?.$metadata?.httpStatusCode === 403 ||
+      err?.Code === 'NoSuchKey'
+    ) {
       return res.status(404).end()
     }
     return next(err)

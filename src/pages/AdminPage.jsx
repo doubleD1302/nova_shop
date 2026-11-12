@@ -2193,7 +2193,7 @@ export default function AdminPage() {
                               <div className="flex items-center gap-2.5">
                                 {prod.images?.[0]?.url ? (
                                   <img
-                                    src={prod.images[0].url.startsWith('/') ? `http://localhost:3000${prod.images[0].url}` : prod.images[0].url}
+                                    src={resolveImageUrl(prod.images[0].url)}
                                     alt=""
                                     className="h-10 w-10 shrink-0 rounded-lg border border-[#E6D5C2] object-cover"
                                   />
@@ -3147,7 +3147,7 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                   {previewProduct.images && previewProduct.images.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {previewProduct.images.slice(0, 4).map((img, idx) => {
-                        const fullUrl = img.url?.startsWith('/') ? `http://localhost:3000${img.url}` : img.url
+                        const fullUrl = resolveImageUrl(img.url)
                         return (
                           <div key={idx} className="group relative overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FBF3E8]">
                             <img

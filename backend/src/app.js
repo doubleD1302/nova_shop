@@ -49,6 +49,22 @@ const corsOptions = {
       return callback(null, true)
     }
 
+    // Ở môi trường development: cho phép các thiết bị trong mạng nội bộ Wi-Fi/LAN truy cập test
+    if (env.nodeEnv === 'development') {
+      try {
+        const { hostname } = new URL(origin)
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+          /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+          /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)
+        ) {
+          return callback(null, true)
+        }
+      } catch {}
+    }
+
     // Nguồn không hợp lệ: không thêm header cho phép CORS
     return callback(null, false)
   },

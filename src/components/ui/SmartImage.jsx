@@ -1,25 +1,30 @@
 import { useEffect, useState } from 'react'
+import { productPlaceholder, resolveImageUrl } from '../../utils/image'
 
-/** Shows a plain empty state when there is no real image or its URL is unavailable. */
+/** Shows a clean styled fallback placeholder when there is no real image or its URL is unavailable. */
 export default function SmartImage({ src, fallback, alt = '', className = '', ...rest }) {
   const [failedUrls, setFailedUrls] = useState([])
 
   useEffect(() => setFailedUrls([]), [src, fallback])
-  const sources = [...new Set([src, ...(Array.isArray(fallback) ? fallback : [fallback])].filter(
+  const rawSources = [src, ...(Array.isArray(fallback) ? fallback : [fallback])].filter(
     (source) => typeof source === 'string' && source.length > 0,
-  ))]
+  )
+  const sources = [...new Set(rawSources.flatMap((s) => {
+    const resolved = resolveImageUrl(s)
+    return resolved && resolved !== s ? [resolved, s] : [s]
+  }))]
   const activeSrc = sources.find((source) => !failedUrls.includes(source)) || ''
 
   if (!activeSrc) {
+    const placeholder = productPlaceholder({ name: alt || 'ShopNova' })
     return (
-      <div
-        className={`${className} grid place-items-center bg-page px-1 text-center text-[10px] text-muted`}
-        role="img"
-        aria-label={alt || 'Chưa có ảnh'}
+      <img
+        src={placeholder}
+        alt={alt || 'Sản phẩm ShopNova'}
+        className={`${className} object-cover`}
+        draggable={false}
         {...rest}
-      >
-        Chưa có ảnh
-      </div>
+      />
     )
   }
 
