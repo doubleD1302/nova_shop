@@ -6,8 +6,11 @@ import sharp from 'sharp'
 const base = (process.env.CATALOG_BACKEND_URL || 'http://127.0.0.1:3000').replace(/\/$/, '')
 const password = process.env.CATALOG_SEED_PASSWORD
 assert.ok(password, 'Cần CATALOG_SEED_PASSWORD của các shop mẫu.')
-const catalog = JSON.parse(await readFile(new URL('../../data-api/seeders/catalog.json', import.meta.url), 'utf8'))
-const accounts = [
+const profile = process.env.CATALOG_SEED_PROFILE || 'catalog'
+assert.ok(['catalog', 'empty-categories'].includes(profile), 'Profile không hợp lệ.')
+const catalog = JSON.parse(await readFile(new URL(`../../data-api/seeders/${profile}.json`, import.meta.url), 'utf8'))
+const productCount = profile === 'catalog' ? 50 : 10
+const accounts = profile === 'empty-categories' ? catalog : [
   { category: 'me-be', username: 'shopmebe', slug: 'may-nho-me-be' },
   { category: 'bach-hoa', username: 'shopbachhoa', slug: 'an-nhien-bach-hoa' },
   { category: 'the-thao', username: 'shopthethao', slug: 'nang-dong-sports' },
@@ -44,11 +47,11 @@ const shopIds = []
 for (const account of accounts) {
   const category = categories.categories.find((row) => row.slug === account.category)
   assert.ok(category, `Thiếu danh mục ${account.category}.`)
-  assert.ok(category.productCount >= 50, `Danh mục ${account.category} chưa đủ 50 sản phẩm có ảnh.`)
+  assert.ok(category.productCount >= productCount, `Danh mục ${account.category} chưa đủ ${productCount} sản phẩm có ảnh.`)
   const publicShop = (await json(`/shops/${account.slug}`)).shop
   assert.ok(publicShop, 'Thiếu gian hàng public.')
   assert.equal(publicShop.status, 'active')
-  assert.equal(publicShop.productCount, 50)
+  assert.equal(publicShop.productCount, productCount)
   for (const url of [publicShop.logoUrl, publicShop.bannerUrl, category.imageUrl]) {
     assert.ok(url, 'Shop và danh mục cần có ảnh đại diện.')
     const image = await fetch(`${base}${url}`, { method: 'HEAD', signal: AbortSignal.timeout(30000) })
@@ -65,13 +68,13 @@ for (const account of accounts) {
     const sellerShop = await json('/seller/shop', { headers })
     assert.equal(sellerShop.shop.slug, account.slug)
     const own = await json('/seller/products?limit=100', { headers })
-    assert.equal(own.total, 50)
-    assert.equal(own.products.length, 50)
+    assert.equal(own.total, productCount)
+    assert.equal(own.products.length, productCount)
     assert.ok(own.products.every((product) => product.status === 'active' && product.approvalStatus === 'approved'))
     const result = await json(`/products?categoryId=${account.category}&shopId=${account.slug}&fullImages=1&limit=100`)
-    assert.equal(result.total, 50)
-    assert.equal(result.products.length, 50)
-    assert.equal(new Set(result.products.map((product) => product.name)).size, 50)
+    assert.equal(result.total, productCount)
+    assert.equal(result.products.length, productCount)
+    assert.equal(new Set(result.products.map((product) => product.name)).size, productCount)
     assert.deepEqual(new Set(result.products.map((product) => product.id)), new Set(own.products.map((product) => product.id)))
     const fixtures = catalog.find((group) => group.category === account.category).products
     for (let offset = 0; offset < result.products.length; offset += 4) {
@@ -99,10 +102,10 @@ for (const account of accounts) {
       assert.equal(other.products.length, 0)
     }
     shopIds.push({ productId: result.products[0].id })
-    console.log(`PASS ${account.username}: đăng nhập, đúng shop/danh mục, 50 sản phẩm và 200 ảnh giải mã được.`)
+    console.log(`PASS ${account.username}: đăng nhập, đúng shop/danh mục, ${productCount} sản phẩm và ${productCount * 4} ảnh giải mã được.`)
   } finally {
     if (login.refreshToken) await json('/auth/logout', { method: 'POST', headers, body: JSON.stringify({ refreshToken: login.refreshToken }) })
   }
 }
-assert.equal(imageCount, 600)
-console.log('PASS: 3 shop, 150 sản phẩm, 600 ảnh qua Backend → Data API → database/kho ảnh.')
+assert.equal(imageCount, accounts.length * productCount * 4)
+console.log(`PASS: ${accounts.length} shop, ${accounts.length * productCount} sản phẩm, ${imageCount} ảnh qua Backend → Data API → database/kho ảnh.`)

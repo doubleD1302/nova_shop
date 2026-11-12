@@ -8,6 +8,22 @@ Bộ dữ liệu học tập bổ sung ba ngành hàng trước đây chưa có 
 | Bách hóa Online | An Nhiên Bách Hóa | `shopbachhoa` | `an-nhien-bach-hoa` |
 | Thể thao & Du lịch | Năng Động Sports | `shopthethao` | `nang-dong-sports` |
 
+## Bổ sung năm danh mục trống
+
+Bộ `data-api/seeders/empty-categories.json` bổ sung năm danh mục có `productCount = 0` trên API public tại thời điểm khảo sát ngày 12/11/2026. Mỗi shop có đúng 10 sản phẩm và mỗi sản phẩm có bốn ảnh khác nội dung. Các sản phẩm nháp hoặc chưa được duyệt có trước vẫn được giữ nguyên.
+
+| Danh mục | Shop | Tên đăng nhập | Slug shop |
+| --- | --- | --- | --- |
+| Điện thoại và phụ kiện | Sao Mai Mobile | `shopdienthoai` | `sao-mai-mobile` |
+| Giày dép | Bước Êm Giày Dép | `shopgiaydep` | `buoc-em-giay-dep` |
+| Túi xách | Mộc Túi Xách | `shoptuixach` | `moc-tui-xach` |
+| Nhà cửa & đời sống | Nhà Xinh Living | `shopnhacua` | `nha-xinh-living` |
+| Phụ kiện công nghệ | Kết Nối Tech | `shopcongnghe` | `ket-noi-tech` |
+
+Đặt thêm `$env:CATALOG_SEED_PROFILE = 'empty-categories'` trước các lệnh seed/kiểm tra bên dưới để chọn bộ này. Không đặt biến hoặc dùng `catalog` để giữ bộ ba shop cũ. Không có thay đổi schema, API hoặc dữ liệu frontend tĩnh. Trang shop lấy tên danh mục từ API; breadcrumb và thông tin chi tiết ưu tiên `product.categoryName` để các slug ngoài danh sách mẫu cũng hiển thị đúng tên.
+
+Ảnh điện thoại và thiết bị công nghệ lấy từ trang sản phẩm [CellphoneS](https://cellphones.com.vn/); giày và túi từ [Decathlon Việt Nam](https://www.decathlon.vn/); đồ dùng bàn ăn từ [IKEA](https://www.ikea.com/us/en/). Manifest lưu URL trang nguồn và từng ảnh. Giá VND là giá mẫu, đặc biệt sản phẩm IKEA dùng giá thực hành tự đặt, không quy đổi giá bán USD. Tên và ảnh dùng tham khảo trong dự án học tập; không gán giấy phép tự do cho ảnh nguồn.
+
 ## Chuẩn bị
 
 Chạy Backend và Data API với cùng database MySQL/TiDB dev/test. Backend phải cấu hình kho ảnh dùng chung nếu web/app hoặc các máy khác cũng truy cập dữ liệu. Khi dùng Backend đã triển khai, đặt `CATALOG_BACKEND_URL` trỏ tới chính Backend đó để ảnh được tải lên đúng kho mà website/app đang đọc. Cùng database không có nghĩa là hai Backend dùng cùng kho ảnh. Script không dùng SQLite fallback, không đổi schema và từ chối môi trường production của tiến trình seed.
@@ -22,7 +38,7 @@ $env:CATALOG_SEED_PASSWORD = Read-Host 'Mật khẩu chung cho ba shop mẫu'
 npm run seed:catalog
 ```
 
-`CATALOG_SEED_DB` phải khớp chính xác `DB_NAME`. Mật khẩu cần ít nhất tám ký tự, tối đa 72 byte và được hash bằng bcrypt. Không ghi mật khẩu thật vào source, file ZIP hoặc tài liệu dùng chung. Database cần có một quản trị viên đang hoạt động để ghi nhận khởi tạo shop/sản phẩm mẫu. Đây là dữ liệu seed được đặt trạng thái `active`/`approved` để dùng ngay; luồng đăng sản phẩm thông thường của seller vẫn phải qua kiểm duyệt.
+`CATALOG_SEED_DB` phải khớp chính xác `DB_NAME`. Mật khẩu cần ít nhất tám ký tự, tối đa 72 byte và được hash bằng bcrypt. Không ghi mật khẩu thật vào source, file ZIP hoặc tài liệu dùng chung. Database cần có một quản trị viên đang hoạt động để ghi nhận khởi tạo shop/sản phẩm mẫu. Đây là dữ liệu seed được đặt trạng thái `active`/`approved` để dùng ngay; luồng đăng sản phẩm thông thường của seller vẫn phải qua kiểm duyệt. Công cụ seed dùng Sequelize/mysql2 trong Data API với thời gian chờ kết nối 25 giây, chờ pool 30 giây để chịu được độ trễ khởi động cloud; không đổi timeout readiness của dịch vụ HTTP.
 
 ## Cách hoạt động và chạy lại
 
@@ -34,6 +50,7 @@ npm run seed:catalog
 - Trước khi upload và ghi sản phẩm mới, script so hash của cả bốn file để chặn ảnh trùng nội dung dù URL khác nhau. API upload kiểm tra file ảnh giải mã được và giới hạn kích thước.
 - Có thể chạy lại với cùng mật khẩu. Script giữ nguyên sản phẩm có slug đã tạo và không đặt lại giá, tồn kho hoặc mật khẩu. Xung đột tài khoản/shop/slug dừng quá trình thay vì ghi đè. Không chạy đồng thời nhiều tiến trình seed.
 - `data-api/data/catalog-uploads.json` là checkpoint local, bị Git ignore. File chỉ lưu URL ảnh đã upload, không lưu mật khẩu hoặc token. Giữ file này nếu seed bị gián đoạn; lần chạy sau kiểm tra ảnh đã có trước khi dùng lại. Nếu checkpoint thuộc môi trường khác, giữ riêng file cũ trước khi seed cho môi trường mới.
+- Bộ năm shop dùng checkpoint riêng `data-api/data/empty-categories-uploads.json`, không dùng chung checkpoint với ba shop cũ.
 - Đổi database hoặc kho ảnh cần cấu hình lại môi trường và chạy seed tại đó. Việc commit source không tự đồng bộ dữ liệu sang database khác. File ZIP source không chứa database dump hoặc file `.env`.
 
 ## Kiểm tra dữ liệu thật
@@ -45,5 +62,7 @@ node backend/scripts/test-catalog.mjs
 ```
 
 Kiểm tra gọi Backend thật: đăng nhập từng seller, shop hoạt động, danh mục có sản phẩm, danh sách public/seller khớp nhau, 50 tên riêng biệt mỗi shop, giá đúng manifest, SKU có tồn kho và đầy đủ 600 ảnh có thể tải và giải mã. Kiểm tra cũng xác nhận seller không đọc được chi tiết quản lý sản phẩm của shop khác. Script không đặt hàng hoặc sửa sản phẩm; các phiên đăng nhập kiểm tra được đăng xuất sau khi dùng.
+
+Khi chọn `empty-categories`, cùng kiểm tra xác nhận năm seller, 10 tên riêng biệt mỗi shop, 50 sản phẩm và 200 ảnh giải mã được. Có thể đặt `CATALOG_BACKEND_URL` là origin web triển khai để kiểm tra cả đường proxy API và ảnh của web.
 
 Giá và tồn kho là dữ liệu thực hành. Việc dữ liệu được API đọc đúng không thay thế kiểm thử giao diện web/Flutter trên thiết bị.

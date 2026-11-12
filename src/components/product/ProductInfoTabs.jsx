@@ -12,7 +12,7 @@ const TABS = [
 export default function ProductInfoTabs({ product }) {
   const [tab, setTab] = useState('desc')
 
-  const categoryLabel = getCategoryName(product?.categoryId) || product?.categoryName || 'Sản phẩm tiêu chuẩn'
+  const categoryLabel = product?.categoryName || getCategoryName(product?.categoryId) || 'Sản phẩm tiêu chuẩn'
   const shopLabel = product?.shopName || 'ShopNova Official Store'
   const locationLabel = product?.location || 'TP. Hồ Chí Minh'
   const stockCount = typeof product?.stock === 'number' ? product.stock : 120

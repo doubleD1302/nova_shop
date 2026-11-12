@@ -37,7 +37,7 @@ export default function ShopPage() {
   const products = productResult.products
   const pageItems = products
   const totalPages = Math.max(1, Math.ceil(productResult.total / PAGE_SIZE))
-  const shopCategories = categories.map((category) => [category.id, Number(category.productCount) || 0])
+  const shopCategories = categories.map((category) => [category.id, category.name])
 
   useEffect(() => {
     let current = true
@@ -121,7 +121,7 @@ export default function ShopPage() {
               Tất cả sản phẩm
               <span className="text-[11px] text-muted">{shop.productCount}</span>
             </button>
-            {shopCategories.map(([cid]) => (
+            {shopCategories.map(([cid, categoryName]) => (
               <button
                 key={cid}
                 type="button"
@@ -130,7 +130,7 @@ export default function ShopPage() {
                   categoryFilter === cid ? 'bg-brand-soft font-medium text-brand' : 'text-ink-soft hover:text-brand'
                 }`}
               >
-                <span className="truncate">{getCategoryName(cid)}</span>
+                <span className="truncate">{categoryName || getCategoryName(cid)}</span>
                 <span className="text-[11px] text-muted"> </span>
               </button>
             ))}

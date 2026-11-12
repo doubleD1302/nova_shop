@@ -2,12 +2,16 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import bcrypt from 'bcryptjs'
 import { env } from '../src/config/env.js'
-import { executeQuery, executeTransaction, closeDatabase } from '../src/config/database.js'
+import { executeQuery, executeTransaction, closeDatabase } from './seed-db.mjs'
 import { validUploadedImage } from '../src/utils/seller-product.validation.js'
 
-const catalogUrl = new URL('../seeders/catalog.json', import.meta.url)
-const cacheUrl = new URL('../data/catalog-uploads.json', import.meta.url)
-const shops = [
+const profile = process.env.CATALOG_SEED_PROFILE || 'catalog'
+if (!['catalog', 'empty-categories'].includes(profile)) throw new Error('CATALOG_SEED_PROFILE không hợp lệ.')
+const catalogUrl = new URL(`../seeders/${profile}.json`, import.meta.url)
+const cacheUrl = new URL(`../data/${profile}-uploads.json`, import.meta.url)
+const catalog = JSON.parse(await readFile(catalogUrl, 'utf8'))
+const productCount = profile === 'catalog' ? 50 : 10
+const shops = profile === 'empty-categories' ? catalog.map(({ products, ...shop }) => shop) : [
   { category: 'me-be', categoryName: 'Mẹ & Bé yêu', username: 'shopmebe', slug: 'may-nho-me-be', name: 'Mây Nhỏ Mẹ & Bé', tagline: 'Đồ dùng, tã bỉm và đồ chơi cho bé' },
   { category: 'bach-hoa', categoryName: 'Bách hóa Online', username: 'shopbachhoa', slug: 'an-nhien-bach-hoa', name: 'An Nhiên Bách Hóa', tagline: 'Sữa, bánh kẹo và thực phẩm đóng gói' },
   { category: 'the-thao', categoryName: 'Thể thao & Du lịch', username: 'shopthethao', slug: 'nang-dong-sports', name: 'Năng Động Sports', tagline: 'Dụng cụ tập luyện, thể thao và dã ngoại' },
@@ -33,12 +37,12 @@ function settings() {
 }
 
 function validateCatalog(catalog) {
-  if (!Array.isArray(catalog) || catalog.length !== shops.length) throw new Error('Catalog phải gồm đúng 3 danh mục.')
+  if (!Array.isArray(catalog) || catalog.length !== shops.length || shops.length !== (profile === 'catalog' ? 3 : 5)) throw new Error('Số danh mục không hợp lệ.')
   const slugs = new Set()
-  const imageHosts = ['cdn1.concung.com', 'contents.mediadecathlon.com']
+  const imageHosts = ['cdn1.concung.com', 'contents.mediadecathlon.com', 'cdn2.cellphones.com.vn', 'www.ikea.com']
   for (const shop of shops) {
     const groups = catalog.filter((group) => group.category === shop.category)
-    if (groups.length !== 1 || groups[0].products?.length !== 50) throw new Error(`Cần đúng 50 sản phẩm cho ${shop.category}.`)
+    if (groups.length !== 1 || groups[0].products?.length !== productCount) throw new Error(`Cần đúng ${productCount} sản phẩm cho ${shop.category}.`)
     for (const product of groups[0].products) {
       if (typeof product.name !== 'string' || !product.name.trim() || product.name.length > 200 ||
           typeof product.brand !== 'string' || product.brand.length > 120 || !/^\d+$/.test(String(product.sourceId)) ||
@@ -47,7 +51,7 @@ function validateCatalog(catalog) {
         throw new Error('Tên, giá, thương hiệu hoặc bộ 4 ảnh không hợp lệ.')
       }
       const source = new URL(product.sourceUrl)
-      if (source.protocol !== 'https:' || !['concung.com', 'www.decathlon.vn'].includes(source.hostname) || source.username || source.password) {
+      if (source.protocol !== 'https:' || !['concung.com', 'www.decathlon.vn', 'cellphones.com.vn', 'www.ikea.com'].includes(source.hostname) || source.username || source.password) {
         throw new Error('Nguồn tham khảo không hợp lệ.')
       }
       for (const image of product.images) {
@@ -112,13 +116,12 @@ async function prepareShops(password) {
 async function requestJson(url, options = {}) {
   const response = await fetch(url, { ...options, signal: AbortSignal.timeout(60000) })
   const payload = await response.json().catch(() => null)
-  if (!response.ok || payload?.success !== true) throw new Error(`HTTP ${response.status}: ${payload?.error?.code || 'INVALID_RESPONSE'}`)
+  if (!response.ok || payload?.success !== true) throw new Error(`${new URL(url).pathname}: HTTP ${response.status}: ${payload?.error?.code || 'INVALID_RESPONSE'}`)
   return payload.data
 }
 
 async function seedCatalog() {
   const { password, backend } = settings()
-  const catalog = JSON.parse(await readFile(catalogUrl, 'utf8'))
   validateCatalog(catalog)
   // Phát hiện xung đột trước khi tạo tài khoản hoặc tải ảnh.
   const expected = new Map(shops.flatMap((shop) => shop.products.map((product) => [product.slug, { shop, product }])))
@@ -201,7 +204,7 @@ async function seedCatalog() {
           await query(`INSERT INTO product_images (product_id, url, alt_text, sort_order, author, license_name) VALUES ${images.map(() => '(?, ?, ?, ?, ?, ?)').join(',')}`, images.flatMap((url, index) => [inserted.insertId, url, `${product.name} - ảnh ${index + 1}`.slice(0, 200), index, 'Ảnh do người bán tải lên', 'Ảnh do người bán cung cấp']))
         }, 15000)
         created += 1
-        if (created % 10 === 0) console.log(`${shop.username}: đã thêm ${created}/50 sản phẩm.`)
+        if (created % 10 === 0) console.log(`${shop.username}: đã thêm ${created}/${productCount} sản phẩm.`)
       }
       // Dùng ảnh đã tải lên để logo/banner cũng đọc được qua Backend trên web và app.
       await executeQuery(`UPDATE shops s JOIN products p ON p.shop_id=s.id AND p.slug=? JOIN product_images i ON i.product_id=p.id AND i.sort_order=0 SET s.logo_url=COALESCE(s.logo_url,i.url), s.banner_url=COALESCE(s.banner_url,i.url) WHERE s.id=? AND (s.logo_url IS NULL OR s.banner_url IS NULL)`, [shop.products[0].slug, shop.id], 15000)
@@ -212,7 +215,7 @@ async function seedCatalog() {
       if (login.refreshToken) await requestJson(`${backend}/api/v1/auth/logout`, { method: 'POST', headers, body: JSON.stringify({ refreshToken: login.refreshToken }) }).catch(() => {})
     }
   }
-  console.log('Đã xử lý 3 shop. Chạy kiểm tra catalog qua Backend trước khi bàn giao.')
+  console.log(`Đã xử lý ${shops.length} shop. Chạy kiểm tra catalog qua Backend trước khi bàn giao.`)
 }
 
 try {

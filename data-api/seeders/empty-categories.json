@@ -1,0 +1,702 @@
+[
+  {
+    "category": "dien-thoai",
+    "categoryName": "Điện thoại và phụ kiện",
+    "username": "shopdienthoai",
+    "slug": "sao-mai-mobile",
+    "name": "Sao Mai Mobile",
+    "tagline": "Điện thoại thông minh cho học tập và giải trí",
+    "products": [
+      {
+        "sourceId": "323687800105",
+        "sourceUrl": "https://cellphones.com.vn/iphone-16.html",
+        "name": "iPhone 16 128GB",
+        "brand": "Apple",
+        "price": 24490000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-16-1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-16-2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-16-3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-16-4.png"
+        ]
+      },
+      {
+        "sourceId": "652567767967",
+        "sourceUrl": "https://cellphones.com.vn/iphone-15.html",
+        "name": "iPhone 15 128GB",
+        "brand": "Apple",
+        "price": 21490000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-15-plus_1__1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/v/n/vn_iphone_15_pink_pdp_image_position-2_design_2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/v/n/vn_iphone_15_pink_pdp_image_position-3_design_detail_2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/v/n/vn1b93_1_2.jpg"
+        ]
+      },
+      {
+        "sourceId": "1069281750303",
+        "sourceUrl": "https://cellphones.com.vn/iphone-13.html",
+        "name": "iPhone 13 128GB",
+        "brand": "Apple",
+        "price": 15290000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-13_2_2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone_13_pdp_position-1b_color_midnight__vn.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone_13_pdp_position-2_size_comparison__vn.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone_13_pdp_position-3_camera__vn.png"
+        ]
+      },
+      {
+        "sourceId": "774497936427",
+        "sourceUrl": "https://cellphones.com.vn/iphone-17-256gb.html",
+        "name": "iPhone 17 256GB",
+        "brand": "Apple",
+        "price": 28490000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone_17_256gb-3_2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-17-256gb.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-17-256gb-1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/i/p/iphone-17-256gb-2.jpg"
+        ]
+      },
+      {
+        "sourceId": "813211938801",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-samsung-galaxy-a56.html",
+        "name": "Samsung Galaxy A56 5G 8GB 128GB",
+        "brand": "Samsung",
+        "price": 8990000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a56_5g_8gb_128gb_-_1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a56_5g_8gb_128gb_-_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a56_5g_8gb_128gb_-_3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a56_5g_8gb_128gb_-_4.png"
+        ]
+      },
+      {
+        "sourceId": "420310831311",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-samsung-galaxy-s25-ultra.html",
+        "name": "Samsung Galaxy S25 Ultra 12GB 256GB",
+        "brand": "Samsung",
+        "price": 25790000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_s25_ultra_-_1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_s25_ultra_-_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_s25_ultra_-_4.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_s25_ultra_-_5.png"
+        ]
+      },
+      {
+        "sourceId": "1018837038788",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-samsung-galaxy-a36.html",
+        "name": "Samsung Galaxy A36 5G 8GB 128GB",
+        "brand": "Samsung",
+        "price": 7490000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a36_5g_8gb_128gb_-_1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a36_5g_8gb_128gb_-_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a36_5g_8gb_128gb_-_3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/a/samsung_galaxy_a36_5g_8gb_128gb_-_4.png"
+        ]
+      },
+      {
+        "sourceId": "542181022694",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-oppo-find-x8.html",
+        "name": "OPPO Find X8 16GB 512GB",
+        "brand": "OPPO",
+        "price": 19490000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-oppo-find-x8.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-oppo-find-x8-2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-oppo-find-x8-1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-oppo-find-x8-3.jpg"
+        ]
+      },
+      {
+        "sourceId": "97696602657",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-xiaomi-redmi-note-14-pro-plus.html",
+        "name": "Xiaomi Redmi Note 14 Pro Plus 5G 8GB 256GB",
+        "brand": "Xiaomi",
+        "price": 8290000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/x/i/xiaomi_redmi_note_14_pro_plus_5g_8gb_256gb_-_1.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/x/i/xiaomi_redmi_note_14_pro_plus_5g_8gb_256gb_-_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/x/i/xiaomi_redmi_note_14_pro_plus_5g_8gb_256gb_-_4.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/x/i/xiaomi_redmi_note_14_pro_plus_5g_8gb_256gb_-_3.png"
+        ]
+      },
+      {
+        "sourceId": "82433772900",
+        "sourceUrl": "https://cellphones.com.vn/dien-thoai-samsung-galaxy-a17-5g.html",
+        "name": "Samsung Galaxy A17 5G 8GB 128GB",
+        "brand": "Samsung",
+        "price": 7300000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-samsung-galaxy-a17-5g_1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-samsung-galaxy-a17-5g-1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-samsung-galaxy-a17-5g-2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/s/l/slider-samsung-galaxy-a17-5g-3.jpg"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "giay-dep",
+    "categoryName": "Giày dép",
+    "username": "shopgiaydep",
+    "slug": "buoc-em-giay-dep",
+    "name": "Bước Êm Giày Dép",
+    "tagline": "Giày đi bộ, chạy bộ và dã ngoại",
+    "products": [
+      {
+        "sourceId": "8844095",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-leo-núi-hiking-nam-cổ-thấp-nh50-đen-quechua-8844095.html",
+        "name": "Giày leo núi hiking nam cổ thấp - NH50 đen",
+        "brand": "QUECHUA",
+        "price": 339000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3170935/k$aa31149c65dd156d3602f537b555f17a/men-s-hiking-boots-nh50-black-quechua-8844095.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3054544/k$0adc723ebe860b8fda0cb549621b872e/men-s-hiking-boots-nh50-black-quechua-8844095.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3043441/k$aea863ded313f91d645e8376f9777c91/men-s-hiking-boots-nh50-black-quechua-8844095.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3043376/k$a6d5565fe1ce5db1e0364d03559423f0/men-s-hiking-boots-nh50-black-quechua-8844095.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8756701",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-leo-núi-hiking-nam-cổ-lửng-nh100-đen-quechua-8756701.html",
+        "name": "Giày leo núi hiking nam cổ lửng - NH100 đen",
+        "brand": "QUECHUA",
+        "price": 439000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2457687/k$6d4b0725f7b994e0472f0ce96cecb2aa/gi%C3%A0y-leo-n%C3%BAi-hiking-nam-c%E1%BB%95-l%E1%BB%ADng-nh100-%C4%91en-quechua-8756701.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2457689/k$6d6f4d8363daa80a60b38279812c4118/gi%C3%A0y-leo-n%C3%BAi-hiking-nam-c%E1%BB%95-l%E1%BB%ADng-nh100-%C4%91en-quechua-8756701.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2457690/k$9c15e3cfbccaf4e77c491bf5da4cf967/gi%C3%A0y-leo-n%C3%BAi-hiking-nam-c%E1%BB%95-l%E1%BB%ADng-nh100-%C4%91en-quechua-8756701.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2457688/k$65d11f3d95da6af07cdd60e1ffecafed/gi%C3%A0y-leo-n%C3%BAi-hiking-nam-c%E1%BB%95-l%E1%BB%ADng-nh100-%C4%91en-quechua-8756701.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8553549",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-leo-núi-hiking-nữ-cổ-thấp-nh50-đen-quechua-8553549.html",
+        "name": "Giày leo núi hiking nữ cổ thấp - NH50 đen",
+        "brand": "QUECHUA",
+        "price": 339000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2617652/k$57bedf2d6f430089d05ec81e00773c18/women-s-hiking-boots-nh50-grey-quechua-8553549.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2617656/k$c26f8ec7b130699cbd591fbc45e18c7d/women-s-hiking-boots-nh50-grey-quechua-8553549.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2617650/k$bf2e9cf21141ef6a345bab19a3d21370/women-s-hiking-boots-nh50-grey-quechua-8553549.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2617655/k$d5b10ec763914f4b4a7b81e1ff89f2fd/women-s-hiking-boots-nh50-grey-quechua-8553549.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8861991",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-ballet-đi-bộ-nữ-êm-ái-thoải-mái-pw-160-br-easy-trắng-decathlon-8861991.html",
+        "name": "Giày ballet đi bộ nữ êm ái thoải mái - PW 160 Br'easy trắng",
+        "brand": "DECATHLON",
+        "price": 499000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2633371/k$8e09aad940a044eab7528296c0d74b40/women-s-pw-160-br-easy-urban-walking-ballerina-pumps-grey-decathlon-8861991.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2633367/k$828817e5d7f745c1d51fedbcc42a01ed/women-s-pw-160-br-easy-urban-walking-ballerina-pumps-grey-decathlon-8861991.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2633369/k$72b8b54a1c9d17267d62d3253af8f533/women-s-pw-160-br-easy-urban-walking-ballerina-pumps-grey-decathlon-8861991.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2633364/k$9de6f8952151ab68179af6c3dc724448/women-s-pw-160-br-easy-urban-walking-ballerina-pumps-grey-decathlon-8861991.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8733464",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-chạy-bộ-nam-jogflow-100-1-đen-trắng-decathlon-8733464.html",
+        "name": "Giày chạy bộ nam - Jogflow 100.1 đen/trắng",
+        "brand": "DECATHLON",
+        "price": 499000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3239545/k$d1d9003b160994e2bc8bbb7f9ffcfbd4/men-s-jogflow-100-1-running-shoes-black-grey-decathlon-8733464.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3239542/k$9147a9e1643f17befdc61d7fdf714c18/men-s-jogflow-100-1-running-shoes-black-grey-decathlon-8733464.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3239547/k$1310cbc3486206fcab3d5c83d2481dd2/men-s-jogflow-100-1-running-shoes-black-grey-decathlon-8733464.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3239546/k$8fbae4da15bf7ea06077c68fe9fa5338/men-s-jogflow-100-1-running-shoes-black-grey-decathlon-8733464.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8351755",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-chạy-bộ-nam-nhẹ-thoải-mái-run-one-xám-decathlon-8351755.html",
+        "name": "Giày chạy bộ nam nhẹ thoải mái - Run One xám",
+        "brand": "DECATHLON",
+        "price": 249000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2917181/k$b9f72ce4fd201c7854d388de3b27b076/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-x%C3%A1m-decathlon-8351755.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2917189/k$bab5c388e6a68d91677d8bf55d4a92f3/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-x%C3%A1m-decathlon-8351755.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2917161/k$762c5d177c2fa8cc70db4be9df21eb37/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-x%C3%A1m-decathlon-8351755.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2917150/k$6ec43208be0798d568b38f37b24f6b43/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-x%C3%A1m-decathlon-8351755.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8607728",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-chạy-bộ-nam-nhẹ-thoải-mái-run-one-xanh-dương-decathlon-8607728.html",
+        "name": "Giày chạy bộ nam nhẹ thoải mái - Run One xanh dương",
+        "brand": "DECATHLON",
+        "price": 299000,
+        "images": [
+          "https://contents.mediadecathlon.com/p1985520/k$eb8ed3a45ad9172f8ddc862ea1c5fa48/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-xanh-d%C6%B0%C6%A1ng-decathlon-8607728.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1985522/k$2e55fd5a52b5304b959738d33fd1f053/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-xanh-d%C6%B0%C6%A1ng-decathlon-8607728.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1974922/k$8ccf6168314fd5b99f90bf32cbfedcb8/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-xanh-d%C6%B0%C6%A1ng-decathlon-8607728.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1985515/k$0cd77baa2515742337695df09610fff2/gi%C3%A0y-ch%E1%BA%A1y-b%E1%BB%99-nam-nh%E1%BA%B9-tho%E1%BA%A3i-m%C3%A1i-run-one-xanh-d%C6%B0%C6%A1ng-decathlon-8607728.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8861952",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-leo-núi-nam-chống-thấm-nước-cổ-vừa-giữ-ấm-nh100-xanh-navy-quechua-8861952.html",
+        "name": "Giày leo núi nam chống thấm nước cổ vừa giữ ấm - NH100 Xanh navy",
+        "brand": "QUECHUA",
+        "price": 539000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2702165/k$f2ea2424dfbfc848c7d4f557c8eef714/men-s-waterproof-winter-hiking-shoes-nh100-blue-quechua-8861952.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702162/k$128ea2318182b8ae3e6cf573d3c78aad/men-s-waterproof-winter-hiking-shoes-nh100-blue-quechua-8861952.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702164/k$6cc9708092210b2218c9f26a30dc1ca2/men-s-waterproof-winter-hiking-shoes-nh100-blue-quechua-8861952.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702166/k$aa1d38a0b7b1cdacb9c17662cb3d8dba/men-s-waterproof-winter-hiking-shoes-nh100-blue-quechua-8861952.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8800108",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-đi-tuyết-nữ-cổ-vừa-chống-thấm-nước-giữ-ấm-nh100-đen-quechua-8800108.html",
+        "name": "Giày đi tuyết nữ cổ vừa chống thấm nước giữ ấm - NH100 Đen",
+        "brand": "QUECHUA",
+        "price": 499000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2702143/k$5b9383911a2869b4659507765ce3c181/women-s-warm-and-waterproof-snow-hiking-boots-nh100-black-quechua-8800108.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702153/k$237f0f0c029ddb04618a9aa13cd3e51c/women-s-warm-and-waterproof-snow-hiking-boots-nh100-black-quechua-8800108.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702144/k$7766abd6e061965968544f6aeace9e98/women-s-warm-and-waterproof-snow-hiking-boots-nh100-black-quechua-8800108.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2702140/k$819dacbac7e3aa16568c742cec94d51f/women-s-warm-and-waterproof-snow-hiking-boots-nh100-black-quechua-8800108.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8649282",
+        "sourceUrl": "https://www.decathlon.vn/p/giày-leo-núi-hiking-nữ-cổ-lửng-nh100-xám-quechua-8649282.html",
+        "name": "Giày leo núi hiking nữ cổ lửng - NH100 xám",
+        "brand": "QUECHUA",
+        "price": 439000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2583101/k$d943e22d376229335f19f00d5b476680/women-s-mid-rise-hiking-boots-nh100-grey-quechua-8649282.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2472726/k$d54ad6e3ccbe33e0f0091ee6e51c6605/women-s-mid-rise-hiking-boots-nh100-grey-quechua-8649282.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2472727/k$40d807be138d85aac3a9926c38cfd466/women-s-mid-rise-hiking-boots-nh100-grey-quechua-8649282.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2472728/k$bd292b655771c8c76d6da8ecc1198961/women-s-mid-rise-hiking-boots-nh100-grey-quechua-8649282.jpg?f=1200x1200&format=jpg"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "tui-xach",
+    "categoryName": "Túi xách",
+    "username": "shoptuixach",
+    "slug": "moc-tui-xach",
+    "name": "Mộc Túi Xách",
+    "tagline": "Túi xách thể thao, túi du lịch và túi tiện dụng",
+    "products": [
+      {
+        "sourceId": "8682669",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-thể-thao-12-5-l-linear-đen-adidas-8682669.html",
+        "name": "Túi thể thao 12,5 L - Linear đen",
+        "brand": "ADIDAS",
+        "price": 499000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2839297/k$d97f4947862001f9d85bde937895ca0d/t%C3%BAi-th%E1%BB%83-thao-12-5-l-linear-%C4%91en-adidas-8682669.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2839293/k$39bbff7b0363cbad42a7d6dbdd16686d/t%C3%BAi-th%E1%BB%83-thao-12-5-l-linear-%C4%91en-adidas-8682669.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2839296/k$6942fde2a1b983a44d04e192962713b6/t%C3%BAi-th%E1%BB%83-thao-12-5-l-linear-%C4%91en-adidas-8682669.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2839298/k$65a48dd4e8fed4b1f009455df0b6aab8/t%C3%BAi-th%E1%BB%83-thao-12-5-l-linear-%C4%91en-adidas-8682669.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8200579",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-trống-thể-thao-30l-gấp-gọn-move-100-đen-decathlon-8200579.html",
+        "name": "Túi trống thể thao 30L gấp gọn - Move 100 đen",
+        "brand": "DECATHLON",
+        "price": 99000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3262412/k$e12e93270c3917046bba42f10256f94d/t%C3%BAi-tr%E1%BB%91ng-th%E1%BB%83-thao-30l-g%E1%BA%A5p-g%E1%BB%8Dn-move-100-%C4%91en-decathlon-8200579.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2426985/k$bbcddd9478ef14df6702955943051249/t%C3%BAi-tr%E1%BB%91ng-th%E1%BB%83-thao-30l-g%E1%BA%A5p-g%E1%BB%8Dn-move-100-%C4%91en-decathlon-8200579.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2426979/k$6f56af313748022ca10a87aa4ffb92c9/t%C3%BAi-tr%E1%BB%91ng-th%E1%BB%83-thao-30l-g%E1%BA%A5p-g%E1%BB%8Dn-move-100-%C4%91en-decathlon-8200579.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2426980/k$5b36f7a3da631bc77b166976dd8a4330/t%C3%BAi-tr%E1%BB%91ng-th%E1%BB%83-thao-30l-g%E1%BA%A5p-g%E1%BB%8Dn-move-100-%C4%91en-decathlon-8200579.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8575374",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-đi-bơi-đựng-đồ-ướt-3l-100-cam-nhạt-decathlon-8575374.html",
+        "name": "Túi đi bơi đựng đồ ướt 3L - 100 Cam nhạt",
+        "brand": "DECATHLON",
+        "price": 99000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3256634/k$41266a291aa50fd4296577000803e0c3/t%C3%BAi-%C4%91i-b%C6%A1i-%C4%91%E1%BB%B1ng-%C4%91%E1%BB%93-%C6%B0%E1%BB%9Bt-3l-100-cam-nh%E1%BA%A1t-decathlon-8575374.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2870734/k$24f4efb3d22a65eb85d14cd164ae79c5/t%C3%BAi-%C4%91i-b%C6%A1i-%C4%91%E1%BB%B1ng-%C4%91%E1%BB%93-%C6%B0%E1%BB%9Bt-3l-100-cam-nh%E1%BA%A1t-decathlon-8575374.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1761331/k$54570530276ffbc033ca47097f14e27a/t%C3%BAi-%C4%91i-b%C6%A1i-%C4%91%E1%BB%B1ng-%C4%91%E1%BB%93-%C6%B0%E1%BB%9Bt-3l-100-cam-nh%E1%BA%A1t-decathlon-8575374.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p3256634/k$41266a291aa50fd4296577000803e0c3/túi-đi-bơi-đựng-đồ-ướt-3l-100-cam-nhạt-decathlon-8575374.jpg"
+        ]
+      },
+      {
+        "sourceId": "8558317",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-thể-thao-55l-gấp-gọn-kèm-quai-đeo-vai-essential-club-100-đen-kipsta-8558317.html",
+        "name": "Túi thể thao 55L gấp gọn kèm quai đeo vai - Essential Club 100 Đen",
+        "brand": "KIPSTA",
+        "price": 299000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3262421/k$71f433ce0fa7bcb67435a01f89e6296f/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-%C4%91en-kipsta-8558317.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1818476/k$dc18e1d7f57b41ec2136074c7e4ac036/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-%C4%91en-kipsta-8558317.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1818469/k$5e7341885f72684eb8bd6823acb3385c/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-%C4%91en-kipsta-8558317.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1818474/k$d3e5942e11c06f20f701875f2569961a/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-%C4%91en-kipsta-8558317.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8616572",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-dây-kéo-2-trong-1-travel-15l-đen-forclaz-8616572.html",
+        "name": "Túi dây kéo 2-trong-1 TRAVEL 15L - Đen",
+        "brand": "FORCLAZ",
+        "price": 539000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2621832/k$882bb295dd549afcc0dde0385eac5d37/t%C3%BAi-d%C3%A2y-k%C3%A9o-2-trong-1-travel-15l-%C4%91en-forclaz-8616572.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1928012/k$dc573944756fbd33e7cb1403142ad4a7/t%C3%BAi-d%C3%A2y-k%C3%A9o-2-trong-1-travel-15l-%C4%91en-forclaz-8616572.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1926475/k$1ce707aa5369df094c0dc664010e7e52/t%C3%BAi-d%C3%A2y-k%C3%A9o-2-trong-1-travel-15l-%C4%91en-forclaz-8616572.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1926467/k$15187f129689edca2fece3d9b847a7a4/t%C3%BAi-d%C3%A2y-k%C3%A9o-2-trong-1-travel-15l-%C4%91en-forclaz-8616572.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8401949",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-đi-bơi-đựng-đồ-ướt-6l-trắng-tribord-8401949.html",
+        "name": "Túi đi bơi đựng đồ ướt 6L - Trắng",
+        "brand": "TRIBORD",
+        "price": 159000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2844528/k$cab139d979b19b885589b1f502b394c7/waterproof-swimming-pouch-6l-transparent-tribord-8401949.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2854076/k$f00d8677a40dacd622c1b647556c3d0d/waterproof-swimming-pouch-6l-transparent-tribord-8401949.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2844531/k$2ce81ea46b83347f87b84a494e556ceb/waterproof-swimming-pouch-6l-transparent-tribord-8401949.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2844530/k$2fc7af9adb1b44b2f461c143cb9a64cb/waterproof-swimming-pouch-6l-transparent-tribord-8401949.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8926873",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-đi-bơi-đựng-đồ-ướt-6l-trắng-họa-tiết-xanh-lá-tribord-8926873.html",
+        "name": "Túi đi bơi đựng đồ ướt 6L - Trắng/họa tiết xanh lá",
+        "brand": "TRIBORD",
+        "price": 119000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3156444/k$5fa3cb78f09150290657be447090f115/swimming-waterproof-pouch-6l-alo-green-orange-tribord-8926873.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2870741/k$bc02e0fd30147ac8059b866822a65f6c/swimming-waterproof-pouch-6l-alo-green-orange-tribord-8926873.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2870740/k$146da2999ea34d6bb754217ef89030e7/swimming-waterproof-pouch-6l-alo-green-orange-tribord-8926873.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2793688/k$7bdbc5cf6ce5fe30aae95359a25a183f/swimming-waterproof-pouch-6l-alo-green-orange-tribord-8926873.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8619465",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-du-lịch-nhiều-ngăn-travel-đen-forclaz-8619465.html",
+        "name": "Túi du lịch nhiều ngăn - Travel đen",
+        "brand": "FORCLAZ",
+        "price": 129000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2621119/k$d9bc79e9562c06adb570d482511e7829/t%C3%BAi-du-l%E1%BB%8Bch-nhi%E1%BB%81u-ng%C4%83n-travel-%C4%91en-forclaz-8619465.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1926514/k$c5bcfeb0faa7bc0c942ad2f4c2648143/t%C3%BAi-du-l%E1%BB%8Bch-nhi%E1%BB%81u-ng%C4%83n-travel-%C4%91en-forclaz-8619465.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1926518/k$229ea581e6558375cd4d5459237efb38/t%C3%BAi-du-l%E1%BB%8Bch-nhi%E1%BB%81u-ng%C4%83n-travel-%C4%91en-forclaz-8619465.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p1926515/k$2aa4c4a42cf04b0b68b29b968d40a45c/t%C3%BAi-du-l%E1%BB%8Bch-nhi%E1%BB%81u-ng%C4%83n-travel-%C4%91en-forclaz-8619465.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8580093",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-thể-thao-35l-gấp-gọn-kèm-quai-đeo-vai-ensential-club-100-đen-kipsta-8580093.html",
+        "name": "Túi thể thao 35L gấp gọn kèm quai đeo vai - Ensential Club 100 Đen",
+        "brand": "KIPSTA",
+        "price": 239000,
+        "images": [
+          "https://contents.mediadecathlon.com/p3262429/k$26de3c0852fb149a65222f2362df1f36/t%C3%BAi-th%E1%BB%83-thao-35l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-ensential-club-100-%C4%91en-kipsta-8580093.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2161274/k$84a0aa813ad6ec897904446a6e2f5fae/t%C3%BAi-th%E1%BB%83-thao-35l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-ensential-club-100-%C4%91en-kipsta-8580093.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2193927/k$57d08b0e5abb219e167b79d314467a01/t%C3%BAi-th%E1%BB%83-thao-35l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-ensential-club-100-%C4%91en-kipsta-8580093.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2193929/k$bee61d7780c534ab41bc402c97203208/t%C3%BAi-th%E1%BB%83-thao-35l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-ensential-club-100-%C4%91en-kipsta-8580093.jpg?f=1200x1200&format=jpg"
+        ]
+      },
+      {
+        "sourceId": "8649429",
+        "sourceUrl": "https://www.decathlon.vn/p/túi-thể-thao-55l-gấp-gọn-kèm-quai-đeo-vai-essential-club-100-xanh-dương-kipsta-8649429.html",
+        "name": "Túi thể thao 55L gấp gọn kèm quai đeo vai - Essential Club 100 Xanh dương",
+        "brand": "KIPSTA",
+        "price": 299000,
+        "images": [
+          "https://contents.mediadecathlon.com/p2161167/k$aefd562de676c7e442bbafecc21f1900/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-xanh-d%C6%B0%C6%A1ng-kipsta-8649429.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2193839/k$d68e085634a697cabd56786fd4543fae/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-xanh-d%C6%B0%C6%A1ng-kipsta-8649429.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2193841/k$9bd19cd0dbea6c1194df4eba26a4d3cc/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-xanh-d%C6%B0%C6%A1ng-kipsta-8649429.jpg?f=1200x1200&format=jpg",
+          "https://contents.mediadecathlon.com/p2193844/k$89f71138362f2b14c20f91d9cfb5c650/t%C3%BAi-th%E1%BB%83-thao-55l-g%E1%BA%A5p-g%E1%BB%8Dn-k%C3%A8m-quai-%C4%91eo-vai-essential-club-100-xanh-d%C6%B0%C6%A1ng-kipsta-8649429.jpg?f=1200x1200&format=jpg"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "nha-cua-doi-song",
+    "categoryName": "Nhà cửa & đời sống",
+    "username": "shopnhacua",
+    "slug": "nha-xinh-living",
+    "name": "Nhà Xinh Living",
+    "tagline": "Bát đĩa, cốc và đồ dùng bàn ăn",
+    "products": [
+      {
+        "sourceId": "80258915",
+        "sourceUrl": "https://www.ikea.com/us/en/p/oftast-bowl-white-80258915/",
+        "name": "Bát thủy tinh trắng IKEA OFTAST 15 cm",
+        "brand": "IKEA",
+        "price": 39000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/oftast-bowl-white__0712208_pe728639_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-bowl-white__1233821_pe916979_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-bowl-white__1233846_pe916983_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-bowl-white__1391197_pe965708_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "30258913",
+        "sourceUrl": "https://www.ikea.com/us/en/p/oftast-plate-white-30258913/",
+        "name": "Đĩa trắng IKEA OFTAST 25 cm",
+        "brand": "IKEA",
+        "price": 49000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/oftast-plate-white__0712367_pe728786_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-plate-white__1233889_pe917000_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-plate-white__1391202_pe965710_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-plate-white__1391197_pe965708_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "60318939",
+        "sourceUrl": "https://www.ikea.com/us/en/p/oftast-side-plate-white-60318939/",
+        "name": "Đĩa nhỏ trắng IKEA OFTAST 19 cm",
+        "brand": "IKEA",
+        "price": 39000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/oftast-side-plate-white__0713530_pe729595_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-side-plate-white__0898956_pe609014_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-side-plate-white__1084925_pe859941_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-side-plate-white__1391197_pe965708_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "00318942",
+        "sourceUrl": "https://www.ikea.com/us/en/p/oftast-deep-plate-bowl-white-00318942/",
+        "name": "Đĩa sâu lòng trắng IKEA OFTAST 20 cm",
+        "brand": "IKEA",
+        "price": 49000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/oftast-deep-plate-bowl-white__0712360_pe728779_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-deep-plate-bowl-white__0898439_pe608999_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-deep-plate-bowl-white__1391202_pe965710_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-deep-plate-bowl-white__1391203_pe965709_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "20439392",
+        "sourceUrl": "https://www.ikea.com/us/en/p/oftast-serving-bowl-white-20439392/",
+        "name": "Tô lớn trắng IKEA OFTAST 23 cm",
+        "brand": "IKEA",
+        "price": 99000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/oftast-serving-bowl-white__0671981_pe716453_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-serving-bowl-white__0898446_pe716454_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-serving-bowl-white__0747026_pe744377_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/oftast-serving-bowl-white__0898450_pe724686_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "10270478",
+        "sourceUrl": "https://www.ikea.com/us/en/p/pokal-glass-clear-glass-10270478/",
+        "name": "Cốc thủy tinh IKEA POKAL 35 cl",
+        "brand": "IKEA",
+        "price": 39000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/pokal-glass-clear-glass__0713251_pe729361_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/pokal-glass-clear-glass__0908826_pe609409_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/pokal-glass-clear-glass__1392104_pe965990_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/pokal-glass-clear-glass__1384267_pe962938_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "20282942",
+        "sourceUrl": "https://www.ikea.com/us/en/p/ikea-365-mug-white-20282942/",
+        "name": "Cốc trắng IKEA 365+ 36 cl",
+        "brand": "IKEA",
+        "price": 89000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/ikea-365-mug-white__0713396_pe729489_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/ikea-365-mug-white__1386545_pe963845_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/ikea-365-mug-white__1386226_pe963684_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/ikea-365-mug-white__1385949_pe963560_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "20461378",
+        "sourceUrl": "https://www.ikea.com/us/en/p/kalas-bowl-mixed-colors-20461378/",
+        "name": "Bộ 6 bát nhiều màu IKEA KALAS",
+        "brand": "IKEA",
+        "price": 79000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/kalas-bowl-mixed-colors__0998009_pe822911_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-bowl-mixed-colors__0998032_pe822923_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-bowl-mixed-colors__0998010_pe822912_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-bowl-mixed-colors__0612202_pe685654_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "80461380",
+        "sourceUrl": "https://www.ikea.com/us/en/p/kalas-plate-mixed-colors-80461380/",
+        "name": "Bộ 6 đĩa nhiều màu IKEA KALAS",
+        "brand": "IKEA",
+        "price": 79000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/kalas-plate-mixed-colors__0998030_pe822920_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-plate-mixed-colors__0998032_pe822923_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-plate-mixed-colors__0998033_pe822922_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-plate-mixed-colors__0612202_pe685654_s5.jpg"
+        ]
+      },
+      {
+        "sourceId": "00461379",
+        "sourceUrl": "https://www.ikea.com/us/en/p/kalas-tumbler-mixed-colors-00461379/",
+        "name": "Bộ 6 cốc nhiều màu IKEA KALAS",
+        "brand": "IKEA",
+        "price": 69000,
+        "images": [
+          "https://www.ikea.com/us/en/images/products/kalas-tumbler-mixed-colors__0998019_pe822917_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-tumbler-mixed-colors__0998032_pe822923_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-tumbler-mixed-colors__0998020_pe822918_s5.jpg",
+          "https://www.ikea.com/us/en/images/products/kalas-tumbler-mixed-colors__0612202_pe685654_s5.jpg"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "phu-kien-cong-nghe",
+    "categoryName": "Phụ kiện công nghệ",
+    "username": "shopcongnghe",
+    "slug": "ket-noi-tech",
+    "name": "Kết Nối Tech",
+    "tagline": "Chuột, bàn phím và thiết bị âm thanh",
+    "products": [
+      {
+        "sourceId": "869606590644",
+        "sourceUrl": "https://cellphones.com.vn/chuot-khong-day-logitech-m185.html",
+        "name": "Chuột không dây Logitech M185",
+        "brand": "Logitech",
+        "price": 225000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/3/0/304_3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/3/0/305_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/3/0/300_1_6.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/3/0/303_3.png"
+        ]
+      },
+      {
+        "sourceId": "944492074191",
+        "sourceUrl": "https://cellphones.com.vn/loa-bluetooth-jbl-go-4.html",
+        "name": "Loa Bluetooth JBL Go 4",
+        "brand": "JBL",
+        "price": 890000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/l/o/loa-bluetooth-jbl-go-4-spa.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/l/o/loa-bluetooth-jbl-go-4_16_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/l/o/loa-bluetooth-jbl-go-4-1_10_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/l/o/loa-bluetooth-jbl-go-4_2_.png"
+        ]
+      },
+      {
+        "sourceId": "757826382791",
+        "sourceUrl": "https://cellphones.com.vn/chuot-choi-game-co-day-logitech-g502-hero.html",
+        "name": "Chuột Gaming Logitech G502 Hero",
+        "brand": "Logitech",
+        "price": 920000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/f/a/fab763309ba5fd53478e9dda2268c79a.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/3/c/3c42e4219bbaa920c07c54784edd6269.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ba03e617b265b70575b8cc0997635097.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/d/d/dd9879f963254dd903ce0429bfd445fd.jpg"
+        ]
+      },
+      {
+        "sourceId": "1010722483443",
+        "sourceUrl": "https://cellphones.com.vn/chuot-gaming-khong-day-logitech-g304-lightspeed.html",
+        "name": "Chuột Gaming không dây Logitech G304 Lightspeed",
+        "brand": "Logitech",
+        "price": 725000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/t/_/t_i_xu_ng_36__2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/t/_/t_i_xu_ng_37_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/t/_/t_i_xu_ng_38__3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/t/_/t_i_xu_ng_39_.png"
+        ]
+      },
+      {
+        "sourceId": "1025795983803",
+        "sourceUrl": "https://cellphones.com.vn/chuot-choi-game-co-day-logitech-g102-lightsync-8000dpi.html",
+        "name": "Chuột có dây Gaming Logitech G102 LightSync Gen 2",
+        "brand": "Logitech",
+        "price": 400000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-choi-game-co-day-logitech-g102-lightsync-8000dpi-1_1_2.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/l/o/logitech-g102-lightsync-rgb-white-1_eb113ff7e83b4289812fb9bff7034b4d_1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-choi-game-co-day-logitech-g102-lightsync-8000dpi-3.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-choi-game-co-day-logitech-g102-lightsync-8000dpi-4.png"
+        ]
+      },
+      {
+        "sourceId": "857439094862",
+        "sourceUrl": "https://cellphones.com.vn/ban-phim-co-khong-day-aula-f75-den.html",
+        "name": "Bàn phím cơ không dây AULA F75 đen",
+        "brand": "Aula",
+        "price": 1190000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-khong-day-aula-f75-den.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-khong-day-aula-f75-den-1.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-khong-day-aula-f75-den-2.jpg",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-khong-day-aula-f75-den-3.jpg"
+        ]
+      },
+      {
+        "sourceId": "337898868823",
+        "sourceUrl": "https://cellphones.com.vn/ban-phim-khong-day-hyperwork-silentkey.html",
+        "name": "Bàn phím không dây Hyperwork Silentkey",
+        "brand": "HyperWork",
+        "price": 779000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/t/e/text_ng_n_-_2024-11-12t144204.920.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-khong-day-hyperwork-silentkey_3_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-khong-day-hyperwork-silentkey_5_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-khong-day-hyperwork-silentkey_6_.png"
+        ]
+      },
+      {
+        "sourceId": "593057644047",
+        "sourceUrl": "https://cellphones.com.vn/ban-phim-bluetooth-logitech-k250-xam.html",
+        "name": "Bàn phím Bluetooth Logitech K250",
+        "brand": "Logitech",
+        "price": 399000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/f/r/frame_379_-_2025-06-16t162650.878.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/f/r/frame_379_-_2025-06-16t162740.130.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/f/r/frame_379_-_2025-06-16t162841.916.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/f/r/frame_379_-_2025-06-16t162800.729.png"
+        ]
+      },
+      {
+        "sourceId": "410276762271",
+        "sourceUrl": "https://cellphones.com.vn/ban-phim-co-gaming-e-dra-ek398x-beta-den-xam.html",
+        "name": "Bàn phím cơ gaming E-Dra EK398X Beta đen xám",
+        "brand": "E-dra",
+        "price": 690000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-gaming-e-dra-ek398x-beta-den-xam_2_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-gaming-e-dra-ek398x-beta-den-xam_3_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-gaming-e-dra-ek398x-beta-den-xam_4_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/b/a/ban-phim-co-gaming-e-dra-ek398x-beta-den-xam_5_.png"
+        ]
+      },
+      {
+        "sourceId": "896339448826",
+        "sourceUrl": "https://cellphones.com.vn/chuot-gaming-khong-day-e-dra-thunderbird-tm621w.html",
+        "name": "Chuột gaming không dây E-Dra Thunderbird TM621W",
+        "brand": "E-dra",
+        "price": 450000,
+        "images": [
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-gaming-khong-day-e-dra-thunderbird-tm621w_7_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-gaming-khong-day-e-dra-thunderbird-tm621w_8_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-gaming-khong-day-e-dra-thunderbird-tm621w_9_.png",
+          "https://cdn2.cellphones.com.vn/x/media/catalog/product/c/h/chuot-gaming-khong-day-e-dra-thunderbird-tm621w_10_.png"
+        ]
+      }
+    ]
+  }
+]

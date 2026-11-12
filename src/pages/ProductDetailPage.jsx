@@ -116,7 +116,7 @@ export default function ProductDetailPage() {
         className="mb-2"
         items={[
           { label: 'Trang chủ', to: '/' },
-          { label: getCategoryName(product.categoryId), to: `/tim-kiem?category=${product.categoryId}` },
+          { label: product.categoryName || getCategoryName(product.categoryId), to: `/tim-kiem?category=${product.categoryId}` },
           { label: shop?.name || product.shopName, to: `/shop/${product.shopId}` },
           { label: product.name },
         ]}
