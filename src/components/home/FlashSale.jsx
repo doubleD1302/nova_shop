@@ -80,23 +80,28 @@ export default function FlashSale() {
 
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6D5C2] bg-gradient-to-r from-[#F5E7D4] to-[#FFFCF7] px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6D5C2] bg-gradient-to-r from-[#F5E7D4] via-[#FDF3E8] to-[#FFFCF7] px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center gap-2.5">
-          <span className="flex items-center gap-1.5 text-base font-black uppercase tracking-tight text-[#BD6E49] sm:text-lg">
-            <IconBolt className="h-5 w-5" />
+          <div className="flex items-center gap-1.5 text-base font-black uppercase tracking-tight text-[#BD6E49] sm:text-lg">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#BD6E49] text-amber-300 shadow-xs">
+              <IconBolt className="h-4 w-4 fill-amber-300" />
+            </span>
             Flash Sale
-          </span>
-          <span className="rounded bg-[#B93832] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+          </div>
+          <span className="rounded-md bg-[#B93832] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-2xs">
             {campaign.badge}
           </span>
           <Countdown />
-          <span className="hidden text-xs text-[#8B7566] md:inline">
+          <span className="hidden text-xs font-medium text-[#8B7566] md:inline">
             • {sessionLabel}
           </span>
         </div>
-        <Link to="/tim-kiem?flash=1" className="flex items-center gap-0.5 text-[13px] font-medium text-[#BD6E49] transition hover:text-[#A95532]">
-          Xem tất cả
-          <IconChevronRight className="h-3.5 w-3.5" />
+        <Link
+          to="/tim-kiem?flash=1"
+          className="group flex items-center gap-1 text-[13px] font-semibold text-[#BD6E49] transition hover:text-[#A95532]"
+        >
+          <span>Xem tất cả</span>
+          <IconChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
 
@@ -108,7 +113,7 @@ export default function FlashSale() {
       {loading ? (
         <p className="px-5 py-10 text-center text-sm text-[#8B7566]">Đang tải sản phẩm Flash Sale...</p>
       ) : flashProducts.length ? (
-        <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3.5 p-3.5 sm:grid-cols-3 lg:grid-cols-5">
           {flashProducts.map((p) => (
             <ProductCard key={p.id} product={p} variant="flash" />
           ))}

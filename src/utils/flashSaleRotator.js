@@ -124,16 +124,64 @@ export function rotateFlashProducts(products = [], count = 6) {
   const campaign = getCurrentCampaign()
 
   return selected.map((p, idx) => {
-    let discount = Number(p.discount) || 0
-    if (discount < 25) {
-      discount = 30 + ((idx * 7 + slot * 3) % 35)
+    // 1. Xác định giá gốc (originalPrice) chuẩn của sản phẩm
+    const rawPrice = Number(p.price) || 0
+    const rawOriginalPrice = Number(p.originalPrice) || 0
+    const originalPrice = rawOriginalPrice > rawPrice ? rawOriginalPrice : rawPrice
+
+    // 2. Xác định % giảm giá Flash Sale mục tiêu (25% - 75%)
+    let targetDiscount = Number(p.discount) || 0
+    if (targetDiscount < 25) {
+      targetDiscount = 30 + ((idx * 7 + slot * 3) % 35)
     }
-    discount = Math.min(75, Math.max(25, discount + campaign.bonusDiscount))
+    targetDiscount = Math.min(75, Math.max(25, targetDiscount + campaign.bonusDiscount))
+
+    // 3. Tính giá đã giảm Flash Sale: làm tròn đến hàng nghìn (1.000₫) cho đúng thực tế mua sắm
+    let flashPrice = Math.round((originalPrice * (1 - targetDiscount / 100)) / 1000) * 1000
+    if (flashPrice >= originalPrice && originalPrice > 10000) {
+      flashPrice = originalPrice - 10000
+    } else if (flashPrice <= 0) {
+      flashPrice = Math.max(1000, Math.round(originalPrice * 0.5))
+    }
+
+    // 4. Tính % giảm thực tế từ 2 mức giá để đảm bảo giá gốc, giá giảm và % khớp tuyệt đối
+    const exactDiscount = Math.round(((originalPrice - flashPrice) / originalPrice) * 100)
+
+    // 5. Tiến độ bán hàng: nếu sản phẩm chưa có thì mô phỏng tỷ lệ bán tự nhiên
+    let soldPercent = Number(p.soldPercent) || 0
+    if (soldPercent === 0) {
+      const simulated = (idx * 23 + slot * 17) % 85
+      soldPercent = idx % 2 === 0 ? 0 : Math.max(8, simulated)
+    }
+
+    const variants = (p.variants && p.variants.length > 0)
+      ? p.variants.map((v) => {
+          const vRaw = Number(v.price) || originalPrice
+          const vOrig = Number(v.originalPrice) > vRaw ? Number(v.originalPrice) : vRaw
+          const vFlash = Math.round((vOrig * (1 - exactDiscount / 100)) / 1000) * 1000
+          return {
+            ...v,
+            price: vFlash,
+            originalPrice: vOrig,
+          }
+        })
+      : [{
+          id: `sku_flash_${p.id}`,
+          name: 'Mặc định',
+          price: flashPrice,
+          originalPrice,
+          stock: Number(p.stock) || 50,
+        }]
+
     return {
       ...p,
-      discount,
+      price: flashPrice,
+      originalPrice,
+      discount: exactDiscount,
+      soldPercent,
       flash: true,
       is_flash_sale: true,
+      variants,
     }
   })
 }

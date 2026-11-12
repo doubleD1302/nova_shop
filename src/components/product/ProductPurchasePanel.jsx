@@ -88,7 +88,9 @@ export default function ProductPurchasePanel({ product, rating = product.rating,
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl bg-page px-4 py-3">
         <div className="flex items-baseline gap-2">
           <Price value={displayedPrice} size="xl" className="text-brand font-bold" />
-          {selectedSku?.originalPrice > displayedPrice ? <OldPrice value={selectedSku.originalPrice} size="md" /> : null}
+          {(selectedSku?.originalPrice || product.originalPrice) > displayedPrice ? (
+            <OldPrice value={selectedSku?.originalPrice || product.originalPrice} size="md" />
+          ) : null}
         </div>
         {product.discount ? (
           <span className="flex items-center gap-1.5">

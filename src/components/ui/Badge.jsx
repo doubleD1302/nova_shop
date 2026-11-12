@@ -25,8 +25,10 @@ export function FavoriteBadge({ className = '' }) {
 /** Nhãn giảm giá hình "cờ" ở góc phải (nền đỏ, chữ trắng) */
 export function DiscountBadge({ percent, className = '' }) {
   if (!percent) return null
+  const hasPosition = className.includes('absolute') || className.includes('fixed')
+  const posClass = hasPosition ? '' : 'relative'
   return (
-    <span className={`relative inline-block ${className}`}>
+    <span className={`${posClass} inline-block ${className}`.trim()}>
       <span className="flex flex-col items-center bg-brand px-1 pt-[2px] pb-[3px] text-[11px] font-bold leading-none text-white">
         -{percent}%
       </span>
