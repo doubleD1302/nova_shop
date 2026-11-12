@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
@@ -343,6 +344,31 @@ void main() {
       final resNet = SocialAuthService().testMapFacebookLoginFailure('Network connection error');
       expect(resNet.ok, isFalse);
       expect(resNet.error, contains('kết nối mạng'));
+
+      final resWebCancel = SocialAuthService().testMapFirebaseAuthError(
+        FirebaseAuthException(code: 'web-context-canceled', message: 'Canceled by user'),
+      );
+      expect(resWebCancel.cancelled, isTrue);
+
+      final resShortCancel = SocialAuthService().testMapFirebaseAuthError(
+        FirebaseAuthException(code: 'canceled', message: 'User closed dialog'),
+      );
+      expect(resShortCancel.cancelled, isTrue);
+
+      final resAlreadyPresented = SocialAuthService().testMapFirebaseAuthError(
+        FirebaseAuthException(
+          code: 'web-context-already-presented',
+          message: 'Another auth flow is open',
+        ),
+      );
+      expect(resAlreadyPresented.ok, isFalse);
+      expect(resAlreadyPresented.error, contains('Cửa sổ đăng nhập đang được mở'));
+
+      final resWebDev = SocialAuthService().testMapFirebaseAuthError(
+        FirebaseAuthException(code: 'unknown', message: 'App not active in development mode'),
+      );
+      expect(resWebDev.ok, isFalse);
+      expect(resWebDev.error, contains('chế độ phát triển'));
     });
   });
 

@@ -176,9 +176,13 @@ class SocialAuthService {
     }
 
     try {
+      // Dùng Chrome Custom Tab (webOnly) trên Android để tránh lỗi ProxyAuthDialog của app Facebook native
+      // bị kẹt 'Ứng dụng không hoạt động' khi chưa khớp Key Hash/SSO native từng máy build debug.
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: const ['email', 'public_profile'],
-        loginBehavior: LoginBehavior.nativeWithFallback,
+        loginBehavior: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+            ? LoginBehavior.webOnly
+            : LoginBehavior.nativeWithFallback,
       );
 
       if (result.status == LoginStatus.cancelled) {
@@ -285,8 +289,21 @@ class SocialAuthService {
     );
   }
 
+  @visibleForTesting
+  SocialAuthTokenResult testMapFirebaseAuthError(FirebaseAuthException error) =>
+      _mapFirebaseAuthError(error);
+
   SocialAuthTokenResult _mapFirebaseAuthError(FirebaseAuthException error) {
     switch (error.code) {
+      case 'web-context-canceled':
+      case 'user-cancelled':
+      case 'canceled':
+      case 'cancelled':
+        return SocialAuthTokenResult.cancel();
+      case 'web-context-already-presented':
+        return SocialAuthTokenResult.failure(
+          'Cửa sổ đăng nhập đang được mở. Vui lòng hoàn tất hoặc đóng cửa sổ hiện tại rồi thử lại.',
+        );
       case 'account-exists-with-different-credential':
         return SocialAuthTokenResult.failure(
           'Email của tài khoản này đã được liên kết với phương thức đăng nhập khác (ví dụ: Google, Facebook hoặc tài khoản thường).',
@@ -309,6 +326,16 @@ class SocialAuthService {
         );
       default:
         final msg = (error.message ?? '').trim();
+        final lower = msg.toLowerCase();
+        if (lower.contains('cancel')) {
+          return SocialAuthTokenResult.cancel();
+        }
+        if (lower.contains('app not active') ||
+            lower.contains('development mode') ||
+            lower.contains('key hash') ||
+            lower.contains('chế độ phát triển')) {
+          return _mapFacebookLoginFailure(msg);
+        }
         return SocialAuthTokenResult.failure(
           msg.isNotEmpty
               ? msg
