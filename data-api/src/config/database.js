@@ -560,6 +560,14 @@ export async function executeQuery(sql, values = [], timeoutMs = env.dbReadiness
   }
 }
 
+export async function hasColumn(tableName, columnName, query = executeQuery) {
+  const rows = await query(
+    'SELECT 1 FROM information_schema.columns WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
+    [tableName, columnName],
+  )
+  return rows.length > 0
+}
+
 /**
  * Thực thi một nhóm truy vấn trên cùng kết nối trong một transaction có deadline.
  */

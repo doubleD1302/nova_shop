@@ -78,7 +78,7 @@ function normalizeProduct(product) {
     soldPercent: totalQty > 0 ? Math.round((sold / totalQty) * 100) : 0,
     freeship: Boolean(product.freeship),
     extraShip: false,
-    approvalStatus: product.approvalStatus || 'pending',
+    approvalStatus: product.approvalStatus ?? null,
     rejectionReason: product.rejectionReason || null,
     reviewedAt: product.reviewedAt || null,
     specs: Object.entries(product.specs || {}),

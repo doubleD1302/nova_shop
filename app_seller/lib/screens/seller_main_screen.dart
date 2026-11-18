@@ -1516,8 +1516,8 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
             child: Row(
               children: [
                 _productFilterChip('all', 'Tất cả (${_sellerProducts.length})'),
-                _productFilterChip('active', 'Đang bán (${_sellerProducts.where((p) => p['approvalStatus'] == 'approved' && p['status'] != 'hidden' && (p['stock'] ?? 0) > 0).length})'),
-                _productFilterChip('pending', 'Chờ duyệt (${_sellerProducts.where((p) => (p['approvalStatus'] ?? 'pending') == 'pending').length})'),
+                _productFilterChip('active', 'Đang bán (${_sellerProducts.where((p) => (p['approvalStatus'] == null || p['approvalStatus'] == 'approved') && p['status'] == 'active' && (p['stock'] ?? 0) > 0).length})'),
+                _productFilterChip('pending', 'Chờ duyệt (${_sellerProducts.where((p) => p['approvalStatus'] == 'pending').length})'),
                 _productFilterChip('rejected', 'Bị từ chối (${_sellerProducts.where((p) => p['approvalStatus'] == 'rejected').length})'),
                 _productFilterChip('out_of_stock', 'Hết hàng / Ẩn (${_sellerProducts.where((p) => (p['stock'] ?? 0) <= 0 || p['status'] == 'hidden').length})'),
               ],
@@ -1606,7 +1606,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
     final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
     final stock = item['stock'] ?? 0;
     final sold = item['sold'] ?? 0;
-    final approvalStatus = item['approvalStatus']?.toString() ?? 'pending';
+    final approvalStatus = item['approvalStatus']?.toString() ?? 'unreviewed';
     final status = item['status']?.toString() ?? 'active';
 
     String? imageUrl = item['imageUrl']?.toString();
@@ -1718,7 +1718,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
       case 'approved':
         bg = SellerTheme.successBg;
         text = SellerTheme.success;
-        label = 'Đang bán';
+        label = 'Đã duyệt';
         break;
       case 'rejected':
         bg = SellerTheme.dangerBg;
@@ -1726,10 +1726,14 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
         label = 'Bị từ chối';
         break;
       case 'pending':
-      default:
         bg = SellerTheme.warningBg;
         text = SellerTheme.warning;
         label = 'Chờ duyệt';
+        break;
+      default:
+        bg = Colors.grey.shade100;
+        text = SellerTheme.textSecondary;
+        label = 'Chưa có lịch sử duyệt';
         break;
     }
 
@@ -2998,10 +3002,10 @@ extension _ProductFilterHelper on List<Map<String, dynamic>> {
         if (p['categoryId']?.toString() != cat) return false;
       }
       if (tab == 'active') {
-        return p['approvalStatus'] == 'approved' && p['status'] != 'hidden' && (p['stock'] ?? 0) > 0;
+        return (p['approvalStatus'] == null || p['approvalStatus'] == 'approved') && p['status'] == 'active' && (p['stock'] ?? 0) > 0;
       }
       if (tab == 'pending') {
-        return (p['approvalStatus'] ?? 'pending') == 'pending';
+        return p['approvalStatus'] == 'pending';
       }
       if (tab == 'rejected') {
         return p['approvalStatus'] == 'rejected';

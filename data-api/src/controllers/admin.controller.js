@@ -276,9 +276,10 @@ export async function listAdminShopApprovalEvents(req, res, next) {
 
 export async function listAdminProducts(req, res, next) {
   try {
-    const rows = await executeQuery(`
+    const { rows, images } = await executeTransaction(async (query) => {
+      const rows = await query(`
       SELECT p.id, p.shop_id, p.slug, p.name, p.description, p.status, p.approval_status, p.rejection_reason,
-             p.reviewed_at, p.is_flash_sale, p.created_at,
+             p.reviewed_at, p.is_flash_sale, p.created_at, CAST(p.updated_at AS CHAR) AS review_version,
              s.name AS shop_name, s.status AS shop_status,
              c.name AS category_name,
              COALESCE(sold.qty, 0) AS sold_count,
@@ -303,16 +304,19 @@ export async function listAdminProducts(req, res, next) {
         FROM product_variants
         WHERE is_active = 1 GROUP BY product_id
       ) min_v ON min_v.product_id = p.id
-      ORDER BY p.created_at DESC, p.id DESC LIMIT 500
-    `)
-    if (!rows.length) return res.status(200).json({ success: true, data: { products: [] } })
-    const ids = rows.map((r) => String(r.id))
-    const placeholders = ids.map(() => '?').join(',')
-    const images = await executeQuery(
-      `SELECT product_id, url, alt_text, sort_order FROM product_images
-       WHERE product_id IN (${placeholders}) ORDER BY product_id, sort_order LIMIT 2000`,
-      ids,
-    )
+      ORDER BY CASE WHEN p.approval_status = 'pending' AND p.status <> 'archived' THEN 0 ELSE 1 END,
+               p.created_at DESC, p.id DESC LIMIT 500
+      `)
+      if (!rows.length) return { rows, images: [] }
+      const ids = rows.map((row) => String(row.id))
+      const placeholders = ids.map(() => '?').join(',')
+      const images = await query(
+        `SELECT product_id, url, alt_text, sort_order FROM product_images
+         WHERE product_id IN (${placeholders}) ORDER BY product_id, sort_order`,
+        ids,
+      )
+      return { rows, images }
+    })
     const imagesByProduct = new Map()
     for (const img of images) {
       const pid = String(img.product_id)
@@ -337,6 +341,7 @@ export async function listAdminProducts(req, res, next) {
           description: row.description || '',
           status: row.status,
           approvalStatus: row.approval_status ?? null,
+          reviewVersion: row.review_version,
           rejectionReason: row.rejection_reason || null,
           reviewedAt: row.reviewed_at instanceof Date ? row.reviewed_at.toISOString() : (row.reviewed_at ? String(row.reviewed_at) : null),
           flash: Boolean(row.is_flash_sale),
@@ -362,19 +367,21 @@ export async function updateAdminProductStatus(req, res, next) {
     }
     const result = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT p.id, p.approval_status, s.status AS shop_status, owner.status AS owner_status,
+        `SELECT p.id, p.status, p.approval_status, s.status AS shop_status, owner.status AS owner_status,
            (SELECT COUNT(*) FROM product_images pi WHERE pi.product_id = p.id) AS image_count,
            (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1) AS variant_count
          FROM products p JOIN shops s ON s.id = p.shop_id JOIN users owner ON owner.id = s.owner_id WHERE p.id = ? FOR UPDATE`, [productId],
       )
       if (!rows.length) return { error: 'PRODUCT_NOT_FOUND' }
+      if (rows[0].status === 'archived' && status !== 'archived') return { error: 'PRODUCT_ARCHIVED' }
       if (status === 'active' && (rows[0].approval_status !== 'approved' || rows[0].shop_status !== 'active' || rows[0].owner_status !== 'active' || Number(rows[0].image_count) < 1 || Number(rows[0].variant_count) < 1)) {
         return { error: 'PRODUCT_NOT_READY' }
       }
-      await query(`UPDATE products SET status = ? WHERE id = ?`, [status, productId])
+      await query(`UPDATE products SET status = ?, updated_at = GREATEST(CURRENT_TIMESTAMP(3), TIMESTAMPADD(MICROSECOND, 1000, updated_at)) WHERE id = ?`, [status, productId])
       return { productId, status }
     })
     if (result.error) {
+      if (result.error === 'PRODUCT_ARCHIVED') return res.status(409).json({ success: false, message: 'Sản phẩm đã lưu trữ.', error: { code: result.error } })
       return res.status(result.error === 'PRODUCT_NOT_FOUND' ? 404 : 400).json({
         success: false,
         message: result.error === 'PRODUCT_NOT_FOUND' ? 'Không tìm thấy sản phẩm.' : 'Chỉ có thể đăng bán sản phẩm của gian hàng đang hoạt động, có ảnh thật và có SKU.',
@@ -394,16 +401,16 @@ export async function updateAdminProductFlashSale(req, res, next) {
     }
     const result = await executeTransaction(async (query) => {
       const rows = await query(
-        `SELECT p.id, p.status, s.status AS shop_status, owner.status AS owner_status
+        `SELECT p.id, p.status, p.approval_status, s.status AS shop_status, owner.status AS owner_status
          FROM products p JOIN shops s ON s.id = p.shop_id JOIN users owner ON owner.id = s.owner_id
          WHERE p.id = ? FOR UPDATE`,
         [productId],
       )
       if (!rows.length) return { error: 'PRODUCT_NOT_FOUND' }
-      if (enabled && (rows[0].status !== 'active' || rows[0].shop_status !== 'active' || rows[0].owner_status !== 'active')) {
+      if (enabled && (rows[0].approval_status !== 'approved' || rows[0].status !== 'active' || rows[0].shop_status !== 'active' || rows[0].owner_status !== 'active')) {
         return { error: 'PRODUCT_NOT_READY' }
       }
-      await query(`UPDATE products SET is_flash_sale = ? WHERE id = ?`, [enabled ? 1 : 0, productId])
+      await query(`UPDATE products SET is_flash_sale = ?, updated_at = GREATEST(CURRENT_TIMESTAMP(3), TIMESTAMPADD(MICROSECOND, 1000, updated_at)) WHERE id = ?`, [enabled ? 1 : 0, productId])
       return { productId, flash: enabled }
     })
     if (result.error) {
@@ -870,8 +877,10 @@ export async function getViolationDetail(req, res, next) {
 export async function updateAdminProductApproval(req, res, next) {
   try {
     const productId = String(req.params.productId || '')
-    const { approvalStatus, rejectionReason, userId } = req.body || {}
-    if (!validId(productId) || !['approved', 'rejected'].includes(approvalStatus)) {
+    const { approvalStatus, rejectionReason, reviewVersion } = req.body || {}
+    const userId = String(req.body?.userId || '')
+    if (!validId(productId) || !validId(userId) || !['approved', 'rejected'].includes(approvalStatus) ||
+        typeof reviewVersion !== 'string' || reviewVersion.length < 19 || reviewVersion.length > 32) {
       return res.status(400).json({ success: false, message: 'Trạng thái duyệt không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
     const reason = typeof rejectionReason === 'string' ? rejectionReason.trim() : ''
@@ -880,8 +889,11 @@ export async function updateAdminProductApproval(req, res, next) {
     }
 
     const result = await executeTransaction(async (query) => {
+      const admins = await query("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active' FOR UPDATE", [userId])
+      if (!admins.length) return { error: 'ADMIN_REQUIRED' }
       const rows = await query(
-        `SELECT p.id, p.status, p.approval_status, s.status AS shop_status, owner.status AS owner_status,
+        `SELECT p.id, p.status, p.approval_status, CAST(p.updated_at AS CHAR) AS review_version,
+           s.status AS shop_status, owner.status AS owner_status,
            (SELECT COUNT(*) FROM product_images pi WHERE pi.product_id = p.id) AS image_count,
            (SELECT COUNT(*) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = 1) AS variant_count
          FROM products p
@@ -891,42 +903,38 @@ export async function updateAdminProductApproval(req, res, next) {
         [productId],
       )
       if (!rows.length) return { error: 'PRODUCT_NOT_FOUND' }
+      const product = rows[0]
+      if (product.status === 'archived') return { error: 'PRODUCT_ARCHIVED' }
+      if (product.review_version !== reviewVersion) return { error: 'PRODUCT_APPROVAL_CONFLICT' }
 
-      const adminUserId = validId(userId) ? userId : null
-
-      if (approvalStatus === 'approved') {
-        const nextVisibility = rows[0].status === 'hidden' ? 'hidden' : 'active'
-        await query(
-          `UPDATE products
-           SET approval_status = 'approved',
-               status = ?,
-               rejection_reason = NULL,
-               reviewed_by = ?,
-               reviewed_at = CURRENT_TIMESTAMP(3)
-           WHERE id = ?`,
-          [nextVisibility, adminUserId, productId],
-        )
-        return { productId, approvalStatus: 'approved', status: nextVisibility }
-      } else {
-        await query(
-          `UPDATE products
-           SET approval_status = 'rejected',
-               rejection_reason = ?,
-               reviewed_by = ?,
-               reviewed_at = CURRENT_TIMESTAMP(3)
-           WHERE id = ?`,
-          [reason, adminUserId, productId],
-        )
-        return { productId, approvalStatus: 'rejected', rejectionReason: reason }
+      const approved = approvalStatus === 'approved'
+      if (approved && (product.shop_status !== 'active' || product.owner_status !== 'active' ||
+          Number(product.image_count) < 1 || Number(product.variant_count) < 1)) {
+        return { error: 'PRODUCT_NOT_READY' }
       }
+      const status = product.status === 'hidden' ? 'hidden' : approved ? 'active' : 'draft'
+      const savedReason = approved ? null : reason
+      await query(
+        `UPDATE products SET approval_status = ?, status = ?, rejection_reason = ?, reviewed_by = ?,
+          reviewed_at = CURRENT_TIMESTAMP(3),
+          updated_at = GREATEST(CURRENT_TIMESTAMP(3), TIMESTAMPADD(MICROSECOND, 1000, updated_at)),
+          is_flash_sale = IF(? = 'approved', is_flash_sale, 0)
+         WHERE id = ?`,
+        [approvalStatus, status, savedReason, userId, approvalStatus, productId],
+      )
+      return { productId, approvalStatus, status, rejectionReason: savedReason }
     })
 
     if (result.error) {
-      return res.status(result.error === 'PRODUCT_NOT_FOUND' ? 404 : 400).json({
-        success: false,
-        message: result.error === 'PRODUCT_NOT_FOUND' ? 'Không tìm thấy sản phẩm.' : 'Không thể cập nhật kiểm duyệt.',
-        error: { code: result.error },
-      })
+      const errors = {
+        ADMIN_REQUIRED: [403, 'Yêu cầu tài khoản quản trị đang hoạt động.'],
+        PRODUCT_NOT_FOUND: [404, 'Không tìm thấy sản phẩm.'],
+        PRODUCT_ARCHIVED: [409, 'Sản phẩm đã lưu trữ.'],
+        PRODUCT_APPROVAL_CONFLICT: [409, 'Sản phẩm đã thay đổi. Tải lại để kiểm tra phiên bản mới.'],
+        PRODUCT_NOT_READY: [409, 'Chỉ duyệt sản phẩm có ảnh, SKU hợp lệ và thuộc gian hàng đang hoạt động.'],
+      }
+      const [status, message] = errors[result.error]
+      return res.status(status).json({ success: false, message, error: { code: result.error } })
     }
 
     return res.status(200).json({ success: true, data: result })

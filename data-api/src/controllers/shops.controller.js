@@ -1,6 +1,8 @@
 import { getCategoryDefinitions } from '../utils/category-attributes.js'
 import { readPagination } from '../utils/pagination.js'
-import { executeQuery, executeTransaction } from '../config/database.js'
+import { executeQuery, executeTransaction, hasColumn } from '../config/database.js'
+
+const publicProductApproval = "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)"
 
 const imageUrlIsAllowed = (value) => value === null || value === undefined || value === '' || (
   typeof value === 'string' && value.length <= 1024 &&
@@ -30,7 +32,7 @@ const shopSelect = `
       WHERE so.status = 'delivered'
       GROUP BY oi.product_id
     ) sd ON sd.product_id = p.id
-    WHERE p.status = 'active'
+    WHERE p.status = 'active' __PRODUCT_APPROVAL__
     GROUP BY p.shop_id
   ) ps ON ps.shop_id = s.id
   LEFT JOIN (
@@ -38,7 +40,7 @@ const shopSelect = `
     FROM reviews r
     JOIN products p ON p.id = r.product_id
     JOIN users reviewer ON reviewer.id = r.user_id AND reviewer.status = 'active'
-    WHERE r.status = 'visible' AND p.status = 'active'
+    WHERE r.status = 'visible' AND p.status = 'active' __PRODUCT_APPROVAL__
     GROUP BY p.shop_id
   ) rs ON rs.shop_id = s.id
   LEFT JOIN (
@@ -46,9 +48,12 @@ const shopSelect = `
   ) fs ON fs.shop_id = s.id
 `
 
-async function getShopSelect() {
-  const columns = await executeQuery("SELECT 1 FROM information_schema.columns WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shops' AND COLUMN_NAME = 'suspension_reason' LIMIT 1")
-  return shopSelect.replace('__SUSPENSION_REASON__', columns.length ? 's.suspension_reason' : 'NULL AS suspension_reason')
+async function getShopSelect(approvalFilter) {
+  const hasSuspensionReason = await hasColumn('shops', 'suspension_reason')
+  const filter = approvalFilter ?? (await hasColumn('products', 'approval_status') ? publicProductApproval : '')
+  return shopSelect
+    .replace('__SUSPENSION_REASON__', hasSuspensionReason ? 's.suspension_reason' : 'NULL AS suspension_reason')
+    .replaceAll('__PRODUCT_APPROVAL__', filter)
 }
 
 function serializeShop(row) {
@@ -80,11 +85,13 @@ function serializeShop(row) {
 
 export async function listCategories(req, res, next) {
   try {
+    const hasApproval = await hasColumn('products', 'approval_status')
     const rows = await executeQuery(
       `SELECT c.id, c.slug, c.name, c.image_url,
               (SELECT COUNT(*) FROM products p
                JOIN shops s ON s.id = p.shop_id AND s.status = 'active'
                WHERE p.category_id = c.id AND p.status = 'active'
+                 ${hasApproval ? publicProductApproval : ''}
                  AND (SELECT COUNT(*) FROM product_images pi WHERE pi.product_id = p.id) = 4) AS product_count
        FROM categories c WHERE c.is_active = 1 ORDER BY c.sort_order, c.id`,
     )
@@ -107,6 +114,7 @@ export async function listShops(req, res, next) {
     }
     const where = ["s.status = 'active'"]
     const params = []
+    const approvalFilter = await hasColumn('products', 'approval_status') ? publicProductApproval : ''
     const query = String(req.query.q || '').trim().slice(0, 120)
     if (query) {
       where.push(`(
@@ -114,6 +122,7 @@ export async function listShops(req, res, next) {
         OR EXISTS (
           SELECT 1 FROM products p
           WHERE p.shop_id = s.id AND p.status = 'active'
+            ${approvalFilter}
             AND (p.name LIKE ? OR p.description LIKE ?)
         )
       )`)
@@ -121,7 +130,7 @@ export async function listShops(req, res, next) {
     }
     if (['1', 'true'].includes(req.query.mall) || ['1', 'true'].includes(req.query.featured)) where.push('s.is_mall = 1')
     const whereSql = where.join(' AND ')
-    const select = await getShopSelect()
+    const select = await getShopSelect(approvalFilter)
     const orderBy = query
       ? 's.is_mall DESC, s.created_at DESC, s.id DESC'
       : 's.created_at DESC, s.id DESC'

@@ -1,6 +1,7 @@
-import { executeQuery, executeTransaction } from '../config/database.js'
+import { executeQuery, executeTransaction, hasColumn } from '../config/database.js'
 
 const FREE_SHIP_THRESHOLD = 1000000
+const approvedProductStatus = "CASE WHEN p.approval_status IN ('pending', 'rejected') THEN 'draft' ELSE p.status END"
 const SHIP_FEE_PER_SHOP = 16500
 const VOUCHER_MIN = 500000
 const VOUCHER_VALUE = 20000
@@ -73,6 +74,7 @@ function serializeCartItem(row) {
 }
 
 export async function fetchUserCartData(userId) {
+  const hasApproval = await hasColumn('products', 'approval_status')
   const sql = `
     SELECT
       ci.id AS cart_item_id,
@@ -92,7 +94,7 @@ export async function fetchUserCartData(userId) {
       p.id AS product_id,
       p.name AS product_name,
       p.slug AS product_slug,
-      p.status AS product_status,
+      ${hasApproval ? approvedProductStatus : 'p.status'} AS product_status,
       p.free_shipping,
       s.id AS shop_id,
       s.name AS shop_name,
@@ -193,14 +195,14 @@ export async function getCart(req, res, next) {
 /**
  * Tìm kiếm và xác thực biến thể sản phẩm (SKU) khả dụng.
  */
-async function resolveVariant(variantId, productId, query = executeQuery) {
+async function resolveVariant(variantId, productId, hasApproval, query = executeQuery) {
   const cleanVariantId = String(variantId || '').trim()
   const cleanProductId = String(productId || '').trim()
 
   if (isValidId(cleanVariantId)) {
     const rows = await query(
       `SELECT pv.id, pv.product_id, pv.price, pv.stock_qty, pv.is_active,
-              p.status AS product_status, s.status AS shop_status
+              ${hasApproval ? approvedProductStatus : 'p.status'} AS product_status, s.status AS shop_status
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        JOIN shops s ON s.id = p.shop_id
@@ -214,7 +216,7 @@ async function resolveVariant(variantId, productId, query = executeQuery) {
     const isId = isValidId(cleanProductId)
     const rows = await query(
       `SELECT pv.id, pv.product_id, pv.price, pv.stock_qty, pv.is_active,
-              p.status AS product_status, s.status AS shop_status
+              ${hasApproval ? approvedProductStatus : 'p.status'} AS product_status, s.status AS shop_status
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        JOIN shops s ON s.id = p.shop_id
@@ -248,7 +250,8 @@ export async function addItemToCart(req, res, next) {
 
     const selected = req.body?.selected !== undefined ? (Boolean(req.body.selected) ? 1 : 0) : 1
 
-    const variant = await resolveVariant(variantId, productId)
+    const hasApproval = await hasColumn('products', 'approval_status')
+    const variant = await resolveVariant(variantId, productId, hasApproval)
     if (!variant) {
       return responseError(res, 404, 'SKU_NOT_FOUND', 'Không tìm thấy biến thể sản phẩm.')
     }
@@ -454,9 +457,10 @@ export async function syncCart(req, res, next) {
     }
 
     // Hợp nhất cả danh sách trong một transaction để lỗi không lưu một phần.
+    const hasApproval = await hasColumn('products', 'approval_status')
     await executeTransaction(async (query) => {
       for (const item of items) {
-        const variant = await resolveVariant(item.variantId, item.productId, query)
+        const variant = await resolveVariant(item.variantId, item.productId, hasApproval, query)
         if (!variant || variant.is_active !== 1 || variant.product_status !== 'active' || variant.shop_status !== 'active' || Number(variant.stock_qty) < 1) {
           continue
         }

@@ -139,11 +139,12 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   // Cập nhật kiểm duyệt sản phẩm
-  Future<void> _updateProductApproval(String productId, String approvalStatus) async {
+  Future<void> _updateProductApproval(String productId, String approvalStatus, Object? reviewVersion) async {
     final response = await _client.patch(
       '/api/v1/admin/products/$productId/approval',
       body: {
         'approvalStatus': approvalStatus,
+        'reviewVersion': reviewVersion,
         if (approvalStatus == 'rejected') 'rejectionReason': 'Vi phạm tiêu chuẩn niêm yết sàn',
       },
     );
@@ -156,6 +157,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       );
       _loadProducts();
     } else {
+      if (response.statusCode == 409) _loadProducts();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(backgroundColor: Colors.red, content: Text(response.message)),
       );
@@ -718,7 +720,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       final id = (item['id'] ?? '').toString();
                       final name = item['name'] ?? 'Sản phẩm';
                       final price = num.tryParse((item['price'] ?? 0).toString()) ?? 0;
-                      final approval = item['approval_status'] ?? item['approvalStatus'] ?? 'pending';
+                      final approval = item['approval_status'] ?? item['approvalStatus'] ?? 'unreviewed';
                       final shopName = item['shop_name'] ?? item['shopName'] ?? '';
 
                       return Card(
@@ -769,9 +771,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        if (approval == 'pending') ...[
+                                        if ((approval == 'pending' || approval == 'unreviewed') && item['status'] != 'archived') ...[
                                           ElevatedButton(
-                                            onPressed: () => _updateProductApproval(id, 'approved'),
+                                            onPressed: () => _updateProductApproval(id, 'approved', item['reviewVersion']),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.green.shade600,
                                               foregroundColor: Colors.white,
@@ -781,7 +783,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                           ),
                                           const SizedBox(width: 8),
                                           OutlinedButton(
-                                            onPressed: () => _updateProductApproval(id, 'rejected'),
+                                            onPressed: () => _updateProductApproval(id, 'rejected', item['reviewVersion']),
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: Colors.red.shade700,
                                               visualDensity: VisualDensity.compact,
@@ -1071,6 +1073,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     String label = status;
 
     switch (status) {
+      case 'unreviewed':
+        label = 'Chưa có lịch sử duyệt';
+        break;
       case 'open':
       case 'pending':
         bg = const Color(0xFFFFF3E0);

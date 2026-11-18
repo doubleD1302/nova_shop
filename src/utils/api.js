@@ -431,10 +431,10 @@ export async function apiUpdateAdminProductFlashSale(productId, enabled) {
   return response
 }
 
-export async function apiUpdateAdminProductApproval(productId, { approvalStatus, rejectionReason }) {
+export async function apiUpdateAdminProductApproval(productId, { approvalStatus, rejectionReason, reviewVersion }) {
   const response = await apiRequest(`/admin/products/${encodeURIComponent(productId)}/approval`, {
     method: 'PATCH',
-    body: { approvalStatus, rejectionReason },
+    body: { approvalStatus, rejectionReason, reviewVersion },
   })
   if (response.ok) invalidatePublicApiCache('/products')
   return response

@@ -1,5 +1,5 @@
 import { shopSupportsShipping } from '../utils/shop-shipping.js'
-import { executeTransaction } from '../config/database.js'
+import { executeTransaction, hasColumn } from '../config/database.js'
 import { calculateShipping, estimateItemWeight } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
 import { isValidAmount } from '../utils/money.js'
@@ -18,6 +18,7 @@ export async function calculateCheckoutPreview(query, { userId, items, shippingM
   const groups = new Map()
   let subtotal = 0
   const placeholders = items.map(() => '?').join(', ')
+  const hasApproval = await hasColumn('products', 'approval_status', query)
   const rows = await query(
     `SELECT v.id AS variant_id, v.price, v.stock_qty, p.shop_id, p.free_shipping,
             s.name AS shop_name, s.province AS shop_province, c.slug AS category_slug
@@ -26,7 +27,8 @@ export async function calculateCheckoutPreview(query, { userId, items, shippingM
      JOIN categories c ON c.id = p.category_id
      JOIN shops s ON s.id = p.shop_id
      JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
-     WHERE v.id IN (${placeholders}) AND v.is_active = 1 AND p.status = 'active' AND s.status = 'active'`,
+     WHERE v.id IN (${placeholders}) AND v.is_active = 1 AND p.status = 'active' AND s.status = 'active'
+       ${hasApproval ? "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)" : ''}`,
     items.map((item) => item.variantId),
   )
   const variants = new Map(rows.map((row) => [String(row.variant_id), row]))

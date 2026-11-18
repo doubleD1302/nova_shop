@@ -1067,17 +1067,22 @@ export default function AdminPage() {
   const handleApproveProduct = async (product) => {
     setSavingId(`approve:${product.id}`)
     try {
-      const res = await apiUpdateAdminProductApproval(product.id, { approvalStatus: 'approved' })
+      const res = await apiUpdateAdminProductApproval(product.id, {
+        approvalStatus: 'approved',
+        reviewVersion: product.reviewVersion,
+      })
       const payload = await res.json().catch(() => null)
       if (!res.ok || !payload?.success) {
+        if (payload?.error?.code === 'PRODUCT_APPROVAL_CONFLICT') {
+          setPreviewProduct(null)
+          loadResource('products')
+        }
         throw new Error(payload?.message || 'Không thể duyệt sản phẩm.')
       }
       pushToast(`Đã duyệt sản phẩm "${product.name}".`, 'success')
       refreshPublicCatalog()
       loadResource('products')
-      if (previewProduct?.id === product.id) {
-        setPreviewProduct((prev) => prev ? { ...prev, approvalStatus: 'approved', status: payload.data?.status || 'active', rejectionReason: null } : null)
-      }
+      if (previewProduct?.id === product.id) setPreviewProduct(null)
     } catch (err) {
       pushToast(err.message || 'Lỗi khi duyệt sản phẩm.', 'error')
     } finally {
@@ -1104,17 +1109,21 @@ export default function AdminPage() {
       const res = await apiUpdateAdminProductApproval(rejectTarget.id, {
         approvalStatus: 'rejected',
         rejectionReason: reason,
+        reviewVersion: rejectTarget.reviewVersion,
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok || !payload?.success) {
+        if (payload?.error?.code === 'PRODUCT_APPROVAL_CONFLICT') {
+          setPreviewProduct(null)
+          setRejectTarget(null)
+          loadResource('products')
+        }
         throw new Error(payload?.message || 'Không thể từ chối sản phẩm.')
       }
       pushToast(`Đã từ chối duyệt sản phẩm "${rejectTarget.name}".`, 'success')
       refreshPublicCatalog()
       loadResource('products')
-      if (previewProduct?.id === rejectTarget.id) {
-        setPreviewProduct((prev) => prev ? { ...prev, approvalStatus: 'rejected', rejectionReason: reason } : null)
-      }
+      if (previewProduct?.id === rejectTarget.id) setPreviewProduct(null)
       setRejectTarget(null)
       setRejectReason('')
     } catch (err) {
@@ -1129,7 +1138,7 @@ export default function AdminPage() {
     if (activeTab !== 'products' || !Array.isArray(resourceItems)) return { all: 0, pending: 0, approved: 0, rejected: 0, draft_hidden: 0 }
     return {
       all: resourceItems.length,
-      pending: resourceItems.filter((p) => (p.approvalStatus || 'pending') === 'pending').length,
+      pending: resourceItems.filter((p) => p.approvalStatus === 'pending' && p.status !== 'archived').length,
       approved: resourceItems.filter((p) => p.approvalStatus === 'approved').length,
       rejected: resourceItems.filter((p) => p.approvalStatus === 'rejected').length,
       draft_hidden: resourceItems.filter((p) => p.status === 'draft' || p.status === 'hidden').length,
@@ -1140,8 +1149,8 @@ export default function AdminPage() {
   const displayedProducts = useMemo(() => {
     if (activeTab !== 'products') return filteredItems
     return filteredItems.filter((p) => {
-      const app = p.approvalStatus || 'pending'
-      if (productFilterTab === 'pending') return app === 'pending'
+      const app = p.approvalStatus
+      if (productFilterTab === 'pending') return app === 'pending' && p.status !== 'archived'
       if (productFilterTab === 'approved') return app === 'approved'
       if (productFilterTab === 'rejected') return app === 'rejected'
       if (productFilterTab === 'draft_hidden') return p.status === 'draft' || p.status === 'hidden'
@@ -2194,7 +2203,7 @@ export default function AdminPage() {
                     </thead>
                     <tbody className="divide-y divide-[#E6D5C2]/60">
                       {displayedProducts.map((prod) => {
-                        const appStatus = prod.approvalStatus || 'pending'
+                        const appStatus = prod.approvalStatus
                         const isAppSaving = savingId === `approve:${prod.id}` || savingId === `reject:${prod.id}`
                         return (
                           <tr key={prod.id} className="hover:bg-[#FBF3E8]/50 transition">
@@ -2237,7 +2246,7 @@ export default function AdminPage() {
                                 <input
                                   type="checkbox"
                                   checked={Boolean(prod.flash)}
-                                  disabled={savingId === `flash:${prod.id}` || prod.status !== 'active' || appStatus !== 'approved'}
+                                  disabled={savingId === `flash:${prod.id}` || (!prod.flash && (prod.status !== 'active' || appStatus !== 'approved' || prod.shopStatus !== 'active'))}
                                   onChange={(e) => handleToggleFlashSale(prod, e.target.checked)}
                                   className="accent-[#A95532] h-4 w-4 rounded-sm"
                                 />
@@ -2252,8 +2261,7 @@ export default function AdminPage() {
                                   APPROVAL_BADGE_STYLES[appStatus] || 'bg-gray-50 text-gray-700'
                                 }`}
                               >
-                                {appStatus === 'pending' ? '⏳ ' : appStatus === 'approved' ? '✓ ' : '✕ '}
-                                {APPROVAL_LABELS[appStatus] || appStatus}
+                                {APPROVAL_LABELS[appStatus] || 'Chưa có lịch sử duyệt'}
                               </span>
                               {appStatus === 'rejected' && prod.rejectionReason ? (
                                 <button
@@ -2292,7 +2300,7 @@ export default function AdminPage() {
                                 </button>
 
                                 {/* Nút Duyệt: hiển thị nếu chờ duyệt hoặc từ chối */}
-                                {appStatus !== 'approved' ? (
+                                {prod.status !== 'archived' && appStatus !== 'approved' ? (
                                   <button
                                     type="button"
                                     disabled={isAppSaving}
@@ -2304,7 +2312,7 @@ export default function AdminPage() {
                                 ) : null}
 
                                 {/* Nút Từ chối: hiển thị nếu chờ duyệt hoặc đã duyệt */}
-                                {appStatus !== 'rejected' ? (
+                                {prod.status !== 'archived' && appStatus !== 'rejected' ? (
                                   <button
                                     type="button"
                                     disabled={isAppSaving}
@@ -2318,7 +2326,7 @@ export default function AdminPage() {
                                 {/* Dropdown đổi trạng thái hiển thị (draft, active, hidden, archived) */}
                                 <select
                                   value={prod.status}
-                                  disabled={savingId === prod.id || appStatus !== 'approved'}
+                                  disabled={savingId === prod.id || appStatus !== 'approved' || prod.status === 'archived'}
                                   onChange={(e) => handleUpdateStatus(prod, e.target.value)}
                                   title={appStatus !== 'approved' ? 'Chỉ có thể thay đổi trạng thái hiển thị sau khi sản phẩm đã được Admin duyệt' : 'Thay đổi trạng thái hiển thị'}
                                   className="rounded-lg border border-[#E6D5C2] bg-[#FFFCF7] px-2 py-1 text-[11px] text-[#49352D] outline-none transition focus:border-[#BD6E49] disabled:opacity-50 disabled:bg-gray-100"
@@ -3138,7 +3146,7 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                       Sản phẩm được phép xuất hiện công khai trên sàn khi trạng thái hiển thị là "Đang hoạt động".
                     </p>
                   </div>
-                ) : (
+                ) : previewProduct.approvalStatus === 'pending' ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                     <div className="flex items-center gap-2 text-amber-700 font-bold text-[13px]">
                       <span>⏳ Sản phẩm đang chờ Admin kiểm duyệt</span>
@@ -3147,6 +3155,8 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                       Sản phẩm chưa được hiển thị công khai. Vui lòng kiểm tra kỹ nội dung và bộ 4 ảnh trước khi duyệt.
                     </p>
                   </div>
+                ) : (
+                  <p className="rounded-2xl border border-[#E6D5C2] p-4">Chưa có lịch sử duyệt sản phẩm này.</p>
                 )}
 
                 {/* 2. Bộ tối đa 4 ảnh thực tế */}
@@ -3220,20 +3230,22 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                   Đóng
                 </button>
                 <div className="flex items-center gap-2">
-                  <button
+                  {previewProduct.status !== 'archived' && previewProduct.approvalStatus !== 'rejected' ? <button
                     type="button"
+                    disabled={savingId === `reject:${previewProduct.id}` || savingId === `approve:${previewProduct.id}`}
                     onClick={() => handleOpenReject(previewProduct)}
                     className="rounded-xl border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 px-4 py-2 text-[13px] font-semibold transition"
                   >
                     ✕ Từ chối duyệt...
-                  </button>
-                  <button
+                  </button> : null}
+                  {previewProduct.status !== 'archived' && previewProduct.approvalStatus !== 'approved' ? <button
                     type="button"
+                    disabled={savingId === `approve:${previewProduct.id}` || savingId === `reject:${previewProduct.id}`}
                     onClick={() => handleApproveProduct(previewProduct)}
                     className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[#FFFCF7] px-5 py-2 text-[13px] font-semibold transition shadow-2xs"
                   >
                     ✓ Duyệt sản phẩm này
-                  </button>
+                  </button> : null}
                 </div>
               </div>
             </div>
@@ -4136,18 +4148,6 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
               </div>
 
               <div className="overflow-y-auto p-6 space-y-4 text-[13px]">
-                {approvalEventsLoading ? (
-                  <p className="py-8 text-center text-[#8B7566]">Đang tải lịch sử xét duyệt...</p>
-                ) : approvalEventsError ? (
-                  <p className="rounded-xl bg-rose-50 p-4 text-[13px] text-rose-700">{approvalEventsError}</p>
-                ) : approvalEvents.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F5E7D4] text-xl text-[#A95532]">
-                      ℹ️
-                    </span>
-                    <p className="mt-2 text-[14px] font-semibold text-[#49352D]">Chưa có sự kiện xét duyệt nào được ghi nhận</p>
-                    <p className="text-[12px] text-[#8B7566] mt-0.5">Gian hàng chưa trải qua lần phê duyệt hoặc từ chối nào.</p>
-                  </div>
                 {shopRegistrationError ? (
                   <p className="rounded-xl bg-rose-50 p-4 text-rose-700">{shopRegistrationError}</p>
                 ) : null}
@@ -4163,6 +4163,18 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                     <dt>Email hóa đơn</dt><dd>{shopRegistration.profile.invoiceEmail || 'Chưa khai báo'}</dd>
                   </dl>
                 ) : null}
+                {approvalEventsLoading ? (
+                  <p className="py-8 text-center text-[#8B7566]">Đang tải lịch sử xét duyệt...</p>
+                ) : approvalEventsError ? (
+                  <p className="rounded-xl bg-rose-50 p-4 text-[13px] text-rose-700">{approvalEventsError}</p>
+                ) : approvalEvents.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F5E7D4] text-xl text-[#A95532]">
+                      ℹ️
+                    </span>
+                    <p className="mt-2 text-[14px] font-semibold text-[#49352D]">Chưa có sự kiện xét duyệt nào được ghi nhận</p>
+                    <p className="text-[12px] text-[#8B7566] mt-0.5">Gian hàng chưa trải qua lần phê duyệt hoặc từ chối nào.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {approvalEvents.map((evt) => {

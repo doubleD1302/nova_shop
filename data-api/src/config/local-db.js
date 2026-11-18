@@ -637,6 +637,9 @@ export function executeLocalQuery(sql, values = []) {
     .replace(/\bFOR\s+UPDATE\b/gi, '')
     .replace(/\bLOCK\s+IN\s+SHARE\s+MODE\b/gi, '')
     .replace(/DATE_ADD\([^)]+\)/gi, "datetime('now', '+15 minutes')")
+    .replace(/GREATEST\(CURRENT_TIMESTAMP\(3\), TIMESTAMPADD\(MICROSECOND, 1000, updated_at\)\)/gi,
+      "MAX(strftime('%Y-%m-%d %H:%M:%f', 'now'), strftime('%Y-%m-%d %H:%M:%f', updated_at, '+0.001 seconds'))")
+    .replace(/CURRENT_TIMESTAMP\(3\)/gi, "strftime('%Y-%m-%d %H:%M:%f', 'now')")
     .replace(/UTC_TIMESTAMP\(\d*\)/gi, "datetime('now')")
     .trim()
 

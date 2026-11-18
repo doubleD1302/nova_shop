@@ -1,6 +1,6 @@
 import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
-import { executeQuery, executeTransaction } from '../config/database.js'
+import { executeQuery, executeTransaction, hasColumn } from '../config/database.js'
 import { calculateShipping } from '../utils/shipping.js'
 import { evaluateVoucher } from '../utils/voucher.js'
 import { allocateDiscounts, isValidAmount } from '../utils/money.js'
@@ -144,6 +144,7 @@ export async function createOrder(req, res, next) {
       if (!buyers.length) return { error: 'BUYER_NOT_FOUND' }
 
       const variants = []
+      const hasApproval = await hasColumn('products', 'approval_status', query)
       for (const item of order.items) {
         const rows = await query(
           `SELECT v.id AS variant_id, v.product_id, v.name AS variant_name, v.attributes, v.sku,
@@ -155,6 +156,7 @@ export async function createOrder(req, res, next) {
            JOIN shops s ON s.id = p.shop_id
            JOIN users shop_owner ON shop_owner.id = s.owner_id AND shop_owner.status = 'active'
            WHERE v.id = ? AND v.is_active = 1 AND p.status = 'active' AND s.status = 'active'
+             ${hasApproval ? "AND (p.approval_status = 'approved' OR p.approval_status IS NULL)" : ''}
            FOR UPDATE`,
           [item.variantId],
         )

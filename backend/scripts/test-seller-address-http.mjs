@@ -36,8 +36,8 @@ const { signAccessToken } = await import(url('backend', 'middlewares/auth.middle
 const server = backend.listen(0, '127.0.0.1')
 await new Promise((resolve) => server.once('listening', resolve))
 const base = `http://127.0.0.1:${server.address().port}/api/v1`
-async function request(uri, token, method = 'GET', body) {
-  const response = await fetch(base + uri, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+async function request(uri, token, method = 'GET', body, headers = {}) {
+  const response = await fetch(base + uri, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) })
   return { status: response.status, headers: response.headers, body: await response.json() }
 }
 try {
@@ -94,7 +94,45 @@ try {
     approvalStatus: 'approved', approvalVersion: latest.body.data.approvalVersion,
   })).status, 200)
 
-  console.log('PASS: HTTP Backend → Data API, địa chỉ và kiểm duyệt hồ sơ gian hàng trên SQLite tạm')
+  const { getLocalDatabase } = await import(url('data-api', 'config/local-db.js'))
+  const local = getLocalDatabase()
+  local.prepare("UPDATE products SET approval_status = 'pending', status = 'hidden' WHERE id = 1").run()
+  const listProducts = async () => {
+    const products = await request('/admin/products', admin)
+    assert.equal(products.status, 200, JSON.stringify(products.body))
+    return products.body.data.products.find((item) => item.id === '1')
+  }
+  const { reviewVersion } = await listProducts()
+  const productApprovalUrl = '/admin/products/1/approval'
+  assert.equal((await request(productApprovalUrl, sellerToken, 'PATCH', { approvalStatus: 'approved', reviewVersion })).status, 403)
+  const approved = await request(productApprovalUrl, admin, 'PATCH', { approvalStatus: 'approved', reviewVersion })
+  assert.equal(approved.status, 200, JSON.stringify(approved.body))
+  assert.equal(approved.body.data.status, 'hidden')
+  const stale = await request(productApprovalUrl, admin, 'PATCH', {
+    approvalStatus: 'rejected', reviewVersion, rejectionReason: 'Ảnh cần cập nhật',
+  })
+  assert.equal(stale.body.error.code, 'PRODUCT_APPROVAL_CONFLICT')
+  local.prepare("UPDATE products SET status = 'archived' WHERE id = 1").run()
+  const archived = await request(productApprovalUrl, admin, 'PATCH', {
+    approvalStatus: 'approved', reviewVersion: (await listProducts()).reviewVersion,
+  })
+  assert.equal(archived.body.error.code, 'PRODUCT_ARCHIVED')
+  local.prepare("UPDATE products SET status = 'active', approval_status = 'rejected' WHERE id = 1").run()
+  const flash = await request('/admin/products/1/flash-sale', admin, 'PATCH', { enabled: true })
+  assert.equal(flash.body.error.code, 'PRODUCT_NOT_READY')
+  const cart = await request('/cart/items', sellerToken, 'POST', { variantId: '1', qty: 1 })
+  assert.equal(cart.body.error.code, 'PRODUCT_UNAVAILABLE', JSON.stringify(cart.body))
+  const preview = await request('/orders/preview', sellerToken, 'POST', {
+    items: [{ variantId: '1', qty: 1 }], shippingMethod: 'nhanh',
+  })
+  assert.equal(preview.body.error.code, 'PRODUCT_UNAVAILABLE', JSON.stringify(preview.body))
+  const checkout = await request('/orders', sellerToken, 'POST', {
+    items: [{ variantId: '1', qty: 1 }], shippingMethod: 'nhanh', paymentMethod: 'cod',
+    address: { fullName: 'Nguoi Nhan', phone: '0900000000', province: 'Ha Noi', detail: '123 Test' },
+  }, { 'idempotency-key': 'moderation-checkout-fixture-01' })
+  assert.equal(checkout.body.error.code, 'PRODUCT_UNAVAILABLE', JSON.stringify(checkout.body))
+
+  console.log('PASS: HTTP Backend → Data API, hồ sơ và duyệt shop, duyệt sản phẩm, chặn flash sale và mua hàng trên SQLite tạm')
 } finally {
   server.close(); dataServer.close()
   const { closeDatabase } = await import(url('data-api', 'config/database.js'))

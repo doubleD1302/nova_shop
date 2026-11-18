@@ -1,7 +1,7 @@
 import { validateCategoryAttributes } from '../utils/category-attributes.js'
 import { readPagination } from '../utils/pagination.js'
 import crypto from 'node:crypto'
-import { executeQuery, executeTransaction } from '../config/database.js'
+import { executeQuery, executeTransaction, hasColumn } from '../config/database.js'
 import {
   validUploadedImage,
   validateSellerProductInput,
@@ -61,14 +61,6 @@ function resolveCategorySlug(rawSlug) {
 }
 
 const asDateString = (value) => value instanceof Date ? value.toISOString() : String(value || '')
-
-async function hasColumn(tableName, columnName) {
-  const rows = await executeQuery(
-    'SELECT 1 FROM information_schema.columns WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
-    [tableName, columnName],
-  )
-  return rows.length > 0
-}
 
 export async function listProducts(req, res, next) {
   try {
@@ -828,7 +820,9 @@ export async function saveSellerProduct(req, res, next) {
         const nextStatus = status === 'hidden' ? 'hidden' : 'draft'
         if (hasApproval) {
           await query(
-            `UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ?, approval_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND shop_id = ?`,
+            `UPDATE products SET category_id = ?, name = ?, description = ?, free_shipping = ?, status = ?, approval_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ?,
+               is_flash_sale = 0, updated_at = GREATEST(CURRENT_TIMESTAMP(3), TIMESTAMPADD(MICROSECOND, 1000, updated_at))
+             WHERE id = ? AND shop_id = ?`,
             [categories[0].id, name, description || null, body.freeShipping ? 1 : 0, nextStatus, nextApprovalStatus, nextRejectionReason, nextReviewedBy, nextReviewedAt, productId, shops[0].id],
           )
         } else {
@@ -912,8 +906,10 @@ export async function saveSellerProduct(req, res, next) {
           error: { code: 'SHOP_SUSPENDED' },
         })
       }
-      const notFound = result.error !== 'CATEGORY_NOT_FOUND' && result.error !== 'SHOP_INACTIVE'
-      return res.status(notFound ? 404 : 400).json({
+      if (result.error === 'SHOP_INACTIVE') {
+        return res.status(403).json({ success: false, message: result.message, error: { code: result.error } })
+      }
+      return res.status(result.error === 'CATEGORY_NOT_FOUND' ? 400 : 404).json({
         success: false,
         message: result.error === 'SHOP_NOT_FOUND' ? 'Tài khoản chưa có gian hàng đang hoạt động.' :
           result.error === 'CATEGORY_NOT_FOUND' ? 'Danh mục đã chọn không còn hoạt động.' : 'Không tìm thấy sản phẩm thuộc gian hàng này.',

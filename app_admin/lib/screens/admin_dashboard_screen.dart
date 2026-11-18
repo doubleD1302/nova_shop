@@ -217,7 +217,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _fetchProducts() async {
     final res = await _client.get('/api/v1/admin/products');
-    if (res.success) {
+    if (mounted && res.success) {
       final list = res.data is Map ? (res.data['products'] ?? res.data) : res.data;
       if (list is List) {
         setState(() {
@@ -450,11 +450,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // 4. Duyệt / Từ chối Sản phẩm
-  Future<void> _updateProductApproval(String productId, String approvalStatus, {String? reason}) async {
+  Future<void> _updateProductApproval(String productId, String approvalStatus, Object? reviewVersion, {String? reason}) async {
     final res = await _client.patch(
       '/api/v1/admin/products/$productId/approval',
       body: {
         'approvalStatus': approvalStatus,
+        'reviewVersion': reviewVersion,
         if (approvalStatus == 'rejected') 'rejectionReason': reason ?? 'Sản phẩm vi phạm chính sách đăng bán',
       },
     );
@@ -465,13 +466,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       _fetchProducts();
     } else {
+      if (res.statusCode == 409) _fetchProducts();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: AdminTheme.danger),
       );
     }
   }
 
-  Future<void> _promptRejectProduct(String productId, String productName) async {
+  Future<void> _promptRejectProduct(String productId, String productName, Object? reviewVersion) async {
     final ctrl = TextEditingController(text: 'Hình ảnh sản phẩm mờ hoặc sai quy cách 4 góc.');
     final reason = await showDialog<String>(
       context: context,
@@ -545,7 +547,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
     if (reason != null && reason.isNotEmpty) {
-      _updateProductApproval(productId, 'rejected', reason: reason);
+      _updateProductApproval(productId, 'rejected', reviewVersion, reason: reason);
     }
   }
 
@@ -604,11 +606,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               final isLoading = snapshot.connectionState == ConnectionState.waiting;
               Map<String, dynamic>? regData;
               List<Map<String, dynamic>> events = [];
-
-              if (snapshot.hasData) {
               String? registrationError;
               String? eventsError;
               var canApprove = false;
+
+              if (snapshot.hasData) {
                 final regRes = snapshot.data![0];
                 final evRes = snapshot.data![1];
                 if (regRes.success && regRes.data is Map) {
@@ -809,9 +811,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         },
       ),
     );
+    if (mounted) await _fetchShops();
   }
 
-    if (mounted) await _fetchShops();
   Widget _kycRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.5),
@@ -967,8 +969,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final desc = product['description']?.toString() ?? 'Chưa có mô tả chi tiết cho sản phẩm này.';
     final category = product['categoryName']?.toString() ?? product['category']?.toString() ?? 'Ngành hàng';
     final shopName = product['shopName']?.toString() ?? 'Shop';
-    final approvalStatus = product['approvalStatus']?.toString() ?? 'pending';
-    final isFlashSale = product['isFlashSale'] == true;
+    final approvalStatus = product['approvalStatus']?.toString() ?? 'unreviewed';
+    final isFlashSale = product['flash'] == true;
 
     final List<String> images = [];
     if (product['images'] is List) {
@@ -1174,10 +1176,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () {
+                    onPressed: product['status'] != 'archived' && approvalStatus != 'rejected' ? () {
                       Navigator.pop(ctx);
-                      _promptRejectProduct(pId, name);
-                    },
+                      _promptRejectProduct(pId, name, product['reviewVersion']);
+                    } : null,
                     child: const Text('✕ Từ chối duyệt...'),
                   ),
                 ),
@@ -1190,10 +1192,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () {
+                    onPressed: product['status'] != 'archived' && approvalStatus != 'approved' ? () {
                       Navigator.pop(ctx);
-                      _updateProductApproval(pId, 'approved');
-                    },
+                      _updateProductApproval(pId, 'approved', product['reviewVersion']);
+                    } : null,
                     child: const Text('✓ Duyệt sản phẩm'),
                   ),
                 ),
@@ -1885,8 +1887,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final totalUsers = _stats?['users'] ?? _users.length;
     final totalShops = _stats?['shops'] ?? _shops.length;
 
-    final pendingShopsCount = _shops.where((s) => s['approvalStatus'] == 'pending').length;
-    final pendingProductsCount = _products.where((p) => (p['approvalStatus'] ?? 'pending') == 'pending').length;
+    final pendingShopsCount = _shops.where((s) => s['status'] == 'pending').length;
+    final pendingProductsCount = _products.where((p) => p['approvalStatus'] == 'pending' && p['status'] != 'archived').length;
     final openReportsCount = _reports.where((r) => r['status'] == 'open' || r['status'] == 'investigating').length;
 
     return RefreshIndicator(
@@ -2454,7 +2456,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final name = (p['name']?.toString() ?? '').toLowerCase();
         if (!name.contains(_searchQuery.toLowerCase())) return false;
       }
-      if (_productFilterTab == 'pending') return (p['approvalStatus'] ?? 'pending') == 'pending';
+      if (_productFilterTab == 'pending') return p['approvalStatus'] == 'pending' && p['status'] != 'archived';
       if (_productFilterTab == 'approved') return p['approvalStatus'] == 'approved';
       if (_productFilterTab == 'rejected') return p['approvalStatus'] == 'rejected';
       if (_productFilterTab == 'draft_hidden') return p['status'] == 'hidden' || p['status'] == 'draft';
@@ -2471,7 +2473,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Row(
               children: [
                 _filterChip('all', 'Tất cả (${_products.length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
-                _filterChip('pending', 'Chờ duyệt (${_products.where((p) => (p['approvalStatus'] ?? 'pending') == 'pending').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
+                _filterChip('pending', 'Chờ duyệt (${_products.where((p) => p['approvalStatus'] == 'pending' && p['status'] != 'archived').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
                 _filterChip('approved', 'Đã duyệt (${_products.where((p) => p['approvalStatus'] == 'approved').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
                 _filterChip('rejected', 'Bị từ chối (${_products.where((p) => p['approvalStatus'] == 'rejected').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
                 _filterChip('draft_hidden', 'Bản nháp / Ẩn (${_products.where((p) => p['status'] == 'hidden' || p['status'] == 'draft').length})', _productFilterTab, (k) => setState(() => _productFilterTab = k)),
@@ -2503,7 +2505,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     final pId = p['id']?.toString() ?? '';
                     final name = p['name']?.toString() ?? 'Sản phẩm';
                     final price = double.tryParse(p['price']?.toString() ?? '0') ?? 0;
-                    final approvalStatus = p['approvalStatus']?.toString() ?? 'pending';
+                    final approvalStatus = p['approvalStatus']?.toString() ?? 'unreviewed';
                     final shopName = p['shopName']?.toString() ?? 'Shop';
 
                     String? rawThumb = p['imageUrl']?.toString();
@@ -2560,21 +2562,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                           IconButton(
                             icon: Icon(
-                              p['isFlashSale'] == true ? Icons.bolt_rounded : Icons.bolt_outlined,
-                              color: p['isFlashSale'] == true ? AdminTheme.warning : AdminTheme.textSecondary,
+                              p['flash'] == true ? Icons.bolt_rounded : Icons.bolt_outlined,
+                              color: p['flash'] == true ? AdminTheme.warning : AdminTheme.textSecondary,
                               size: 20,
                             ),
                             tooltip: 'Flash Sale sàn',
-                            onPressed: () => _toggleFlashSale(pId, p['isFlashSale'] == true),
+                            onPressed: () => _toggleFlashSale(pId, p['flash'] == true),
                           ),
-                          if (approvalStatus == 'pending') ...[
+                          if ((approvalStatus == 'pending' || approvalStatus == 'unreviewed') && p['status'] != 'archived') ...[
                             IconButton(
                               icon: const Icon(Icons.close, color: AdminTheme.danger, size: 20),
-                              onPressed: () => _promptRejectProduct(pId, name),
+                              onPressed: () => _promptRejectProduct(pId, name, p['reviewVersion']),
                             ),
                             IconButton(
                               icon: const Icon(Icons.check, color: AdminTheme.success, size: 20),
-                              onPressed: () => _updateProductApproval(pId, 'approved'),
+                              onPressed: () => _updateProductApproval(pId, 'approved', p['reviewVersion']),
                             ),
                           ],
                         ],
@@ -3127,7 +3129,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       default:
         bg = AdminTheme.surfaceSubtle;
         text = AdminTheme.textSecondary;
-        label = status;
+        label = status == 'unreviewed' ? 'Chưa có lịch sử duyệt' : status;
         break;
     }
 

@@ -57,8 +57,8 @@ export default function SellerProductsPage() {
   const tabCounts = useMemo(() => {
     return {
       all: all.length,
-      active: all.filter((p) => (p.approvalStatus === 'approved') && p.status === 'active' && p.stock > 0).length,
-      pending: all.filter((p) => (p.approvalStatus || 'pending') === 'pending').length,
+      active: all.filter((p) => (p.approvalStatus == null || p.approvalStatus === 'approved') && p.status === 'active' && p.stock > 0).length,
+      pending: all.filter((p) => p.approvalStatus === 'pending').length,
       rejected: all.filter((p) => p.approvalStatus === 'rejected').length,
       out_of_stock: all.filter((p) => p.status === 'hidden' || p.stock === 0).length,
     }
@@ -69,8 +69,8 @@ export default function SellerProductsPage() {
     const k = keyword.trim().toLowerCase()
     const filtered = all
       .filter((p) => {
-        const app = p.approvalStatus || 'pending'
-        if (currentTab === 'active') return app === 'approved' && p.status === 'active' && p.stock > 0
+        const app = p.approvalStatus
+        if (currentTab === 'active') return (app == null || app === 'approved') && p.status === 'active' && p.stock > 0
         if (currentTab === 'pending') return app === 'pending'
         if (currentTab === 'rejected') return app === 'rejected'
         if (currentTab === 'out_of_stock') return p.status === 'hidden' || p.stock === 0
@@ -265,7 +265,9 @@ export default function SellerProductsPage() {
             <div className="w-[130px] shrink-0 text-center space-y-1">
               <span className="text-[14px] font-bold text-[#A95532] block">{formatVnd(p.price)}</span>
               {/* Badge Kiểm Duyệt */}
-              {p.approvalStatus === 'pending' || !p.approvalStatus ? (
+              {p.approvalStatus == null ? (
+                <span className="text-[10px] text-gray-600">Chưa có lịch sử duyệt</span>
+              ) : p.approvalStatus === 'pending' ? (
                 <span className="inline-block rounded-full bg-amber-50 border border-amber-200 px-2 py-0.2 text-[10px] font-semibold text-amber-700">
                   ⏳ Chờ duyệt
                 </span>

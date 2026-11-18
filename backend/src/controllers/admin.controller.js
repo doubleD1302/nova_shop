@@ -214,13 +214,13 @@ export async function createContentReport(req, res, next) {
 export async function updateAdminProductApproval(req, res, next) {
   try {
     const { id } = req.params
-    const { approvalStatus, rejectionReason } = req.body || {}
+    const { approvalStatus, rejectionReason, reviewVersion } = req.body || {}
     if (!/^\d{1,20}$/.test(id) || !['approved', 'rejected'].includes(approvalStatus)) {
       return res.status(400).json({ success: false, message: 'Yêu cầu kiểm duyệt không hợp lệ.' })
     }
     const data = await callDataApi(`/internal/v1/admin/products/${encodeURIComponent(id)}/approval`, {
       method: 'PATCH',
-      body: { approvalStatus, rejectionReason, userId: req.user.id },
+      body: { approvalStatus, rejectionReason, reviewVersion, userId: req.user.id },
     })
     return res.status(200).json({ success: true, data })
   } catch (err) {

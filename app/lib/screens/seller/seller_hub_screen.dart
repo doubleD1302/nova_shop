@@ -1420,10 +1420,14 @@ class _SellerHubScreenState extends State<SellerHubScreen> with SingleTickerProv
         text = 'Từ chối';
         break;
       case 'approved':
-      default:
         bg = const Color(0xFFE8F5E9);
         fg = const Color(0xFF2E7D32);
         text = 'Đã duyệt';
+        break;
+      default:
+        bg = Colors.grey.shade100;
+        fg = Colors.grey.shade700;
+        text = 'Chưa có lịch sử duyệt';
         break;
     }
 
