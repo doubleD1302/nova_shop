@@ -8,7 +8,8 @@ import { vietnamProvinces } from '../../data/locations'
 import AvatarPicker from '../../components/ui/AvatarPicker'
 import { IconCheck, IconEye, IconStore } from '../../components/ui/Icons'
 import SmartImage from '../../components/ui/SmartImage'
-import { API_BASE_URL, apiUploadSellerImage } from '../../utils/api'
+import SellerRegistrationWizard from '../../components/seller/SellerRegistrationWizard'
+import { API_BASE_URL, apiGetSellerRegistration, apiUploadSellerImage } from '../../utils/api'
 
 /**
  * THÔNG TIN GIAN HÀNG (NGƯỜI BÁN) - PHONG CÁCH SHOPEE SELLER CENTRE HỒNG PASTEL
@@ -23,6 +24,8 @@ export default function SellerShopPage() {
   const [saving, setSaving] = useState(false)
   const [resubmitting, setResubmitting] = useState(false)
   const [bannerBusy, setBannerBusy] = useState(false)
+  const [editingRegistration, setEditingRegistration] = useState(null)
+  const [loadingRegistration, setLoadingRegistration] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState(() => ({
     name: shop?.name || '',
@@ -122,11 +125,46 @@ export default function SellerShopPage() {
     }
   }
 
+  const openRegistration = async () => {
+    setLoadingRegistration(true)
+    setError('')
+    try {
+      const response = await apiGetSellerRegistration()
+      const payload = await response.json()
+      if (response.ok && payload.success) {
+        setEditingRegistration({ shop, profile: payload.data.profile })
+      } else if (payload.error?.code === 'SELLER_PROFILE_NOT_FOUND') {
+        setEditingRegistration({ shop, profile: null })
+      } else {
+        throw new Error(payload.message || 'Không thể tải hồ sơ người bán.')
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoadingRegistration(false)
+    }
+  }
+
   if (!shop) {
     return (
       <div className="rounded-2xl border border-[#E6D5C2] bg-[#FFFCF7] p-6 text-[13px] text-[#8B7566]">
         {shopError || 'Đang tải thông tin gian hàng từ hệ thống...'}
       </div>
+    )
+  }
+
+  if (editingRegistration) {
+    return (
+      <SellerRegistrationWizard
+        user={user}
+        editShop={editingRegistration.shop}
+        registration={editingRegistration.profile}
+        pushToast={pushToast}
+        onClose={(saved) => {
+          setEditingRegistration(null)
+          if (saved) loadSellerShop().catch((err) => setError(err.message))
+        }}
+      />
     )
   }
 
@@ -185,6 +223,16 @@ export default function SellerShopPage() {
       </div>
 
       {/* Thông báo trạng thái xét duyệt */}
+      {['pending', 'rejected'].includes(shop.status) ? (
+        <button
+          type="button"
+          onClick={openRegistration}
+          disabled={loadingRegistration || saving || resubmitting}
+          className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] px-4 py-2 text-[13px] font-semibold text-[#A95532]"
+        >
+          {loadingRegistration ? 'Đang tải hồ sơ...' : 'Sửa hồ sơ người bán'}
+        </button>
+      ) : null}
       {shop.status === 'pending' ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900 shadow-2xs">
           <div className="flex items-center gap-2 font-bold text-amber-800">
@@ -217,7 +265,7 @@ export default function SellerShopPage() {
             <p className="mt-0.5 whitespace-pre-wrap">{shop.rejectionReason || 'Hồ sơ chưa đạt tiêu chuẩn quy định của sàn NovaShop.'}</p>
           </div>
           <p className="mt-2 text-[12px] text-rose-700">
-            Vui lòng chỉnh sửa các thông tin chưa phù hợp ở form bên dưới, bấm "Lưu Thay Đổi", sau đó bấm "Gửi lại hồ sơ duyệt" để Ban Quản Trị kiểm duyệt lại.
+            Chỉnh sửa và lưu phần thông tin được nêu trong lý do từ chối, sau đó bấm “Gửi lại hồ sơ duyệt”.
           </p>
         </div>
       ) : shop.status === 'active' ? (

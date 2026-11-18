@@ -287,6 +287,7 @@ export async function register(req, res, next) {
         role,
         shopName: role === 'seller' ? body.shopName.trim() : undefined,
         shopTagline: typeof body.shopTagline === 'string' ? body.shopTagline.trim() : '',
+        ...(body.sellerProfile !== undefined ? { sellerProfile: body.sellerProfile } : {}),
       },
     })
     const refreshToken = await createSessionForUser(result.user.id)
@@ -328,7 +329,7 @@ export async function createSellerShop(req, res, next) {
   try {
     const result = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop`, {
       method: 'POST',
-      body: { shopName: shopName.trim() },
+      body: { shopName: shopName.trim(), shopTagline: req.body?.shopTagline, sellerProfile: req.body?.sellerProfile },
     })
     const refreshToken = await createSessionForUser(result.user.id)
     return res.status(200).json({

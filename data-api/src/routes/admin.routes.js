@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { searchAdmin } from '../controllers/ai-admin.controller.js'
+import { getSellerRegistration, listSellerIdentityAccessEvents, revealSellerIdentity } from '../controllers/seller-registration.controller.js'
 import {
   createReport,
   getAdminStats,
@@ -38,6 +39,9 @@ router.get('/admin/shops', listAdminShops)
 router.patch('/admin/shops/:shopId/status', updateAdminShopStatus)
 router.patch('/admin/shops/:shopId/approval', updateAdminShopApproval)
 router.get('/admin/shops/:shopId/approval-events', listAdminShopApprovalEvents)
+router.get('/admin/shops/:shopId/registration', getSellerRegistration)
+router.get('/admin/shops/:shopId/identity-access-events', listSellerIdentityAccessEvents)
+router.post('/admin/shops/:shopId/identity-access', revealSellerIdentity)
 router.get('/admin/shops/:shopId/violations', getShopViolations)
 router.get('/admin/products', listAdminProducts)
 router.patch('/admin/products/:productId/status', updateAdminProductStatus)

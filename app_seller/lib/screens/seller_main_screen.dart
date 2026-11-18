@@ -10,7 +10,7 @@ import '../services/upload_service.dart';
 import '../theme/seller_theme.dart';
 import '../widgets/nova_logo.dart';
 import 'login_screen.dart';
-import 'register_screen.dart' show kVietnamProvinces;
+import 'register_screen.dart' show RegisterScreen, kVietnamProvinces;
 import '../services/seller_feature_service.dart';
 import 'seller_chat_notifications_screen.dart';
 import 'seller_marketing_screen.dart';
@@ -298,6 +298,33 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
           SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Gửi lại hồ sơ thất bại.'), backgroundColor: SellerTheme.danger),
         );
       }
+    }
+  }
+
+  Future<void> _editShopRegistration() async {
+    final shop = _shopProfile;
+    if (shop == null) return;
+    final res = await _client.get('/api/v1/seller/shop/registration');
+    if (!mounted) return;
+    final payload = res.data;
+    final profile = payload is Map ? payload['profile'] : null;
+    final missing = res.error is Map && res.error['code'] == 'SELLER_PROFILE_NOT_FOUND';
+    if (profile is! Map && !missing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Không thể tải hồ sơ người bán.')),
+      );
+      return;
+    }
+    final saved = await Navigator.push<bool>(context, MaterialPageRoute(
+      builder: (_) => RegisterScreen(
+        editShop: shop,
+        registration: profile is Map ? Map<String, dynamic>.from(profile) : null,
+      ),
+    ));
+    if (mounted && saved == true) {
+      await _loadProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã lưu hồ sơ người bán.')));
     }
   }
 
@@ -2096,8 +2123,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
 
   Widget _buildShopTab() {
     final user = AuthService().currentUser;
-    final shopStatus = _shopProfile?['status']?.toString() ?? 'pending';
-    final approvalStatus = _shopProfile?['approvalStatus']?.toString() ?? shopStatus;
+    final shopStatus = _shopProfile?['status']?.toString();
     final approvalVersion = _shopProfile?['approvalVersion'] ?? 1;
     final rejectionReason = _shopProfile?['rejectionReason']?.toString() ?? 'Hồ sơ chưa đạt tiêu chuẩn quy định của sàn NovaShop.';
 
@@ -2114,7 +2140,14 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. BANNER TRẠNG THÁI XÉT DUYỆT (GIỐNG SELLERSHOPPAGE.JSX)
-          if (approvalStatus == 'pending' || shopStatus == 'pending') ...[
+          if (shopStatus == 'pending' || shopStatus == 'rejected') ...[
+            OutlinedButton(
+              onPressed: _isSavingShop || _isResubmitting ? null : _editShopRegistration,
+              child: const Text('Sửa hồ sơ người bán'),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (shopStatus == 'pending') ...[
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -2144,7 +2177,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
               ),
             ),
             const SizedBox(height: 14),
-          ] else if (approvalStatus == 'rejected' || shopStatus == 'rejected') ...[
+          ] else if (shopStatus == 'rejected') ...[
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -2210,7 +2243,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
               ),
             ),
             const SizedBox(height: 14),
-          ] else if (approvalStatus == 'active' || shopStatus == 'active') ...[
+          ] else if (shopStatus == 'active') ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
@@ -2457,7 +2490,7 @@ class _SellerMainScreenState extends State<SellerMainScreen> with SingleTickerPr
                         ),
                       ),
                     ),
-                    if (approvalStatus == 'rejected' || shopStatus == 'rejected') ...[
+                    if (shopStatus == 'rejected') ...[
                       const SizedBox(width: 10),
                       SizedBox(
                         height: 46,

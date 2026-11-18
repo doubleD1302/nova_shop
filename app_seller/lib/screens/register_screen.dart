@@ -22,7 +22,10 @@ const List<String> kVietnamProvinces = [
 ];
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.editShop, this.registration});
+
+  final Map<String, dynamic>? editShop;
+  final Map<String, dynamic>? registration;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -65,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Bước 4: Thông tin thuế
   final TextEditingController _taxCodeController = TextEditingController();
   final TextEditingController _invoiceEmailController = TextEditingController();
-  bool _agreeTerms = true;
+  bool _agreeTerms = false;
 
   @override
   void initState() {
@@ -77,6 +80,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _fullNameController.text = user.fullName;
       _ownerNameController.text = user.fullName;
       _invoiceEmailController.text = user.email ?? '';
+    }
+    final shop = widget.editShop;
+    if (shop != null) {
+      final profile = widget.registration;
+      _currentStep = 1;
+      _shopNameController.text = shop['name']?.toString() ?? '';
+      _shopTaglineController.text = shop['tagline']?.toString() ?? '';
+      _pickupAddress = (profile?['pickupAddress'] ?? shop['address'])?.toString() ?? '';
+      final province = (profile?['province'] ?? shop['location'])?.toString();
+      if (kVietnamProvinces.contains(province)) _selectedProvince = province!;
+      if (profile != null) {
+        _emailController.text = profile['contactEmail']?.toString() ?? '';
+        _phoneController.text = profile['contactPhone']?.toString() ?? '';
+        _ownerNameController.text = profile['ownerName']?.toString() ?? '';
+        _businessType = profile['businessType']?.toString() ?? 'personal';
+        _taxCodeController.text = profile['taxCode']?.toString() ?? '';
+        _invoiceEmailController.text = profile['invoiceEmail']?.toString() ?? '';
+        final shipping = profile['shippingMethods'];
+        if (shipping is List) {
+          _shippingNhanh = shipping.contains('nhanh');
+          _shippingTietKiem = shipping.contains('tietkiem');
+          _shippingHoaToc = shipping.contains('hoatoc');
+        }
+      }
     }
   }
 
@@ -200,11 +227,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     // Validate Bước 1: Thông tin Shop
     if (_currentStep == 1) {
       final name = _shopNameController.text.trim();
-      if (name.isEmpty) {
+      if (widget.editShop == null && name.isEmpty) {
         setState(() => _errorMessage = 'Vui lòng nhập Tên Shop (bắt buộc).');
         return;
       }
-      if (name.length < 3 || name.length > 30) {
+      if (widget.editShop == null && (name.length < 3 || name.length > 30)) {
         setState(() => _errorMessage = 'Tên Shop phải có độ dài từ 3 đến 30 ký tự.');
         return;
       }
@@ -330,7 +357,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final shopTagline = _shopTaglineController.text.trim();
 
       ApiResponse res;
-      if (user != null) {
+      if (widget.editShop != null) {
+        res = await ApiClient().put('/api/v1/seller/shop/registration', body: sellerProfile);
+      } else if (user != null) {
         res = await AuthService().openSellerShop(
           shopName: shopName,
           shopTagline: shopTagline.isNotEmpty ? shopTagline : null,
@@ -353,6 +382,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _submitting = false);
 
       if (res.success) {
+        if (widget.editShop != null) {
+          Navigator.pop(context, true);
+          return;
+        }
         setState(() => _currentStep = 5);
       } else {
         setState(() {
@@ -371,12 +404,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: SellerTheme.background,
       appBar: AppBar(
-        title: const Text('Đăng Ký Kênh Người Bán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(widget.editShop == null ? 'Đăng Ký Kênh Người Bán' : 'Sửa hồ sơ người bán', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             if (_currentStep > 1) {
               setState(() => _currentStep--);
+            } else if (widget.editShop != null) {
+              Navigator.pop(context);
             } else {
               setState(() => _currentStep = 0);
             }
@@ -614,6 +649,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Tên Shop
           TextField(
             controller: _shopNameController,
+            readOnly: widget.editShop != null,
             maxLength: 30,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
@@ -627,6 +663,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Slogan
           TextField(
             controller: _shopTaglineController,
+            readOnly: widget.editShop != null,
             maxLength: 100,
             decoration: const InputDecoration(
               labelText: 'Slogan gian hàng',
@@ -1156,6 +1193,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 : () {
                     if (_currentStep > 1) {
                       setState(() => _currentStep--);
+                    } else if (widget.editShop != null) {
+                      Navigator.pop(context);
                     } else {
                       setState(() => _currentStep = 0);
                     }
@@ -1180,7 +1219,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: _submitting
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : Text(
-                    _currentStep == 4 ? 'Hoàn tất & Gửi duyệt' : 'Tiếp theo',
+                    _currentStep == 4
+                        ? (widget.editShop == null ? 'Hoàn tất & Gửi duyệt' : 'Lưu hồ sơ')
+                        : 'Tiếp theo',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
           ),

@@ -2,6 +2,7 @@ import { prepareSellerProfile, encryptIdentity, decryptIdentity, saveSellerProfi
 import { executeQuery, executeTransaction } from '../config/database.js'
 
 export async function getSellerRegistration(req, res, next) {
+  res.set('Cache-Control', 'no-store')
   try {
     const userId = String(req.params.userId || req.query.userId || '')
     const shopId = req.params.shopId
@@ -13,12 +14,13 @@ export async function getSellerRegistration(req, res, next) {
       : 's.owner_id = ?'
     const values = shopId ? [shopId, userId] : [userId]
     const rows = await executeQuery(`SELECT p.pickup_address, p.province, p.contact_email, p.contact_phone,
-      p.shipping_methods, p.business_type, p.owner_name, p.identity_last4, p.tax_code, p.invoice_email, p.agreed_at
+      p.shipping_methods, p.business_type, p.owner_name, p.identity_last4, p.tax_code, p.invoice_email, p.agreed_at,
+      s.status, s.approval_version
       FROM seller_registration_profiles p JOIN shops s ON s.id = p.shop_id WHERE ${access} LIMIT 1`, values)
     if (!rows.length) return res.status(404).json({ success: false, message: 'Không tìm thấy hồ sơ.', error: { code: 'SELLER_PROFILE_NOT_FOUND' } })
     const p = rows[0]
     const methods = typeof p.shipping_methods === 'string' ? JSON.parse(p.shipping_methods) : p.shipping_methods
-    return res.json({ success: true, data: { profile: {
+    return res.json({ success: true, data: { status: p.status, approvalVersion: Number(p.approval_version), profile: {
       pickupAddress: p.pickup_address, province: p.province, contactEmail: p.contact_email,
       contactPhone: p.contact_phone, shippingMethods: methods, businessType: p.business_type,
       ownerName: p.owner_name, identityLast4: p.identity_last4, taxCode: p.tax_code,
@@ -28,6 +30,7 @@ export async function getSellerRegistration(req, res, next) {
 }
 
 export async function updateSellerRegistration(req, res, next) {
+  res.set('Cache-Control', 'no-store')
   try {
     const userId = String(req.params.userId || '')
     const profile = prepareSellerProfile(req.body)

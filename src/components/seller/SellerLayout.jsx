@@ -125,7 +125,6 @@ const MENU_GROUPS = [
     icon: IconStore,
     items: [
       { to: '/nguoi-ban/gian-hang', label: 'Thông tin gian hàng' },
-      { action: 'seller_profile', label: 'Hồ sơ người bán' },
       { action: 'shipping_settings', label: 'Cài đặt vận chuyển' },
       { action: 'shop_addresses', label: 'Địa chỉ lấy hàng' },
     ],

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { executeQuery, executeTransaction } from '../config/database.js'
+import { prepareSellerProfile, encryptIdentity, saveSellerProfile } from '../utils/seller-profile.js'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -474,6 +475,14 @@ export async function registerUser(req, res, next) {
     const shopTagline = typeof body.shopTagline === 'string' ? body.shopTagline.trim() : ''
     const role = body.role
     const password = body.password
+    const sellerProfile = body.sellerProfile === undefined ? null : prepareSellerProfile(body.sellerProfile)
+    if (body.sellerProfile !== undefined && (!sellerProfile || role !== 'seller')) {
+      return res.status(400).json({ success: false, message: 'Hồ sơ người bán không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const encryptedIdentity = sellerProfile ? encryptIdentity(sellerProfile.idCard) : null
+    if (sellerProfile && !encryptedIdentity) {
+      return res.status(503).json({ success: false, message: 'Chưa cấu hình bảo vệ hồ sơ người bán.', error: { code: 'SELLER_PROFILE_NOT_CONFIGURED' } })
+    }
     const rawAddress = body.address
     const address = rawAddress && typeof rawAddress === 'object' && !Array.isArray(rawAddress)
       ? {
@@ -530,11 +539,12 @@ export async function registerUser(req, res, next) {
       let shopId = null
       if (role === 'seller') {
         const shopResult = await query(
-          `INSERT INTO shops (owner_id, slug, name, tagline, province, status)
-           VALUES (?, ?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
-          [userId, shopSlug, body.shopName.trim(), shopTagline || null],
+          `INSERT INTO shops (owner_id, slug, name, tagline, province, address_detail, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+          [userId, shopSlug, body.shopName.trim(), shopTagline || null, sellerProfile?.province || 'TP. Hồ Chí Minh', sellerProfile?.pickupAddress || null],
         )
         shopId = String(shopResult.insertId)
+        if (sellerProfile) await saveSellerProfile(query, shopId, sellerProfile, encryptedIdentity)
         await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
       if (address) {
@@ -753,6 +763,19 @@ export async function createSellerShop(req, res, next) {
       })
     }
 
+    const rawTagline = req.body?.shopTagline
+    const shopTagline = typeof rawTagline === 'string' ? rawTagline.trim() : ''
+    const rawProfile = req.body?.sellerProfile
+    const sellerProfile = rawProfile === undefined ? null : prepareSellerProfile(rawProfile)
+    if ((rawProfile !== undefined && !sellerProfile) ||
+        (rawTagline != null && typeof rawTagline !== 'string') || shopTagline.length > 255) {
+      return res.status(400).json({ success: false, message: 'Thông tin mở gian hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const encryptedIdentity = sellerProfile ? encryptIdentity(sellerProfile.idCard) : null
+    if (sellerProfile && !encryptedIdentity) {
+      return res.status(503).json({ success: false, message: 'Chưa cấu hình bảo vệ hồ sơ người bán.', error: { code: 'SELLER_PROFILE_NOT_CONFIGURED' } })
+    }
+
     const result = await executeTransaction(async (query) => {
       const users = await query(
         `SELECT id, username, full_name, email, phone, avatar_url, role, status
@@ -780,12 +803,13 @@ export async function createSellerShop(req, res, next) {
       } else {
         const shopSlug = `${slugify(shopName)}-${crypto.randomBytes(4).toString('hex')}`
         const shop = await query(
-          `INSERT INTO shops (owner_id, slug, name, province, status)
-           VALUES (?, ?, ?, 'TP. Hồ Chí Minh', 'pending')`,
-          [userId, shopSlug, shopName],
+          `INSERT INTO shops (owner_id, slug, name, tagline, province, address_detail, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+          [userId, shopSlug, shopName, shopTagline || null, sellerProfile?.province || 'TP. Hồ Chí Minh', sellerProfile?.pickupAddress || null],
         )
         shopId = String(shop.insertId)
         shopStatus = 'pending'
+        if (sellerProfile) await saveSellerProfile(query, shopId, sellerProfile, encryptedIdentity)
         await query(`INSERT INTO shop_approval_events (shop_id, actor_id, action, profile_version) VALUES (?, ?, 'submitted', 1)`, [shopId, userId])
       }
 

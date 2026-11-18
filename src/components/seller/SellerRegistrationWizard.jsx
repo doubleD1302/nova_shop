@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { vietnamProvinces } from '../../data/locations'
 import { isValidEmail, normalizeEmail } from '../../utils/validation'
+import { apiUpdateSellerRegistration } from '../../utils/api'
 import { IconCheck, IconClose, IconStore, IconTruck } from '../ui/Icons'
 
 /**
@@ -15,11 +16,14 @@ export default function SellerRegistrationWizard({
   loadSellerShop,
   register,
   pushToast,
+  editShop,
+  registration,
+  onClose,
 }) {
   const navigate = useNavigate()
 
   // currentStep: 0 = Màn hình Welcome, 1..5 = Các bước Stepper
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStep, setCurrentStep] = useState(editShop ? 1 : 0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -33,12 +37,12 @@ export default function SellerRegistrationWizard({
   // Dữ liệu form xuyên suốt các bước
   const [form, setForm] = useState({
     // Bước 1: Thông tin Shop
-    shopName: '',
-    shopTagline: '',
-    pickupAddress: '',
-    province: 'TP. Hồ Chí Minh',
-    email: user?.email || '',
-    phone: user?.phone || '',
+    shopName: editShop?.name || '',
+    shopTagline: editShop?.tagline || '',
+    pickupAddress: registration?.pickupAddress || editShop?.address || '',
+    province: registration?.province || editShop?.location || 'TP. Hồ Chí Minh',
+    email: registration?.contactEmail || user?.email || '',
+    phone: registration?.contactPhone || user?.phone || '',
 
     // Nếu chưa đăng nhập tài khoản
     fullName: '',
@@ -47,18 +51,18 @@ export default function SellerRegistrationWizard({
     confirmPassword: '',
 
     // Bước 2: Cài đặt vận chuyển
-    shippingNhanh: true,
-    shippingTietKiem: true,
-    shippingHoaToc: false,
+    shippingNhanh: registration?.shippingMethods?.includes('nhanh') ?? true,
+    shippingTietKiem: registration?.shippingMethods?.includes('tietkiem') ?? true,
+    shippingHoaToc: registration?.shippingMethods?.includes('hoatoc') ?? false,
 
     // Bước 3: Thông tin định danh
-    businessType: 'personal', // 'personal' | 'household' | 'enterprise'
-    ownerName: user?.fullName || '',
+    businessType: registration?.businessType || 'personal',
+    ownerName: registration?.ownerName || user?.fullName || '',
     idCard: '',
 
     // Bước 4: Thông tin thuế
-    taxCode: '',
-    invoiceEmail: user?.email || '',
+    taxCode: registration?.taxCode || '',
+    invoiceEmail: registration?.invoiceEmail ?? user?.email ?? '',
     agreeTerms: false,
   })
 
@@ -93,11 +97,11 @@ export default function SellerRegistrationWizard({
     // Validate Bước 1
     if (currentStep === 1) {
       const name = form.shopName.trim()
-      if (!name) {
+      if (!editShop && !name) {
         setError('Vui lòng nhập Tên Shop (bắt buộc).')
         return
       }
-      if (name.length < 3 || name.length > 30) {
+      if (!editShop && (name.length < 3 || name.length > 30)) {
         setError('Tên Shop phải có độ dài từ 3 đến 30 ký tự.')
         return
       }
@@ -189,7 +193,14 @@ export default function SellerRegistrationWizard({
       }
       setSubmitting(true)
       try {
-        if (!user) {
+        if (editShop) {
+          const response = await apiUpdateSellerRegistration(sellerProfile)
+          const { success, message } = await response.json()
+          if (!response.ok || !success) throw new Error(message || 'Không thể lưu hồ sơ người bán.')
+          pushToast('Đã lưu hồ sơ người bán.', 'success')
+          onClose(true)
+          return
+        } else if (!user) {
           // Tạo tài khoản người bán mới
           const res = await register({
             fullName: form.fullName.trim() || form.ownerName.trim(),
@@ -387,6 +398,7 @@ export default function SellerRegistrationWizard({
                 <div className="relative flex-1">
                   <input
                     value={form.shopName}
+                    readOnly={Boolean(editShop)}
                     onChange={setField('shopName')}
                     maxLength={30}
                     placeholder="Nhập tên Shop của bạn..."
@@ -406,6 +418,7 @@ export default function SellerRegistrationWizard({
                 <div className="flex-1">
                   <input
                     value={form.shopTagline}
+                    readOnly={Boolean(editShop)}
                     onChange={setField('shopTagline')}
                     maxLength={100}
                     placeholder="Ví dụ: Thời trang thiết kế chính hãng, Giao hàng siêu tốc..."
@@ -794,7 +807,7 @@ export default function SellerRegistrationWizard({
               ) : (
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(0)}
+                  onClick={() => editShop ? onClose(false) : setCurrentStep(0)}
                   className="rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] px-5 py-2.5 text-[13px] font-semibold text-[#8B7566] transition cursor-pointer"
                 >
                   Hủy
@@ -812,7 +825,7 @@ export default function SellerRegistrationWizard({
                 {submitting
                   ? 'Đang gửi hồ sơ...'
                   : currentStep === 4
-                  ? 'Hoàn tất & Gửi duyệt'
+                  ? (editShop ? 'Lưu hồ sơ' : 'Hoàn tất & Gửi duyệt')
                   : 'Tiếp theo'}
               </button>
             </div>

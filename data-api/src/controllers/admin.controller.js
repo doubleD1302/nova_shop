@@ -149,7 +149,7 @@ export async function listAdminShops(req, res, next) {
       FROM shops s
       JOIN users u ON u.id = s.owner_id
       LEFT JOIN users suspended_admin ON suspended_admin.id = s.suspended_by
-      ORDER BY s.created_at DESC, s.id DESC LIMIT 500
+      ORDER BY CASE WHEN s.status = 'pending' THEN 0 ELSE 1 END, s.created_at DESC, s.id DESC LIMIT 500
     `)
     return res.status(200).json({ success: true, data: { shops: rows.map((row) => ({
       id: String(row.id), ownerId: String(row.owner_id), ownerUsername: row.username,
@@ -183,8 +183,8 @@ export async function updateAdminShopStatus(req, res, next) {
       return res.status(400).json({ success: false, message: 'Trạng thái gian hàng không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
 
-    if ((status === 'suspended' || status === 'closed') && reason.length < 3) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do khóa gian hàng (ít nhất 3 ký tự).', error: { code: 'VALIDATION_ERROR' } })
+    if ((status === 'suspended' || status === 'closed') && (reason.length < 3 || reason.length > 1000)) {
+      return res.status(400).json({ success: false, message: 'Lý do khóa gian hàng phải dài từ 3 đến 1000 ký tự.', error: { code: 'VALIDATION_ERROR' } })
     }
 
     const result = await executeTransaction(async (query) => {

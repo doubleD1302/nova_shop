@@ -6,8 +6,11 @@ Shop mới từ đăng ký seller hoặc `POST /api/v1/auth/seller-shop` có tr�
 |---|---|---|
 | `GET /api/v1/seller/shop` | Seller/admin sở hữu shop | Trả `data.shop`, gồm `status`, `approvalVersion`, `rejectionReason`; đọc được cả shop chưa active |
 | `PUT /api/v1/seller/shop` | Chủ shop | Sửa hồ sơ pending/rejected/active; pending hoặc rejected tăng phiên bản sau mỗi lần lưu |
+| `GET /api/v1/seller/shop/registration` | Chủ shop | Đọc hồ sơ đăng ký, chỉ trả bốn số cuối của giấy tờ |
+| `PUT /api/v1/seller/shop/registration` | Chủ shop | Nộp hoặc sửa hồ sơ đăng ký của shop pending/rejected và tăng phiên bản |
 | `POST /api/v1/seller/shop/resubmit` | Chủ shop | Chỉ chuyển rejected → pending, xóa lý do và tăng phiên bản |
 | `GET /api/v1/admin/shops` | Admin | Danh sách có hồ sơ, trạng thái và phiên bản để duyệt |
+| `GET /api/v1/admin/shops/:id/registration` | Admin | Trả `data.profile`, `data.status` và `data.approvalVersion` của cùng hồ sơ. Giấy tờ được che |
 | `PATCH /api/v1/admin/shops/:id/approval` | Admin | Nhận `{ approvalStatus: "approved" hoặc "rejected", approvalVersion, rejectionReason }` |
 | `GET /api/v1/admin/shops/:id/approval-events` | Admin | Trả `data.events`: tối đa 200 sự kiện mới nhất |
 
@@ -27,4 +30,6 @@ ALTER TABLE của MySQL có implicit commit: sao lưu và lên lịch triển kh
 
 Kiểm thử từ root: `node data-api/scripts/test-shop-approval-mysql.mjs`. Cần MySQL 8 cục bộ riêng và các biến `SHOP_APPROVAL_TEST=1`, `SHOP_APPROVAL_DB_PORT`, `SHOP_APPROVAL_DB_PASSWORD`, tùy chọn `SHOP_APPROVAL_DB_USER` (root mặc định). Script tạo rồi xóa database `shopnova_test_approval_<timestamp>`; kiểm tra migration giữ shop cũ và các luồng HTTP qua Backend/Data API. Không chạy trên database dùng chung.
 
-Web và Flutter cần dùng API hồ sơ seller cho shop chưa active, hiển thị trạng thái/lý do, sửa hồ sơ và gửi lại. Phía Admin cần màn hình duyệt dùng phiên bản vừa đọc, xử lý 409 bằng tải lại; danh sách lịch sử có giới hạn 200. Phần giao diện chưa được thay đổi trong chức năng Backend này.
+Người bán trên web và app Seller mở mục thông tin gian hàng để sửa hồ sơ. Khi hồ sơ bị từ chối, lưu thông tin đã chỉnh sửa rồi gửi lại để chuyển sang chờ duyệt. Web và app Admin hiển thị hồ sơ đã che giấy tờ, lịch sử và phiên bản trước khi duyệt. Nếu nhận `SHOP_APPROVAL_CONFLICT`, mở lại hồ sơ từ danh sách mới.
+
+Data API cần `SELLER_IDENTITY_KEY` để mã hóa giấy tờ khi nộp hoặc sửa hồ sơ. Truy xuất số đầy đủ qua endpoint có nhật ký riêng theo [hướng dẫn vận hành](./SELLER_IDENTITY_OPERATIONS.md).

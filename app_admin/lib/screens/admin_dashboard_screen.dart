@@ -193,7 +193,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _fetchShops() async {
     final res = await _client.get('/api/v1/admin/shops');
-    if (res.success) {
+    if (mounted && res.success) {
       final list = res.data is Map ? (res.data['shops'] ?? res.data) : res.data;
       if (list is List) {
         setState(() {
@@ -277,6 +277,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       _fetchShops();
     } else {
+      if (res.error is Map && res.error['code'] == 'SHOP_APPROVAL_CONFLICT') _fetchShops();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: AdminTheme.danger),
       );
@@ -362,8 +363,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _promptSuspendShop(String shopId, String shopName) async {
-    final ctrl = TextEditingController(text: 'Gian hàng có dấu hiệu vi phạm chính sách bán hàng sàn NovaShop.');
-    final confirm = await showDialog<bool>(
+    final ctrl = TextEditingController();
+    final reason = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AdminTheme.card,
@@ -387,29 +388,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             const Text('Hành động này sẽ tạm ẩn toàn bộ sản phẩm của gian hàng khỏi sàn thương mại.', style: TextStyle(fontSize: 12, color: AdminTheme.textSecondary)),
             const SizedBox(height: 10),
-            TextField(controller: ctrl, maxLines: 2, style: const TextStyle(fontSize: 13), decoration: const InputDecoration(labelText: 'Lý do tạm khóa gian hàng')),
+            TextField(controller: ctrl, maxLength: 1000, maxLines: 2, style: const TextStyle(fontSize: 13), decoration: const InputDecoration(labelText: 'Lý do tạm khóa gian hàng')),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.danger, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             child: const Text('Khóa gian hàng'),
           ),
         ],
       ),
     );
-    if (confirm == true) {
-      _updateShopStatus(shopId, 'suspended');
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
+    if (!mounted || reason == null) return;
+    if (reason.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nhập lý do khóa gian hàng từ 3 ký tự.')));
+      return;
     }
+    await _updateShopStatus(shopId, 'suspended', reason: reason);
   }
 
   // 2. Khóa / Mở khóa Shop
-  Future<void> _updateShopStatus(String shopId, String status) async {
+  Future<void> _updateShopStatus(String shopId, String status, {String? reason}) async {
     final res = await _client.patch(
       '/api/v1/admin/shops/$shopId/status',
-      body: {'status': status},
+      body: {'status': status, if (reason != null) 'reason': reason},
     );
     if (!mounted) return;
     if (res.success) {
@@ -418,6 +423,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       _fetchShops();
     } else {
+      if (res.error is Map && res.error['code'] == 'SHOP_APPROVAL_CONFLICT') _fetchShops();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(res.message.isNotEmpty ? res.message : 'Thao tác thất bại.'), backgroundColor: AdminTheme.danger),
       );
@@ -580,43 +586,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final shopId = shop['id']?.toString() ?? '';
     final shopName = shop['name']?.toString() ?? 'Gian hàng';
     final version = shop['approvalVersion'] is int ? shop['approvalVersion'] as int : 1;
-    final approvalStatus = shop['approvalStatus']?.toString() ?? 'pending';
+    final status = shop['status']?.toString();
+    final details = Future.wait([
+      _client.get('/api/v1/admin/shops/$shopId/registration'),
+      _client.get('/api/v1/admin/shops/$shopId/approval-events'),
+    ]);
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           return FutureBuilder<List<dynamic>>(
-            future: Future.wait([
-              _client.get('/api/v1/admin/shops/$shopId/registration'),
-              _client.get('/api/v1/admin/shops/$shopId/approval-events'),
-            ]),
+            future: details,
             builder: (context, snapshot) {
               final isLoading = snapshot.connectionState == ConnectionState.waiting;
               Map<String, dynamic>? regData;
               List<Map<String, dynamic>> events = [];
 
               if (snapshot.hasData) {
+              String? registrationError;
+              String? eventsError;
+              var canApprove = false;
                 final regRes = snapshot.data![0];
                 final evRes = snapshot.data![1];
                 if (regRes.success && regRes.data is Map) {
                   final dataMap = regRes.data as Map;
-                  regData = Map<String, dynamic>.from(dataMap.containsKey('registration') ? dataMap['registration'] : dataMap);
+                  final profile = dataMap['profile'];
+                  if (profile is Map) {
+                    regData = Map<String, dynamic>.from(profile);
+                    canApprove = status == 'pending' && dataMap['status'] == 'pending' && dataMap['approvalVersion'] == version;
+                    if (status == 'pending' && !canApprove) {
+                      registrationError = 'Hồ sơ đã thay đổi. Đóng cửa sổ và tải lại danh sách.';
+                    }
+                  }
+                } else {
+                  registrationError = regRes.message.isNotEmpty ? regRes.message : 'Không thể tải hồ sơ.';
                 }
-                if (evRes.success && evRes.data is List) {
-                  events = List<Map<String, dynamic>>.from(evRes.data as List);
+                final history = evRes.data;
+                if (evRes.success && history is Map && history['events'] is List) {
+                  events = List<Map<String, dynamic>>.from(history['events'] as List);
+                } else {
+                  eventsError = evRes.message.isNotEmpty ? evRes.message : 'Không thể tải lịch sử duyệt.';
                 }
               }
 
-              final ownerName = regData?['ownerName'] ?? shop['ownerFullName'] ?? shop['ownerUsername'] ?? 'Chủ shop';
-              final idNumber = regData?['identityCardNumber']?.toString() ?? '';
-              final maskedId = idNumber.length >= 4 ? '******${idNumber.substring(idNumber.length - 4)}' : (idNumber.isNotEmpty ? idNumber : 'Chưa cập nhật');
+              final ownerName = regData?['ownerName'] ?? shop['ownerName'] ?? shop['ownerUsername'] ?? 'Chủ shop';
+              final last4 = regData?['identityLast4']?.toString();
+              final maskedId = last4 == null || last4.isEmpty ? 'Chưa cập nhật' : '******$last4';
               final busType = regData?['businessType'] == 'enterprise' ? 'Doanh nghiệp' : regData?['businessType'] == 'household' ? 'Hộ kinh doanh' : 'Cá nhân';
               final taxCode = regData?['taxCode'] ?? 'Chưa khai báo';
               final invoiceEmail = regData?['invoiceEmail'] ?? 'Chưa khai báo';
-              final shippingMethods = regData?['shippingMethods'] is List ? (regData!['shippingMethods'] as List).join(', ') : 'Nhanh ⚡, Tiết kiệm 📦';
+              final shippingMethods = regData?['shippingMethods'] is List ? (regData!['shippingMethods'] as List).join(', ') : 'Chưa cập nhật';
 
               return Container(
                 constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
@@ -671,7 +693,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ? const Center(child: CircularProgressIndicator(color: AdminTheme.primary))
                           : ListView(
                               children: [
-                                Container(
+                                if (registrationError != null) Text(registrationError, style: const TextStyle(color: AdminTheme.danger)),
+                                if (regData != null) Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AdminTheme.surfaceSubtle,
@@ -689,15 +712,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       _kycRow('Mã số thuế:', taxCode.toString()),
                                       _kycRow('Email hóa đơn điện tử:', invoiceEmail.toString()),
                                       _kycRow('Đơn vị vận chuyển:', shippingMethods),
-                                      _kycRow('Địa chỉ kho / liên hệ:', shop['address']?.toString() ?? 'Chưa cập nhật'),
-                                      _kycRow('Tỉnh / Thành phố:', shop['location']?.toString() ?? 'Chưa cập nhật'),
+                                      _kycRow('Địa chỉ kho / liên hệ:', regData?['pickupAddress']?.toString() ?? 'Chưa cập nhật'),
+                                      _kycRow('Tỉnh / Thành phố:', regData?['province']?.toString() ?? 'Chưa cập nhật'),
                                     ],
                                   ),
                                 ),
                                 const SizedBox(height: 14),
                                 const Text('LỊCH SỬ XÉT DUYỆT GIAN HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AdminTheme.textSecondary)),
                                 const SizedBox(height: 8),
-                                if (events.isEmpty)
+                                if (eventsError != null)
+                                  Text(eventsError, style: const TextStyle(color: AdminTheme.danger))
+                                else if (events.isEmpty)
                                   Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(color: AdminTheme.card, borderRadius: BorderRadius.circular(12), border: Border.all(color: AdminTheme.border)),
@@ -709,7 +734,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     final actionLabel = action == 'approved' ? 'Đã phê duyệt' : action == 'rejected' ? 'Bị từ chối' : action == 'resubmitted' ? 'Gửi lại hồ sơ' : 'Nộp hồ sơ';
                                     final actionColor = action == 'approved' ? AdminTheme.success : action == 'rejected' ? AdminTheme.danger : Colors.amber.shade800;
                                     final time = evt['createdAt']?.toString() ?? '';
-                                    final comment = evt['comment']?.toString() ?? '';
+                                    final comment = evt['reason']?.toString() ?? '';
 
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
@@ -741,7 +766,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                     ),
                     const Divider(color: AdminTheme.border, height: 20),
-                    Row(
+                    if (status == 'pending') Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
@@ -767,10 +792,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            onPressed: () {
+                            onPressed: canApprove ? () {
                               Navigator.pop(ctx);
                               _approveShop(shopId, version, isApproved: true);
-                            },
+                            } : null,
                             child: const Text('✓ Phê duyệt KYC'),
                           ),
                         ),
@@ -786,6 +811,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+    if (mounted) await _fetchShops();
   Widget _kycRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.5),
@@ -2121,10 +2147,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final owner = (s['ownerUsername']?.toString() ?? s['ownerFullName']?.toString() ?? '').toLowerCase();
         if (!name.contains(_searchQuery.toLowerCase()) && !owner.contains(_searchQuery.toLowerCase())) return false;
       }
-      if (_shopFilterTab == 'pending') return s['approvalStatus'] == 'pending';
-      if (_shopFilterTab == 'active') return s['status'] == 'active' && s['approvalStatus'] == 'approved';
+      if (_shopFilterTab == 'pending') return s['status'] == 'pending';
+      if (_shopFilterTab == 'active') return s['status'] == 'active';
       if (_shopFilterTab == 'suspended') return s['status'] == 'suspended';
-      if (_shopFilterTab == 'rejected') return s['approvalStatus'] == 'rejected';
+      if (_shopFilterTab == 'rejected') return s['status'] == 'rejected';
       return true;
     }).toList();
 
@@ -2139,10 +2165,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Row(
               children: [
                 _filterChip('all', 'Tất cả (${_shops.length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
-                _filterChip('pending', 'Chờ duyệt KYC (${_shops.where((s) => s['approvalStatus'] == 'pending').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
-                _filterChip('active', 'Đang hoạt động (${_shops.where((s) => s['status'] == 'active' && s['approvalStatus'] == 'approved').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('pending', 'Chờ duyệt KYC (${_shops.where((s) => s['status'] == 'pending').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('active', 'Đang hoạt động (${_shops.where((s) => s['status'] == 'active').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
                 _filterChip('suspended', 'Tạm khóa (${_shops.where((s) => s['status'] == 'suspended').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
-                _filterChip('rejected', 'Bị từ chối (${_shops.where((s) => s['approvalStatus'] == 'rejected').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
+                _filterChip('rejected', 'Bị từ chối (${_shops.where((s) => s['status'] == 'rejected').length})', _shopFilterTab, (k) => setState(() => _shopFilterTab = k)),
               ],
             ),
           ),
@@ -2177,10 +2203,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     final shop = filtered[idx];
                     final shopId = shop['id']?.toString() ?? '';
                     final name = shop['name']?.toString() ?? 'Gian hàng';
-                    final owner = shop['ownerFullName']?.toString() ?? shop['ownerUsername']?.toString() ?? 'Chủ shop';
+                    final owner = shop['ownerName']?.toString() ?? shop['ownerUsername']?.toString() ?? 'Chủ shop';
                     final ownerUsername = shop['ownerUsername']?.toString() ?? '';
-                    final approvalStatus = shop['approvalStatus']?.toString() ?? 'pending';
-                    final status = shop['status']?.toString() ?? 'active';
+                    final status = shop['status']?.toString() ?? '';
                     final version = shop['approvalVersion'] is int ? shop['approvalVersion'] as int : 1;
                     final location = shop['location']?.toString() ?? 'TP. Hồ Chí Minh';
 
@@ -2227,7 +2252,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              _statusPill(approvalStatus),
+                              _statusPill(status),
                             ],
                           ),
                           const Divider(color: AdminTheme.border, height: 18),
@@ -2253,7 +2278,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               Row(
                                 children: [
-                                  if (approvalStatus == 'pending') ...[
+                                  if (status == 'pending') ...[
                                     OutlinedButton(
                                       style: OutlinedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2264,18 +2289,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       onPressed: () => _promptRejectShop(shopId, version, name),
                                       child: const Text('Từ chối', style: TextStyle(fontSize: 11)),
                                     ),
-                                    const SizedBox(width: 8),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                        minimumSize: Size.zero,
-                                        backgroundColor: AdminTheme.success,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () => _approveShop(shopId, version, isApproved: true),
-                                      child: const Text('Duyệt KYC', style: TextStyle(fontSize: 11)),
-                                    ),
-                                  ] else ...[
+                                  ] else if (status == 'active' || status == 'suspended' || status == 'closed') ...[
                                     OutlinedButton(
                                       style: OutlinedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

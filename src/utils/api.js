@@ -256,6 +256,18 @@ export function apiCreateSellerShop(shopName, sellerProfile, shopTagline) {
   return apiRequest('/auth/seller-shop', { method: 'POST', body: { shopName, sellerProfile, shopTagline } })
 }
 
+export function apiGetSellerRegistration() {
+  return apiRequest('/seller/shop/registration')
+}
+
+export function apiUpdateSellerRegistration(profile) {
+  return apiRequest('/seller/shop/registration', { method: 'PUT', body: profile })
+}
+
+export function apiGetAdminShopRegistration(shopId) {
+  return apiRequest(`/admin/shops/${encodeURIComponent(shopId)}/registration`)
+}
+
 export function apiGetProducts(options = {}) {
   const { limit = 20, offset = 0, signal, ...filters } = options
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })

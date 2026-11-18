@@ -63,6 +63,24 @@ export async function resubmitSellerShop(req, res, next) {
   } catch (err) { return next(err) }
 }
 
+export async function getSellerRegistration(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`)
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
+export async function updateSellerRegistration(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/registration`, {
+      method: 'PUT', body: req.body,
+    })
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
 export async function getCategoryAttributes(req, res, next) {
   try {
     const slug = req.params.categorySlug

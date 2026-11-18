@@ -21,7 +21,7 @@ import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
 
 const router = Router()
 router.post('/reports', authenticate, createContentReport)
-router.use(['/admin/shops/:shopId/identity-access', '/admin/shops/:shopId/identity-access-events'], (req, res, next) => {
+router.use(['/admin/shops/:shopId/registration', '/admin/shops/:shopId/identity-access', '/admin/shops/:shopId/identity-access-events'], (req, res, next) => {
   res.set('Cache-Control', 'no-store')
   next()
 })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCatalog } from '../context/CatalogContext'
@@ -10,6 +10,7 @@ import {
   apiGetAdminEmailStatus,
   apiGetAdminResource,
   apiGetAdminShopApprovalEvents,
+  apiGetAdminShopRegistration,
   apiGetShopViolations,
   apiRetryViolationEmail,
   apiUpdateAdminProductApproval,
@@ -410,6 +411,9 @@ export default function AdminPage() {
   const [approvalEvents, setApprovalEvents] = useState([])
   const [approvalEventsLoading, setApprovalEventsLoading] = useState(false)
   const [approvalEventsError, setApprovalEventsError] = useState('')
+  const [shopRegistration, setShopRegistration] = useState(null)
+  const [shopRegistrationError, setShopRegistrationError] = useState('')
+  const approvalRequest = useRef(0)
 
   // Quản lý báo cáo vi phạm
   const [reportFilterTab, setReportFilterTab] = useState('all')
@@ -849,14 +853,16 @@ export default function AdminPage() {
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok || !payload?.success) {
-        if (res.status === 409 || payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
+        if (payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
           pushToast('Hồ sơ gian hàng đã thay đổi phiên bản. Đang tải lại danh sách...', 'error')
+          setViewingApprovalEventsShop(null)
           loadResource('shops')
           return
         }
         throw new Error(payload?.message || 'Không thể phê duyệt gian hàng.')
       }
       pushToast(`Đã phê duyệt gian hàng "${shop.name}" thành công!`, 'success')
+      setViewingApprovalEventsShop(null)
       refreshPublicCatalog()
       loadResource('shops')
     } catch (err) {
@@ -890,7 +896,7 @@ export default function AdminPage() {
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok || !payload?.success) {
-        if (res.status === 409 || payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
+        if (payload?.error?.code === 'SHOP_APPROVAL_CONFLICT') {
           pushToast('Hồ sơ gian hàng đã thay đổi phiên bản. Đang tải lại danh sách...', 'error')
           loadResource('shops')
           setRejectShopTarget(null)
@@ -912,22 +918,35 @@ export default function AdminPage() {
 
   // Xem lịch sử xét duyệt gian hàng
   const handleViewApprovalEvents = async (shop) => {
+    const request = ++approvalRequest.current
     setViewingApprovalEventsShop(shop)
     setApprovalEvents([])
+    setShopRegistration(null)
     setApprovalEventsLoading(true)
     setApprovalEventsError('')
-    try {
-      const res = await apiGetAdminShopApprovalEvents(shop.id)
-      const payload = await res.json().catch(() => null)
-      if (!res.ok || !payload?.success) {
-        throw new Error(payload?.message || 'Không thể tải lịch sử duyệt.')
-      }
-      setApprovalEvents(payload.data?.events || [])
-    } catch (err) {
-      setApprovalEventsError(err.message || 'Lỗi khi tải lịch sử duyệt.')
-    } finally {
-      setApprovalEventsLoading(false)
+    setShopRegistrationError('')
+    const [history, registration] = await Promise.allSettled([
+      apiGetAdminShopApprovalEvents(shop.id).then((res) => res.json()),
+      apiGetAdminShopRegistration(shop.id).then((res) => res.json()),
+    ])
+    if (request !== approvalRequest.current) return
+
+    if (history.status === 'fulfilled' && history.value.success) {
+      setApprovalEvents(history.value.data?.events || [])
+    } else {
+      setApprovalEventsError(history.value?.message || 'Không thể tải lịch sử duyệt.')
     }
+    if (registration.status === 'fulfilled' && registration.value.success) {
+      const data = registration.value.data
+      setShopRegistration(data)
+      if (data.approvalVersion !== shop.approvalVersion || data.status !== shop.status) {
+        setShopRegistrationError('Hồ sơ đã thay đổi. Hãy mở lại từ danh sách vừa tải.')
+        loadResource('shops')
+      }
+    } else {
+      setShopRegistrationError(registration.value?.message || 'Không thể tải hồ sơ người bán.')
+    }
+    setApprovalEventsLoading(false)
   }
 
   // Cập nhật trạng thái báo cáo vi phạm và tự động áp dụng chế tài
@@ -1892,12 +1911,12 @@ export default function AdminPage() {
                                 <button
                                   type="button"
                                   disabled={savingId === `approve-shop:${shop.id}`}
-                                  onClick={() => handleApproveShop(shop)}
+                                  onClick={() => handleViewApprovalEvents(shop)}
                                   className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[12px] font-bold transition disabled:opacity-50 shadow-2xs cursor-pointer"
                                   title="Duyệt gian hàng cho phép bán hàng"
                                 >
                                   <span>✓</span>
-                                  <span>{savingId === `approve-shop:${shop.id}` ? 'Đang duyệt...' : 'Duyệt'}</span>
+                                  <span>Xem hồ sơ để duyệt</span>
                                 </button>
                                 <button
                                   type="button"
@@ -1908,15 +1927,6 @@ export default function AdminPage() {
                                 >
                                   <span>✕</span>
                                   <span>Từ chối</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleViewApprovalEvents(shop)}
-                                  className="inline-flex items-center gap-1 rounded-xl border border-[#E6D5C2] bg-[#FFFCF7] hover:bg-[#F5E7D4] text-[#8B7566] px-2.5 py-1.5 text-[11px] font-medium transition cursor-pointer"
-                                  title="Xem lịch sử các lần duyệt hồ sơ"
-                                >
-                                  <span>📋</span>
-                                  <span>Lịch sử</span>
                                 </button>
                               </div>
                             ) : shop.status === 'rejected' ? (
@@ -4109,7 +4119,7 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                   </span>
                   <div>
                     <h3 className="text-[16px] font-bold text-[#49352D]">
-                      Lịch Sử Xét Duyệt: {viewingApprovalEventsShop.name}
+                      Hồ sơ và lịch sử duyệt · {viewingApprovalEventsShop.name}
                     </h3>
                     <p className="text-[11px] text-[#8B7566]">
                       Mã Shop #{viewingApprovalEventsShop.id} · Chủ sở hữu: @{viewingApprovalEventsShop.ownerUsername} · Phiên bản hiện tại: v{viewingApprovalEventsShop.approvalVersion || 1}
@@ -4138,6 +4148,21 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                     <p className="mt-2 text-[14px] font-semibold text-[#49352D]">Chưa có sự kiện xét duyệt nào được ghi nhận</p>
                     <p className="text-[12px] text-[#8B7566] mt-0.5">Gian hàng chưa trải qua lần phê duyệt hoặc từ chối nào.</p>
                   </div>
+                {shopRegistrationError ? (
+                  <p className="rounded-xl bg-rose-50 p-4 text-rose-700">{shopRegistrationError}</p>
+                ) : null}
+                {shopRegistration?.profile ? (
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border border-[#E6D5C2] p-4">
+                    <dt>Chủ hồ sơ</dt><dd>{shopRegistration.profile.ownerName}</dd>
+                    <dt>Loại hình</dt><dd>{{ personal: 'Cá nhân', household: 'Hộ kinh doanh', enterprise: 'Doanh nghiệp' }[shopRegistration.profile.businessType]}</dd>
+                    <dt>Số giấy tờ</dt><dd>{shopRegistration.profile.identityLast4 ? `••••${shopRegistration.profile.identityLast4}` : 'Chưa cập nhật'}</dd>
+                    <dt>Địa chỉ lấy hàng</dt><dd>{shopRegistration.profile.pickupAddress}</dd>
+                    <dt>Liên hệ</dt><dd>{shopRegistration.profile.contactEmail} · {shopRegistration.profile.contactPhone}</dd>
+                    <dt>Vận chuyển</dt><dd>{shopRegistration.profile.shippingMethods?.join(', ')}</dd>
+                    <dt>Mã số thuế</dt><dd>{shopRegistration.profile.taxCode || 'Chưa khai báo'}</dd>
+                    <dt>Email hóa đơn</dt><dd>{shopRegistration.profile.invoiceEmail || 'Chưa khai báo'}</dd>
+                  </dl>
+                ) : null}
                 ) : (
                   <div className="space-y-3">
                     {approvalEvents.map((evt) => {
@@ -4174,7 +4199,17 @@ SMTP_FROM="NOVA SHOP - Ban Quản Trị" <your_email@gmail.com>`}
                 )}
               </div>
 
-              <div className="flex items-center justify-end border-t border-[#E6D5C2] px-6 py-3 bg-[#FBF3E8]">
+              <div className="flex items-center justify-end gap-2 border-t border-[#E6D5C2] px-6 py-3 bg-[#FBF3E8]">
+                {viewingApprovalEventsShop.status === 'pending' && shopRegistration?.profile && !shopRegistrationError ? (
+                  <button
+                    type="button"
+                    disabled={savingId === `approve-shop:${viewingApprovalEventsShop.id}`}
+                    onClick={() => handleApproveShop(viewingApprovalEventsShop)}
+                    className="rounded-xl bg-emerald-600 px-5 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+                  >
+                    Duyệt gian hàng
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setViewingApprovalEventsShop(null)}

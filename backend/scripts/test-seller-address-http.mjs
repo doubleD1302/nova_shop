@@ -52,10 +52,20 @@ try {
   assert.equal(created.status, 200)
   const shopId = created.body.data.user.shopId
   const sellerToken = created.body.data.token
+  const signup = await request('/auth/register', null, 'POST', {
+    username: 'signup_seller_test', password: 'demo-fixture-password', fullName: 'Seller Signup',
+    email: 'signup@example.test', role: 'seller', shopName: 'Shop Signup', sellerProfile: profile,
+  })
+  assert.equal(signup.status, 201, JSON.stringify(signup.body))
+  const signupProfile = await request('/seller/shop/registration', signup.body.data.token)
+  assert.equal(signupProfile.body.data.profile.identityLast4, '9012')
   assert.equal((await request('/seller/shop/registration', sellerToken)).status, 200)
   assert.equal((await request(`/admin/shops/${shopId}/registration`, sellerToken)).status, 403)
   const reviewed = await request(`/admin/shops/${shopId}/registration`, admin)
   assert.equal(reviewed.status, 200)
+  assert.equal(reviewed.headers.get('cache-control'), 'no-store')
+  assert.equal(reviewed.body.data.status, 'pending')
+  assert.equal(reviewed.body.data.approvalVersion, 1)
   assert.equal(reviewed.body.data.profile.identityLast4, '9012')
   assert.equal(JSON.stringify(reviewed.body).includes(profile.idCard), false)
   assert.equal((await request(`/admin/shops/${shopId}/identity-access`, sellerToken, 'POST', { reason: 'Kiểm tra hồ sơ người bán' })).status, 403)
@@ -66,7 +76,25 @@ try {
   const accessEvents = await request(`/admin/shops/${shopId}/identity-access-events`, admin)
   assert.equal(accessEvents.body.data.events.length, 1)
 
-  console.log('PASS: Backend → Data API HTTP, auth, địa chỉ và hồ sơ seller trên SQLite tạm')
+  const shopApprovalUrl = `/admin/shops/${shopId}/approval`
+  const rejected = await request(shopApprovalUrl, admin, 'PATCH', {
+    approvalStatus: 'rejected', approvalVersion: 1, rejectionReason: 'Cập nhật chủ hồ sơ',
+  })
+  assert.equal(rejected.status, 200)
+  assert.equal((await request('/seller/shop/registration', sellerToken, 'PUT', {
+    ...profile, ownerName: 'Nguoi Ban Da Cap Nhat',
+  })).status, 200)
+  assert.equal((await request('/seller/shop/resubmit', sellerToken, 'POST')).status, 200)
+  const staleShop = await request(shopApprovalUrl, admin, 'PATCH', { approvalStatus: 'approved', approvalVersion: 1 })
+  assert.equal(staleShop.body.error.code, 'SHOP_APPROVAL_CONFLICT')
+  const latest = await request(`/admin/shops/${shopId}/registration`, admin)
+  assert.equal(latest.body.data.approvalVersion, 3)
+  assert.equal(latest.body.data.profile.ownerName, 'Nguoi Ban Da Cap Nhat')
+  assert.equal((await request(shopApprovalUrl, admin, 'PATCH', {
+    approvalStatus: 'approved', approvalVersion: latest.body.data.approvalVersion,
+  })).status, 200)
+
+  console.log('PASS: HTTP Backend → Data API, địa chỉ và kiểm duyệt hồ sơ gian hàng trên SQLite tạm')
 } finally {
   server.close(); dataServer.close()
   const { closeDatabase } = await import(url('data-api', 'config/database.js'))
