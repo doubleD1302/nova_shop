@@ -784,7 +784,7 @@ export async function listSellerOrders(req, res, next) {
               COALESCE(SUM(so.status = 'shipping'), 0) AS shipping,
               COALESCE(SUM(so.status = 'delivered'), 0) AS delivered,
               COALESCE(SUM(so.status = 'cancelled'), 0) AS cancelled,
-              COALESCE(SUM(CASE WHEN so.status = 'delivered' THEN so.total_amount ELSE 0 END), 0) AS revenue
+              COALESCE(SUM(CASE WHEN so.status IN ('delivered', 'completed') THEN so.subtotal - so.discount_amount ELSE 0 END), 0) AS revenue
        FROM shop_orders so JOIN shops s ON s.id = so.shop_id WHERE s.owner_id = ?`,
       [userId],
     )

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { readPagination } from '../utils/pagination.js'
+import { incomeSql, readCommissionRate, refundNetSql } from '../utils/seller-income.js'
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const invalid = (res, msg = 'Dữ liệu không hợp lệ.', code = 'VALIDATION_ERROR') =>
@@ -125,8 +126,9 @@ export async function saveSellerBankAccount(req, res, next) {
 }
 
 /**
- * Tính toán số dư ví doanh thu và Escrow cho Shop:
- * - availableBalance: Tổng tiền đơn hoàn tất (> 7 ngày hoặc completed) trừ các khoản đã yêu cầu rút
+ * Tính toán số dư ví doanh thu và Escrow cho Shop. Tiền mỗi đơn là phần shop thực nhận
+ * (tiền hàng sau giảm giá trừ hoa hồng sàn, không gồm phí vận chuyển); xem utils/seller-income.js.
+ * - availableBalance: Tiền đơn hoàn tất (> 7 ngày hoặc completed) trừ hoàn tiền và các khoản đã yêu cầu rút
  * - pendingEscrowBalance: Tiền đơn đang giữ theo chính sách 7 ngày hoặc đơn đang vận chuyển
  * - processingPayoutAmount: Tiền các lệnh rút đang chờ xử lý
  * - totalPaidOut: Tổng tiền các lệnh rút đã hoàn tất
@@ -136,11 +138,13 @@ export async function getSellerEscrowBalance(req, res, next) {
     const { shopId } = req.query
     if (!validId(shopId)) return invalid(res, 'Mã gian hàng không hợp lệ.')
 
+    const rate = await readCommissionRate()
+
     // 1. Tổng tiền các đơn hàng đã đủ điều kiện chuyển thành số dư khả dụng:
     // Trạng thái 'completed' HOẶC ('delivered' VÀ delivered_at <= 7 ngày trước)
     // VÀ không có yêu cầu trả hàng ở trạng thái 'requested', 'approved', 'disputed'
     const completedRows = await executeQuery(
-      `SELECT COALESCE(SUM(so.total_amount), 0) AS completed_gross
+      `SELECT COALESCE(SUM(${incomeSql(rate)}), 0) AS completed_gross
        FROM shop_orders so
        WHERE so.shop_id = ?
          AND (
@@ -157,7 +161,7 @@ export async function getSellerEscrowBalance(req, res, next) {
 
     // 2. Trừ đi các đơn đã hoàn tiền (order_returns completed)
     const refundRows = await executeQuery(
-      `SELECT COALESCE(SUM(refund_amount), 0) AS total_refunded
+      `SELECT COALESCE(SUM(${refundNetSql(rate)}), 0) AS total_refunded
        FROM order_returns
        WHERE shop_id = ? AND status = 'completed'`,
       [shopId],
@@ -180,7 +184,7 @@ export async function getSellerEscrowBalance(req, res, next) {
 
     // 4. Số dư đang giữ trong Escrow (Đơn đã giao nhưng trong vòng 7 ngày khiếu nại, hoặc đơn đang giao)
     const pendingRows = await executeQuery(
-      `SELECT COALESCE(SUM(so.total_amount), 0) AS pending_escrow
+      `SELECT COALESCE(SUM(${incomeSql(rate)}), 0) AS pending_escrow
        FROM shop_orders so
        WHERE so.shop_id = ?
          AND (
@@ -252,8 +256,9 @@ export async function createSellerPayoutRequest(req, res, next) {
         const bankAccount = bankRows[0]
 
         // 2. Tính số dư khả dụng ngay trong transaction có khóa FOR UPDATE
+        const rate = await readCommissionRate(query)
         const completedRows = await query(
-          `SELECT COALESCE(SUM(so.total_amount), 0) AS completed_gross
+          `SELECT COALESCE(SUM(${incomeSql(rate)}), 0) AS completed_gross
            FROM shop_orders so
            WHERE so.shop_id = ?
              AND (
@@ -269,7 +274,7 @@ export async function createSellerPayoutRequest(req, res, next) {
         const completedGross = Number(completedRows[0]?.completed_gross || 0)
 
         const refundRows = await query(
-          `SELECT COALESCE(SUM(refund_amount), 0) AS total_refunded
+          `SELECT COALESCE(SUM(${refundNetSql(rate)}), 0) AS total_refunded
            FROM order_returns
            WHERE shop_id = ? AND status = 'completed' FOR UPDATE`,
           [shopId],

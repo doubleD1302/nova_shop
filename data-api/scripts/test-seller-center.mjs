@@ -111,9 +111,9 @@ try {
   })
 
   db.income = [
-    { id: 11, order_code: 'NS11', total_amount: '300000', delivered_at: new Date('2026-11-10T00:00:00.000Z'), past_hold: 1, has_open_return: 0 },
-    { id: 12, order_code: 'NS12', total_amount: '200000', delivered_at: new Date('2026-11-18T00:00:00.000Z'), past_hold: 0, has_open_return: 0 },
-    { id: 13, order_code: 'NS13', total_amount: '100000', delivered_at: new Date('2026-11-01T00:00:00.000Z'), past_hold: 1, has_open_return: 1 },
+    { id: 11, order_code: 'NS11', subtotal: '310000', discount_amount: '10000', delivered_at: new Date('2026-11-10T00:00:00.000Z'), past_hold: 1, has_open_return: 0 },
+    { id: 12, order_code: 'NS12', subtotal: '200000', discount_amount: '0', delivered_at: new Date('2026-11-18T00:00:00.000Z'), past_hold: 0, has_open_return: 0 },
+    { id: 13, order_code: 'NS13', subtotal: '100000', discount_amount: '0', delivered_at: new Date('2026-11-01T00:00:00.000Z'), past_hold: 1, has_open_return: 1 },
   ]
   db.refunds = [{ id: 3, refund_amount: '50000', updated_at: new Date('2026-11-12T00:00:00.000Z'), order_code: 'NS11' }]
   db.payouts = [{ id: 2, payout_code: 'PO-2', amount: '150000', status: 'pending', created_at: new Date('2026-11-15T00:00:00.000Z') }]
@@ -124,14 +124,15 @@ try {
     const { items, total } = result.body.data
     assert.equal(total, 5)
     assert.deepEqual(items.map((item) => item.id), ['order_income-12', 'payout-2', 'refund-3', 'order_income-11', 'order_income-13'])
-    assert.equal(items.find((item) => item.type === 'refund').amount, -50000)
+    assert.equal(items.find((item) => item.type === 'refund').amount, -47500, 'hoàn 50.000 trừ hoa hồng 5% của khoản hoàn')
     assert.equal(items.find((item) => item.type === 'payout').amount, -150000)
-    assert.equal(items.find((item) => item.id === 'order_income-11').amount, 300000)
+    assert.equal(items.find((item) => item.id === 'order_income-11').amount, 285000, '(310.000 - 10.000) trừ hoa hồng 5%')
+    assert.equal(items.find((item) => item.id === 'order_income-12').amount, 190000)
   })
   await check('cùng thời điểm thì xếp id số lớn trước (10 trước 9), không theo thứ tự chuỗi', async () => {
     const saved = db.income
     const at = new Date('2026-11-18T00:00:00.000Z')
-    db.income = [9, 10].map((id) => ({ id, order_code: `NS${id}`, total_amount: '1000', delivered_at: at, past_hold: 1, has_open_return: 0 }))
+    db.income = [9, 10].map((id) => ({ id, order_code: `NS${id}`, subtotal: '1000', discount_amount: '0', delivered_at: at, past_hold: 1, has_open_return: 0 }))
     db.refunds = []
     db.payouts = []
     const { items } = (await call('/seller/finance/transactions?shopId=1')).body.data

@@ -1,6 +1,7 @@
 import { executeQuery } from '../config/database.js'
 import { readPagination } from '../utils/pagination.js'
 import { readDateRange } from '../utils/date-range.js'
+import { incomeOf, readCommissionRate, refundNetOf } from '../utils/seller-income.js'
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const invalid = (res, msg = 'Dữ liệu không hợp lệ.') =>
@@ -11,7 +12,7 @@ const TYPES = ['order_income', 'refund', 'payout']
 // Ba nguồn được gộp trong bộ nhớ nên chỉ cho xem tối đa 1000 dòng đầu.
 const MAX_WINDOW = 1000
 
-// Cùng quy tắc giữ tiền 7 ngày với số dư ở seller-payout.controller.js.
+// Cùng quy tắc giữ tiền 7 ngày và cùng cách tính tiền (utils/seller-income.js) với số dư ở seller-payout.controller.js.
 const HOLD_DAYS = 7
 
 function isTableMissingError(err) {
@@ -35,15 +36,16 @@ function addRange(where, params, column, range) {
   return where
 }
 
-// Tiền đơn đã giao/hoàn tất, cộng vào số dư. 'escrow' = còn đang giữ, 'available' = đã khả dụng.
-async function readIncome(shopId, range, take) {
+// Tiền thực nhận của đơn đã giao/hoàn tất (tiền hàng sau giảm trừ hoa hồng), cộng vào số dư.
+// 'escrow' = còn đang giữ, 'available' = đã khả dụng. Tỷ lệ hoa hồng được đọc song song ở nơi gọi.
+async function readIncome(shopId, range, take, ratePromise) {
   const params = [shopId]
   const where = addRange("so.shop_id = ? AND so.status IN ('delivered', 'completed')", params, 'so.delivered_at', range)
 
   const [counts, rows] = await Promise.all([
     executeQuery(`SELECT COUNT(*) AS total FROM shop_orders so WHERE ${where}`, params),
     executeQuery(
-    `SELECT so.id, o.code AS order_code, so.total_amount, so.delivered_at,
+    `SELECT so.id, o.code AS order_code, so.subtotal, so.discount_amount, so.delivered_at,
             (so.status = 'completed' OR so.delivered_at <= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ${HOLD_DAYS} DAY)) AS past_hold,
             EXISTS (SELECT 1 FROM order_returns ret
                     WHERE ret.shop_order_id = so.id AND ret.status IN ('requested', 'approved', 'disputed')) AS has_open_return
@@ -56,6 +58,7 @@ async function readIncome(shopId, range, take) {
     ),
   ])
 
+  const rate = await ratePromise
   return {
     total: Number(counts[0]?.total || 0),
     entries: rows.map((r) => ({
@@ -63,15 +66,15 @@ async function readIncome(shopId, range, take) {
       type: 'order_income',
       reference: r.order_code,
       description: `Doanh thu đơn ${r.order_code}`,
-      amount: Number(r.total_amount),
+      amount: incomeOf(r.subtotal, r.discount_amount, rate),
       status: Number(r.past_hold) === 1 && Number(r.has_open_return) === 0 ? 'available' : 'escrow',
       occurredAt: new Date(r.delivered_at).toISOString(),
     })),
   }
 }
 
-// Tiền hoàn cho người mua sau khi trả hàng hoàn tất, trừ khỏi số dư.
-async function readRefunds(shopId, range, take) {
+// Tiền hoàn cho người mua sau khi trả hàng hoàn tất, trừ khỏi số dư (đã trừ phần hoa hồng của khoản hoàn).
+async function readRefunds(shopId, range, take, ratePromise) {
   const params = [shopId]
   const where = addRange("ret.shop_id = ? AND ret.status = 'completed'", params, 'ret.updated_at', range)
 
@@ -89,6 +92,7 @@ async function readRefunds(shopId, range, take) {
     ),
   ])
 
+  const rate = await ratePromise
   return {
     total: Number(counts[0]?.total || 0),
     entries: rows.map((r) => ({
@@ -96,7 +100,7 @@ async function readRefunds(shopId, range, take) {
       type: 'refund',
       reference: r.order_code,
       description: `Hoàn tiền trả hàng đơn ${r.order_code}`,
-      amount: -Number(r.refund_amount),
+      amount: -refundNetOf(r.refund_amount, rate),
       status: 'completed',
       occurredAt: new Date(r.updated_at).toISOString(),
     })),
@@ -156,9 +160,10 @@ export async function listSellerTransactions(req, res, next) {
     const take = limit + offset
     const wanted = type ? [type] : TYPES
     const readers = { order_income: readIncome, refund: readRefunds, payout: readPayouts }
+    const ratePromise = readCommissionRate()
     const [shops, ...sources] = await Promise.all([
       executeQuery('SELECT id FROM shops WHERE id = ? LIMIT 1', [shopId]),
-      ...wanted.map((name) => readers[name](shopId, range, take)),
+      ...wanted.map((name) => readers[name](shopId, range, take, ratePromise)),
     ])
     if (!shops.length) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng tương ứng.', error: { code: 'SHOP_NOT_FOUND' } })

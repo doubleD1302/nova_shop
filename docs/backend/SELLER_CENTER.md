@@ -32,8 +32,8 @@ Phản hồi thành công có dạng `{ "success": true, "data": ... }`. Lỗi c
 
 Mỗi dòng: `id`, `type`, `reference` (mã đơn hoặc mã lệnh rút), `description`, `amount`, `status`, `occurredAt`.
 
-- `order_income`: tiền đơn đã giao/hoàn tất, `amount` dương, tính theo ngày giao. `status` là `available` (đã qua 7 ngày giữ tiền hoặc đơn `completed`, không có yêu cầu trả hàng đang mở) hoặc `escrow`.
-- `refund`: trả hàng đã `completed`, `amount` âm, tính theo thời điểm cập nhật.
+- `order_income`: tiền đơn đã giao/hoàn tất, `amount` dương là phần shop thực nhận (xem "Cách tính tiền"), tính theo ngày giao. `status` là `available` (đã qua 7 ngày giữ tiền hoặc đơn `completed`, không có yêu cầu trả hàng đang mở) hoặc `escrow`.
+- `refund`: trả hàng đã `completed`, `amount` âm đã trừ phần hoa hồng của khoản hoàn, tính theo thời điểm cập nhật.
 - `payout`: lệnh rút tiền (trừ lệnh bị từ chối), `amount` âm, `status` là trạng thái lệnh rút.
 
 Dữ liệu: `{ items, total, limit, offset }`. Lỗi: 400 `VALIDATION_ERROR` (bộ lọc sai hoặc vượt cửa sổ 1000 dòng), 404 `SHOP_NOT_FOUND`, 503 `DATA_STORAGE_UNAVAILABLE` khi bảng chưa có.
@@ -95,6 +95,21 @@ Phản hồi 200: `data` là cài đặt sau khi lưu (`pickupAddress`, `provinc
 
 Kiểm thử: `data-api/scripts/test-shop-shipping.mjs` (SQLite tạm) và `backend/scripts/test-seller-center.mjs` (Data API giả lập); chưa chạy trên MySQL/TiDB thật.
 
+## Cách tính tiền
+
+Một công thức dùng chung, nằm ở `data-api/src/utils/seller-income.js`:
+
+| Khái niệm | Công thức | Dùng ở |
+|---|---|---|
+| Doanh thu đơn | `subtotal - discount_amount` (tiền hàng sau giảm giá, **không gồm phí vận chuyển**), chỉ đơn con `delivered` hoặc `completed` | Thẻ Doanh thu và biểu đồ của tổng quan, thẻ doanh thu danh sách đơn, `reports/revenue` (`totalSubtotal - totalDiscount`) |
+| Hoa hồng sàn | `ROUND(doanh thu × commission_rate / 100)`, làm tròn nửa lên theo từng đơn | `reports/revenue` (`commissionFee`) |
+| Thực nhận | doanh thu - hoa hồng | `payout/balance`, `payout/request`, `finance/transactions` (`order_income`), `reports/revenue` (`sellerPayout`) |
+| Hoàn tiền trả hàng | `refund_amount - ROUND(refund_amount × commission_rate / 100)`, trả hàng `completed` | `payout/balance`, `payout/request`, `finance/transactions` (`refund`) |
+
+Phí vận chuyển người mua trả thuộc về bên vận chuyển nên không cộng vào tiền shop, theo `SELLER_PAYOUT_DRAFT.md`. Đơn `completed` được tính như `delivered` ở mọi nơi. Số dư khả dụng vẫn giữ quy tắc cũ: đơn `completed` hoặc `delivered` quá 7 ngày, không có yêu cầu trả hàng đang mở, trừ hoàn tiền và các lệnh rút chưa bị từ chối.
+
+Thay đổi so với trước: `payout/balance` và `finance/transactions` từng cộng `total_amount` (gồm phí ship, chưa trừ hoa hồng) nên số dư nhỏ đi một khoản bằng phí ship cộng hoa hồng; `reports/revenue` và thẻ doanh thu danh sách đơn từng chỉ tính `delivered`; tổng quan từng tính doanh thu gồm phí ship. Chưa có chính sách phí giao dịch nên không có khoản nào khác bị trừ.
+
 ## Thay đổi với API có sẵn
 
 - `POST /api/v1/seller/marketing/boost`: chỉ sản phẩm đang bán và đã duyệt mới mua được (400 `PRODUCT_NOT_ELIGIBLE`); sản phẩm đang có gói còn hiệu lực trả 409 `BOOST_ALREADY_ACTIVE`. Việc kiểm tra và ghi nằm trong một transaction có khóa dòng sản phẩm.
@@ -102,13 +117,14 @@ Kiểm thử: `data-api/scripts/test-shop-shipping.mjs` (SQLite tạm) và `back
 
 ## Giới hạn và điểm cần quyết định
 
-- **Công thức tiền chưa thống nhất.** `payout/balance` cộng `total_amount` của đơn (gồm phí vận chuyển, chưa trừ hoa hồng). `reports/revenue` trừ hoa hồng trên `subtotal - discount` và chỉ tính đơn `delivered`. `SELLER_PAYOUT_DRAFT.md` đề xuất không tính phí vận chuyển. Lịch sử giao dịch bám theo `payout/balance`; công thức cần được chốt ở một bước nghiệp vụ riêng trước khi đổi.
+- **Hoa hồng không lưu theo từng đơn.** Mọi số tiền tính bằng tỷ lệ hoa hồng hiện tại trong `system_settings` (`commission_rate`, mặc định 5%); khi quản trị đổi tỷ lệ thì số dư và lịch sử của các đơn cũ đổi theo. Muốn cố định theo thời điểm bán cần thêm cột lưu tỷ lệ/hoa hồng trên `shop_orders` (đổi schema, chưa làm). Các lệnh rút đã tạo trước khi công thức này áp dụng không bị đổi; số dư khả dụng hiển thị không âm.
 - **Phí gói đẩy chưa trừ vào số dư.** `product_boosts.cost_vnd` chỉ được ghi nhận; không xuất hiện trong lịch sử giao dịch hoặc số dư cho tới khi có quy tắc thanh toán quảng cáo.
 - Không có lượt xem/lượt nhấp (xem trên). `summary` được tính bằng truy vấn riêng nên mỗi dòng hàng chỉ đếm một lần; vì vậy tổng đơn/doanh thu của các gói trong `boosts` có thể lớn hơn `summary` khi các gói chạy chồng nhau. Số gói và chi phí trong `summary` tính trên toàn bộ gói, không bị giới hạn 200 của danh sách.
 - Lịch sử giao dịch gộp ba nguồn trong bộ nhớ nên giới hạn 1000 dòng gần nhất cho mỗi truy vấn.
 
 ## Kiểm tra
 
-- `npm --prefix data-api run test:seller-center` (25 kiểm tra) và `npm --prefix backend run test:seller-center` (14 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
+- `npm --prefix data-api run test:seller-center` (31 kiểm tra), `node data-api/scripts/test-seller-income.mjs` (8 kiểm tra, công thức tiền) và `npm --prefix backend run test:seller-center` (19 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
 - Ngày 19/11/2026, các truy vấn đọc (giao dịch, hiệu quả quảng cáo, đánh giá, trả hàng `disputed`) đã chạy trên database dev TiDB, không lỗi SQL. Với một shop có 31 đơn đã giao/hoàn tất, số dư khả dụng tính từ lịch sử giao dịch khớp đúng với `payout/balance`. Các câu lệnh ghi và khóa (`FOR UPDATE`, `INSERT product_boosts`, `UPDATE reviews`) chỉ được kiểm tra bằng `EXPLAIN`, chưa thực thi. Database dev chưa có hoàn tiền, rút tiền, gói đẩy hay đánh giá nên các nhánh đó chưa được thử với dữ liệu thật.
 - Đây là TiDB, chưa phải MySQL 8, và chưa có test hai request song song (trả lời cùng một đánh giá, mua gói đẩy cùng sản phẩm). Cần thử trên MySQL 8 trước khi coi là kiểm chứng đầu cuối.
+- Ngày 19/11/2026, các truy vấn đọc của công thức tiền mới (tiền đơn, hoàn tiền, doanh thu, tổng quan theo trạng thái) đã chạy trên TiDB dev không lỗi SQL; với shop nhiều đơn nhất, số dư khả dụng tính theo thực nhận nhỏ hơn cách cộng `total_amount` cũ (88.901.000 so với 93.740.000 đồng). Chưa chạy câu lệnh rút tiền (`FOR UPDATE`) trên database thật.

@@ -1,4 +1,5 @@
 import { executeQuery } from '../config/database.js'
+import { commissionOf, readCommissionRate, salesOf } from '../utils/seller-income.js'
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const invalid = (res, msg = 'Dữ liệu không hợp lệ.') =>
@@ -24,11 +25,8 @@ export async function getSellerRevenueReport(req, res, next) {
       params.push(new Date(endDate))
     }
 
-    // Đọc cấu hình tỷ lệ hoa hồng từ system_settings
-    const settings = await executeQuery(
-      "SELECT setting_value FROM system_settings WHERE setting_key = 'commission_rate'"
-    )
-    const commissionRate = settings.length ? Number(settings[0].setting_value) : 5.0
+    // Tỷ lệ hoa hồng từ system_settings; cách tính tiền xem utils/seller-income.js
+    const commissionRate = await readCommissionRate()
 
     // Truy vấn danh sách đơn hàng con của shop
     const orders = await executeQuery(
@@ -53,11 +51,13 @@ export async function getSellerRevenueReport(req, res, next) {
       const subtotal = Number(o.subtotal)
       const discount = Number(o.discount_amount)
       const totalAmount = Number(o.total_amount)
-      const isDelivered = o.status === 'delivered'
+      // Đơn đã giao và đơn đã hoàn tất cùng được tính vào doanh thu
+      const isDelivered = o.status === 'delivered' || o.status === 'completed'
 
       // Hoa hồng sàn tính trên tiền hàng thực tế
-      const commissionFee = Math.round((subtotal - discount) * (commissionRate / 100))
-      const sellerPayout = Math.max(0, subtotal - discount - commissionFee)
+      const sales = salesOf(subtotal, discount)
+      const commissionFee = commissionOf(sales, commissionRate)
+      const sellerPayout = sales - commissionFee
 
       if (isDelivered) {
         totalSubtotal += subtotal
@@ -89,7 +89,7 @@ export async function getSellerRevenueReport(req, res, next) {
       data: {
         summary: {
           totalOrders: orders.length,
-          deliveredOrders: orders.filter((o) => o.status === 'delivered').length,
+          deliveredOrders: orders.filter((o) => o.status === 'delivered' || o.status === 'completed').length,
           totalSubtotal,
           totalDiscount,
           totalCommission,

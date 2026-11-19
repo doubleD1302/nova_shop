@@ -32,7 +32,7 @@ export async function getSellerDashboard(req, res, next) {
 
     // 2. Thống kê số lượng đơn và doanh thu theo trạng thái
     const statusRows = await executeQuery(
-      `SELECT status, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS revenue
+      `SELECT status, COUNT(*) AS count, COALESCE(SUM(subtotal - discount_amount), 0) AS revenue
        FROM shop_orders
        WHERE shop_id = ?
        GROUP BY status`,
@@ -65,7 +65,7 @@ export async function getSellerDashboard(req, res, next) {
     // 3. Đơn hàng và doanh thu trong ngày hôm nay
     const todayRows = await executeQuery(
       `SELECT COUNT(*) AS today_orders,
-              COALESCE(SUM(CASE WHEN status IN ('delivered', 'completed') THEN total_amount ELSE 0 END), 0) AS today_revenue
+              COALESCE(SUM(CASE WHEN status IN ('delivered', 'completed') THEN subtotal - discount_amount ELSE 0 END), 0) AS today_revenue
        FROM shop_orders
        WHERE shop_id = ? AND created_at >= CURDATE()`,
       [shopId],
@@ -107,7 +107,7 @@ export async function getSellerDashboard(req, res, next) {
     const chartRows = await executeQuery(
       `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS order_date,
               COUNT(*) AS orders,
-              COALESCE(SUM(CASE WHEN status IN ('delivered', 'completed') THEN total_amount ELSE 0 END), 0) AS revenue
+              COALESCE(SUM(CASE WHEN status IN ('delivered', 'completed') THEN subtotal - discount_amount ELSE 0 END), 0) AS revenue
        FROM shop_orders
        WHERE shop_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL ${chartDays - 1} DAY)
        GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')`,
