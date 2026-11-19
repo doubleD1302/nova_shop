@@ -50,7 +50,7 @@ Duyệt đăng ký chưa đổi giá ngay. Việc áp và hoàn giá do `syncCam
 
 Quy tắc khác: một sản phẩm chỉ chịu **một** đăng ký đang áp giá; đăng ký thứ hai chờ đến khi đăng ký trước được hoàn giá. Đơn đã đặt giữ giá lúc đặt; giỏ hàng và checkout dùng giá biến thể hiện tại.
 
-**Triển khai:** chạy migration trước, sau đó mới deploy code. Chưa có cột `applied_at` thì `syncCampaignPrices` trả `{ skipped: true, reason: "MIGRATION_PENDING" }` và không đổi giá (duyệt đăng ký vẫn hoạt động). Migration chạy một lần bằng tài khoản có quyền ALTER; tài khoản runtime của Data API không có quyền này.
+**Triển khai:** chạy migration trước, sau đó mới deploy code. Chưa có cột `applied_at` thì `syncCampaignPrices` trả `{ skipped: true, reason: "MIGRATION_PENDING" }` và không đổi giá (duyệt đăng ký vẫn hoạt động). Migration chạy một lần bằng tài khoản có quyền ALTER; tài khoản runtime của Data API không có quyền này. Môi trường dev đã chạy migration; production và các môi trường khác phải chạy riêng.
 
 ## Giới hạn
 
@@ -58,9 +58,9 @@ Quy tắc khác: một sản phẩm chỉ chịu **một** đăng ký đang áp 
 - Shop sửa sản phẩm đang khuyến mãi vẫn có thể đặt lại giá; khi đó hệ thống không áp lại cho đến lần đăng ký sau.
 - `registerCampaign` của shop chỉ kiểm tra chiến dịch đang bật, chưa kiểm tra đã kết thúc; đăng ký vào chiến dịch đã hết hạn vẫn tạo được hồ sơ `pending` (admin chỉ từ chối được).
 - Chưa có API xóa chiến dịch; dùng `isActive: false`.
-- Chưa kiểm thử đồng thời (hai tiến trình đồng bộ cùng lúc) và chưa chạy câu lệnh ghi áp/hoàn giá trên database thật.
+- Chưa kiểm thử đồng thời (hai tiến trình đồng bộ cùng lúc).
 
 ## Kiểm tra
 
 `node data-api/scripts/test-admin-campaigns.mjs` (9 kiểm tra, database giả lập), `node data-api/scripts/test-campaign-pricing.mjs` (12 kiểm tra áp/hoàn giá, database giả lập có trạng thái) và `npm --prefix backend run test:seller-center` (phần "Admin: chiến dịch marketing", Data API giả lập). Các truy vấn đọc (danh sách chiến dịch, danh sách đăng ký, truy vấn khóa dòng khi duyệt, không có `FOR UPDATE`) đã chạy trên TiDB dev ngày 19/11/2026 không lỗi SQL; dev có 2 chiến dịch và chưa có đăng ký nào. Câu lệnh ghi (`INSERT`, `UPDATE`) chưa chạy trên database thật; chưa phải MySQL 8; chưa thử hai quản trị viên duyệt cùng một đăng ký song song.
-- Áp giá/hoàn giá: **chưa chạy trên database thật**. Cột mới chưa được áp dụng vào TiDB dev (migration chưa chạy), và tài khoản runtime không có quyền tạo bảng tạm để thử độc lập. Chạy migration trên dev rồi thử một đăng ký thật trước khi dùng.
+- Ngày 19/11/2026 migration `2026-11-19-campaign-price-apply.sql` đã áp dụng vào TiDB dev `shopnova_dev` bằng tài khoản quản trị (3 cột mới, chưa có đăng ký nào). Sau đó đã thử đầu cuối trên TiDB dev bằng một chiến dịch `flash_sale` tạm và đăng ký tạm: áp giá (180.000 → 90.000, giá gạch ngang 220.000 giữ nguyên, bật Flash Sale), chạy lại không áp lần hai, rồi cho chiến dịch hết hạn thì giá và Flash Sale trở về đúng ban đầu. Chiến dịch, đăng ký tạm đã xóa và giá sản phẩm khôi phục. Đây là TiDB, chưa phải MySQL 8, và chưa thử qua giao diện admin hay cron thật.
