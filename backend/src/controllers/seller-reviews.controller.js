@@ -70,12 +70,18 @@ export async function replySellerReview(req, res, next) {
       title: 'Shop đã phản hồi đánh giá của bạn',
       content: `Shop đã trả lời đánh giá của bạn về "${data.productName}".`,
       type: 'system',
-      link: `/san-pham/${data.productSlug}`,
+      link: data.productSlug ? `/san-pham/${data.productSlug}` : null,
       metadata: { reviewId: data.id, productId: data.productId },
     }).catch(() => {})
 
-    // buyerId chỉ dùng để gửi thông báo, không trả cho seller
-    const { buyerId, ...result } = data
+    // buyerId chỉ dùng để gửi thông báo nên không trả cho seller
+    const result = {
+      id: data.id,
+      productId: data.productId,
+      productName: data.productName,
+      sellerReply: data.sellerReply,
+      repliedAt: data.repliedAt,
+    }
     return res.status(201).json({ success: true, message: 'Đã gửi phản hồi đánh giá.', data: result })
   } catch (err) {
     return next(err)

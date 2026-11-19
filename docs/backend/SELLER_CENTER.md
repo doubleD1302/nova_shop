@@ -27,7 +27,7 @@ Phản hồi thành công có dạng `{ "success": true, "data": ... }`. Lỗi c
 | Query | Mô tả |
 |---|---|
 | `type` | Tùy chọn: `order_income`, `refund`, `payout`. Bỏ trống để lấy cả ba. |
-| `startDate`, `endDate` | Tùy chọn, ISO 8601. `endDate` chỉ có ngày (`2026-11-19`) nghĩa là hết ngày đó (UTC). |
+| `startDate`, `endDate` | Tùy chọn, ISO 8601. Chỉ có ngày (`2026-11-19`) thì `endDate` nghĩa là hết ngày đó (UTC). Có phần giờ thì bắt buộc kèm múi giờ (`Z` hoặc `+07:00`, nhớ mã hóa `+` thành `%2B`); thiếu múi giờ trả 400. |
 | `limit`, `offset` | Mặc định 50 và 0; `limit` tối đa 100; `limit + offset` tối đa 1000. |
 
 Mỗi dòng: `id`, `type`, `reference` (mã đơn hoặc mã lệnh rút), `description`, `amount`, `status`, `occurredAt`.
@@ -46,7 +46,7 @@ Số tiền dùng cùng cách tính với `GET /seller/payout/balance` để hai
 
 Dữ liệu:
 
-- `summary`: `totalBoosts`, `activeBoosts`, `totalSpend`, `ordersDuringBoost`, `unitsDuringBoost`, `revenueDuringBoost`, `revenueToSpendRatio` (`null` khi chưa chi).
+- `summary`: `totalBoosts`, `activeBoosts`, `totalSpend`, `ordersDuringBoost`, `unitsDuringBoost`, `revenueDuringBoost`, `revenueToSpendRatio` (`null` khi chưa chi). Tính trên toàn bộ gói trong khoảng ngày, mỗi dòng hàng đếm một lần.
 - `registrations`: số hồ sơ chiến dịch theo `pending`, `approved`, `rejected` và `total`.
 - `boosts`: từng gói đẩy (tối đa 200, `truncated` báo bị cắt) kèm `costVnd`, đơn, số lượng và doanh thu của sản phẩm trong thời gian gói chạy.
 
@@ -75,11 +75,11 @@ Doanh thu/đơn là của sản phẩm trong thời gian gói chạy (bỏ đơn
 
 - **Công thức tiền chưa thống nhất.** `payout/balance` cộng `total_amount` của đơn (gồm phí vận chuyển, chưa trừ hoa hồng). `reports/revenue` trừ hoa hồng trên `subtotal - discount` và chỉ tính đơn `delivered`. `SELLER_PAYOUT_DRAFT.md` đề xuất không tính phí vận chuyển. Lịch sử giao dịch bám theo `payout/balance`; công thức cần được chốt ở một bước nghiệp vụ riêng trước khi đổi.
 - **Phí gói đẩy chưa trừ vào số dư.** `product_boosts.cost_vnd` chỉ được ghi nhận; không xuất hiện trong lịch sử giao dịch hoặc số dư cho tới khi có quy tắc thanh toán quảng cáo.
-- Không có lượt xem/lượt nhấp (xem trên). Gói đẩy của cùng sản phẩm không được chồng nhau từ nay, nhưng dữ liệu cũ có thể chồng và làm doanh thu ở `summary` bị tính lặp.
+- Không có lượt xem/lượt nhấp (xem trên). `summary` được tính bằng truy vấn riêng nên mỗi dòng hàng chỉ đếm một lần; vì vậy tổng đơn/doanh thu của các gói trong `boosts` có thể lớn hơn `summary` khi các gói chạy chồng nhau. Số gói và chi phí trong `summary` tính trên toàn bộ gói, không bị giới hạn 200 của danh sách.
 - Lịch sử giao dịch gộp ba nguồn trong bộ nhớ nên giới hạn 1000 dòng gần nhất cho mỗi truy vấn.
 
 ## Kiểm tra
 
-- `npm --prefix data-api run test:seller-center` (22 kiểm tra) và `npm --prefix backend run test:seller-center` (13 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
+- `npm --prefix data-api run test:seller-center` (25 kiểm tra) và `npm --prefix backend run test:seller-center` (14 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
 - Ngày 19/11/2026, các truy vấn đọc (giao dịch, hiệu quả quảng cáo, đánh giá, trả hàng `disputed`) đã chạy trên database dev TiDB, không lỗi SQL. Với một shop có 31 đơn đã giao/hoàn tất, số dư khả dụng tính từ lịch sử giao dịch khớp đúng với `payout/balance`. Các câu lệnh ghi và khóa (`FOR UPDATE`, `INSERT product_boosts`, `UPDATE reviews`) chỉ được kiểm tra bằng `EXPLAIN`, chưa thực thi. Database dev chưa có hoàn tiền, rút tiền, gói đẩy hay đánh giá nên các nhánh đó chưa được thử với dữ liệu thật.
 - Đây là TiDB, chưa phải MySQL 8, và chưa có test hai request song song (trả lời cùng một đánh giá, mua gói đẩy cùng sản phẩm). Cần thử trên MySQL 8 trước khi coi là kiểm chứng đầu cuối.

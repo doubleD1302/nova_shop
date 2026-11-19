@@ -346,8 +346,10 @@ export async function getSellerMarketingAnalytics(req, res, next) {
       regParams.push(range.to)
     }
 
+    // Bốn truy vấn độc lập nên chạy song song để không vượt timeout 5s của Backend.
     // Đơn hủy không tính. Điều kiện thời gian nằm trong ON để gói không có đơn vẫn được liệt kê.
-    const boostRows = await executeQuery(
+    const [boostRows, totalRows, spendRows, regRows] = await Promise.all([
+    executeQuery(
       `SELECT b.id, b.product_id, p.name AS product_name, b.package_type, b.starts_at, b.ends_at,
               b.status, b.cost_vnd, b.created_at, (b.ends_at <= UTC_TIMESTAMP(3)) AS is_expired,
               COUNT(DISTINCT so.id) AS orders_count,
@@ -365,15 +367,43 @@ export async function getSellerMarketingAnalytics(req, res, next) {
        ORDER BY b.id DESC
        LIMIT ?`,
       [...boostParams, MAX_ANALYTICS_BOOSTS]
-    )
+    ),
 
-    const regRows = await executeQuery(
+    // Tổng riêng cho summary: mỗi dòng hàng chỉ đếm một lần dù nằm trong nhiều gói chạy cùng lúc
+    // và không bị cắt theo giới hạn 200 gói của danh sách.
+    executeQuery(
+      `SELECT COUNT(DISTINCT so.id) AS distinct_orders,
+              COALESCE(SUM(oi.qty), 0) AS distinct_units,
+              COALESCE(SUM(oi.line_total), 0) AS distinct_revenue
+       FROM order_items oi
+       JOIN shop_orders so ON so.id = oi.shop_order_id AND so.status <> 'cancelled'
+       WHERE oi.shop_id = ?
+         AND EXISTS (
+           SELECT 1 FROM product_boosts b
+           WHERE b.shop_id = oi.shop_id AND b.product_id = oi.product_id
+             AND so.created_at >= b.starts_at
+             AND so.created_at <= LEAST(b.ends_at, UTC_TIMESTAMP(3)) ${boostRange}
+         )`,
+      boostParams
+    ),
+
+    // Số gói và chi phí tính trên toàn bộ gói, không phụ thuộc giới hạn của danh sách
+    executeQuery(
+      `SELECT COUNT(*) AS total_boosts, COALESCE(SUM(b.cost_vnd), 0) AS total_spend,
+              COALESCE(SUM(b.status = 'active' AND b.ends_at > UTC_TIMESTAMP(3)), 0) AS active_boosts
+       FROM product_boosts b
+       WHERE b.shop_id = ? ${boostRange}`,
+      boostParams
+    ),
+
+    executeQuery(
       `SELECT r.status, COUNT(*) AS total
        FROM campaign_registrations r
        WHERE r.shop_id = ? ${regRange}
        GROUP BY r.status`,
       regParams
-    )
+    ),
+    ])
 
     const boosts = boostRows.map((r) => {
       const costVnd = Number(r.cost_vnd)
@@ -396,8 +426,10 @@ export async function getSellerMarketingAnalytics(req, res, next) {
       }
     })
 
-    const totalSpend = boosts.reduce((sum, b) => sum + b.costVnd, 0)
-    const totalRevenue = boosts.reduce((sum, b) => sum + b.revenueDuringBoost, 0)
+    const spend = spendRows[0] || {}
+    const totalSpend = Number(spend.total_spend || 0)
+    const totals = totalRows[0] || {}
+    const totalRevenue = Number(totals.distinct_revenue || 0)
 
     const registrations = { pending: 0, approved: 0, rejected: 0, total: 0 }
     for (const row of regRows) {
@@ -413,11 +445,11 @@ export async function getSellerMarketingAnalytics(req, res, next) {
           endDate: range.to ? range.to.toISOString() : null,
         },
         summary: {
-          totalBoosts: boosts.length,
-          activeBoosts: boosts.filter((b) => b.status === 'active').length,
+          totalBoosts: Number(spend.total_boosts || 0),
+          activeBoosts: Number(spend.active_boosts || 0),
           totalSpend,
-          ordersDuringBoost: boosts.reduce((sum, b) => sum + b.ordersDuringBoost, 0),
-          unitsDuringBoost: boosts.reduce((sum, b) => sum + b.unitsDuringBoost, 0),
+          ordersDuringBoost: Number(totals.distinct_orders || 0),
+          unitsDuringBoost: Number(totals.distinct_units || 0),
           revenueDuringBoost: totalRevenue,
           revenueToSpendRatio: totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(2)) : null,
         },

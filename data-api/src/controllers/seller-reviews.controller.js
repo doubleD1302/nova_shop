@@ -37,23 +37,35 @@ export async function listSellerReviews(req, res, next) {
       params.push(productId)
     }
 
-    const counts = await executeQuery(
-      `SELECT COUNT(*) AS total FROM reviews r JOIN products p ON p.id = r.product_id WHERE ${where}`,
-      params,
-    )
-
-    const rows = await executeQuery(
-      `SELECT r.id, r.product_id, r.rating, r.comment, r.created_at, r.seller_reply, r.replied_at,
-              p.name AS product_name, u.full_name AS buyer_name, oi.variant_name
-       FROM reviews r
-       JOIN products p ON p.id = r.product_id
-       JOIN users u ON u.id = r.user_id
-       JOIN order_items oi ON oi.id = r.order_item_id
-       WHERE ${where}
-       ORDER BY r.created_at DESC, r.id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
-    )
+    // COUNT, danh sách và thống kê độc lập nhau nên chạy song song
+    const [counts, rows, stats] = await Promise.all([
+      executeQuery(
+        `SELECT COUNT(*) AS total FROM reviews r JOIN products p ON p.id = r.product_id WHERE ${where}`,
+        params,
+      ),
+      executeQuery(
+        `SELECT r.id, r.product_id, r.rating, r.comment, r.created_at, r.seller_reply, r.replied_at,
+                p.name AS product_name, u.full_name AS buyer_name, oi.variant_name
+         FROM reviews r
+         JOIN products p ON p.id = r.product_id
+         JOIN users u ON u.id = r.user_id
+         JOIN order_items oi ON oi.id = r.order_item_id
+         WHERE ${where}
+         ORDER BY r.created_at DESC, r.id DESC
+         LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      ),
+      executeQuery(
+        `SELECT COUNT(*) AS total, COALESCE(AVG(r.rating), 0) AS average,
+                COALESCE(SUM(r.seller_reply IS NULL), 0) AS unreplied,
+                COALESCE(SUM(r.rating = 1), 0) AS star1, COALESCE(SUM(r.rating = 2), 0) AS star2,
+                COALESCE(SUM(r.rating = 3), 0) AS star3, COALESCE(SUM(r.rating = 4), 0) AS star4,
+                COALESCE(SUM(r.rating = 5), 0) AS star5
+         FROM reviews r JOIN products p ON p.id = r.product_id
+         WHERE p.shop_id = ? AND r.status = 'visible'`,
+        [shopId],
+      ),
+    ])
 
     let imageRows = []
     if (rows.length) {
@@ -65,16 +77,6 @@ export async function listSellerReviews(req, res, next) {
       )
     }
 
-    const stats = await executeQuery(
-      `SELECT COUNT(*) AS total, COALESCE(AVG(r.rating), 0) AS average,
-              COALESCE(SUM(r.seller_reply IS NULL), 0) AS unreplied,
-              COALESCE(SUM(r.rating = 1), 0) AS star1, COALESCE(SUM(r.rating = 2), 0) AS star2,
-              COALESCE(SUM(r.rating = 3), 0) AS star3, COALESCE(SUM(r.rating = 4), 0) AS star4,
-              COALESCE(SUM(r.rating = 5), 0) AS star5
-       FROM reviews r JOIN products p ON p.id = r.product_id
-       WHERE p.shop_id = ? AND r.status = 'visible'`,
-      [shopId],
-    )
     const stat = stats[0] || {}
 
     return res.status(200).json({

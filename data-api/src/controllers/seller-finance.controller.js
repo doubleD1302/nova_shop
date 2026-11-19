@@ -20,6 +20,9 @@ function isTableMissingError(err) {
          String(err?.message || '').includes("doesn't exist")
 }
 
+// id có dạng 'order_income-12'; lấy phần số để so sánh đúng thứ tự
+const numericId = (entry) => Number(entry.id.slice(entry.type.length + 1))
+
 function addRange(where, params, column, range) {
   if (range.from) {
     where += ` AND ${column} >= ?`
@@ -37,8 +40,9 @@ async function readIncome(shopId, range, take) {
   const params = [shopId]
   const where = addRange("so.shop_id = ? AND so.status IN ('delivered', 'completed')", params, 'so.delivered_at', range)
 
-  const counts = await executeQuery(`SELECT COUNT(*) AS total FROM shop_orders so WHERE ${where}`, params)
-  const rows = await executeQuery(
+  const [counts, rows] = await Promise.all([
+    executeQuery(`SELECT COUNT(*) AS total FROM shop_orders so WHERE ${where}`, params),
+    executeQuery(
     `SELECT so.id, o.code AS order_code, so.total_amount, so.delivered_at,
             (so.status = 'completed' OR so.delivered_at <= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ${HOLD_DAYS} DAY)) AS past_hold,
             EXISTS (SELECT 1 FROM order_returns ret
@@ -49,7 +53,8 @@ async function readIncome(shopId, range, take) {
      ORDER BY so.delivered_at DESC, so.id DESC
      LIMIT ?`,
     [...params, take],
-  )
+    ),
+  ])
 
   return {
     total: Number(counts[0]?.total || 0),
@@ -70,8 +75,9 @@ async function readRefunds(shopId, range, take) {
   const params = [shopId]
   const where = addRange("ret.shop_id = ? AND ret.status = 'completed'", params, 'ret.updated_at', range)
 
-  const counts = await executeQuery(`SELECT COUNT(*) AS total FROM order_returns ret WHERE ${where}`, params)
-  const rows = await executeQuery(
+  const [counts, rows] = await Promise.all([
+    executeQuery(`SELECT COUNT(*) AS total FROM order_returns ret WHERE ${where}`, params),
+    executeQuery(
     `SELECT ret.id, ret.refund_amount, ret.updated_at, o.code AS order_code
      FROM order_returns ret
      JOIN shop_orders so ON so.id = ret.shop_order_id
@@ -80,7 +86,8 @@ async function readRefunds(shopId, range, take) {
      ORDER BY ret.updated_at DESC, ret.id DESC
      LIMIT ?`,
     [...params, take],
-  )
+    ),
+  ])
 
   return {
     total: Number(counts[0]?.total || 0),
@@ -101,15 +108,17 @@ async function readPayouts(shopId, range, take) {
   const params = [shopId]
   const where = addRange("pr.shop_id = ? AND pr.status <> 'rejected'", params, 'pr.created_at', range)
 
-  const counts = await executeQuery(`SELECT COUNT(*) AS total FROM seller_payout_requests pr WHERE ${where}`, params)
-  const rows = await executeQuery(
+  const [counts, rows] = await Promise.all([
+    executeQuery(`SELECT COUNT(*) AS total FROM seller_payout_requests pr WHERE ${where}`, params),
+    executeQuery(
     `SELECT pr.id, pr.payout_code, pr.amount, pr.status, pr.created_at
      FROM seller_payout_requests pr
      WHERE ${where}
      ORDER BY pr.created_at DESC, pr.id DESC
      LIMIT ?`,
     [...params, take],
-  )
+    ),
+  ])
 
   return {
     total: Number(counts[0]?.total || 0),
@@ -143,21 +152,22 @@ export async function listSellerTransactions(req, res, next) {
       return invalid(res, `Chỉ xem được tối đa ${MAX_WINDOW} giao dịch gần nhất; hãy thu hẹp khoảng ngày.`)
     }
 
-    const shops = await executeQuery('SELECT id FROM shops WHERE id = ? LIMIT 1', [shopId])
+    // Kiểm tra shop và các nguồn dữ liệu chạy song song để tổng thời gian không vượt timeout 5s của Backend
+    const take = limit + offset
+    const wanted = type ? [type] : TYPES
+    const readers = { order_income: readIncome, refund: readRefunds, payout: readPayouts }
+    const [shops, ...sources] = await Promise.all([
+      executeQuery('SELECT id FROM shops WHERE id = ? LIMIT 1', [shopId]),
+      ...wanted.map((name) => readers[name](shopId, range, take)),
+    ])
     if (!shops.length) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng tương ứng.', error: { code: 'SHOP_NOT_FOUND' } })
     }
 
-    const take = limit + offset
-    const wanted = type ? [type] : TYPES
-    const sources = []
-    if (wanted.includes('order_income')) sources.push(await readIncome(shopId, range, take))
-    if (wanted.includes('refund')) sources.push(await readRefunds(shopId, range, take))
-    if (wanted.includes('payout')) sources.push(await readPayouts(shopId, range, take))
-
+    // Cùng thời điểm thì xếp theo loại rồi theo id số, giống ORDER BY của từng nguồn
     const merged = sources
       .flatMap((source) => source.entries)
-      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id))
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.type.localeCompare(a.type) || numericId(b) - numericId(a))
 
     return res.status(200).json({
       success: true,

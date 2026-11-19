@@ -159,7 +159,8 @@ try {
     const forwarded = upstreamCalls('/internal/v1/seller/reviews/5/reply')[0].body
     assert.deepEqual(forwarded, { shopId: '10', userId: '1', reply: 'Cảm ơn bạn' })
     assert.equal(result.body.data.sellerReply, 'Cảm ơn bạn')
-    assert.ok(!('buyerId' in result.body.data), 'không trả buyerId cho seller')
+    assert.ok(!('buyerId' in result.body.data) && !('productSlug' in result.body.data), 'không trả buyerId/productSlug cho seller')
+    assert.deepEqual(Object.keys(result.body.data).sort(), ['id', 'productId', 'productName', 'repliedAt', 'sellerReply'])
 
     // Thông báo chạy nền sau khi trả lời; chờ tối đa 2 giây
     for (let i = 0; i < 40 && !noticeCalls().length; i++) await new Promise((resolve) => setTimeout(resolve, 50))
@@ -168,6 +169,14 @@ try {
     assert.equal(notice.body.userId, '9')
     assert.equal(notice.body.link, '/san-pham/tai-nghe')
     await new Promise((resolve) => setTimeout(resolve, 300)) // để phần push nền kết thúc trước bài sau
+  })
+  await check('Data API cũ không trả productSlug: thông báo không có link /san-pham/undefined', async () => {
+    upstream = { status: 201, json: { success: true, data: { id: '5', productId: '7', productName: 'Tai nghe', buyerId: '9', sellerReply: 'Cảm ơn', repliedAt: '2026-11-19T03:00:00.000Z' } } }
+    const result = await call('POST', '/seller/reviews/5/reply', { user: '1', body: { reply: 'Cảm ơn' } })
+    assert.equal(result.status, 201)
+    for (let i = 0; i < 40 && !noticeCalls().length; i++) await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(noticeCalls()[0].body.link, null)
+    await new Promise((resolve) => setTimeout(resolve, 300))
   })
   await check('đã trả lời rồi: 409 từ Data API đến được người dùng và không gửi thông báo', async () => {
     upstream = { status: 409, json: { success: false, message: 'Đánh giá này đã được phản hồi.', error: { code: 'REVIEW_ALREADY_REPLIED' } } }

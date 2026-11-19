@@ -20,6 +20,8 @@ const db = {
   shopOwned: true,
   boostRows: [],
   regRows: [],
+  totalRows: [{ distinct_orders: 0, distinct_units: 0, distinct_revenue: 0 }],
+  spendRows: [{ total_boosts: 0, total_spend: 0, active_boosts: 0 }],
 }
 const log = []
 
@@ -37,6 +39,8 @@ const conn = {
     else if (sql.includes('COUNT(*) AS total FROM seller_payout_requests')) rows = [{ total: db.payouts.length }]
     else if (sql.includes('FROM seller_payout_requests pr')) rows = db.payouts
     // Gói đẩy và hiệu quả quảng cáo
+    else if (sql.includes('AS distinct_orders')) rows = db.totalRows
+    else if (sql.includes('AS total_boosts')) rows = db.spendRows
     else if (sql.includes('FROM products WHERE id = ? FOR UPDATE')) rows = db.product ? [db.product] : []
     else if (sql.includes('FROM product_boosts') && sql.includes('LIMIT 1')) rows = db.runningBoost ? [{ id: 1 }] : []
     else if (sql.includes('INSERT INTO product_boosts')) rows = { insertId: 99 }
@@ -86,9 +90,13 @@ try {
   console.log('--- Tài chính: lịch sử giao dịch ---')
   await check('từ chối shopId, loại, ngày, limit không hợp lệ (HTTP 400)', async () => {
     for (const query of ['shopId=abc', 'shopId=1&type=bank', 'shopId=1&startDate=hôm-nay', 'shopId=1&startDate=2026-11-20&endDate=2026-11-01',
+      'shopId=1&startDate=2026-11-01T00:00:00', 'shopId=1&endDate=2026-11-01T10:00',
       'shopId=1&limit=0', 'shopId=1&limit=101', 'shopId=1&limit=100&offset=901']) {
       assert.equal((await call(`/seller/finance/transactions?${query}`)).status, 400, query)
     }
+  })
+  await check('ngày giờ có múi giờ (Z hoặc +07:00) được chấp nhận', async () => {
+    assert.equal((await call('/seller/finance/transactions?shopId=1&startDate=2026-11-01T00:00:00Z&endDate=2026-11-30T23:59:59%2B07:00')).status, 200)
   })
   await check('shop không tồn tại trả 404 SHOP_NOT_FOUND', async () => {
     db.shopExists = false
@@ -115,6 +123,18 @@ try {
     assert.equal(items.find((item) => item.type === 'refund').amount, -50000)
     assert.equal(items.find((item) => item.type === 'payout').amount, -150000)
     assert.equal(items.find((item) => item.id === 'order_income-11').amount, 300000)
+  })
+  await check('cùng thời điểm thì xếp id số lớn trước (10 trước 9), không theo thứ tự chuỗi', async () => {
+    const saved = db.income
+    const at = new Date('2026-11-18T00:00:00.000Z')
+    db.income = [9, 10].map((id) => ({ id, order_code: `NS${id}`, total_amount: '1000', delivered_at: at, past_hold: 1, has_open_return: 0 }))
+    db.refunds = []
+    db.payouts = []
+    const { items } = (await call('/seller/finance/transactions?shopId=1')).body.data
+    db.income = saved
+    db.refunds = [{ id: 3, refund_amount: '50000', updated_at: new Date('2026-11-12T00:00:00.000Z'), order_code: 'NS11' }]
+    db.payouts = [{ id: 2, payout_code: 'PO-2', amount: '150000', status: 'pending', created_at: new Date('2026-11-15T00:00:00.000Z') }]
+    assert.deepEqual(items.map((item) => item.id), ['order_income-10', 'order_income-9'])
   })
   await check('trạng thái tiền đơn: available / escrow (đang giữ hoặc đang trả hàng)', async () => {
     const { items } = (await call('/seller/finance/transactions?shopId=1&type=order_income')).body.data
@@ -189,22 +209,43 @@ try {
     assert.deepEqual(result.body.data.registrations, { pending: 2, approved: 1, rejected: 0, total: 3 })
     assert.equal(result.body.data.truncated, false)
   })
-  await check('báo cáo hiệu quả: tổng chi phí, doanh thu và gói đã hết hạn', async () => {
+  await check('báo cáo hiệu quả: tổng tính riêng nên đơn nằm trong nhiều gói không bị đếm lặp', async () => {
     const make = (id, cost, revenue, expired) => ({
       id, product_id: 7, product_name: 'Tai nghe', package_type: 'basic_1d', status: 'active',
       starts_at: new Date('2026-11-10T00:00:00.000Z'), ends_at: new Date('2026-11-11T00:00:00.000Z'), created_at: new Date('2026-11-10T00:00:00.000Z'),
       cost_vnd: cost, is_expired: expired, orders_count: 2, units_sold: 3, revenue,
     })
     db.boostRows = [make(2, '50000', '400000', 0), make(1, '50000', '100000', 1)]
+    // Tổng các gói là 500000 nhưng một số đơn thuộc cả hai gói, nên tổng không trùng chỉ là 450000
+    db.totalRows = [{ distinct_orders: 3, distinct_units: 4, distinct_revenue: '450000' }]
+    db.spendRows = [{ total_boosts: 2, total_spend: '100000', active_boosts: '1' }]
+    log.length = 0
     const { summary, boosts } = (await call('/seller/marketing/analytics?shopId=1&startDate=2026-11-01&endDate=2026-11-30')).body.data
     assert.equal(summary.totalBoosts, 2)
     assert.equal(summary.activeBoosts, 1)
     assert.equal(summary.totalSpend, 100000)
-    assert.equal(summary.revenueDuringBoost, 500000)
-    assert.equal(summary.revenueToSpendRatio, 5)
+    assert.equal(summary.ordersDuringBoost, 3)
+    assert.equal(summary.unitsDuringBoost, 4)
+    assert.equal(summary.revenueDuringBoost, 450000)
+    assert.equal(summary.revenueToSpendRatio, 4.5)
     assert.equal(boosts[0].revenueToSpendRatio, 8)
     assert.equal(boosts[1].status, 'expired')
     assert.ok(!('impressions' in summary) && !('clicks' in summary), 'không bịa số lượt xem/nhấp')
+    const totalsQuery = log.find((entry) => entry.sql.includes('AS distinct_orders'))
+    assert.ok(totalsQuery.sql.includes('EXISTS') && totalsQuery.sql.includes('b.created_at >= ?') && totalsQuery.sql.includes('b.created_at <= ?'), 'tổng cũng lọc theo khoảng ngày')
+    db.totalRows = [{ distinct_orders: 0, distinct_units: 0, distinct_revenue: 0 }]
+    db.spendRows = [{ total_boosts: 0, total_spend: 0, active_boosts: 0 }]
+  })
+  await check('báo cáo hiệu quả: số gói và chi phí không bị cắt theo giới hạn 200 gói của danh sách', async () => {
+    db.boostRows = []
+    db.totalRows = [{ distinct_orders: 10, distinct_units: 10, distinct_revenue: '1000000' }]
+    db.spendRows = [{ total_boosts: 350, total_spend: '17500000', active_boosts: 4 }]
+    const data = (await call('/seller/marketing/analytics?shopId=1')).body.data
+    db.totalRows = [{ distinct_orders: 0, distinct_units: 0, distinct_revenue: 0 }]
+    db.spendRows = [{ total_boosts: 0, total_spend: 0, active_boosts: 0 }]
+    assert.equal(data.summary.totalBoosts, 350)
+    assert.equal(data.summary.totalSpend, 17500000)
+    assert.equal(data.summary.revenueToSpendRatio, Number((1000000 / 17500000).toFixed(2)))
   })
   await check('báo cáo hiệu quả từ chối shopId hoặc ngày sai (HTTP 400)', async () => {
     assert.equal((await call('/seller/marketing/analytics?shopId=x')).status, 400)
