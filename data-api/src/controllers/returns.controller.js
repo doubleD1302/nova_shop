@@ -191,7 +191,7 @@ export async function listSellerReturns(req, res, next) {
     const { status } = req.query
     const page = readPagination(req.query)
     if (!/^[1-9]\d{0,19}$/.test(String(userId || '')) || !page ||
-        (status !== undefined && status !== '' && !['requested', 'approved', 'rejected', 'completed', 'cancelled'].includes(status))) {
+        (status !== undefined && status !== '' && !['requested', 'approved', 'rejected', 'completed', 'cancelled', 'disputed'].includes(status))) {
       return res.status(400).json({ success: false, message: 'Bộ lọc không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
     }
     const { limit, offset } = page
@@ -213,7 +213,7 @@ export async function listSellerReturns(req, res, next) {
     try {
       const params = [shopId]
       let whereSql = 'ret.shop_id = ?'
-      if (status && ['requested', 'approved', 'rejected', 'completed', 'cancelled'].includes(status)) {
+      if (status && ['requested', 'approved', 'rejected', 'completed', 'cancelled', 'disputed'].includes(status)) {
         whereSql += ' AND ret.status = ?'
         params.push(status)
       }

@@ -1,4 +1,5 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
+import { readDateRange } from '../utils/date-range.js'
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const invalid = (res, msg = 'Dữ liệu không hợp lệ.') =>
@@ -193,45 +194,76 @@ export async function buyProductBoost(req, res, next) {
       })
     }
 
-    // Kiểm tra sản phẩm
-    const products = await executeQuery(
-      'SELECT id, shop_id, name, status, approval_status FROM products WHERE id = ?',
-      [productId]
-    )
-    if (!products.length) {
+    const now = new Date()
+    const endsAt = new Date(now.getTime() + pkg.days * 24 * 3600 * 1000)
+
+    // Khóa dòng sản phẩm để hai lần bấm mua cùng lúc không tạo hai gói đang chạy
+    const result = await executeTransaction(async (query) => {
+      const products = await query(
+        'SELECT id, shop_id, name, status, approval_status FROM products WHERE id = ? FOR UPDATE',
+        [productId]
+      )
+      if (!products.length) return { error: 'PRODUCT_NOT_FOUND' }
+      if (String(products[0].shop_id) !== String(shopId)) return { error: 'FORBIDDEN' }
+
+      // Giống đăng ký chiến dịch: chỉ sản phẩm đang bán và đã duyệt mới được quảng bá
+      if (products[0].status !== 'active' || products[0].approval_status !== 'approved') {
+        return { error: 'PRODUCT_NOT_ELIGIBLE' }
+      }
+
+      const running = await query(
+        `SELECT id FROM product_boosts
+         WHERE product_id = ? AND status = 'active' AND ends_at > UTC_TIMESTAMP(3) LIMIT 1`,
+        [productId]
+      )
+      if (running.length) return { error: 'BOOST_ALREADY_ACTIVE' }
+
+      const insertResult = await query(
+        `INSERT INTO product_boosts
+         (shop_id, product_id, package_type, starts_at, ends_at, status, cost_vnd)
+         VALUES (?, ?, ?, ?, ?, 'active', ?)`,
+        [shopId, productId, packageType, now, endsAt, pkg.cost]
+      )
+      return { boostId: insertResult.insertId, productName: products[0].name }
+    })
+
+    if (result.error === 'PRODUCT_NOT_FOUND') {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy sản phẩm.',
         error: { code: 'PRODUCT_NOT_FOUND' },
       })
     }
-
-    if (String(products[0].shop_id) !== String(shopId)) {
+    if (result.error === 'FORBIDDEN') {
       return res.status(403).json({
         success: false,
         message: 'Bạn không thể mua gói đẩy cho sản phẩm của shop khác.',
         error: { code: 'FORBIDDEN' },
       })
     }
-
-    const now = new Date()
-    const endsAt = new Date(now.getTime() + pkg.days * 24 * 3600 * 1000)
-
-    const insertResult = await executeQuery(
-      `INSERT INTO product_boosts
-       (shop_id, product_id, package_type, starts_at, ends_at, status, cost_vnd)
-       VALUES (?, ?, ?, ?, ?, 'active', ?)`,
-      [shopId, productId, packageType, now, endsAt, pkg.cost]
-    )
+    if (result.error === 'PRODUCT_NOT_ELIGIBLE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ sản phẩm đã được kiểm duyệt và đang bán mới được mua gói đẩy.',
+        error: { code: 'PRODUCT_NOT_ELIGIBLE' },
+      })
+    }
+    if (result.error === 'BOOST_ALREADY_ACTIVE') {
+      return res.status(409).json({
+        success: false,
+        message: 'Sản phẩm này đang có gói đẩy còn hiệu lực. Vui lòng chờ hết hạn rồi mua gói mới.',
+        error: { code: 'BOOST_ALREADY_ACTIVE' },
+      })
+    }
 
     return res.status(201).json({
       success: true,
       message: `Kích hoạt ${pkg.name} thành công. Sản phẩm sẽ được ưu tiên hiển thị đến ${endsAt.toLocaleString('vi-VN')}.`,
       data: {
-        boostId: String(insertResult.insertId),
+        boostId: String(result.boostId),
         shopId: String(shopId),
         productId: String(productId),
-        productName: products[0].name,
+        productName: result.productName,
         packageType,
         packageName: pkg.name,
         costVnd: pkg.cost,
@@ -277,6 +309,123 @@ export async function listSellerProductBoosts(req, res, next) {
     }))
 
     return res.status(200).json({ success: true, data: { items } })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+// Số gói đẩy tối đa trả về trong một báo cáo hiệu quả
+const MAX_ANALYTICS_BOOSTS = 200
+
+/**
+ * Báo cáo hiệu quả quảng cáo của shop: chi phí gói đẩy, đơn/doanh thu của sản phẩm
+ * trong thời gian gói chạy và số hồ sơ chiến dịch theo trạng thái.
+ * Hệ thống chưa ghi nhận lượt xem hay lượt nhấp nên báo cáo không có hai số này;
+ * doanh thu là doanh thu của sản phẩm trong thời gian chạy gói, không chứng minh do quảng cáo mang lại.
+ */
+export async function getSellerMarketingAnalytics(req, res, next) {
+  try {
+    const { shopId } = req.query
+    const range = readDateRange(req.query)
+    if (!validId(shopId) || !range) return invalid(res, 'Tham số báo cáo không hợp lệ.')
+
+    let boostRange = ''
+    let regRange = ''
+    const boostParams = [shopId]
+    const regParams = [shopId]
+    if (range.from) {
+      boostRange += ' AND b.created_at >= ?'
+      regRange += ' AND r.created_at >= ?'
+      boostParams.push(range.from)
+      regParams.push(range.from)
+    }
+    if (range.to) {
+      boostRange += ' AND b.created_at <= ?'
+      regRange += ' AND r.created_at <= ?'
+      boostParams.push(range.to)
+      regParams.push(range.to)
+    }
+
+    // Đơn hủy không tính. Điều kiện thời gian nằm trong ON để gói không có đơn vẫn được liệt kê.
+    const boostRows = await executeQuery(
+      `SELECT b.id, b.product_id, p.name AS product_name, b.package_type, b.starts_at, b.ends_at,
+              b.status, b.cost_vnd, b.created_at, (b.ends_at <= UTC_TIMESTAMP(3)) AS is_expired,
+              COUNT(DISTINCT so.id) AS orders_count,
+              COALESCE(SUM(CASE WHEN so.id IS NOT NULL THEN oi.qty ELSE 0 END), 0) AS units_sold,
+              COALESCE(SUM(CASE WHEN so.id IS NOT NULL THEN oi.line_total ELSE 0 END), 0) AS revenue
+       FROM product_boosts b
+       JOIN products p ON p.id = b.product_id
+       LEFT JOIN order_items oi ON oi.product_id = b.product_id AND oi.shop_id = b.shop_id
+       LEFT JOIN shop_orders so ON so.id = oi.shop_order_id
+            AND so.status <> 'cancelled'
+            AND so.created_at >= b.starts_at
+            AND so.created_at <= LEAST(b.ends_at, UTC_TIMESTAMP(3))
+       WHERE b.shop_id = ? ${boostRange}
+       GROUP BY b.id, b.product_id, p.name, b.package_type, b.starts_at, b.ends_at, b.status, b.cost_vnd, b.created_at
+       ORDER BY b.id DESC
+       LIMIT ?`,
+      [...boostParams, MAX_ANALYTICS_BOOSTS]
+    )
+
+    const regRows = await executeQuery(
+      `SELECT r.status, COUNT(*) AS total
+       FROM campaign_registrations r
+       WHERE r.shop_id = ? ${regRange}
+       GROUP BY r.status`,
+      regParams
+    )
+
+    const boosts = boostRows.map((r) => {
+      const costVnd = Number(r.cost_vnd)
+      const revenue = Number(r.revenue)
+      const expired = Number(r.is_expired) === 1
+      return {
+        id: String(r.id),
+        productId: String(r.product_id),
+        productName: r.product_name,
+        packageType: r.package_type,
+        packageName: BOOST_PACKAGES[r.package_type]?.name || r.package_type,
+        status: expired ? 'expired' : r.status,
+        startsAt: new Date(r.starts_at).toISOString(),
+        endsAt: new Date(r.ends_at).toISOString(),
+        costVnd,
+        ordersDuringBoost: Number(r.orders_count),
+        unitsDuringBoost: Number(r.units_sold),
+        revenueDuringBoost: revenue,
+        revenueToSpendRatio: costVnd > 0 ? Number((revenue / costVnd).toFixed(2)) : null,
+      }
+    })
+
+    const totalSpend = boosts.reduce((sum, b) => sum + b.costVnd, 0)
+    const totalRevenue = boosts.reduce((sum, b) => sum + b.revenueDuringBoost, 0)
+
+    const registrations = { pending: 0, approved: 0, rejected: 0, total: 0 }
+    for (const row of regRows) {
+      if (row.status in registrations) registrations[row.status] = Number(row.total)
+      registrations.total += Number(row.total)
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        range: {
+          startDate: range.from ? range.from.toISOString() : null,
+          endDate: range.to ? range.to.toISOString() : null,
+        },
+        summary: {
+          totalBoosts: boosts.length,
+          activeBoosts: boosts.filter((b) => b.status === 'active').length,
+          totalSpend,
+          ordersDuringBoost: boosts.reduce((sum, b) => sum + b.ordersDuringBoost, 0),
+          unitsDuringBoost: boosts.reduce((sum, b) => sum + b.unitsDuringBoost, 0),
+          revenueDuringBoost: totalRevenue,
+          revenueToSpendRatio: totalSpend > 0 ? Number((totalRevenue / totalSpend).toFixed(2)) : null,
+        },
+        registrations,
+        boosts,
+        truncated: boostRows.length === MAX_ANALYTICS_BOOSTS,
+      },
+    })
   } catch (err) {
     return next(err)
   }

@@ -122,3 +122,27 @@ export async function listSellerProductBoosts(req, res, next) {
     return next(err)
   }
 }
+
+/**
+ * Theo dõi hiệu quả quảng cáo: chi phí gói đẩy, đơn/doanh thu trong thời gian gói chạy
+ * Endpoint: GET /api/v1/seller/marketing/analytics?startDate=&endDate=
+ */
+export async function getSellerMarketingAnalytics(req, res, next) {
+  try {
+    const shopId = getShopId(req, res)
+    if (!shopId) return
+
+    // Data API kiểm tra định dạng ngày
+    const params = new URLSearchParams({ shopId })
+    for (const key of ['startDate', 'endDate']) {
+      if (req.query[key] !== undefined && req.query[key] !== '') {
+        params.set(key, String(req.query[key]))
+      }
+    }
+
+    const data = await callDataApi(`/internal/v1/seller/marketing/analytics?${params}`)
+    return res.status(200).json({ success: true, data })
+  } catch (err) {
+    return next(err)
+  }
+}

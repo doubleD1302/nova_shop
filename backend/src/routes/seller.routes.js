@@ -16,6 +16,7 @@ import {
   listSellerCampaignRegistrations,
   buySellerProductBoost,
   listSellerProductBoosts,
+  getSellerMarketingAnalytics,
 } from '../controllers/marketing.controller.js'
 import {
   getSellerRevenueData,
@@ -25,6 +26,8 @@ import {
 } from '../controllers/reports.controller.js'
 import { createSellerShop } from '../controllers/auth.controller.js'
 import { getSellerDashboard } from '../controllers/seller-dashboard.controller.js'
+import { listSellerTransactions } from '../controllers/seller-finance.controller.js'
+import { listSellerReviews, replySellerReview } from '../controllers/seller-reviews.controller.js'
 import {
   getSellerBankAccount,
   saveSellerBankAccount,
@@ -48,6 +51,13 @@ router.post('/payout/bank-account', saveSellerBankAccount)
 router.get('/payout/balance', getSellerEscrowBalance)
 router.post('/payout/request', createSellerPayoutRequest)
 router.get('/payout/history', listSellerPayoutHistory)
+
+// Lịch sử giao dịch (tiền đơn hàng, hoàn tiền, rút tiền)
+router.get('/finance/transactions', listSellerTransactions)
+
+// Đánh giá sản phẩm: xem và phản hồi
+router.get('/reviews', listSellerReviews)
+router.post('/reviews/:reviewId/reply', replySellerReview)
 
 router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)
@@ -78,6 +88,7 @@ router.post('/marketing/campaigns/register', registerSellerCampaign)
 router.get('/marketing/registrations', listSellerCampaignRegistrations)
 router.post('/marketing/boost', buySellerProductBoost)
 router.get('/marketing/boosts', listSellerProductBoosts)
+router.get('/marketing/analytics', getSellerMarketingAnalytics)
 
 // Báo cáo & Thống kê nâng cao (JSON & Xuất Excel)
 router.get('/reports/revenue', getSellerRevenueData)

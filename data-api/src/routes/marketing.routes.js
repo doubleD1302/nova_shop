@@ -5,6 +5,7 @@ import {
   listSellerCampaignRegistrations,
   buyProductBoost,
   listSellerProductBoosts,
+  getSellerMarketingAnalytics,
 } from '../controllers/marketing.controller.js'
 
 const router = Router()
@@ -19,5 +20,8 @@ router.get('/seller/marketing/registrations', listSellerCampaignRegistrations)
 // Seller mua gói đẩy sản phẩm
 router.post('/seller/marketing/boost', buyProductBoost)
 router.get('/seller/marketing/boosts', listSellerProductBoosts)
+
+// Theo dõi hiệu quả quảng cáo
+router.get('/seller/marketing/analytics', getSellerMarketingAnalytics)
 
 export default router

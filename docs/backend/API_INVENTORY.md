@@ -66,6 +66,10 @@ Luồng chờ duyệt, API hồ sơ seller, duyệt/từ chối và lịch sử 
 | **Đánh giá (Reviews)** | `src/components/product/ProductReviews.jsx` | `GET /api/v1/products/:productId/reviews` | `public` | Đọc đánh giá công khai đã lưu trong MySQL theo sản phẩm; mọi tài khoản/khách đều xem được | **implemented** |
 | **Đánh giá (Reviews)** | `src/components/product/ProductReviews.jsx` | `GET /api/v1/products/:productId/reviews/eligible` | `buyer` | Chỉ trả các mặt hàng đã giao của chính người mua chưa được đánh giá | **implemented** |
 | **Đánh giá (Reviews)** | `src/components/product/ProductReviews.jsx` | `POST /api/v1/products/:productId/reviews` | `buyer` | Tạo đánh giá gắn với order item đã giao; backend kiểm tra quyền sở hữu, rating/nội dung và unique order item | **implemented** |
+| **Tài chính (Seller)** | Chưa nối giao diện | `GET /api/v1/seller/finance/transactions` | `seller` | Lịch sử tiền đơn hàng, hoàn tiền và rút tiền của shop; xem [SELLER_CENTER.md](./SELLER_CENTER.md) | **implemented** |
+| **Quảng cáo (Seller)** | Chưa nối giao diện | `GET /api/v1/seller/marketing/analytics` | `seller` | Chi phí gói đẩy, đơn/doanh thu trong thời gian gói chạy, hồ sơ chiến dịch theo trạng thái | **implemented** |
+| **Đánh giá (Seller)** | Chưa nối giao diện | `GET /api/v1/seller/reviews` | `seller` | Đánh giá của sản phẩm thuộc shop, lọc theo sao/đã trả lời/sản phẩm kèm thống kê | **implemented** |
+| **Đánh giá (Seller)** | Chưa nối giao diện | `POST /api/v1/seller/reviews/:reviewId/reply` | `seller` | Shop trả lời một đánh giá (một lần); người mua nhận thông báo | **implemented** |
 | **Duyệt & Flash Sale (Admin)** | `src/pages/AdminPage.jsx` | `PATCH /api/v1/admin/products/:id/status`, `PATCH /api/v1/admin/products/:id/flash-sale` | `admin` | Lưu trạng thái duyệt và cờ Flash Sale vào MySQL; Flash Sale chỉ bật trên sản phẩm đủ điều kiện | **implemented** |
 
 ---

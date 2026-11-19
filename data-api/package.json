@@ -12,6 +12,7 @@
     "seed:catalog": "node scripts/seed-catalog.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "test:seller-product-validation": "node scripts/test-seller-product-validation.mjs",
+    "test:seller-center": "node scripts/test-seller-center.mjs",
     "check:db": "node scripts/check-db.mjs",
     "check:cloud": "node scripts/check-cloud-db.mjs",
     "check:cloud-required": "node scripts/test-cloud-required.mjs",
