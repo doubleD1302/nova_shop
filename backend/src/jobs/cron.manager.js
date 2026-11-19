@@ -9,6 +9,7 @@ const jobRunningFlags = {
   cancelExpiredOrders: false,
   autoCompleteOrders: false,
   expireVouchers: false,
+  syncCampaignPrices: false,
   cleanOrphanUploads: false,
 }
 
@@ -136,6 +137,27 @@ export async function runAutoExpireVouchers() {
 }
 
 /**
+ * Áp giá chiến dịch marketing đang chạy và hoàn giá chiến dịch đã kết thúc
+ */
+export async function runSyncCampaignPrices() {
+  if (jobRunningFlags.syncCampaignPrices) return { skipped: true, reason: 'ALREADY_RUNNING' }
+  jobRunningFlags.syncCampaignPrices = true
+
+  try {
+    const result = await callDataApi('/internal/v1/jobs/sync-campaign-prices', { method: 'POST' })
+    if (result?.applied || result?.reverted) {
+      console.log(`[Cron Job] Chiến dịch: áp giá ${result.applied || 0} đăng ký, hoàn giá ${result.reverted || 0} đăng ký.`)
+    }
+    return { success: true, ...result }
+  } catch (err) {
+    console.error('[Cron Job] Lỗi khi đồng bộ giá chiến dịch:', err.message)
+    return { success: false, error: err.message }
+  } finally {
+    jobRunningFlags.syncCampaignPrices = false
+  }
+}
+
+/**
  * 4. Dọn dẹp ảnh mồ côi (Orphan Upload Cleaner)
  * Quét và xóa các tệp ảnh được upload lên server tạm thời nhưng không gắn vào sản phẩm, avatar hay review nào sau 24h
  */
@@ -222,6 +244,8 @@ export async function executeJobByName(jobName, options = {}) {
       return runAutoCompleteOrders(options)
     case 'expire-vouchers':
       return runAutoExpireVouchers()
+    case 'sync-campaign-prices':
+      return runSyncCampaignPrices()
     case 'clean-orphan-uploads':
       return runCleanOrphanUploads(options)
     default:
@@ -255,7 +279,13 @@ export function startAllCronJobs() {
   }, 5 * 60 * 1000)
   activeTimers.push(expireVouchersTimer)
 
-  // 4. Dọn dẹp ảnh mồ côi sau 24h: mỗi 60 phút
+  // 4. Áp giá và hoàn giá chiến dịch marketing: mỗi 5 phút
+  const campaignPricesTimer = setInterval(() => {
+    runSyncCampaignPrices().catch(() => {})
+  }, 5 * 60 * 1000)
+  activeTimers.push(campaignPricesTimer)
+
+  // 5. Dọn dẹp ảnh mồ côi sau 24h: mỗi 60 phút
   const cleanOrphanTimer = setInterval(() => {
     runCleanOrphanUploads({ maxAgeHours: 24 }).catch(() => {})
   }, 60 * 60 * 1000)
@@ -264,7 +294,7 @@ export function startAllCronJobs() {
   // Đảm bảo các timer không cản trở Node.js tiến trình tắt an toàn
   activeTimers.forEach((timer) => timer.unref && timer.unref())
 
-  console.log('[ShopNova Cron] 4 tác vụ nền (Hủy đơn quá hạn, Auto-complete, Expire voucher, Dọn ảnh mồ côi) đã kích hoạt thành công.')
+  console.log('[ShopNova Cron] 5 tác vụ nền (Hủy đơn quá hạn, Auto-complete, Expire voucher, Giá chiến dịch, Dọn ảnh mồ côi) đã kích hoạt thành công.')
 }
 
 /**

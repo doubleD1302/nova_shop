@@ -1,8 +1,9 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
 import { readPagination } from '../utils/pagination.js'
+import { syncCampaignPrices } from '../utils/campaign-pricing.js'
 
 // Quản trị chiến dịch marketing và duyệt đăng ký tham gia của shop.
-// Duyệt đăng ký chỉ ghi trạng thái và ghi chú; chưa tự đổi giá sản phẩm hay bật Flash Sale.
+// Duyệt đăng ký hoặc đổi chiến dịch xong sẽ đồng bộ giá khuyến mãi ngay (utils/campaign-pricing.js); cron cũng chạy định kỳ.
 
 const validId = (value) => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value)
 const invalid = (res, msg = 'Dữ liệu không hợp lệ.') =>
@@ -29,6 +30,15 @@ async function requireAdmin(query, userId) {
   if (!validId(userId)) return false
   const rows = await query("SELECT id FROM users WHERE id = ? AND role = 'admin' AND status = 'active'", [userId])
   return rows.length > 0
+}
+
+// Lỗi đồng bộ giá không làm hỏng thao tác của admin; cron sẽ chạy lại sau vài phút
+async function syncPricesQuietly() {
+  try {
+    await syncCampaignPrices()
+  } catch (err) {
+    console.error('[Campaign Pricing] Đồng bộ giá sau thao tác admin lỗi:', err.message)
+  }
 }
 
 const forbidden = (res) => fail(res, 403, 'ADMIN_REQUIRED', 'Chỉ quản trị viên mới thực hiện được thao tác này.')
@@ -172,6 +182,7 @@ export async function updateAdminCampaign(req, res, next) {
     if (result.error === 'ADMIN_REQUIRED') return forbidden(res)
     if (result.error === 'CAMPAIGN_NOT_FOUND') return fail(res, 404, 'CAMPAIGN_NOT_FOUND', 'Không tìm thấy chiến dịch.')
     if (result.error === 'INVALID_RANGE') return invalid(res, 'Thời điểm kết thúc phải sau thời điểm bắt đầu.')
+    await syncPricesQuietly()
     return res.status(200).json({ success: true, message: 'Đã cập nhật chiến dịch.', data: result.campaign })
   } catch (err) {
     return next(err)
@@ -303,6 +314,7 @@ export async function reviewCampaignRegistration(req, res, next) {
       PRODUCT_NOT_ELIGIBLE: () => fail(res, 409, 'PRODUCT_NOT_ELIGIBLE', 'Sản phẩm không còn đang bán hoặc chưa được kiểm duyệt.'),
     }
     if (result.error) return errors[result.error]()
+    await syncPricesQuietly()
     return res.status(200).json({
       success: true,
       message: status === 'approved' ? 'Đã duyệt đăng ký.' : 'Đã từ chối đăng ký.',

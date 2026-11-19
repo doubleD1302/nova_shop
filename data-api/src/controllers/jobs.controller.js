@@ -1,4 +1,5 @@
 import { executeQuery, executeTransaction } from '../config/database.js'
+import { syncCampaignPrices } from '../utils/campaign-pricing.js'
 
 async function releaseOrderVoucher(query, orderId) {
   const voucherUses = await query(
@@ -224,6 +225,18 @@ export async function expireVouchers(req, res, next) {
         expiredCount: result.affectedRows,
       },
     })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Áp giá chiến dịch đang chạy và hoàn giá chiến dịch đã kết thúc hoặc bị tắt
+ */
+export async function syncCampaignPricesJob(req, res, next) {
+  try {
+    const data = await syncCampaignPrices()
+    return res.status(200).json({ success: true, data })
   } catch (err) {
     return next(err)
   }

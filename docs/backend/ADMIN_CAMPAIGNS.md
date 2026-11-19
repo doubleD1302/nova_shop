@@ -1,6 +1,6 @@
 # Quản trị chiến dịch marketing và duyệt đăng ký của shop
 
-Trước đây shop đăng ký sản phẩm vào chiến dịch (`POST /api/v1/seller/marketing/campaigns/register`) nhưng không có API nào để quản trị viên tạo chiến dịch hay duyệt đăng ký, nên mọi đăng ký dừng mãi ở `pending`. Tài liệu này mô tả các API admin bổ sung. Chúng dùng bảng `marketing_campaigns` và `campaign_registrations` có sẵn, **không đổi schema**.
+Trước đây shop đăng ký sản phẩm vào chiến dịch (`POST /api/v1/seller/marketing/campaigns/register`) nhưng không có API nào để quản trị viên tạo chiến dịch hay duyệt đăng ký, nên mọi đăng ký dừng mãi ở `pending`. Tài liệu này mô tả các API admin bổ sung. Chúng dùng bảng `marketing_campaigns` và `campaign_registrations`. Phần duyệt và quản lý chiến dịch không cần đổi schema; phần **áp giá khuyến mãi** cần migration `database/migrations/2026-11-19-campaign-price-apply.sql` (xem "Áp giá khuyến mãi").
 
 Tất cả endpoint yêu cầu đăng nhập với vai trò `admin`; quản trị viên lấy từ token, `userId` do client gửi bị bỏ qua. Data API kiểm tra lại tài khoản là admin đang hoạt động. Phản hồi thành công có dạng `{ "success": true, "data": ... }`, lỗi có dạng `{ "success": false, "message": "...", "error": { "code": "..." } }`.
 
@@ -36,12 +36,31 @@ Tất cả endpoint yêu cầu đăng nhập với vai trò `admin`; quản tr�
 | 409 `CAMPAIGN_ENDED` | Duyệt khi chiến dịch đã kết thúc hoặc đang tắt (từ chối vẫn được) |
 | 409 `PRODUCT_NOT_ELIGIBLE` | Duyệt khi sản phẩm không còn `active` hoặc chưa được kiểm duyệt |
 
+## Áp giá khuyến mãi
+
+Duyệt đăng ký chưa đổi giá ngay. Việc áp và hoàn giá do `syncCampaignPrices` (`data-api/src/utils/campaign-pricing.js`) thực hiện. Hàm này chạy ngay sau khi admin duyệt đăng ký hoặc sửa chiến dịch (lỗi đồng bộ không làm hỏng thao tác admin) và định kỳ mỗi 5 phút qua job `sync-campaign-prices` (Backend gọi `POST /internal/v1/jobs/sync-campaign-prices`; admin chạy tay được bằng `POST /api/v1/admin/jobs/run` với `{ "jobName": "sync-campaign-prices" }`). Hàm idempotent nên chạy nhiều nơi không áp hai lần.
+
+**Áp giá** khi đăng ký `approved`, chiến dịch đang bật và đang chạy (`startsAt <= bây giờ < endsAt`), sản phẩm đang `active` và đã kiểm duyệt:
+- Mỗi biến thể đang bán có giá **cao hơn** `discountPrice` được hạ xuống `discountPrice`. Biến thể có giá thấp hơn hoặc bằng giữ nguyên.
+- Giá cũ thành giá gạch ngang (`original_price`); nếu biến thể đã có giá gạch ngang thì giữ giá đó. Trang chủ và trang Flash Sale vì thế hiển thị % giảm.
+- Chiến dịch `flash_sale` còn bật `products.is_flash_sale` nếu đang tắt. Không biến thể nào được hạ giá thì không bật Flash Sale.
+- Giá gốc lưu trong `campaign_registrations.price_snapshot`, thời điểm áp/hoàn lưu ở `applied_at`, `reverted_at`.
+
+**Hoàn giá** khi chiến dịch bị tắt hoặc hết hạn: trả giá và giá gạch ngang từ snapshot, **chỉ cho biến thể còn đúng giá khuyến mãi** (nếu shop đã tự đổi giá trong lúc chiến dịch chạy thì giữ giá shop đặt). Flash Sale chỉ tắt nếu chiến dịch là bên đã bật nó và không còn đăng ký flash_sale nào khác đang áp cho sản phẩm. Bật lại chiến dịch đã tắt (khi còn hạn) thì đăng ký được áp lại.
+
+Quy tắc khác: một sản phẩm chỉ chịu **một** đăng ký đang áp giá; đăng ký thứ hai chờ đến khi đăng ký trước được hoàn giá. Đơn đã đặt giữ giá lúc đặt; giỏ hàng và checkout dùng giá biến thể hiện tại.
+
+**Triển khai:** chạy migration trước, sau đó mới deploy code. Chưa có cột `applied_at` thì `syncCampaignPrices` trả `{ skipped: true, reason: "MIGRATION_PENDING" }` và không đổi giá (duyệt đăng ký vẫn hoạt động). Migration chạy một lần bằng tài khoản có quyền ALTER; tài khoản runtime của Data API không có quyền này.
+
 ## Giới hạn
 
-- **Duyệt đăng ký chưa tự đổi giá hay bật Flash Sale.** API chỉ ghi `status` và `note`. `discount_price` mà shop cam kết chưa được áp vào biến thể, và `products.is_flash_sale` vẫn do quản trị bật riêng qua `PATCH /admin/products/:id/flash-sale`. Áp giá khi chiến dịch bắt đầu và hoàn giá khi kết thúc cần cách lưu giá gốc (thêm cột trên `campaign_registrations`, đổi schema) và quy tắc cho sản phẩm nhiều biến thể; cần quyết định riêng.
-- `registerCampaign` của shop chỉ kiểm tra chiến dịch đang bật, chưa kiểm tra đã kết thúc; đăng ký vào chiến dịch đã hết hạn vẫn tạo được hồ sơ `pending` (admin sẽ không duyệt được, chỉ từ chối).
+- Biến thể thêm mới sau khi áp giá không được hạ giá; biến thể bị shop xóa rồi tạo lại (đổi id) sẽ không được hoàn giá.
+- Shop sửa sản phẩm đang khuyến mãi vẫn có thể đặt lại giá; khi đó hệ thống không áp lại cho đến lần đăng ký sau.
+- `registerCampaign` của shop chỉ kiểm tra chiến dịch đang bật, chưa kiểm tra đã kết thúc; đăng ký vào chiến dịch đã hết hạn vẫn tạo được hồ sơ `pending` (admin chỉ từ chối được).
 - Chưa có API xóa chiến dịch; dùng `isActive: false`.
+- Chưa kiểm thử đồng thời (hai tiến trình đồng bộ cùng lúc) và chưa chạy câu lệnh ghi áp/hoàn giá trên database thật.
 
 ## Kiểm tra
 
-`node data-api/scripts/test-admin-campaigns.mjs` (9 kiểm tra, database giả lập) và `npm --prefix backend run test:seller-center` (phần "Admin: chiến dịch marketing", Data API giả lập). Các truy vấn đọc (danh sách chiến dịch, danh sách đăng ký, truy vấn khóa dòng khi duyệt, không có `FOR UPDATE`) đã chạy trên TiDB dev ngày 19/11/2026 không lỗi SQL; dev có 2 chiến dịch và chưa có đăng ký nào. Câu lệnh ghi (`INSERT`, `UPDATE`) chưa chạy trên database thật; chưa phải MySQL 8; chưa thử hai quản trị viên duyệt cùng một đăng ký song song.
+`node data-api/scripts/test-admin-campaigns.mjs` (9 kiểm tra, database giả lập), `node data-api/scripts/test-campaign-pricing.mjs` (12 kiểm tra áp/hoàn giá, database giả lập có trạng thái) và `npm --prefix backend run test:seller-center` (phần "Admin: chiến dịch marketing", Data API giả lập). Các truy vấn đọc (danh sách chiến dịch, danh sách đăng ký, truy vấn khóa dòng khi duyệt, không có `FOR UPDATE`) đã chạy trên TiDB dev ngày 19/11/2026 không lỗi SQL; dev có 2 chiến dịch và chưa có đăng ký nào. Câu lệnh ghi (`INSERT`, `UPDATE`) chưa chạy trên database thật; chưa phải MySQL 8; chưa thử hai quản trị viên duyệt cùng một đăng ký song song.
+- Áp giá/hoàn giá: **chưa chạy trên database thật**. Cột mới chưa được áp dụng vào TiDB dev (migration chưa chạy), và tài khoản runtime không có quyền tạo bảng tạm để thử độc lập. Chạy migration trên dev rồi thử một đăng ký thật trước khi dùng.
