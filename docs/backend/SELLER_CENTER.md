@@ -16,7 +16,7 @@ Tài liệu mô tả API Backend cho ba nhóm menu của Kênh Người Bán. T�
 | Chăm sóc khách hàng | Đánh giá sản phẩm | `GET /api/v1/seller/reviews`, `POST /api/v1/seller/reviews/:reviewId/reply` | **implemented** |
 | Chăm sóc khách hàng | Hỗ trợ và khiếu nại | `GET /api/v1/seller/returns?status=...`, `PATCH .../returns/:returnId/status` | implemented; **lọc được `disputed`** |
 
-Web hiện vẫn mở hộp thoại "đang hoàn thiện" cho các mục này (`SellerLayout.jsx`); việc nối giao diện chưa thuộc phạm vi tài liệu này.
+Web đã nối giao diện cho các mục menu trên: Tài chính (`/nguoi-ban/tai-chinh`), Quảng cáo (`/nguoi-ban/quang-cao`), CSKH (`/nguoi-ban/cskh`) và Dữ liệu (`/nguoi-ban/du-lieu`); mỗi trang chia tab bằng `?tab=`. Mục "Dữ liệu" dùng `GET /seller/dashboard` và `GET /seller/reports/inventory`. Các mục Khuyến mãi (Chương trình khuyến mãi, Flash Sale) và Shop của tôi (cài đặt vận chuyển, địa chỉ lấy hàng) vẫn hiện hộp thoại "đang hoàn thiện". App Flutter chưa thuộc phạm vi này.
 
 Phản hồi thành công có dạng `{ "success": true, "data": ... }`. Lỗi có dạng `{ "success": false, "message": "...", "error": { "code": "..." } }`.
 

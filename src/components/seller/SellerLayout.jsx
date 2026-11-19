@@ -84,9 +84,9 @@ const MENU_GROUPS = [
     label: 'Tài chính',
     icon: IconWallet,
     items: [
-      { action: 'finance_overview', label: 'Tổng quan doanh thu' },
-      { action: 'transactions', label: 'Lịch sử giao dịch' },
-      { action: 'payouts', label: 'Số dư và thanh toán' },
+      { to: '/nguoi-ban/tai-chinh', label: 'Tổng quan doanh thu', tabbed: true },
+      { to: '/nguoi-ban/tai-chinh?tab=transactions', label: 'Lịch sử giao dịch', tabbed: true },
+      { to: '/nguoi-ban/tai-chinh?tab=payouts', label: 'Số dư và thanh toán', tabbed: true },
     ],
   },
   {
@@ -94,9 +94,9 @@ const MENU_GROUPS = [
     label: 'Quảng cáo',
     icon: IconMegaphone,
     items: [
-      { action: 'marketing_tools', label: 'Công cụ quảng bá' },
-      { action: 'marketing_programs', label: 'Chương trình tiếp thị' },
-      { action: 'marketing_analytics', label: 'Theo dõi hiệu quả' },
+      { to: '/nguoi-ban/quang-cao', label: 'Công cụ quảng bá', tabbed: true },
+      { to: '/nguoi-ban/quang-cao?tab=programs', label: 'Chương trình tiếp thị', tabbed: true },
+      { to: '/nguoi-ban/quang-cao?tab=analytics', label: 'Theo dõi hiệu quả', tabbed: true },
     ],
   },
   {
@@ -104,9 +104,9 @@ const MENU_GROUPS = [
     label: 'CSKH',
     icon: IconChat,
     items: [
-      { action: 'chat', label: 'Tin nhắn' },
-      { action: 'reviews', label: 'Đánh giá sản phẩm' },
-      { action: 'inquiries', label: 'Hỗ trợ và khiếu nại' },
+      { to: '/nguoi-ban/cskh', label: 'Tin nhắn', tabbed: true },
+      { to: '/nguoi-ban/cskh?tab=reviews', label: 'Đánh giá sản phẩm', tabbed: true },
+      { to: '/nguoi-ban/cskh?tab=inquiries', label: 'Hỗ trợ và khiếu nại', tabbed: true },
     ],
   },
   {
@@ -114,9 +114,9 @@ const MENU_GROUPS = [
     label: 'Dữ liệu',
     icon: IconChart,
     items: [
-      { action: 'sales_analysis', label: 'Phân tích bán hàng' },
-      { action: 'product_performance', label: 'Hiệu quả sản phẩm' },
-      { action: 'order_performance', label: 'Hiệu quả đơn hàng' },
+      { to: '/nguoi-ban/du-lieu', label: 'Phân tích bán hàng', tabbed: true },
+      { to: '/nguoi-ban/du-lieu?tab=products', label: 'Hiệu quả sản phẩm', tabbed: true },
+      { to: '/nguoi-ban/du-lieu?tab=orders', label: 'Hiệu quả đơn hàng', tabbed: true },
     ],
   },
   {
@@ -130,6 +130,14 @@ const MENU_GROUPS = [
     ],
   },
 ]
+
+/** Mục menu dùng ?tab=: active khi đúng đường dẫn và đúng tab (mục không có tab là tab mặc định). */
+function isTabbedItemActive(item, location) {
+  const [path, query = ''] = item.to.split('?')
+  const itemTab = new URLSearchParams(query).get('tab')
+  const currentTab = new URLSearchParams(location.search).get('tab')
+  return location.pathname === path && (itemTab || null) === (currentTab || null)
+}
 
 /**
  * KHU VỰC NGƯỜI BÁN (Kênh Người Bán) - GIAO DIỆN SHOPEE SELLER CENTRE HỒNG PASTEL
@@ -187,6 +195,12 @@ export default function SellerLayout() {
   useEffect(() => {
     setSidebarOpen(false)
   }, [location.pathname, location.search])
+
+  // Tự mở nhóm menu chứa trang đang xem (ví dụ khi tải lại trang hoặc vào thẳng đường dẫn)
+  useEffect(() => {
+    const group = MENU_GROUPS.find((g) => g.items.some((item) => item.to && item.to.split('?')[0] === location.pathname))
+    if (group) setOpenGroups((prev) => (prev[group.id] ? prev : { ...prev, [group.id]: true }))
+  }, [location.pathname])
 
   const toggleGroup = (groupId) => {
     setOpenGroups((prev) => ({
@@ -425,7 +439,7 @@ export default function SellerLayout() {
               const GroupIcon = group.icon
               const isOpen = openGroups[group.id]
               const hasActiveChild = group.items.some((item) =>
-                item.to ? location.pathname === item.to : false,
+                item.to ? location.pathname === item.to.split('?')[0] : false,
               )
 
               return (
@@ -462,7 +476,7 @@ export default function SellerLayout() {
                               end={item.end}
                               className={({ isActive }) =>
                                 `block rounded-lg px-2.5 py-1.5 text-[12px] transition ${
-                                  isActive
+                                  (item.tabbed ? isTabbedItemActive(item, location) : isActive)
                                     ? 'bg-[#F5E7D4] font-semibold text-[#A95532]'
                                     : 'text-[#8B7566] hover:bg-[#FBF3E8] hover:text-[#A95532]'
                                 }`

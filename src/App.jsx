@@ -17,7 +17,11 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const SearchPage = lazy(() => import('./pages/SearchPage'))
 const ShopPage = lazy(() => import('./pages/ShopPage'))
 const ShopsPage = lazy(() => import('./pages/ShopsPage'))
+const SellerAnalyticsPage = lazy(() => import('./pages/seller/SellerAnalyticsPage'))
+const SellerCarePage = lazy(() => import('./pages/seller/SellerCarePage'))
 const SellerDashboardPage = lazy(() => import('./pages/seller/SellerDashboardPage'))
+const SellerFinancePage = lazy(() => import('./pages/seller/SellerFinancePage'))
+const SellerMarketingPage = lazy(() => import('./pages/seller/SellerMarketingPage'))
 const SellerOrdersPage = lazy(() => import('./pages/seller/SellerOrdersPage'))
 const SellerProductFormPage = lazy(() => import('./pages/seller/SellerProductFormPage'))
 const SellerProductsPage = lazy(() => import('./pages/seller/SellerProductsPage'))
@@ -69,6 +73,10 @@ export default function App() {
           <Route path="san-pham/:productId" element={<SellerProductFormPage />} />
           <Route path="don-hang" element={<SellerOrdersPage />} />
           <Route path="vouchers" element={<SellerVouchersPage />} />
+          <Route path="tai-chinh" element={<SellerFinancePage />} />
+          <Route path="quang-cao" element={<SellerMarketingPage />} />
+          <Route path="cskh" element={<SellerCarePage />} />
+          <Route path="du-lieu" element={<SellerAnalyticsPage />} />
           <Route path="khuyen-mai" element={<Navigate to="/nguoi-ban/vouchers" replace />} />
           <Route path="gian-hang" element={<SellerShopPage />} />
           <Route path="*" element={<Navigate to="/nguoi-ban" replace />} />

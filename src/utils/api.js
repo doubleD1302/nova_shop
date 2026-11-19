@@ -732,3 +732,87 @@ export function apiDeleteSellerVoucher(id, options = {}) {
     ...options,
   })
 }
+
+/**
+ * 5. Kênh Người Bán: Tài chính, Quảng cáo, Chăm sóc khách hàng, Dữ liệu
+ */
+function dateParams(params, { startDate, endDate } = {}) {
+  if (startDate) params.set('startDate', startDate)
+  if (endDate) params.set('endDate', endDate)
+}
+
+export function apiGetSellerRevenueReport(options = {}) {
+  const params = new URLSearchParams()
+  dateParams(params, options)
+  const query = params.toString() ? `?${params}` : ''
+  return apiRequest(`/seller/reports/revenue${query}`, { signal: options.signal })
+}
+
+export function apiGetSellerInventoryReport(options = {}) {
+  return apiRequest('/seller/reports/inventory', { signal: options.signal })
+}
+
+export function apiGetSellerTransactions({ type, limit = 20, offset = 0, startDate, endDate, signal } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (type) params.set('type', type)
+  dateParams(params, { startDate, endDate })
+  return apiRequest(`/seller/finance/transactions?${params}`, { signal })
+}
+
+export function apiGetSellerPayoutBalance(options = {}) {
+  return apiRequest('/seller/payout/balance', options)
+}
+
+export function apiGetSellerBankAccount(options = {}) {
+  return apiRequest('/seller/payout/bank-account', options)
+}
+
+export function apiSaveSellerBankAccount(payload) {
+  return apiRequest('/seller/payout/bank-account', { method: 'POST', body: payload })
+}
+
+export function apiCreateSellerPayout(amount) {
+  return apiRequest('/seller/payout/request', { method: 'POST', body: { amount } })
+}
+
+export function apiGetSellerPayoutHistory(options = {}) {
+  return apiRequest('/seller/payout/history', options)
+}
+
+export function apiGetSellerCampaigns(options = {}) {
+  return apiRequest('/seller/marketing/campaigns', options)
+}
+
+export function apiRegisterSellerCampaign(payload) {
+  return apiRequest('/seller/marketing/campaigns/register', { method: 'POST', body: payload })
+}
+
+export function apiGetSellerCampaignRegistrations(options = {}) {
+  return apiRequest('/seller/marketing/registrations', options)
+}
+
+export function apiBuySellerBoost(productId, packageType) {
+  return apiRequest('/seller/marketing/boost', { method: 'POST', body: { productId, packageType } })
+}
+
+export function apiGetSellerBoosts(options = {}) {
+  return apiRequest('/seller/marketing/boosts', options)
+}
+
+export function apiGetSellerMarketingAnalytics({ startDate, endDate, signal } = {}) {
+  const params = new URLSearchParams()
+  dateParams(params, { startDate, endDate })
+  const query = params.toString() ? `?${params}` : ''
+  return apiRequest(`/seller/marketing/analytics${query}`, { signal })
+}
+
+export function apiGetSellerReviews({ rating, replied, limit = 20, offset = 0, signal } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (rating) params.set('rating', String(rating))
+  if (replied) params.set('replied', replied)
+  return apiRequest(`/seller/reviews?${params}`, { signal })
+}
+
+export function apiReplySellerReview(reviewId, reply) {
+  return apiRequest(`/seller/reviews/${encodeURIComponent(reviewId)}/reply`, { method: 'POST', body: { reply } })
+}
