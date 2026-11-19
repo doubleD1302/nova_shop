@@ -10,7 +10,7 @@ Tài liệu mô tả API Backend cho ba nhóm menu của Kênh Người Bán. T�
 | Tài chính | Lịch sử giao dịch | `GET /api/v1/seller/finance/transactions` | **implemented** |
 | Tài chính | Số dư và thanh toán | `GET /api/v1/seller/payout/balance`, `bank-account`, `request`, `history` | implemented (có từ trước) |
 | Quảng cáo | Công cụ quảng bá | `POST /api/v1/seller/marketing/boost`, `GET .../boosts` | implemented; **bổ sung kiểm tra** |
-| Quảng cáo | Chương trình tiếp thị | `GET /api/v1/seller/marketing/campaigns`, `POST .../campaigns/register`, `GET .../registrations` | implemented (có từ trước) |
+| Quảng cáo | Chương trình tiếp thị | `GET /api/v1/seller/marketing/campaigns`, `POST .../campaigns/register`, `GET .../registrations` | implemented (có từ trước); admin tạo chiến dịch và duyệt đăng ký tại `ADMIN_CAMPAIGNS.md` |
 | Quảng cáo | Theo dõi hiệu quả | `GET /api/v1/seller/marketing/analytics` | **implemented** |
 | Chăm sóc khách hàng | Tin nhắn | `/api/v1/chat/conversations*` | implemented (có từ trước) |
 | Chăm sóc khách hàng | Đánh giá sản phẩm | `GET /api/v1/seller/reviews`, `POST /api/v1/seller/reviews/:reviewId/reply` | **implemented** |
@@ -124,7 +124,7 @@ Thay đổi so với trước: `payout/balance` và `finance/transactions` từn
 
 ## Kiểm tra
 
-- `npm --prefix data-api run test:seller-center` (31 kiểm tra), `node data-api/scripts/test-seller-income.mjs` (8 kiểm tra, công thức tiền) và `npm --prefix backend run test:seller-center` (19 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
+- `npm --prefix data-api run test:seller-center` (31 kiểm tra), `node data-api/scripts/test-seller-income.mjs` (8 kiểm tra, công thức tiền) và `npm --prefix backend run test:seller-center` (24 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
 - Ngày 19/11/2026, các truy vấn đọc (giao dịch, hiệu quả quảng cáo, đánh giá, trả hàng `disputed`) đã chạy trên database dev TiDB, không lỗi SQL. Với một shop có 31 đơn đã giao/hoàn tất, số dư khả dụng tính từ lịch sử giao dịch khớp đúng với `payout/balance`. Các câu lệnh ghi và khóa (`FOR UPDATE`, `INSERT product_boosts`, `UPDATE reviews`) chỉ được kiểm tra bằng `EXPLAIN`, chưa thực thi. Database dev chưa có hoàn tiền, rút tiền, gói đẩy hay đánh giá nên các nhánh đó chưa được thử với dữ liệu thật.
 - Đây là TiDB, chưa phải MySQL 8, và chưa có test hai request song song (trả lời cùng một đánh giá, mua gói đẩy cùng sản phẩm). Cần thử trên MySQL 8 trước khi coi là kiểm chứng đầu cuối.
 - Ngày 19/11/2026, các truy vấn đọc của công thức tiền mới (tiền đơn, hoàn tiền, doanh thu, tổng quan theo trạng thái) đã chạy trên TiDB dev không lỗi SQL; với shop nhiều đơn nhất, số dư khả dụng tính theo thực nhận nhỏ hơn cách cộng `total_amount` cũ (88.901.000 so với 93.740.000 đồng). Chưa chạy câu lệnh rút tiền (`FOR UPDATE`) trên database thật.

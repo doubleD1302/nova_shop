@@ -1,5 +1,12 @@
 import { Router } from 'express'
 import { searchAdmin } from '../controllers/ai-admin.controller.js'
+import {
+  createAdminCampaign,
+  listAdminCampaignRegistrations,
+  listAdminCampaigns,
+  reviewCampaignRegistration,
+  updateAdminCampaign,
+} from '../controllers/admin-campaigns.controller.js'
 import { getSellerRegistration, listSellerIdentityAccessEvents, revealSellerIdentity } from '../controllers/seller-registration.controller.js'
 import {
   createReport,
@@ -55,6 +62,11 @@ router.get('/admin/vouchers', listAdminVouchers)
 router.post('/admin/vouchers', createAdminVoucher)
 router.patch('/admin/vouchers/:voucherId/status', updateAdminVoucherStatus)
 router.delete('/admin/vouchers/:voucherId', deleteAdminVoucher)
+router.get('/admin/campaigns', listAdminCampaigns)
+router.post('/admin/campaigns', createAdminCampaign)
+router.patch('/admin/campaigns/:campaignId', updateAdminCampaign)
+router.get('/admin/campaign-registrations', listAdminCampaignRegistrations)
+router.patch('/admin/campaign-registrations/:registrationId', reviewCampaignRegistration)
 router.get('/admin/violations/:violationId', getViolationDetail)
 router.patch('/admin/violations/:violationId/email-status', updateViolationEmailStatus)
 router.post('/reports', createReport)

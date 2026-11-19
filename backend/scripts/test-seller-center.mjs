@@ -222,6 +222,64 @@ try {
     upstream = { status: 404, json: { success: false, message: 'Không tìm thấy đánh giá.', error: { code: 'REVIEW_NOT_FOUND' } } }
     assert.equal((await call('DELETE', '/seller/reviews/5/reply', { user: '1' })).status, 404)
   })
+  console.log('--- Admin: chiến dịch marketing ---')
+  await check('admin: người mua và seller bị chặn (403), chưa đăng nhập bị 401, không gọi Data API', async () => {
+    for (const [method, route] of [['GET', '/admin/campaigns'], ['POST', '/admin/campaigns'], ['PATCH', '/admin/campaigns/3'], ['GET', '/admin/campaign-registrations'], ['PATCH', '/admin/campaign-registrations/8']]) {
+      assert.equal((await call(method, route)).status, 401, route)
+      assert.equal((await call(method, route, { user: '2', body: {} })).status, 403, route)
+      assert.equal((await call(method, route, { user: '1', body: {} })).status, 403, route)
+    }
+    assert.equal(upstreamCalls('/internal/v1/admin/campaign').length, 0)
+  })
+  await check('admin: danh sách chỉ chuyển limit/offset/campaignId/status, userId lấy từ token', async () => {
+    await call('GET', '/admin/campaigns?limit=5&offset=10&userId=99&x=1', { user: '3' })
+    const first = new URL(upstreamCalls('/internal/v1/admin/campaigns')[0].url, 'http://x')
+    assert.deepEqual([...first.searchParams.entries()], [['userId', '3'], ['limit', '5'], ['offset', '10']])
+    await call('GET', '/admin/campaign-registrations?campaignId=3&status=pending&userId=99', { user: '3' })
+    const second = new URL(upstreamCalls('/internal/v1/admin/campaign-registrations')[0].url, 'http://x')
+    assert.deepEqual([...second.searchParams.entries()], [['userId', '3'], ['campaignId', '3'], ['status', 'pending']])
+  })
+  await check('admin: tạo và sửa chiến dịch ghi đè userId bằng admin trong token', async () => {
+    const created = await call('POST', '/admin/campaigns', { user: '3', body: { name: 'Mega', userId: '99' } })
+    assert.equal(created.status, 201)
+    assert.equal(upstreamCalls('/internal/v1/admin/campaigns')[0].body.userId, '3')
+    const updated = await call('PATCH', '/admin/campaigns/3', { user: '3', body: { isActive: false, userId: '99' } })
+    assert.equal(updated.status, 200)
+    const sent = upstreamCalls('/internal/v1/admin/campaigns/3')[0]
+    assert.equal(sent.method, 'PATCH')
+    assert.deepEqual(sent.body, { isActive: false, userId: '3' })
+    upstream = { status: 400, json: { success: false, message: 'Tên chiến dịch phải từ 1 đến 150 ký tự.', error: { code: 'VALIDATION_ERROR' } } }
+    assert.equal((await call('POST', '/admin/campaigns', { user: '3', body: {} })).status, 400)
+  })
+  await check('admin: duyệt đăng ký gửi thông báo cho chủ shop và không lộ ownerId', async () => {
+    upstream = { status: 200, json: { success: true, data: { id: '8', campaignId: '3', campaignName: 'Flash Sale', shopId: '1', ownerId: '5', productId: '7', productName: 'Tai nghe', status: 'approved', note: null } } }
+    const result = await call('PATCH', '/admin/campaign-registrations/8', { user: '3', body: { status: 'approved', userId: '99' } })
+    assert.equal(result.status, 200)
+    assert.equal(result.body.data.ownerId, undefined)
+    assert.equal(result.body.data.status, 'approved')
+    for (let i = 0; i < 40 && !noticeCalls().length; i++) await new Promise((resolve) => setTimeout(resolve, 50))
+    const notice = noticeCalls()[0].body
+    assert.equal(notice.userId, '5')
+    assert.ok(notice.content.includes('Tai nghe') && notice.content.includes('Flash Sale'))
+    assert.equal(notice.link, '/nguoi-ban/quang-cao?tab=programs')
+    const sent = upstreamCalls('/internal/v1/admin/campaign-registrations/8')[0]
+    assert.deepEqual(sent.body, { userId: '3', status: 'approved' })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  })
+  await check('admin: từ chối kèm lý do trong thông báo; lỗi 409 từ Data API không gửi thông báo', async () => {
+    upstream = { status: 200, json: { success: true, data: { id: '8', campaignId: '3', campaignName: 'Flash Sale', shopId: '1', ownerId: '5', productId: '7', productName: 'Tai nghe', status: 'rejected', note: 'Giá chưa đủ sâu' } } }
+    assert.equal((await call('PATCH', '/admin/campaign-registrations/8', { user: '3', body: { status: 'rejected', note: 'Giá chưa đủ sâu' } })).status, 200)
+    for (let i = 0; i < 40 && !noticeCalls().length; i++) await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.ok(noticeCalls()[0].body.content.includes('Giá chưa đủ sâu'))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    calls.length = 0
+    upstream = { status: 409, json: { success: false, message: 'Đăng ký này đã được xử lý.', error: { code: 'REGISTRATION_ALREADY_REVIEWED' } } }
+    const again = await call('PATCH', '/admin/campaign-registrations/8', { user: '3', body: { status: 'approved' } })
+    assert.equal(again.status, 409)
+    assert.equal(again.body.error.code, 'REGISTRATION_ALREADY_REVIEWED')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    assert.equal(noticeCalls().length, 0)
+  })
   await check('khiếu nại: seller lọc yêu cầu trả hàng disputed qua Backend', async () => {
     const result = await call('GET', '/seller/returns?status=disputed', { user: '1' })
     assert.equal(result.status, 200)

@@ -15,6 +15,13 @@ import {
   createAdminVoucher,
   deleteAdminVoucher,
 } from '../controllers/admin.controller.js'
+import {
+  createAdminCampaign,
+  listAdminCampaignRegistrations,
+  listAdminCampaigns,
+  reviewAdminCampaignRegistration,
+  updateAdminCampaign,
+} from '../controllers/admin-campaigns.controller.js'
 import { listAdminPayouts, updateAdminPayoutStatus } from '../controllers/seller-payout.controller.js'
 import { listAdminReturns, resolveAdminReturnDispute } from '../controllers/returns.controller.js'
 import { authenticate, requireRole } from '../middlewares/auth.middleware.js'
@@ -61,6 +68,13 @@ router.patch('/admin/payouts/:id', updateAdminPayoutStatus)
 // Quản trị và phân xử khiếu nại trả hàng (Admin Returns & Disputes)
 router.get('/admin/returns', listAdminReturns)
 router.patch('/admin/returns/:returnId/resolve', resolveAdminReturnDispute)
+
+// Chiến dịch marketing và duyệt đăng ký tham gia của shop
+router.get('/admin/campaigns', listAdminCampaigns)
+router.post('/admin/campaigns', createAdminCampaign)
+router.patch('/admin/campaigns/:campaignId', updateAdminCampaign)
+router.get('/admin/campaign-registrations', listAdminCampaignRegistrations)
+router.patch('/admin/campaign-registrations/:registrationId', reviewAdminCampaignRegistration)
 
 // Quản lý voucher toàn sàn & hệ thống
 router.post('/admin/vouchers', createAdminVoucher)
