@@ -5,6 +5,8 @@ import { useCatalog } from '../../context/CatalogContext'
 import { useOrders } from '../../context/OrderContext'
 import { useToast } from '../../context/ToastContext'
 import { formatNumber, formatVnd } from '../../utils/format'
+import { apiGetSellerDashboard } from '../../utils/api'
+import SalesChart from '../../components/seller/SalesChart'
 import {
   IconBell,
   IconBolt,
@@ -47,6 +49,9 @@ export default function SellerDashboardPage() {
   } = useOrders()
 
   const [timeRange, setTimeRange] = useState('7d')
+  const [chartDays, setChartDays] = useState([])
+  const [chartLoading, setChartLoading] = useState(false)
+  const [chartError, setChartError] = useState('')
   const [copied, setCopied] = useState(false)
   const [quickToolModal, setQuickToolModal] = useState(null)
 
@@ -61,6 +66,29 @@ export default function SellerDashboardPage() {
       current = false
     }
   }, [user?.shopId, loadShop, loadSellerProducts, loadSellerOrders])
+
+  // Biểu đồ lấy từ API để đủ dữ liệu theo ngày (danh sách đơn trên trang chỉ tải 50 đơn đầu)
+  useEffect(() => {
+    if (!user?.shopId) return undefined
+    const controller = new AbortController()
+    setChartLoading(true)
+    setChartError('')
+    apiGetSellerDashboard({ days: timeRange === '30d' ? 30 : 7, signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || !payload?.success) throw new Error(payload?.message || 'Không thể tải dữ liệu biểu đồ.')
+        setChartDays(Array.isArray(payload.data?.chart) ? payload.data.chart : [])
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        setChartDays([])
+        setChartError(err.message || 'Không thể tải dữ liệu biểu đồ.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChartLoading(false)
+      })
+    return () => controller.abort()
+  }, [user?.shopId, timeRange])
 
   const shop = getShop(user?.shopId)
   const products = getSellerProductsByShop(user?.shopId)
@@ -80,31 +108,6 @@ export default function SellerDashboardPage() {
   const totalSold = useMemo(() => {
     return products.reduce((acc, p) => acc + (p.sold || 0), 0)
   }, [products])
-
-  // Dữ liệu 7 ngày gần đây cho biểu đồ
-  const chartDays = useMemo(() => {
-    const days = []
-    const now = new Date()
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now)
-      d.setDate(d.getDate() - i)
-      const dayStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
-      const dateKey = d.toISOString().slice(0, 10)
-
-      // Tính tổng doanh thu và số đơn của ngày này
-      const dayOrders = orders.filter((o) => o.createdAt && o.createdAt.startsWith(dateKey))
-      const dayRevenue = dayOrders
-        .filter((o) => o.status === 'delivered')
-        .reduce((sum, o) => sum + (o.totalForShop || 0), 0)
-
-      days.push({
-        label: dayStr,
-        orders: dayOrders.length,
-        revenue: dayRevenue,
-      })
-    }
-    return days
-  }, [orders])
 
   const copyShopId = () => {
     const idToCopy = shop?.id ? String(shop.id) : '12345678'
@@ -371,46 +374,9 @@ export default function SellerDashboardPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-12 items-center">
-            {/* Khung Biểu đồ SVG */}
+            {/* Biểu đồ doanh thu và số đơn */}
             <div className="md:col-span-8">
-              <div className="relative h-44 w-full">
-                {/* Các đường gióng ngang */}
-                <div className="absolute inset-0 flex flex-col justify-between text-[10px] text-[#8B7566]">
-                  <div className="border-b border-[#E6D5C2]/50 pb-0.5">200k</div>
-                  <div className="border-b border-[#E6D5C2]/50 pb-0.5">150k</div>
-                  <div className="border-b border-[#E6D5C2]/50 pb-0.5">100k</div>
-                  <div className="border-b border-[#E6D5C2]/50 pb-0.5">50k</div>
-                  <div className="border-b border-[#E6D5C2]/50 pb-0.5">0</div>
-                </div>
-
-                {/* Đường vẽ biểu đồ SVG */}
-                <svg className="absolute inset-0 h-full w-full pl-7 pt-2 pr-2 pb-5" preserveAspectRatio="none" viewBox="0 0 100 100">
-                  {/* Đường Doanh thu màu hồng */}
-                  <polyline
-                    fill="none"
-                    stroke="#A95532"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points="0,92 16.6,92 33.3,92 50,92 66.6,92 83.3,92 100,92"
-                  />
-                  {/* Điểm nút */}
-                  <circle cx="0" cy="92" r="3" fill="#A95532" />
-                  <circle cx="16.6" cy="92" r="3" fill="#A95532" />
-                  <circle cx="33.3" cy="92" r="3" fill="#A95532" />
-                  <circle cx="50" cy="92" r="3" fill="#A95532" />
-                  <circle cx="66.6" cy="92" r="3" fill="#A95532" />
-                  <circle cx="83.3" cy="92" r="3" fill="#A95532" />
-                  <circle cx="100" cy="92" r="3" fill="#A95532" />
-                </svg>
-
-                {/* Nhãn trục ngày dưới chân */}
-                <div className="absolute bottom-0 left-7 right-2 flex justify-between text-[10px] text-[#8B7566]">
-                  {chartDays.map((d, i) => (
-                    <span key={i}>{d.label}</span>
-                  ))}
-                </div>
-              </div>
+              <SalesChart days={chartDays} loading={chartLoading} error={chartError} />
             </div>
 
             {/* Cột thống kê nhanh bên phải biểu đồ */}

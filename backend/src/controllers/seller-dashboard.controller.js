@@ -15,14 +15,18 @@ function getShopId(req, res) {
 
 /**
  * Controller trả về dữ liệu thống kê tổng quan Kênh Người Bán
- * Endpoint: GET /api/v1/seller/dashboard
+ * Endpoint: GET /api/v1/seller/dashboard?days=7|30
  */
 export async function getSellerDashboard(req, res, next) {
   try {
     const shopId = getShopId(req, res)
     if (!shopId) return
 
-    const data = await callDataApi(`/internal/v1/seller/dashboard?shopId=${encodeURIComponent(shopId)}`)
+    // Data API kiểm tra days (7 hoặc 30)
+    const params = new URLSearchParams({ shopId })
+    if (req.query.days !== undefined && req.query.days !== '') params.set('days', String(req.query.days))
+
+    const data = await callDataApi(`/internal/v1/seller/dashboard?${params}`)
     return res.status(200).json({ success: true, data })
   } catch (err) {
     return next(err)

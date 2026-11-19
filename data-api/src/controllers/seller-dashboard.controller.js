@@ -13,6 +13,13 @@ export async function getSellerDashboard(req, res, next) {
     const { shopId } = req.query
     if (!validId(shopId)) return invalid(res, 'Mã gian hàng không hợp lệ.')
 
+    // Số ngày của biểu đồ: 7 (mặc định) hoặc 30
+    const { days: daysQuery } = req.query
+    if (daysQuery !== undefined && daysQuery !== '7' && daysQuery !== '30') {
+      return invalid(res, 'Khoảng thời gian biểu đồ chỉ nhận 7 hoặc 30 ngày.')
+    }
+    const chartDays = daysQuery === '30' ? 30 : 7
+
     // 1. Kiểm tra gian hàng có tồn tại không
     const shops = await executeQuery('SELECT id, name FROM shops WHERE id = ? LIMIT 1', [shopId])
     if (!shops.length) {
@@ -96,13 +103,13 @@ export async function getSellerDashboard(req, res, next) {
     const lowStockCount = Number(stockRows[0]?.low_stock_count || 0)
     const outOfStockCount = Number(stockRows[0]?.out_of_stock_count || 0)
 
-    // 6. Dữ liệu biểu đồ 7 ngày gần nhất (doanh thu và số đơn)
+    // 6. Dữ liệu biểu đồ 7 hoặc 30 ngày gần nhất (doanh thu và số đơn), tính theo ngày UTC
     const chartRows = await executeQuery(
       `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS order_date,
               COUNT(*) AS orders,
               COALESCE(SUM(CASE WHEN status IN ('delivered', 'completed') THEN total_amount ELSE 0 END), 0) AS revenue
        FROM shop_orders
-       WHERE shop_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+       WHERE shop_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL ${chartDays - 1} DAY)
        GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')`,
       [shopId],
     )
@@ -115,13 +122,12 @@ export async function getSellerDashboard(req, res, next) {
       })
     }
 
+    // Ngày và nhãn lấy từ cùng một chuỗi UTC để khớp với cách gom nhóm trong SQL
     const chart = []
-    const now = new Date()
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now)
-      d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().slice(0, 10)
-      const dayStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+    const now = Date.now()
+    for (let i = chartDays - 1; i >= 0; i--) {
+      const dateStr = new Date(now - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const dayStr = `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`
       const entry = chartMap.get(dateStr) || { orders: 0, revenue: 0 }
       chart.push({
         date: dateStr,

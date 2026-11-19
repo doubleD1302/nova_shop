@@ -394,6 +394,11 @@ export function apiGetSellerOrders(options = {}) {
   return apiRequest(`/seller/orders?${params}`, { signal })
 }
 
+/** Tổng quan Kênh Người Bán; days (7 hoặc 30) là số ngày của biểu đồ doanh thu. */
+export function apiGetSellerDashboard({ days = 7, signal } = {}) {
+  return apiRequest(`/seller/dashboard?days=${days === 30 ? 30 : 7}`, { signal })
+}
+
 export function apiUpdateSellerOrderStatus(shopOrderId, status) {
   return apiRequest(`/seller/orders/${encodeURIComponent(shopOrderId)}/status`, {
     method: 'PATCH',

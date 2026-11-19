@@ -20,6 +20,7 @@ const db = {
   shopOwned: true,
   boostRows: [],
   regRows: [],
+  chartRows: [],
   totalRows: [{ distinct_orders: 0, distinct_units: 0, distinct_revenue: 0 }],
   spendRows: [{ total_boosts: 0, total_spend: 0, active_boosts: 0 }],
 }
@@ -30,6 +31,9 @@ const conn = {
     log.push({ sql, values })
     let rows = []
     if (sql.startsWith('START') || sql.startsWith('COMMIT') || sql.startsWith('ROLLBACK')) rows = []
+    // Dashboard: tên shop và số liệu biểu đồ theo ngày
+    else if (sql.includes('SELECT id, name FROM shops')) rows = [{ id: 1, name: 'Shop' }]
+    else if (sql.includes("DATE_FORMAT(created_at, '%Y-%m-%d') AS order_date")) rows = db.chartRows
     // Lịch sử giao dịch
     else if (sql.includes('SELECT id FROM shops WHERE id = ? LIMIT 1')) rows = db.shopExists ? [{ id: 1 }] : []
     else if (sql.includes('COUNT(*) AS total FROM shop_orders so')) rows = [{ total: db.income.length }]
@@ -326,6 +330,28 @@ try {
     assert.equal(result.status, 409)
     assert.equal(result.body.error.code, 'REVIEW_ALREADY_REPLIED')
     assert.equal(ran('UPDATE reviews SET seller_reply'), 0)
+  })
+
+  console.log('--- Dashboard: biểu đồ doanh thu theo ngày ---')
+  await check('biểu đồ mặc định 7 ngày, đủ từng ngày kể cả ngày không có đơn', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    db.chartRows = [{ order_date: today, orders: 3, revenue: '900000' }]
+    const { chart } = (await call('/seller/dashboard?shopId=1')).body.data
+    assert.equal(chart.length, 7)
+    assert.equal(chart[6].date, today)
+    assert.equal(chart[6].revenue, 900000)
+    assert.equal(chart[6].orders, 3)
+    assert.deepEqual(chart[0], { date: chart[0].date, label: `${chart[0].date.slice(8, 10)}/${chart[0].date.slice(5, 7)}`, orders: 0, revenue: 0 })
+  })
+  await check('days=30 trả 30 ngày và truy vấn lùi 29 ngày', async () => {
+    log.length = 0
+    const { chart } = (await call('/seller/dashboard?shopId=1&days=30')).body.data
+    assert.equal(chart.length, 30)
+    assert.ok(log.some((entry) => entry.sql.includes('INTERVAL 29 DAY')))
+  })
+  await check('days khác 7 hoặc 30 bị từ chối (HTTP 400)', async () => {
+    for (const days of ['14', '0', 'abc', '30;DROP']) assert.equal((await call(`/seller/dashboard?shopId=1&days=${days}`)).status, 400, days)
+    db.chartRows = []
   })
 
   console.log('--- Chăm sóc khách hàng: khiếu nại trả hàng ---')
