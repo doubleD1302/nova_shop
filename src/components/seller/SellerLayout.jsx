@@ -101,7 +101,7 @@ const MENU_GROUPS = [
   },
   {
     id: 'customer_care',
-    label: 'Chăm sóc khách hàng',
+    label: 'CSKH',
     icon: IconChat,
     items: [
       { action: 'chat', label: 'Tin nhắn' },
