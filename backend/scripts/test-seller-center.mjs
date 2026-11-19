@@ -193,6 +193,25 @@ try {
     assert.equal(url.searchParams.get('status'), 'disputed')
     assert.equal(url.searchParams.get('userId'), '1')
   })
+  await check('cài đặt vận chuyển: chuyển PATCH sang Data API với userId từ token, không tin body', async () => {
+    upstream = { status: 200, json: { success: true, data: { pickupAddress: '1 A', province: 'Ha Noi', shippingMethods: ['nhanh'] } } }
+    const result = await call('PATCH', '/seller/shop/shipping', { user: '1', body: { shippingMethods: ['nhanh'], userId: '3' } })
+    assert.equal(result.status, 200)
+    assert.deepEqual(result.body.data.shippingMethods, ['nhanh'])
+    const sent = upstreamCalls('/internal/v1/users/1/seller-shop/shipping')[0]
+    assert.equal(sent.method, 'PATCH')
+    assert.deepEqual(sent.body.shippingMethods, ['nhanh'])
+    assert.equal(upstreamCalls('/internal/v1/users/3/').length, 0)
+  })
+  await check('cài đặt vận chuyển: người mua bị 403, chưa đăng nhập bị 401, lỗi Data API đến được người dùng', async () => {
+    assert.equal((await call('PATCH', '/seller/shop/shipping', { user: '2', body: { shippingMethods: ['nhanh'] } })).status, 403)
+    assert.equal((await call('PATCH', '/seller/shop/shipping', { body: { shippingMethods: ['nhanh'] } })).status, 401)
+    assert.equal(upstreamCalls('/internal/v1/users/2/seller-shop/shipping').length, 0)
+    upstream = { status: 409, json: { success: false, message: 'Gian hàng chưa được duyệt.', error: { code: 'SHOP_PROFILE_PENDING' } } }
+    const result = await call('PATCH', '/seller/shop/shipping', { user: '1', body: { shippingMethods: ['nhanh'] } })
+    assert.equal(result.status, 409)
+    assert.equal(result.body.error.code, 'SHOP_PROFILE_PENDING')
+  })
 
   console.log(`\nSeller center Backend: ${passed} kiểm tra PASS (Data API giả lập).`)
 } catch (error) {

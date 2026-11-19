@@ -15,7 +15,7 @@ import {
   getUserStats,
 } from '../controllers/auth.controller.js'
 import { getSellerShop, resubmitSellerShop, updateSellerShop } from '../controllers/shops.controller.js'
-import { getSellerRegistration, updateSellerRegistration } from '../controllers/seller-registration.controller.js'
+import { getSellerRegistration, updateSellerRegistration, updateSellerShipping } from '../controllers/seller-registration.controller.js'
 
 const router = Router()
 
@@ -41,6 +41,7 @@ router.get('/users/:userId/seller-shop', getSellerShop)
 router.post('/users/:userId/seller-shop/resubmit', resubmitSellerShop)
 router.get('/users/:userId/seller-shop/registration', getSellerRegistration)
 router.put('/users/:userId/seller-shop/registration', updateSellerRegistration)
+router.patch('/users/:userId/seller-shop/shipping', updateSellerShipping)
 router.put('/users/:userId/seller-shop', (req, res, next) => {
   req.body = { ...(req.body || {}), userId: req.params.userId }
   return updateSellerShop(req, res, next)

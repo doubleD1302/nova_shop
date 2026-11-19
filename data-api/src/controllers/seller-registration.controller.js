@@ -1,4 +1,4 @@
-import { prepareSellerProfile, encryptIdentity, decryptIdentity, saveSellerProfile } from '../utils/seller-profile.js'
+import { prepareSellerProfile, prepareShippingSettings, encryptIdentity, decryptIdentity, saveSellerProfile } from '../utils/seller-profile.js'
 import { executeQuery, executeTransaction } from '../config/database.js'
 
 export async function getSellerRegistration(req, res, next) {
@@ -56,6 +56,50 @@ export async function updateSellerRegistration(req, res, next) {
     if (result === 'missing') return res.status(404).json({ success: false, message: 'Không tìm thấy gian hàng.', error: { code: 'SHOP_NOT_FOUND' } })
     if (result === 'locked') return res.status(409).json({ success: false, message: 'Chỉ có thể sửa hồ sơ đang chờ duyệt hoặc bị từ chối.', error: { code: 'SHOP_PROFILE_LOCKED' } })
     return res.json({ success: true, data: {} })
+  } catch (err) { return next(err) }
+}
+
+// Shop đang hoạt động đổi phương thức vận chuyển hoặc địa chỉ lấy hàng, không phải duyệt lại.
+// Đơn đã tạo giữ nguyên thông tin đã lưu; checkout mới dùng cài đặt này.
+export async function updateSellerShipping(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const userId = String(req.params.userId || '')
+    const settings = prepareShippingSettings(req.body)
+    if (!/^[1-9]\d{0,19}$/.test(userId) || !settings) {
+      return res.status(400).json({ success: false, message: 'Cài đặt vận chuyển không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+    const result = await executeTransaction(async (query) => {
+      const shops = await query('SELECT id, status FROM shops WHERE owner_id = ? FOR UPDATE', [userId])
+      if (!shops.length) return { error: 'SHOP_NOT_FOUND' }
+      if (shops[0].status !== 'active') return { error: ['pending', 'rejected'].includes(shops[0].status) ? 'SHOP_PROFILE_PENDING' : 'SHOP_NOT_ACTIVE' }
+      const shopId = shops[0].id
+      const rows = await query('SELECT pickup_address, province, shipping_methods FROM seller_registration_profiles WHERE shop_id = ? FOR UPDATE', [shopId])
+      if (!rows.length) return { error: 'SELLER_PROFILE_NOT_FOUND' }
+      const current = rows[0]
+      const next = {
+        pickupAddress: settings.pickupAddress ?? current.pickup_address,
+        province: settings.province ?? current.province,
+        shippingMethods: settings.shippingMethods ?? (typeof current.shipping_methods === 'string' ? JSON.parse(current.shipping_methods) : current.shipping_methods),
+      }
+      await query('UPDATE seller_registration_profiles SET pickup_address = ?, province = ?, shipping_methods = ? WHERE shop_id = ?',
+        [next.pickupAddress, next.province, JSON.stringify(next.shippingMethods), shopId])
+      if (settings.pickupAddress !== undefined || settings.province !== undefined) {
+        await query('UPDATE shops SET province = ?, address_detail = ? WHERE id = ?', [next.province, next.pickupAddress, shopId])
+      }
+      return { data: next }
+    })
+    if (result.error) {
+      const messages = {
+        SHOP_NOT_FOUND: ['Không tìm thấy gian hàng.', 404],
+        SELLER_PROFILE_NOT_FOUND: ['Gian hàng chưa có hồ sơ người bán.', 404],
+        SHOP_PROFILE_PENDING: ['Gian hàng chưa được duyệt; hãy sửa trong hồ sơ đăng ký.', 409],
+        SHOP_NOT_ACTIVE: ['Gian hàng đang không hoạt động.', 409],
+      }
+      const [message, status] = messages[result.error]
+      return res.status(status).json({ success: false, message, error: { code: result.error } })
+    }
+    return res.json({ success: true, data: result.data })
   } catch (err) { return next(err) }
 }
 

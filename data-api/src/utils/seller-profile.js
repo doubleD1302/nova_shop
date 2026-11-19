@@ -25,6 +25,28 @@ export function prepareSellerProfile(input) {
   return result
 }
 
+// Cài đặt vận chuyển sau khi shop đã được duyệt: chỉ nhận ba trường, trường nào có thì phải hợp lệ.
+export function prepareShippingSettings(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null
+  const allowed = ['shippingMethods', 'pickupAddress', 'province']
+  const keys = Object.keys(input)
+  if (!keys.length || keys.some((key) => !allowed.includes(key))) return null
+  const result = {}
+  for (const [key, max] of [['pickupAddress', 255], ['province', 120]]) {
+    if (input[key] === undefined) continue
+    if (typeof input[key] !== 'string') return null
+    result[key] = input[key].trim()
+    if (!result[key] || result[key].length > max) return null
+  }
+  if (input.shippingMethods !== undefined) {
+    const methods = input.shippingMethods
+    if (!Array.isArray(methods) || !methods.length || methods.some((method) => !['nhanh', 'tietkiem', 'hoatoc'].includes(method)) ||
+      new Set(methods).size !== methods.length) return null
+    result.shippingMethods = methods
+  }
+  return result
+}
+
 export function encryptIdentity(idCard) {
   if (!env.sellerIdentityKey) return null
   const iv = crypto.randomBytes(12)

@@ -2,7 +2,7 @@ import { getDemoPayout, setupDemoPayout, createDemoWithdrawal } from '../control
 import { Router } from 'express'
 import { listSellerOrders, updateSellerOrderStatus } from '../controllers/orders.controller.js'
 import { archiveSellerProduct, listSellerProducts, saveSellerProduct, getSellerCategoryAttributes } from '../controllers/products.controller.js'
-import { getSellerRegistration, getSellerShop, resubmitSellerShop, updateSellerRegistration, updateSellerShop } from '../controllers/shops.controller.js'
+import { getSellerRegistration, getSellerShop, resubmitSellerShop, updateSellerRegistration, updateSellerShipping, updateSellerShop } from '../controllers/shops.controller.js'
 import { searchProductImages } from '../controllers/image-search.controller.js'
 import {
   listSellerVouchers,
@@ -67,6 +67,7 @@ router.put('/shop', updateSellerShop)
 router.post('/shop/resubmit', resubmitSellerShop)
 router.get('/shop/registration', getSellerRegistration)
 router.put('/shop/registration', updateSellerRegistration)
+router.patch('/shop/shipping', updateSellerShipping)
 router.get('/images/search', searchProductImages)
 router.get('/products', listSellerProducts)
 router.get('/products/:productId/category-attributes', getSellerCategoryAttributes)

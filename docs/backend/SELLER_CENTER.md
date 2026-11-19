@@ -16,7 +16,7 @@ Tài liệu mô tả API Backend cho ba nhóm menu của Kênh Người Bán. T�
 | Chăm sóc khách hàng | Đánh giá sản phẩm | `GET /api/v1/seller/reviews`, `POST /api/v1/seller/reviews/:reviewId/reply` | **implemented** |
 | Chăm sóc khách hàng | Hỗ trợ và khiếu nại | `GET /api/v1/seller/returns?status=...`, `PATCH .../returns/:returnId/status` | implemented; **lọc được `disputed`** |
 
-Web đã nối giao diện cho các mục menu trên: Tài chính (`/nguoi-ban/tai-chinh`), Quảng cáo (`/nguoi-ban/quang-cao`), CSKH (`/nguoi-ban/cskh`) và Dữ liệu (`/nguoi-ban/du-lieu`); mỗi trang chia tab bằng `?tab=`. Mục "Dữ liệu" dùng `GET /seller/dashboard` và `GET /seller/reports/inventory`. Các mục Khuyến mãi (Chương trình khuyến mãi, Flash Sale) và Shop của tôi (cài đặt vận chuyển, địa chỉ lấy hàng) vẫn hiện hộp thoại "đang hoàn thiện". App Flutter chưa thuộc phạm vi này.
+Web đã nối giao diện cho các mục menu trên: Tài chính (`/nguoi-ban/tai-chinh`), Quảng cáo (`/nguoi-ban/quang-cao`), CSKH (`/nguoi-ban/cskh`) và Dữ liệu (`/nguoi-ban/du-lieu`); mỗi trang chia tab bằng `?tab=`. Mục "Dữ liệu" dùng `GET /seller/dashboard` và `GET /seller/reports/inventory`. Các mục Khuyến mãi (Chương trình khuyến mãi, Flash Sale) và Shop của tôi (cài đặt vận chuyển, địa chỉ lấy hàng) vẫn hiện hộp thoại "đang hoàn thiện" trên web. Backend đã có API cài đặt vận chuyển/địa chỉ lấy hàng (xem phần dưới); web chưa nối. App Flutter chưa thuộc phạm vi này.
 
 Phản hồi thành công có dạng `{ "success": true, "data": ... }`. Lỗi có dạng `{ "success": false, "message": "...", "error": { "code": "..." } }`.
 
@@ -65,6 +65,29 @@ Doanh thu/đơn là của sản phẩm trong thời gian gói chạy (bỏ đơn
 | 403 `FORBIDDEN` | Tài khoản không phải chủ gian hàng |
 | 404 `REVIEW_NOT_FOUND` | Không có, đã bị ẩn hoặc thuộc shop khác (không phân biệt để không lộ dữ liệu) |
 | 409 `REVIEW_ALREADY_REPLIED` | Mỗi đánh giá chỉ trả lời một lần; chưa có API sửa/xóa phản hồi |
+
+## Cài đặt vận chuyển và địa chỉ lấy hàng
+
+Đọc cài đặt hiện tại bằng `GET /api/v1/seller/shop/registration` (`data.profile.shippingMethods`, `pickupAddress`, `province`).
+
+`PATCH /api/v1/seller/shop/shipping` sửa nhanh cho gian hàng **đang hoạt động**, không phải duyệt lại và không đổi `approvalVersion`. Body chứa ít nhất một trong ba trường, trường lạ bị từ chối:
+
+| Trường | Quy tắc |
+|---|---|
+| `shippingMethods` | Mảng không rỗng, không trùng, mỗi phần tử là `nhanh`, `tietkiem` hoặc `hoatoc` |
+| `pickupAddress` | Chuỗi 1–255 ký tự sau khi cắt khoảng trắng |
+| `province` | Chuỗi 1–120 ký tự sau khi cắt khoảng trắng |
+
+Phản hồi 200: `data` là cài đặt sau khi lưu (`pickupAddress`, `province`, `shippingMethods`). Đổi `pickupAddress` hoặc `province` cũng cập nhật địa chỉ hiển thị của shop (`shops.address_detail`, `shops.province`). Gian hàng được xác định từ token. Checkout tạo sau đó dùng cài đặt mới; đơn đã tạo giữ nguyên.
+
+| Mã | Trường hợp |
+|---|---|
+| 400 `VALIDATION_ERROR` | Body rỗng, trường lạ, sai kiểu, trùng hoặc quá dài |
+| 404 `SHOP_NOT_FOUND`, `SELLER_PROFILE_NOT_FOUND` | Chưa có gian hàng hoặc chưa có hồ sơ người bán |
+| 409 `SHOP_PROFILE_PENDING` | Shop đang chờ duyệt hoặc bị từ chối; sửa qua `PUT /seller/shop/registration` rồi gửi lại |
+| 409 `SHOP_NOT_ACTIVE` | Shop bị tạm khóa hoặc đã đóng |
+
+Kiểm thử: `data-api/scripts/test-shop-shipping.mjs` (SQLite tạm) và `backend/scripts/test-seller-center.mjs` (Data API giả lập); chưa chạy trên MySQL/TiDB thật.
 
 ## Thay đổi với API có sẵn
 

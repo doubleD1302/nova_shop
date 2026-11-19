@@ -81,6 +81,16 @@ export async function updateSellerRegistration(req, res, next) {
   } catch (err) { return next(err) }
 }
 
+export async function updateSellerShipping(req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  try {
+    const data = await callDataApi(`/internal/v1/users/${encodeURIComponent(req.user.id)}/seller-shop/shipping`, {
+      method: 'PATCH', body: req.body,
+    })
+    return res.json({ success: true, data })
+  } catch (err) { return next(err) }
+}
+
 export async function getCategoryAttributes(req, res, next) {
   try {
     const slug = req.params.categorySlug
