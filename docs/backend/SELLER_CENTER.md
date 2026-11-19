@@ -81,4 +81,5 @@ Doanh thu/đơn là của sản phẩm trong thời gian gói chạy (bỏ đơn
 ## Kiểm tra
 
 - `npm --prefix data-api run test:seller-center` (22 kiểm tra) và `npm --prefix backend run test:seller-center` (13 kiểm tra) dùng database/Data API giả lập: kiểm tra validation, phân quyền, hình dạng dữ liệu và việc bỏ qua `shopId` từ client.
-- Chưa chạy các truy vấn SQL mới trên MySQL/TiDB thật; tên bảng và cột đã đối chiếu với `database/schema.sql`. Cần chạy trên MySQL 8 trước khi coi là đã kiểm chứng đầu cuối.
+- Ngày 19/11/2026, các truy vấn đọc (giao dịch, hiệu quả quảng cáo, đánh giá, trả hàng `disputed`) đã chạy trên database dev TiDB, không lỗi SQL. Với một shop có 31 đơn đã giao/hoàn tất, số dư khả dụng tính từ lịch sử giao dịch khớp đúng với `payout/balance`. Các câu lệnh ghi và khóa (`FOR UPDATE`, `INSERT product_boosts`, `UPDATE reviews`) chỉ được kiểm tra bằng `EXPLAIN`, chưa thực thi. Database dev chưa có hoàn tiền, rút tiền, gói đẩy hay đánh giá nên các nhánh đó chưa được thử với dữ liệu thật.
+- Đây là TiDB, chưa phải MySQL 8, và chưa có test hai request song song (trả lời cùng một đánh giá, mua gói đẩy cùng sản phẩm). Cần thử trên MySQL 8 trước khi coi là kiểm chứng đầu cuối.
