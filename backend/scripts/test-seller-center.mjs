@@ -186,6 +186,42 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 200))
     assert.equal(noticeCalls().length, 0)
   })
+  await check('sửa phản hồi: gửi PATCH với shop/người dùng từ token, không gửi thông báo', async () => {
+    upstream = null
+    const result = await call('PATCH', '/seller/reviews/5/reply', { user: '1', body: { reply: '  Nội dung mới  ', shopId: '99', userId: '3' } })
+    assert.equal(result.status, 200)
+    const sent = upstreamCalls('/internal/v1/seller/reviews/5/reply')[0]
+    assert.equal(sent.method, 'PATCH')
+    assert.deepEqual(sent.body, { shopId: '10', userId: '1', reply: 'Nội dung mới' })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    assert.equal(noticeCalls().length, 0)
+  })
+  await check('sửa phản hồi: nội dung rỗng/quá dài 400, người mua 403, chưa phản hồi 409 từ Data API', async () => {
+    for (const reply of ['   ', 'a'.repeat(1001), 5]) {
+      assert.equal((await call('PATCH', '/seller/reviews/5/reply', { user: '1', body: { reply } })).status, 400)
+    }
+    assert.equal((await call('PATCH', '/seller/reviews/5/reply', { user: '2', body: { reply: 'x' } })).status, 403)
+    assert.equal((await call('PATCH', '/seller/reviews/5/reply', { body: { reply: 'x' } })).status, 401)
+    assert.equal(upstreamCalls('/internal/v1/seller/reviews/5/reply').length, 0)
+    upstream = { status: 409, json: { success: false, message: 'Đánh giá này chưa có phản hồi.', error: { code: 'REVIEW_NOT_REPLIED' } } }
+    const result = await call('PATCH', '/seller/reviews/5/reply', { user: '1', body: { reply: 'x' } })
+    assert.equal(result.status, 409)
+    assert.equal(result.body.error.code, 'REVIEW_NOT_REPLIED')
+  })
+  await check('xóa phản hồi: gửi DELETE với shop/người dùng từ token; người mua 403; lỗi Data API đến được người dùng', async () => {
+    upstream = null
+    const result = await call('DELETE', '/seller/reviews/5/reply', { user: '1' })
+    assert.equal(result.status, 200)
+    const sent = upstreamCalls('/internal/v1/seller/reviews/5/reply')[0]
+    assert.equal(sent.method, 'DELETE')
+    const url = new URL(sent.url, 'http://x')
+    assert.equal(url.searchParams.get('shopId'), '10')
+    assert.equal(url.searchParams.get('userId'), '1')
+    assert.equal((await call('DELETE', '/seller/reviews/5/reply', { user: '2' })).status, 403)
+    assert.equal((await call('DELETE', '/seller/reviews/5/reply')).status, 401)
+    upstream = { status: 404, json: { success: false, message: 'Không tìm thấy đánh giá.', error: { code: 'REVIEW_NOT_FOUND' } } }
+    assert.equal((await call('DELETE', '/seller/reviews/5/reply', { user: '1' })).status, 404)
+  })
   await check('khiếu nại: seller lọc yêu cầu trả hàng disputed qua Backend', async () => {
     const result = await call('GET', '/seller/returns?status=disputed', { user: '1' })
     assert.equal(result.status, 200)

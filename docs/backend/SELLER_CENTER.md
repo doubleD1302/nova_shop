@@ -64,7 +64,13 @@ Doanh thu/đơn là của sản phẩm trong thời gian gói chạy (bỏ đơn
 | 400 `VALIDATION_ERROR` | Nội dung rỗng/quá dài hoặc mã đánh giá sai |
 | 403 `FORBIDDEN` | Tài khoản không phải chủ gian hàng |
 | 404 `REVIEW_NOT_FOUND` | Không có, đã bị ẩn hoặc thuộc shop khác (không phân biệt để không lộ dữ liệu) |
-| 409 `REVIEW_ALREADY_REPLIED` | Mỗi đánh giá chỉ trả lời một lần; chưa có API sửa/xóa phản hồi |
+| 409 `REVIEW_ALREADY_REPLIED` | Mỗi đánh giá chỉ trả lời một lần; muốn đổi thì sửa hoặc xóa phản hồi (bên dưới) |
+
+`PATCH /api/v1/seller/reviews/:reviewId/reply` với `{ "reply": "..." }` (cùng quy tắc 1–1000 ký tự) sửa phản hồi đã gửi, trả 200 với `sellerReply` mới và `repliedAt` là thời điểm lưu gần nhất (chưa có cột riêng lưu thời điểm gửi lần đầu). Không gửi lại thông báo cho người mua.
+
+`DELETE /api/v1/seller/reviews/:reviewId/reply` xóa phản hồi, đánh giá quay về chưa phản hồi (`sellerReply` và `repliedAt` là `null`) và có thể trả lời lại bằng `POST`. Không có thông báo.
+
+Hai endpoint này dùng chung các mã lỗi 400, 403, 404 ở trên; thêm 409 `REVIEW_NOT_REPLIED` khi đánh giá chưa có phản hồi. Gian hàng và người thao tác lấy từ token.
 
 ## Cài đặt vận chuyển và địa chỉ lấy hàng
 

@@ -75,9 +75,9 @@ sequelize.connectionManager.releaseConnection = async () => {}
 const server = http.createServer(app)
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
 const base = `http://127.0.0.1:${server.address().port}/internal/v1`
-async function call(path, body) {
+async function call(path, body, method = body ? 'POST' : 'GET') {
   const response = await fetch(base + path, {
-    method: body ? 'POST' : 'GET',
+    method,
     headers: { 'x-service-key': process.env.DATA_API_KEY, 'content-type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
@@ -329,6 +329,61 @@ try {
     db.review = saved
     assert.equal(result.status, 409)
     assert.equal(result.body.error.code, 'REVIEW_ALREADY_REPLIED')
+    assert.equal(ran('UPDATE reviews SET seller_reply'), 0)
+  })
+
+  console.log('--- Đánh giá: sửa và xóa phản hồi ---')
+  const withReply = () => ({ ...db.review, seller_reply: 'Phản hồi cũ' })
+  await check('sửa phản hồi: lưu nội dung mới, không trả buyerId', async () => {
+    const saved = db.review
+    db.review = withReply()
+    log.length = 0
+    const result = await call('/seller/reviews/5/reply', reply, 'PATCH')
+    db.review = saved
+    assert.equal(result.status, 200)
+    assert.equal(result.body.data.sellerReply, reply.reply)
+    assert.equal(result.body.data.buyerId, undefined)
+    assert.equal(ran('UPDATE reviews SET seller_reply = ?, replied_by = ?'), 1)
+  })
+  await check('sửa phản hồi: từ chối nội dung sai (400), chưa có phản hồi (409), không phải chủ shop (403), đánh giá lạ (404)', async () => {
+    const saved = db.review
+    db.review = withReply()
+    for (const body of [{ ...reply, reply: '   ' }, { ...reply, reply: 'a'.repeat(1001) }, { ...reply, reply: 123 }, { ...reply, userId: 'x' }]) {
+      assert.equal((await call('/seller/reviews/5/reply', body, 'PATCH')).status, 400)
+    }
+    db.shopOwned = false
+    assert.equal((await call('/seller/reviews/5/reply', reply, 'PATCH')).status, 403)
+    db.shopOwned = true
+    db.review = { ...withReply(), status: 'hidden' }
+    assert.equal((await call('/seller/reviews/5/reply', reply, 'PATCH')).status, 404)
+    db.review = saved // chưa có phản hồi
+    log.length = 0
+    const none = await call('/seller/reviews/5/reply', reply, 'PATCH')
+    assert.equal(none.status, 409)
+    assert.equal(none.body.error.code, 'REVIEW_NOT_REPLIED')
+    assert.equal(ran('UPDATE reviews SET seller_reply'), 0)
+  })
+  await check('xóa phản hồi: đưa về chưa phản hồi, cần shopId/userId ở query', async () => {
+    const saved = db.review
+    db.review = withReply()
+    log.length = 0
+    const result = await call('/seller/reviews/5/reply?shopId=1&userId=2', undefined, 'DELETE')
+    assert.equal(result.status, 200)
+    assert.equal(result.body.data.sellerReply, null)
+    assert.equal(result.body.data.repliedAt, null)
+    assert.equal(ran('UPDATE reviews SET seller_reply = NULL, replied_by = NULL, replied_at = NULL'), 1)
+    for (const query of ['', '?shopId=1', '?shopId=x&userId=2', '?shopId=1&userId=']) {
+      assert.equal((await call(`/seller/reviews/5/reply${query}`, undefined, 'DELETE')).status, 400, query)
+    }
+    assert.equal((await call('/seller/reviews/abc/reply?shopId=1&userId=2', undefined, 'DELETE')).status, 400)
+    db.shopOwned = false
+    assert.equal((await call('/seller/reviews/5/reply?shopId=1&userId=2', undefined, 'DELETE')).status, 403)
+    db.shopOwned = true
+    db.review = saved // chưa có phản hồi
+    log.length = 0
+    const none = await call('/seller/reviews/5/reply?shopId=1&userId=2', undefined, 'DELETE')
+    assert.equal(none.status, 409)
+    assert.equal(none.body.error.code, 'REVIEW_NOT_REPLIED')
     assert.equal(ran('UPDATE reviews SET seller_reply'), 0)
   })
 

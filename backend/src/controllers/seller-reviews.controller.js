@@ -16,6 +16,21 @@ function getShopId(req, res) {
   return String(shopId)
 }
 
+// Đọc nội dung phản hồi; trả null và gửi lỗi 400 nếu rỗng hoặc quá dài
+function readReply(req, res) {
+  const { reply } = req.body || {}
+  const text = typeof reply === 'string' ? reply.trim() : ''
+  if (!text || text.length > MAX_REPLY_LENGTH) {
+    res.status(400).json({
+      success: false,
+      message: `Nội dung phản hồi phải từ 1 đến ${MAX_REPLY_LENGTH} ký tự.`,
+      error: { code: 'VALIDATION_ERROR' },
+    })
+    return null
+  }
+  return text
+}
+
 /**
  * Seller xem đánh giá sản phẩm của shop
  * Endpoint: GET /api/v1/seller/reviews?rating=&replied=&productId=&limit=&offset=
@@ -49,15 +64,8 @@ export async function replySellerReview(req, res, next) {
     const shopId = getShopId(req, res)
     if (!shopId) return
 
-    const { reply } = req.body || {}
-    const text = typeof reply === 'string' ? reply.trim() : ''
-    if (!text || text.length > MAX_REPLY_LENGTH) {
-      return res.status(400).json({
-        success: false,
-        message: `Nội dung phản hồi phải từ 1 đến ${MAX_REPLY_LENGTH} ký tự.`,
-        error: { code: 'VALIDATION_ERROR' },
-      })
-    }
+    const text = readReply(req, res)
+    if (!text) return
 
     const data = await callDataApi(`/internal/v1/seller/reviews/${encodeURIComponent(req.params.reviewId)}/reply`, {
       method: 'POST',
@@ -83,6 +91,46 @@ export async function replySellerReview(req, res, next) {
       repliedAt: data.repliedAt,
     }
     return res.status(201).json({ success: true, message: 'Đã gửi phản hồi đánh giá.', data: result })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Seller sửa phản hồi đã gửi (không gửi lại thông báo cho người mua)
+ * Endpoint: PATCH /api/v1/seller/reviews/:reviewId/reply
+ */
+export async function updateSellerReviewReply(req, res, next) {
+  try {
+    const shopId = getShopId(req, res)
+    if (!shopId) return
+    const text = readReply(req, res)
+    if (!text) return
+
+    const data = await callDataApi(`/internal/v1/seller/reviews/${encodeURIComponent(req.params.reviewId)}/reply`, {
+      method: 'PATCH',
+      body: { shopId, userId: String(req.user.id), reply: text },
+    })
+    return res.status(200).json({ success: true, message: 'Đã cập nhật phản hồi đánh giá.', data })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Seller xóa phản hồi đã gửi; đánh giá quay về trạng thái chưa phản hồi
+ * Endpoint: DELETE /api/v1/seller/reviews/:reviewId/reply
+ */
+export async function deleteSellerReviewReply(req, res, next) {
+  try {
+    const shopId = getShopId(req, res)
+    if (!shopId) return
+
+    const params = new URLSearchParams({ shopId, userId: String(req.user.id) })
+    const data = await callDataApi(`/internal/v1/seller/reviews/${encodeURIComponent(req.params.reviewId)}/reply?${params}`, {
+      method: 'DELETE',
+    })
+    return res.status(200).json({ success: true, message: 'Đã xóa phản hồi đánh giá.', data })
   } catch (err) {
     return next(err)
   }

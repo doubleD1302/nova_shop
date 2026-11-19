@@ -27,7 +27,7 @@ import {
 import { createSellerShop } from '../controllers/auth.controller.js'
 import { getSellerDashboard } from '../controllers/seller-dashboard.controller.js'
 import { listSellerTransactions } from '../controllers/seller-finance.controller.js'
-import { listSellerReviews, replySellerReview } from '../controllers/seller-reviews.controller.js'
+import { deleteSellerReviewReply, listSellerReviews, replySellerReview, updateSellerReviewReply } from '../controllers/seller-reviews.controller.js'
 import {
   getSellerBankAccount,
   saveSellerBankAccount,
@@ -58,6 +58,8 @@ router.get('/finance/transactions', listSellerTransactions)
 // Đánh giá sản phẩm: xem và phản hồi
 router.get('/reviews', listSellerReviews)
 router.post('/reviews/:reviewId/reply', replySellerReview)
+router.patch('/reviews/:reviewId/reply', updateSellerReviewReply)
+router.delete('/reviews/:reviewId/reply', deleteSellerReviewReply)
 
 router.get('/demo-payout', getDemoPayout)
 router.post('/demo-payout/setup', setupDemoPayout)

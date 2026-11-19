@@ -117,36 +117,58 @@ export async function listSellerReviews(req, res, next) {
   }
 }
 
+// Lấy đánh giá của shop và khóa dòng. Đánh giá của shop khác, đã bị ẩn hoặc không tồn tại
+// đều trả REVIEW_NOT_FOUND để không lộ dữ liệu. Chỉ chủ shop mới được thay mặt shop phản hồi.
+async function findOwnReview(query, { reviewId, shopId, userId }) {
+  const owned = await query('SELECT id FROM shops WHERE id = ? AND owner_id = ? LIMIT 1', [shopId, userId])
+  if (!owned.length) return { error: 'FORBIDDEN' }
+
+  const reviews = await query(
+    `SELECT id, user_id, product_id, status, seller_reply
+     FROM reviews WHERE id = ? FOR UPDATE`,
+    [reviewId],
+  )
+  if (!reviews.length || reviews[0].status !== 'visible') return { error: 'REVIEW_NOT_FOUND' }
+
+  const products = await query('SELECT id, shop_id, name, slug FROM products WHERE id = ? LIMIT 1', [reviews[0].product_id])
+  if (!products.length || String(products[0].shop_id) !== String(shopId)) return { error: 'REVIEW_NOT_FOUND' }
+
+  return { review: reviews[0], product: products[0] }
+}
+
+const REPLY_ERRORS = {
+  FORBIDDEN: [403, 'Bạn không có quyền phản hồi thay gian hàng này.'],
+  REVIEW_NOT_FOUND: [404, 'Không tìm thấy đánh giá.'],
+  REVIEW_ALREADY_REPLIED: [409, 'Đánh giá này đã được phản hồi.'],
+  REVIEW_NOT_REPLIED: [409, 'Đánh giá này chưa có phản hồi.'],
+}
+
+function sendReplyError(res, code) {
+  const [status, message] = REPLY_ERRORS[code]
+  return res.status(status).json({ success: false, message, error: { code } })
+}
+
+function readReplyInput(source) {
+  const { shopId, userId, reply } = source || {}
+  return { shopId: String(shopId ?? ''), userId: String(userId ?? ''), text: typeof reply === 'string' ? reply.trim() : '' }
+}
+
 /**
- * Shop trả lời một đánh giá. Mỗi đánh giá chỉ trả lời một lần.
- * Đánh giá của shop khác, đã bị ẩn hoặc không tồn tại đều trả 404 để không lộ dữ liệu.
+ * Shop trả lời một đánh giá. Mỗi đánh giá chỉ trả lời một lần; muốn đổi thì dùng sửa phản hồi.
  */
 export async function replySellerReview(req, res, next) {
   try {
     const { reviewId } = req.params
-    const { shopId, userId, reply } = req.body || {}
-    const text = typeof reply === 'string' ? reply.trim() : ''
-    if (!validId(reviewId) || !validId(String(shopId ?? '')) || !validId(String(userId ?? '')) ||
-        !text || text.length > MAX_REPLY_LENGTH) {
+    const { shopId, userId, text } = readReplyInput(req.body)
+    if (!validId(reviewId) || !validId(shopId) || !validId(userId) || !text || text.length > MAX_REPLY_LENGTH) {
       return invalid(res, `Nội dung phản hồi phải từ 1 đến ${MAX_REPLY_LENGTH} ký tự.`)
     }
 
     const result = await executeTransaction(async (query) => {
-      // Chỉ chủ shop mới được thay mặt shop phản hồi
-      const owned = await query('SELECT id FROM shops WHERE id = ? AND owner_id = ? LIMIT 1', [shopId, userId])
-      if (!owned.length) return { error: 'FORBIDDEN' }
-
-      const reviews = await query(
-        `SELECT id, user_id, product_id, status, seller_reply
-         FROM reviews WHERE id = ? FOR UPDATE`,
-        [reviewId],
-      )
-      if (!reviews.length || reviews[0].status !== 'visible') return { error: 'REVIEW_NOT_FOUND' }
-
-      const products = await query('SELECT id, shop_id, name, slug FROM products WHERE id = ? LIMIT 1', [reviews[0].product_id])
-      if (!products.length || String(products[0].shop_id) !== String(shopId)) return { error: 'REVIEW_NOT_FOUND' }
-
-      if (reviews[0].seller_reply) return { error: 'REVIEW_ALREADY_REPLIED' }
+      const found = await findOwnReview(query, { reviewId, shopId, userId })
+      if (found.error) return found
+      const { review, product } = found
+      if (review.seller_reply) return { error: 'REVIEW_ALREADY_REPLIED' }
 
       await query(
         `UPDATE reviews SET seller_reply = ?, replied_by = ?, replied_at = UTC_TIMESTAMP(3)
@@ -158,26 +180,90 @@ export async function replySellerReview(req, res, next) {
       return {
         review: {
           id: String(reviewId),
-          productId: String(products[0].id),
-          productName: products[0].name,
-          productSlug: products[0].slug,
-          buyerId: String(reviews[0].user_id),
+          productId: String(product.id),
+          productName: product.name,
+          productSlug: product.slug,
+          buyerId: String(review.user_id),
           sellerReply: text,
           repliedAt: new Date(saved[0].replied_at).toISOString(),
         },
       }
     })
 
-    if (result.error === 'FORBIDDEN') {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền phản hồi thay gian hàng này.', error: { code: 'FORBIDDEN' } })
-    }
-    if (result.error === 'REVIEW_NOT_FOUND') {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá.', error: { code: 'REVIEW_NOT_FOUND' } })
-    }
-    if (result.error === 'REVIEW_ALREADY_REPLIED') {
-      return res.status(409).json({ success: false, message: 'Đánh giá này đã được phản hồi.', error: { code: 'REVIEW_ALREADY_REPLIED' } })
-    }
+    if (result.error) return sendReplyError(res, result.error)
     return res.status(201).json({ success: true, message: 'Đã gửi phản hồi đánh giá.', data: result.review })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Shop sửa phản hồi đã gửi. `repliedAt` được cập nhật thành thời điểm lưu gần nhất.
+ * Không gửi lại thông báo cho người mua.
+ */
+export async function updateSellerReviewReply(req, res, next) {
+  try {
+    const { reviewId } = req.params
+    const { shopId, userId, text } = readReplyInput(req.body)
+    if (!validId(reviewId) || !validId(shopId) || !validId(userId) || !text || text.length > MAX_REPLY_LENGTH) {
+      return invalid(res, `Nội dung phản hồi phải từ 1 đến ${MAX_REPLY_LENGTH} ký tự.`)
+    }
+
+    const result = await executeTransaction(async (query) => {
+      const found = await findOwnReview(query, { reviewId, shopId, userId })
+      if (found.error) return found
+      if (!found.review.seller_reply) return { error: 'REVIEW_NOT_REPLIED' }
+
+      await query(
+        `UPDATE reviews SET seller_reply = ?, replied_by = ?, replied_at = UTC_TIMESTAMP(3)
+         WHERE id = ? AND seller_reply IS NOT NULL`,
+        [text, userId, reviewId],
+      )
+      const saved = await query('SELECT replied_at FROM reviews WHERE id = ?', [reviewId])
+      return {
+        review: {
+          id: String(reviewId),
+          productId: String(found.product.id),
+          productName: found.product.name,
+          sellerReply: text,
+          repliedAt: new Date(saved[0].replied_at).toISOString(),
+        },
+      }
+    })
+
+    if (result.error) return sendReplyError(res, result.error)
+    return res.status(200).json({ success: true, message: 'Đã cập nhật phản hồi đánh giá.', data: result.review })
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Shop xóa phản hồi đã gửi để đánh giá quay về trạng thái chưa phản hồi (có thể trả lời lại).
+ * shopId và userId nằm ở query vì DELETE không có body.
+ */
+export async function deleteSellerReviewReply(req, res, next) {
+  try {
+    const { reviewId } = req.params
+    const shopId = typeof req.query.shopId === 'string' ? req.query.shopId : ''
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : ''
+    if (!validId(reviewId) || !validId(shopId) || !validId(userId)) return invalid(res, 'Yêu cầu xóa phản hồi không hợp lệ.')
+
+    const result = await executeTransaction(async (query) => {
+      const found = await findOwnReview(query, { reviewId, shopId, userId })
+      if (found.error) return found
+      if (!found.review.seller_reply) return { error: 'REVIEW_NOT_REPLIED' }
+
+      await query(
+        `UPDATE reviews SET seller_reply = NULL, replied_by = NULL, replied_at = NULL
+         WHERE id = ? AND seller_reply IS NOT NULL`,
+        [reviewId],
+      )
+      return { review: { id: String(reviewId), productId: String(found.product.id), sellerReply: null, repliedAt: null } }
+    })
+
+    if (result.error) return sendReplyError(res, result.error)
+    return res.status(200).json({ success: true, message: 'Đã xóa phản hồi đánh giá.', data: result.review })
   } catch (err) {
     return next(err)
   }
