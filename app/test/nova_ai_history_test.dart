@@ -81,6 +81,7 @@ void main() {
                     'products': [
                       {'id': '5', 'name': 'Áo thun cotton', 'price': 99000, 'imageUrl': ''},
                     ],
+                    'catalog': {'page': 1, 'hasMore': true},
                   },
                 },
               ],
@@ -110,6 +111,8 @@ void main() {
       expect(find.text('Tìm áo thun nam'), findsOneWidget);
       expect(find.text('Nova gợi ý áo thun cotton.'), findsOneWidget);
       expect(find.text('Áo thun cotton'), findsOneWidget);
+      // Câu trả lời cuối còn trang tiếp theo thì dựng lại nút "Xem trang 2"
+      expect(find.text('Xem trang 2'), findsOneWidget);
 
       // Tin mới gửi kèm đúng conversationId, không yêu cầu cuộc mới
       await tester.enterText(find.byType(TextField), 'Có màu đen không?');
@@ -146,6 +149,46 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Nova gửi productId từ trang sản phẩm, cho phép bỏ ngữ cảnh và bỏ qua ID không phải số', (tester) async {
+    await tester.runAsync(() => AuthService().logout());
+    final contexts = <Map<String, dynamic>>[];
+    final client = MockClient((request) async {
+      if (request.method == 'POST') {
+        contexts.add((jsonDecode(request.body) as Map<String, dynamic>)['context'] as Map<String, dynamic>);
+        return _json({'success': true, 'data': {'reply': 'Đã trả lời.'}});
+      }
+      return _json({'success': false}, 404);
+    });
+    addTearDown(client.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NovaAIScreen(httpClient: client, productId: '42', initialQuery: 'Còn hàng không?'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(contexts.single['productId'], '42');
+    expect(find.text('Đang hỏi về sản phẩm bạn vừa xem'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Bỏ ngữ cảnh sản phẩm'));
+    await tester.pump();
+    expect(find.text('Đang hỏi về sản phẩm bạn vừa xem'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'Hỏi thêm');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Gửi tin nhắn'));
+    await tester.pumpAndSettle();
+    expect(contexts.last.containsKey('productId'), isFalse);
+
+    // ID không phải số (dữ liệu mẫu) bị bỏ qua vì Backend sẽ từ chối cả yêu cầu
+    NovaAIScreen.resetSession();
+    await tester.pumpWidget(
+      MaterialApp(home: NovaAIScreen(httpClient: client, productId: 'p01', initialQuery: 'Tư vấn')),
+    );
+    await tester.pumpAndSettle();
+    expect(contexts.last.containsKey('productId'), isFalse);
+    expect(find.text('Đang hỏi về sản phẩm bạn vừa xem'), findsNothing);
+  });
 
   testWidgets('Khách chưa đăng nhập không có nút lịch sử và không gọi API lịch sử', (tester) async {
     await tester.runAsync(() => AuthService().logout());

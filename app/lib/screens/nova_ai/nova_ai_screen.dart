@@ -25,12 +25,16 @@ import '../../widgets/common/nova_assets.dart';
 class NovaAIScreen extends StatefulWidget {
   final bool isStandalone;
   final String? initialQuery;
+
+  /// ID sản phẩm khách đang xem (mở từ trang chi tiết). Backend dùng để nạp dữ liệu thật của sản phẩm đó.
+  final String? productId;
   final http.Client? httpClient;
 
   const NovaAIScreen({
     super.key,
     this.isStandalone = false,
     this.initialQuery,
+    this.productId,
     this.httpClient,
   });
 
@@ -79,6 +83,12 @@ class _NovaAIScreenState extends State<NovaAIScreen>
   static bool _startNewConversation = false;
   bool _hasMoreOlder = false;
   bool _historyBusy = false;
+
+  // Chỉ nhận ID số như Backend yêu cầu; ID lạ sẽ làm cả yêu cầu bị từ chối.
+  late String? _productContextId =
+      RegExp(r'^[1-9]\d{0,19}$').hasMatch(widget.productId ?? '')
+      ? widget.productId
+      : null;
 
   static void resetSessionForTest() {
     _sessionMessages.clear();
@@ -159,9 +169,25 @@ class _NovaAIScreenState extends State<NovaAIScreen>
   }
 
   /// Tin đã lưu trên server → tin nhắn của giao diện; thẻ sản phẩm lấy từ metadata.
-  _AiChatMessage _savedToMessage(Map<String, dynamic> saved) {
+  _AiChatMessage _savedToMessage(
+    Map<String, dynamic> saved, {
+    bool isLast = false,
+  }) {
     final isUser = saved['role'] == 'user';
     final metadata = saved['metadata'];
+    // Nút "Xem trang N" chỉ có nghĩa với câu trả lời cuối cùng của cuộc trò chuyện.
+    var suggestions = <String>[];
+    if (isLast && !isUser && metadata is Map) {
+      final catalog = metadata['catalog'];
+      final pagination = metadata['pagination'];
+      final source = catalog is Map && catalog['hasMore'] == true
+          ? catalog
+          : pagination is Map && pagination['hasMore'] == true
+          ? pagination
+          : null;
+      final page = source?['page'];
+      if (page is num) suggestions = ['Xem trang ${page.toInt() + 1}'];
+    }
     final rawProducts = metadata is Map ? metadata['products'] : null;
     final products = (rawProducts is List ? rawProducts : const [])
         .whereType<Map>()
@@ -179,6 +205,7 @@ class _NovaAIScreenState extends State<NovaAIScreen>
       text: saved['content']?.toString() ?? '',
       time: _formatSavedTime(saved['createdAt']?.toString()),
       products: isUser ? null : products,
+      suggestions: suggestions,
     );
   }
 
@@ -229,10 +256,16 @@ class _NovaAIScreenState extends State<NovaAIScreen>
       if (owner != _currentOwner || !mounted) return false;
       if (res.statusCode != 200) return false;
       final data = jsonDecode(utf8.decode(res.bodyBytes))['data'];
-      final saved = (data['messages'] as List<dynamic>? ?? [])
+      final rawMessages = (data['messages'] as List<dynamic>? ?? [])
           .whereType<Map>()
-          .map((m) => _savedToMessage(Map<String, dynamic>.from(m)))
           .toList();
+      final saved = [
+        for (var i = 0; i < rawMessages.length; i++)
+          _savedToMessage(
+            Map<String, dynamic>.from(rawMessages[i]),
+            isLast: i == rawMessages.length - 1,
+          ),
+      ];
       setState(() {
         _sessionMessages
           ..clear()
@@ -609,6 +642,7 @@ class _NovaAIScreenState extends State<NovaAIScreen>
           if (_isLoggedIn && _conversationId != null)
             'conversationId': _conversationId,
           if (_isLoggedIn && _startNewConversation) 'newConversation': true,
+          if (_productContextId != null) 'productId': _productContextId,
         },
         'history': recentHistory,
       });
@@ -1653,6 +1687,32 @@ class _NovaAIScreenState extends State<NovaAIScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_productContextId != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAF6F0),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Đang hỏi về sản phẩm bạn vừa xem',
+                      style: TextStyle(fontSize: 12, color: AppColors.primary),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Bỏ ngữ cảnh sản phẩm',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    onPressed: () => setState(() => _productContextId = null),
+                  ),
+                ],
+              ),
+            ),
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(

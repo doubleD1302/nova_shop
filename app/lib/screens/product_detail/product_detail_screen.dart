@@ -1758,6 +1758,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         const SizedBox(width: 4),
                         Row(
                           children: List.generate(5, (index) {
+                          productId: _product?.id,
                             return Icon(
                               index < _avgRating.round() ? Icons.star : Icons.star_border,
                               color: Colors.amber,
