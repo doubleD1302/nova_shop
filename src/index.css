@@ -290,6 +290,26 @@ body {
 .nova-send:hover { background: #63402E; }
 .nova-send:disabled { background: #EEE6DC; color: #B4A392; cursor: default; }
 .nova-input-note { margin-top: 9px; color: #A28F7E; font-size: 9px; line-height: 1.65; text-align: center; }
+.nova-icon-button:disabled { cursor: default; opacity: .4; }
+.nova-history { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px; }
+.nova-new-chat { display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid #D8C8B7; border-radius: 10px; color: #80513B; font-size: 12px; font-weight: 600; cursor: pointer; }
+.nova-new-chat:hover { background: #F5EFE7; }
+.nova-new-chat:disabled { cursor: default; opacity: .5; }
+.nova-new-chat:focus-visible, .nova-history-item:focus-visible { outline: 2px solid #BD6E49; outline-offset: 2px; }
+.nova-history-list { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.nova-history-list > li { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 10px; }
+.nova-history-list > li:hover { background: #F8F2EA; }
+.nova-history-active { border-color: #E6D5C2 !important; background: #F5EFE7; }
+.nova-history-item { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; padding: 10px 12px; text-align: left; cursor: pointer; }
+.nova-history-item:disabled { cursor: wait; opacity: .6; }
+.nova-history-title { overflow: hidden; color: #49352D; font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.nova-history-meta { color: #A28F7E; font-size: 10px; }
+.nova-history-delete { flex-shrink: 0; }
+.nova-history-note { margin: 8px 0; color: #8B7566; font-size: 11px; line-height: 1.7; }
+.nova-history-error { color: #B3402F; }
+.nova-load-older { display: flex; margin: 0 auto 18px; }
+.nova-guest-note { margin-top: 10px; color: #8B7566; font-size: 11px; }
+.nova-guest-note a { color: #80513B; font-weight: 600; text-decoration: underline; }
 @media (min-width: 1024px) {
   .nova-workspace .nova-messages { padding: 30px 42px; }
   .nova-workspace .nova-composer { padding: 18px 36px 15px; }

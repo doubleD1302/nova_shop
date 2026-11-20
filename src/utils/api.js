@@ -483,9 +483,38 @@ export async function apiSendAiMessage(message, context = {}) {
   })
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData?.message || 'Không thể kết nối đến trợ lý AI')
+    const error = new Error(errorData?.message || 'Không thể kết nối đến trợ lý AI')
+    error.code = errorData?.error?.code
+    throw error
   }
   return response.json()
+}
+
+// Lịch sử trò chuyện Nova AI (chỉ tài khoản đăng nhập). Lỗi được ném ra để giao diện hiển thị.
+async function readAiHistoryResponse(response, fallbackMessage) {
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const error = new Error(body?.message || fallbackMessage)
+    error.code = body?.error?.code
+    throw error
+  }
+  return body
+}
+
+export async function apiListAiConversations({ limit = 30, offset = 0 } = {}) {
+  const response = await apiRequest(`/ai/conversations?limit=${limit}&offset=${offset}`)
+  return readAiHistoryResponse(response, 'Không tải được lịch sử trò chuyện.')
+}
+
+export async function apiGetAiConversationMessages(conversationId, { limit = 50, beforeId } = {}) {
+  const before = beforeId ? `&beforeId=${encodeURIComponent(beforeId)}` : ''
+  const response = await apiRequest(`/ai/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}${before}`)
+  return readAiHistoryResponse(response, 'Không mở được cuộc trò chuyện.')
+}
+
+export async function apiDeleteAiConversation(conversationId) {
+  const response = await apiRequest(`/ai/conversations/${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
+  return readAiHistoryResponse(response, 'Không xóa được cuộc trò chuyện.')
 }
 
 export async function apiGetAiBrainProfile() {

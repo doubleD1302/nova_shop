@@ -43,3 +43,12 @@ Cả ba yêu cầu Bearer token (`401` nếu thiếu), `400 VALIDATION_ERROR` ch
 - Hỏi đơn hàng của người mua không qua mô hình: trả trạng thái bằng tiếng Việt, tổng tiền, ngày đặt; hỏi theo mã (`NOVA…`) thì trả sản phẩm, đơn vị vận chuyển và cập nhật gần nhất, tìm trong 100 đơn gần nhất vì Data API chưa lọc theo mã; hỏi theo trạng thái (`đang giao`, `đã hủy`…) chỉ lọc trong trang đang xem.
 
 Các kiểm tra dự án: `node scripts/test-ai-data.mjs`, `node scripts/test-ai-catalog.mjs`, `node scripts/test-ai-privacy.mjs`, `node scripts/test-ai-keys.mjs` và `node scripts/test-ai-history.mjs` tại `backend/`. Các bài trên giả lập dịch vụ phụ thuộc. Cần chạy migration `database/migrations/2026-11-20-ai-chat-history.sql` trên MySQL/TiDB trước khi dùng lịch sử; nếu chưa có bảng, Nova AI vẫn trả lời nhưng `historySaved` là `false`. `data-api/scripts/test-ai-admin-mysql.mjs` yêu cầu máy chủ thử cô lập có marker; cần ghi rõ loại database và môi trường khi báo kết quả.
+
+## Giao diện web và app
+
+Cả hai chỉ hiện lịch sử khi đã đăng nhập; khách thấy lời nhắc đăng nhập (web) hoặc không có nút lịch sử (app).
+
+- Mở Nova: tải danh sách cuộc trò chuyện và tự mở lại cuộc gần nhất nếu còn trong 12 giờ, cùng quy tắc với Backend. Lượt gửi sau luôn kèm `context.conversationId`.
+- "Cuộc trò chuyện mới" xóa màn hình và gửi `context.newConversation: true` ở lượt kế tiếp. Trên app, mục này không còn đặt lại ký ức của Nova; việc đó chuyển sang mục "Xóa ký ức của Nova".
+- Lịch sử: mở lại (dựng lại thẻ sản phẩm từ `metadata.products`), xóa sau khi xác nhận, "Xem tin cũ hơn" khi `hasMore`. Nếu cuộc trò chuyện đã bị xóa ở nơi khác (`CONVERSATION_NOT_FOUND`), giao diện báo và lần gửi sau mở cuộc mới.
+- `context.productId` đã được Backend hỗ trợ nhưng chưa có màn hình nào gửi; cần nút "Hỏi Nova về sản phẩm này" ở trang chi tiết sản phẩm.

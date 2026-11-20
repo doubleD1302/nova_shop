@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconArrowRight, IconCart, IconCheck, IconClose, IconExpand, IconMic, IconPackage, IconSearch, IconSend, IconThumbsDown, IconThumbsUp } from '../ui/Icons'
+import { IconArrowRight, IconCart, IconCheck, IconClose, IconExpand, IconHistory, IconMic, IconPackage, IconPlus, IconSearch, IconSend, IconThumbsDown, IconThumbsUp, IconTrash } from '../ui/Icons'
 import { useCart } from '../../context/CartContext'
 import { useAuth } from '../../context/AuthContext'
 import {
+  apiDeleteAiConversation,
   apiGetAiBrainProfile,
+  apiGetAiConversationMessages,
+  apiListAiConversations,
   apiResetAiBrain,
   apiSendAiBrainFeedback,
   apiSendAiMessage,
@@ -13,6 +16,32 @@ import {
 const QUICK_PROMPTS = []
 
 const INITIAL_MESSAGES = []
+
+// Backend tự nối tiếp cuộc trò chuyện gần nhất trong khoảng này; giao diện mở lại đúng cuộc đó cho khớp.
+const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000
+
+const timeFormat = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' })
+const dateTimeFormat = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+function formatSavedTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const isToday = date.toDateString() === new Date().toDateString()
+  return (isToday ? timeFormat : dateTimeFormat).format(date)
+}
+
+// Tin đã lưu trên server → dạng tin nhắn của giao diện. Thẻ sản phẩm và gợi ý lấy từ metadata.
+function toViewMessage(saved) {
+  return {
+    id: `srv_${saved.id}`,
+    serverId: saved.id,
+    isUser: saved.role === 'user',
+    text: saved.content,
+    time: formatSavedTime(saved.createdAt),
+    products: saved.metadata?.products || [],
+    suggestions: saved.metadata?.suggestions || [],
+  }
+}
 
 export default function NovaAiCopilot({ initialOpen = false, fullPage = false }) {
   const [isOpen, setIsOpen] = useState(initialOpen || fullPage)
@@ -39,12 +68,107 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   const sessionRef = useRef(sessionKey)
   sessionRef.current = sessionKey
 
+  // Lịch sử trò chuyện (chỉ tài khoản đăng nhập). conversationRef là cuộc đang mở; startNewRef bắt Backend tạo cuộc mới.
+  const [conversations, setConversations] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+  const [hasMoreOlder, setHasMoreOlder] = useState(false)
+  const conversationRef = useRef(null)
+  const startNewRef = useRef(false)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const skipScrollRef = useRef(false)
+
   useEffect(() => {
     setMessages(INITIAL_MESSAGES)
     setInputText('')
     setIsLoading(false)
     setBrainMemory({ learnedFacts: [], preferredStyles: [], location: null, stats: { totalInteractions: 0, acceptedRecommendations: 0 } })
+    setConversations([])
+    setShowHistory(false)
+    setHistoryError('')
+    setHasMoreOlder(false)
+    conversationRef.current = null
+    startNewRef.current = false
   }, [sessionKey])
+
+  const refreshConversations = async () => {
+    const requestedSession = sessionRef.current
+    const response = await apiListAiConversations({ limit: 30 })
+    if (requestedSession !== sessionRef.current) return []
+    const list = response?.data?.conversations || []
+    setConversations(list)
+    return list
+  }
+
+  const openConversation = async (conversationId) => {
+    const requestedSession = sessionRef.current
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const response = await apiGetAiConversationMessages(conversationId, { limit: 50 })
+      if (requestedSession !== sessionRef.current) return
+      const data = response?.data
+      setMessages((data?.messages || []).map(toViewMessage))
+      setHasMoreOlder(Boolean(data?.hasMore))
+      conversationRef.current = String(data.conversation.id)
+      startNewRef.current = false
+      setShowHistory(false)
+    } catch (error) {
+      if (requestedSession === sessionRef.current) setHistoryError(error.message)
+    } finally {
+      if (requestedSession === sessionRef.current) setHistoryLoading(false)
+    }
+  }
+
+  const startNewConversation = () => {
+    if (isLoading) return
+    setMessages(INITIAL_MESSAGES)
+    setHasMoreOlder(false)
+    conversationRef.current = null
+    startNewRef.current = true
+    setShowHistory(false)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const loadOlderMessages = async () => {
+    const oldest = messages.find((message) => message.serverId)
+    if (!oldest || !conversationRef.current) return
+    const requestedSession = sessionRef.current
+    setHistoryError('')
+    try {
+      const response = await apiGetAiConversationMessages(conversationRef.current, { limit: 50, beforeId: oldest.serverId })
+      if (requestedSession !== sessionRef.current) return
+      skipScrollRef.current = true
+      setMessages((prev) => [...(response?.data?.messages || []).map(toViewMessage), ...prev])
+      setHasMoreOlder(Boolean(response?.data?.hasMore))
+    } catch (error) {
+      if (requestedSession === sessionRef.current) setHistoryError(error.message)
+    }
+  }
+
+  const deleteConversation = async (conversation) => {
+    if (isLoading || !window.confirm(`Xóa cuộc trò chuyện "${conversation.title}"? Thao tác này không thể hoàn tác.`)) return
+    setHistoryError('')
+    try {
+      await apiDeleteAiConversation(conversation.id)
+      setConversations((prev) => prev.filter((item) => item.id !== conversation.id))
+      if (conversationRef.current === conversation.id) startNewConversation()
+    } catch (error) {
+      setHistoryError(error.message)
+    }
+  }
+
+  // Mở Nova: tải danh sách và tự mở lại cuộc gần nhất nếu còn trong 12 giờ (giống cách Backend nối tiếp).
+  useEffect(() => {
+    if (!user || !isOpen) return
+    refreshConversations().then((list) => {
+      const latest = list[0]
+      const isRecent = latest && Date.now() - Date.parse(latest.lastMessageAt) < RESUME_WINDOW_MS
+      if (isRecent && messagesRef.current.length === 0 && !conversationRef.current && !startNewRef.current) openConversation(latest.id)
+    }).catch((error) => setHistoryError(error.message))
+  }, [isOpen, sessionKey])
 
   // Tải hồ sơ bộ não AI khi mở
   useEffect(() => {
@@ -76,6 +200,8 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
 
   useEffect(() => {
     if (isOpen) {
+      // Tải thêm tin cũ ở đầu danh sách thì giữ nguyên vị trí cuộn, không nhảy xuống cuối.
+      if (skipScrollRef.current) { skipScrollRef.current = false; return }
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
         inputRef.current?.focus()
@@ -115,9 +241,18 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         isUser: m.isUser,
         text: m.text,
       }))
-      const response = await apiSendAiMessage(text, { history: recentHistory })
+      // Đã đăng nhập: Backend lấy ngữ cảnh từ lịch sử đã lưu, chỉ cần nói rõ cuộc nào (hoặc yêu cầu cuộc mới).
+      const context = { history: recentHistory }
+      if (user && conversationRef.current) context.conversationId = conversationRef.current
+      if (user && startNewRef.current) context.newConversation = true
+      const response = await apiSendAiMessage(text, context)
       if (requestedSession !== sessionRef.current) return
       const aiData = response?.data || {}
+      if (user && aiData.conversationId) {
+        conversationRef.current = String(aiData.conversationId)
+        startNewRef.current = false
+        refreshConversations().catch(() => {})
+      }
 
       if (aiData.brain) {
         setBrainMemory(aiData.brain)
@@ -134,6 +269,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
         budget: aiData.budget,
         orderInfo: aiData.orderInfo,
         newlyLearned: aiData.brain?.newlyLearned || [],
+        historyNotSaved: Boolean(user) && aiData.historySaved === false,
         suggestions: aiData.suggestions || [
           'Xem thêm sản phẩm tương tự',
           'Chính sách đổi trả và vận chuyển',
@@ -142,12 +278,17 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
       }
 
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
+    } catch (error) {
       if (requestedSession !== sessionRef.current) return
+      // Cuộc trò chuyện đã bị xóa ở nơi khác: lần gửi sau sẽ mở cuộc mới.
+      const conversationGone = error?.code === 'CONVERSATION_NOT_FOUND'
+      if (conversationGone) { conversationRef.current = null; startNewRef.current = true }
       const aiMessage = {
         id: 'ai_fallback_' + Date.now(),
         isUser: false,
-        text: 'Nova AI hiện không kết nối được với máy chủ. Bạn vui lòng thử lại sau.',
+        text: conversationGone
+          ? 'Cuộc trò chuyện này không còn tồn tại. Bạn hãy gửi lại câu hỏi để bắt đầu cuộc trò chuyện mới.'
+          : 'Nova AI hiện không kết nối được với máy chủ. Bạn vui lòng thử lại sau.',
         time: timeNow,
         intentTitle: 'Nova AI',
         suggestions: QUICK_PROMPTS,
@@ -313,26 +454,68 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
                   <p className="mt-0.5 text-xs text-muted">Trợ lý mua sắm của ShopNova</p>
                 </div>
               </div>
-              {!fullPage ? (
-                <div className="flex items-center gap-1">
-                  <Link to="/nova-ai" aria-label="Mở trang trò chuyện" title="Mở trang trò chuyện" className="nova-icon-button">
-                    <IconExpand className="h-[18px] w-[18px]" />
-                  </Link>
-                  <button type="button" onClick={closeChat} aria-label="Đóng trợ lý" className="nova-icon-button">
-                    <IconClose className="h-[18px] w-[18px]" />
-                  </button>
-                </div>
-              ) : null}
+              <div className="flex items-center gap-1">
+                {user ? (
+                  <>
+                    <button type="button" onClick={startNewConversation} disabled={isLoading} aria-label="Cuộc trò chuyện mới" title="Cuộc trò chuyện mới" className="nova-icon-button">
+                      <IconPlus className="h-[18px] w-[18px]" />
+                    </button>
+                    <button type="button" onClick={() => setShowHistory((value) => !value)} aria-label="Lịch sử trò chuyện" title="Lịch sử trò chuyện" aria-pressed={showHistory} className="nova-icon-button">
+                      <IconHistory className="h-[18px] w-[18px]" />
+                    </button>
+                  </>
+                ) : null}
+                {!fullPage ? (
+                  <>
+                    <Link to="/nova-ai" aria-label="Mở trang trò chuyện" title="Mở trang trò chuyện" className="nova-icon-button">
+                      <IconExpand className="h-[18px] w-[18px]" />
+                    </Link>
+                    <button type="button" onClick={closeChat} aria-label="Đóng trợ lý" className="nova-icon-button">
+                      <IconClose className="h-[18px] w-[18px]" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </header>
-            <div className="nova-messages thin-scroll" role="log" aria-label="Nội dung trò chuyện" aria-live="polite" aria-relevant="additions text">
-              {renderChatMessages()}
-            </div>
-            {renderInputBar()}
+            {showHistory && user ? renderHistoryPanel() : (
+              <>
+                <div className="nova-messages thin-scroll" role="log" aria-label="Nội dung trò chuyện" aria-live="polite" aria-relevant="additions text">
+                  {renderChatMessages()}
+                </div>
+                {renderInputBar()}
+              </>
+            )}
           </div>
         </section>
       ) : null}
     </>
   )
+
+  function renderHistoryPanel() {
+    return (
+      <div className="nova-history thin-scroll">
+        <button type="button" onClick={startNewConversation} disabled={isLoading} className="nova-new-chat">
+          <IconPlus className="h-4 w-4" /> Cuộc trò chuyện mới
+        </button>
+        {historyError ? <p role="alert" className="nova-history-note nova-history-error">{historyError}</p> : null}
+        {historyLoading && conversations.length === 0 ? <p role="status" className="nova-history-note">Đang tải lịch sử…</p> : null}
+        {!historyLoading && !historyError && conversations.length === 0 ? <p className="nova-history-note">Chưa có cuộc trò chuyện nào được lưu.</p> : null}
+        <ul className="nova-history-list">
+          {conversations.map((conversation) => (
+            <li key={conversation.id} className={conversation.id === conversationRef.current ? 'nova-history-active' : ''}>
+              <button type="button" onClick={() => openConversation(conversation.id)} disabled={isLoading || historyLoading} className="nova-history-item">
+                <span className="nova-history-title">{conversation.title}</span>
+                <span className="nova-history-meta">{formatSavedTime(conversation.lastMessageAt)} · {conversation.messageCount} tin</span>
+              </button>
+              <button type="button" onClick={() => deleteConversation(conversation)} disabled={isLoading} aria-label={`Xóa cuộc trò chuyện ${conversation.title}`} className="nova-icon-button nova-history-delete">
+                <IconTrash className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   function renderChatMessages() {
     if (messages.length === 0) {
@@ -342,12 +525,17 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
           <p className="nova-eyebrow">BẮT ĐẦU TỪ ĐIỀU BẠN CẦN</p>
           <h3>Bạn đang tìm gì hôm nay?</h3>
           <p>Mô tả món đồ, ngân sách hoặc điều bạn muốn biết. Nova sẽ cùng bạn tìm trong ShopNova.</p>
+          {!user ? <p className="nova-guest-note"><Link to="/dang-nhap">Đăng nhập</Link> để Nova lưu lại lịch sử trò chuyện của bạn.</p> : null}
         </div>
       )
     }
 
     return (
       <>
+        {hasMoreOlder ? (
+          <button type="button" onClick={loadOlderMessages} className="nova-text-link nova-load-older">Xem tin cũ hơn</button>
+        ) : null}
+        {historyError ? <p role="alert" className="nova-history-note nova-history-error">{historyError}</p> : null}
         {messages.map((message) => (
           <div key={message.id} className={`nova-message ${message.isUser ? 'nova-message-user' : ''}`}>
             {message.isUser ? (
@@ -417,6 +605,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
                   </div>
                 ) : null}
 
+                {message.historyNotSaved ? <p className="nova-history-note">Không lưu được cuộc trò chuyện này vào lịch sử.</p> : null}
                 <div className="nova-feedback">
                   <span className="nova-time">{message.time}</span>
                   <div className="flex items-center gap-1">
