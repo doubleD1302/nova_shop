@@ -421,12 +421,14 @@ Nova AI ưu tiên `gemini-3.1-flash-lite` (tự động chuyển sang các model
 
 Câu hỏi mua sắm sử dụng tối đa ba từ khóa để tìm qua Data API, mỗi từ năm sản phẩm mỗi trang, gộp và chuyển tối đa 15 sản phẩm vào ngữ cảnh. Có thể yêu cầu `trang 2`, `trang 3` để truy vấn trang tiếp theo. Kết quả có thể trùng giữa các trang theo từng từ khóa; tìm kiếm từ khóa vẫn có thể bỏ sót cách diễn đạt khác. Khi mọi truy vấn dữ liệu sản phẩm thất bại, Backend trả 503 `DATA_API_UNAVAILABLE`; nếu chỉ một phần thất bại, phản hồi đánh dấu `catalogPartial`. Không dựng sản phẩm mẫu.
 
+Tài khoản đã đăng nhập có lịch sử trò chuyện lưu trong database (qua Data API; cần chạy migration `database/migrations/2026-11-20-ai-chat-history.sql`): `GET /api/v1/ai/conversations`, `GET /api/v1/ai/conversations/:id/messages`, `DELETE /api/v1/ai/conversations/:id`. Ngữ cảnh gửi cho Gemini lấy từ lịch sử đã lưu; khách chưa đăng nhập không được lưu. Câu hỏi tìm sản phẩm hiểu thêm khoảng giá và kiểu sắp xếp, câu hỏi tiếp nối (`có màu đen không?`) được nạp dữ liệu thật của sản phẩm vừa bàn. Xem [Nova AI API](../docs/backend/NOVA_AI.md).
+
 Phân quyền dựa vào hồ sơ tài khoản hiện hành do Data API trả về, không dựa vào role hay userId trong nội dung client. Khách chỉ truy cập danh mục công khai; buyer xem đơn của chính mình; seller xem sản phẩm và đơn thuộc shop của mình. Admin tra cứu thống kê cùng tài khoản, đơn hàng, shop, sản phẩm, báo cáo và đánh giá thông qua Data API; mỗi trang tối đa 20 bản ghi. Có thể lọc theo mã, email, số điện thoại hoặc mã đơn trong những nhóm có hỗ trợ. Trường liên hệ và địa chỉ chỉ được đưa vào ngữ cảnh khi câu hỏi yêu cầu. Danh sách có thể thay đổi khi dữ liệu cập nhật giữa hai trang. Data API xác minh lại admin đang hoạt động cho đường tra cứu mới.
 
 Trợ lý chưa có đường truy vấn mọi bảng và mọi trường dữ liệu; ví dụ chưa hỗ trợ tìm chung trong bảng thanh toán, voucher, giỏ hàng hay lịch sử kho. Không đưa mật khẩu, token hoặc hash xác thực vào ngữ cảnh. Nhận biết chủ đề dựa vào các cụm từ, có thể không nhận ra mọi cách hỏi; trợ lý chưa hỗ trợ sửa dữ liệu.
 
 Thông tin quản trị có thể bao gồm tên, email và số điện thoại được gửi cho Gemini khi admin yêu cầu danh sách tương ứng. Kiểm tra chính sách xử lý dữ liệu của gói API trước khi dùng dữ liệu thật. Chỉ dẫn giới hạn lĩnh vực và dữ liệu giúp giảm câu trả lời ngoài phạm vi nhưng không bảo đảm mô hình luôn chính xác.
 
-Kiểm tra: `node scripts/test-ai-data.mjs`, `node scripts/test-ai-catalog.mjs`, `node scripts/test-ai-keys.mjs`, `node scripts/test-ai-privacy.mjs`. Các bài này dùng dịch vụ giả lập; kiểm tra MySQL và model thật cần thực hiện riêng. Data API có thêm `scripts/test-ai-admin-mysql.mjs` cho một máy chủ thử cô lập có marker.
+Kiểm tra: `node scripts/test-ai-data.mjs`, `node scripts/test-ai-catalog.mjs`, `node scripts/test-ai-keys.mjs`, `node scripts/test-ai-privacy.mjs`, `node scripts/test-ai-history.mjs`. Các bài này dùng dịch vụ giả lập; kiểm tra MySQL và model thật cần thực hiện riêng. Data API có thêm `scripts/test-ai-admin-mysql.mjs` cho một máy chủ thử cô lập có marker.
 
 Chi tiết request, phản hồi, phân quyền và giới hạn: [Nova AI API](../docs/backend/NOVA_AI.md).

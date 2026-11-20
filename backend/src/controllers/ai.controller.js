@@ -1,11 +1,24 @@
 import { randomUUID } from 'node:crypto'
-import { callDataApi } from '../clients/data.client.js'
+import { callDataApi, DataApiClientError } from '../clients/data.client.js'
 import { aiBrainService } from '../services/ai-brain.service.js'
 import { generateGeminiShoppingAdvice } from '../services/gemini.service.js'
-import { findCatalogProducts } from '../services/ai-catalog.service.js'
+import { extractSearchTerms, findCatalogProducts, findProductsByIds } from '../services/ai-catalog.service.js'
+import { analyzeConsultantNeeds } from '../services/consultant-knowledge.js'
+import { loadConversation, saveTurn } from '../services/ai-history.service.js'
+import { buildBuyerOrderReply } from '../services/ai-orders.service.js'
 
 function extractUserKey(req) {
   return req.user?.id ? `account_${req.user.id}` : `guest_ephemeral_${randomUUID().replace(/-/g, '')}`
+}
+
+const PAGE_FOLLOW_UP = /^\s*(?:xem\s+)?trang\s+\d+\s*$/i
+const validId = (value) => (typeof value === 'string' || Number.isSafeInteger(value)) && /^[1-9]\d{0,19}$/.test(String(value))
+
+// Câu hỏi tìm sản phẩm gần nhất có tên sản phẩm cụ thể, để hiểu các câu nối tiếp như "gợi ý thêm".
+function lastProductQuestion(turns) {
+  const turn = [...turns].reverse().find((item) => item.isUser && !PAGE_FOLLOW_UP.test(item.text) &&
+    extractSearchTerms(item.text).length > 0 && analyzeConsultantNeeds(item.text.toLowerCase(), {}).wantsProductRecommendations)
+  return turn?.text || ''
 }
 
 export async function chatWithAi(req, res, next) {
@@ -22,16 +35,38 @@ export async function chatWithAi(req, res, next) {
     const query = message.trim()
     if (!query) return res.status(400).json({ success: false, message: 'Nội dung tin nhắn không được để trống.', error: { code: 'EMPTY_MESSAGE' } })
 
+    // conversationId/newConversation chỉ có tác dụng với tài khoản đã đăng nhập; khách không được lưu lịch sử.
+    const conversationId = req.body?.conversationId ?? context.conversationId
+    const newConversation = req.body?.newConversation ?? context.newConversation ?? false
+    if ((conversationId != null && !validId(conversationId)) || typeof newConversation !== 'boolean' ||
+        (context.productId != null && !validId(context.productId))) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu hội thoại không hợp lệ.', error: { code: 'VALIDATION_ERROR' } })
+    }
+
     const userKey = extractUserKey(req)
     if (!req.user) guestKey = userKey
-    const turns = context.history || history
-    const previousQuestion = [...turns].reverse().find(turn => turn.isUser && !/^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(turn.text))?.text || ''
-    const isPageFollowUp = /^\s*(?:xem\s+)?trang\s+\d+\s*$/i.test(query)
+
+    // Tài khoản đăng nhập: ngữ cảnh lấy từ lịch sử đã lưu trên server (không tin client). Khách hoặc lỗi tải: dùng history client gửi.
+    let conversation = { conversationId: null, turns: [], productIds: [] }
+    if (req.user) {
+      try {
+        conversation = await loadConversation(req.user.id, { conversationId: conversationId == null ? null : String(conversationId), newConversation })
+      } catch (err) {
+        // Cuộc trò chuyện không thuộc tài khoản phải báo lỗi; lỗi dịch vụ khác thì vẫn trả lời bằng ngữ cảnh client gửi.
+        if (err instanceof DataApiClientError && err.code === 'CONVERSATION_NOT_FOUND') throw err
+      }
+    }
+    const clientTurns = context.history || history
+    const turns = conversation.turns.length ? conversation.turns : clientTurns
+    const allTurns = [...conversation.turns, ...clientTurns]
+    const previousQuestion = [...allTurns].reverse().find(turn => turn.isUser && !PAGE_FOLLOW_UP.test(turn.text))?.text || ''
+    const isPageFollowUp = PAGE_FOLLOW_UP.test(query)
     const searchQuery = isPageFollowUp && previousQuestion ? `${previousQuestion} ${query}` : query
     const lower = searchQuery.toLowerCase()
     const sellerQuestion = ['shop của tôi', 'shop của mình', 'cửa hàng của tôi', 'cửa hàng của mình', 'gian hàng của tôi', 'sản phẩm của tôi', 'sản phẩm shop', 'sản phẩm trong shop', 'đơn hàng shop', 'đơn hàng của shop', 'đơn shop'].some((text) => lower.includes(text))
     const adminQuestion = (req.user?.role === 'admin' && ['khách hàng', 'người dùng', 'tài khoản'].some(term => lower.includes(term))) || ['tra cứu tài khoản', 'tra cứu khách hàng', 'tra cứu người dùng', 'thống kê sàn', 'tổng quan sàn', 'toàn sàn', 'quản trị sàn', 'danh sách khách hàng', 'danh sách người dùng', 'danh sách tài khoản', 'danh sách shop', 'danh sách gian hàng', 'danh sách sản phẩm toàn sàn', 'báo cáo vi phạm', 'đánh giá toàn sàn'].some((text) => lower.includes(text))
-    const isOrderQuestion = ['đơn hàng', 'đơn của tôi', 'mã đơn', 'vận đơn'].some((text) => lower.includes(text))
+    const buyerOrderCode = searchQuery.match(/\b(?:NOVA|ORD)[A-Z0-9-]{4,40}\b/i)?.[0] || null
+    const isOrderQuestion = ['đơn hàng', 'đơn của tôi', 'mã đơn', 'vận đơn'].some((text) => lower.includes(text)) || buyerOrderCode !== null
     const privilegedQuestion = sellerQuestion || adminQuestion
     const pageMatch = query.toLowerCase().match(/\btrang\s+(\d+)\b/)
     const page = pageMatch ? Number(pageMatch[1]) : 1
@@ -102,10 +137,11 @@ export async function chatWithAi(req, res, next) {
       if (!req.user) {
         aiResult = { reply: 'Bạn hãy đăng nhập và mở mục Đơn hàng để xem trạng thái đơn của mình.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [] }
       } else {
-        const result = await callDataApi(`/internal/v1/orders?userId=${encodeURIComponent(req.user.id)}&limit=20&offset=${offset}`)
+        // Hỏi theo mã đơn: lấy 100 đơn gần nhất rồi tìm đúng mã, vì Data API chưa có bộ lọc theo mã.
+        const result = await callDataApi(`/internal/v1/orders?userId=${encodeURIComponent(req.user.id)}&limit=${buyerOrderCode ? 100 : 20}&offset=${buyerOrderCode ? 0 : offset}`)
         if (!Array.isArray(result?.orders) || !Number.isSafeInteger(result.total)) throw new Error('Invalid orders')
-        const orders = result.orders.map((order) => `${order.code}: ${order.status}`).join('; ')
-        aiResult = { reply: orders ? `Các đơn của bạn: ${orders}. Bạn có thể xem chi tiết trong mục Đơn hàng.` : result.total ? 'Không có đơn hàng ở trang này.' : 'Bạn chưa có đơn hàng để hiển thị.', intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [], pagination: { page, total: result.total, hasMore: offset + result.orders.length < result.total } }
+        const { reply, pagination } = buildBuyerOrderReply({ result, text: query, code: buyerOrderCode, page, offset: buyerOrderCode ? 0 : offset })
+        aiResult = { reply, intent: 'order_tracking', intentTitle: 'Thông tin đơn hàng', products: [], pagination: buyerOrderCode ? undefined : pagination }
       }
     } else {
       const wantsProducts = consultantInsights?.wantsProductRecommendations === true
@@ -114,23 +150,34 @@ export async function chatWithAi(req, res, next) {
       let catalogPartial = false
       let catalogHasMore = null
 
+      let searchFilters = {}
+
       if (wantsProducts) {
-        const catalog = await findCatalogProducts(searchQuery, page)
+        // Câu như "gợi ý thêm", "rẻ hơn không" không có tên sản phẩm: dùng lại câu tìm sản phẩm gần nhất.
+        const priorProductQuestion = isPageFollowUp || extractSearchTerms(searchQuery).length > 0 ? '' : lastProductQuestion(allTurns)
+        const catalog = await findCatalogProducts(priorProductQuestion ? `${priorProductQuestion} ${searchQuery}` : searchQuery, page)
         const products = catalog.products
         catalogAvailable = catalog.available
         if (catalogAvailable === false) return res.status(503).json({ success: false, message: 'Chưa thể lấy dữ liệu sản phẩm ShopNova. Bạn hãy thử lại sau.', error: { code: 'DATA_API_UNAVAILABLE' } })
         catalogPartial = catalog.partial
         catalogHasMore = catalog.hasMore
-        ranked = aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights).slice(0, 15)
+        searchFilters = catalog.filters
+        // Khách yêu cầu sắp xếp rõ ràng (rẻ nhất, bán chạy...) thì giữ thứ tự đó, không xếp lại theo thói quen.
+        ranked = (searchFilters.sort ? products : aiBrainService.rankProductsByUserHabits(userKey, products, consultantInsights)).slice(0, 15)
       }
 
-      const recentHistory = (context.history || history).map((turn) => ({
-        userQuery: turn.isUser ? turn.text : undefined,
-        aiReply: turn.isUser ? undefined : turn.text,
-      }))
+      // Câu hỏi tiếp nối ("có màu đen không?") hoặc hỏi từ trang sản phẩm: nạp dữ liệu thật của sản phẩm đang bàn tới.
+      let focusProducts = []
+      if (context.productId != null || (!wantsProducts && consultantInsights?.isFollowUp)) {
+        const focusIds = context.productId != null ? [String(context.productId)]
+          : conversation.productIds.length ? conversation.productIds
+            : [brain.activeFocus?.lastDiscussedProductId]
+        focusProducts = await findProductsByIds(focusIds.filter(Boolean))
+      }
+
       const response = await generateGeminiShoppingAdvice({
         query,
-        conversationHistory: [...(brain.conversationHistory || []), ...recentHistory],
+        conversationHistory: turns,
         brainProfile: brain.profile,
         catalogProducts: ranked,
         catalogPartial,
@@ -138,6 +185,8 @@ export async function chatWithAi(req, res, next) {
         catalogHasMore,
         intent: consultantInsights?.intentCategory || 'product_recommendation',
         consultantInsights,
+        searchFilters,
+        focusProducts,
       })
       if (!response?.reply) {
         return res.status(503).json({ success: false, message: 'Nova AI tạm thời không khả dụng. Bạn hãy thử lại sau.', error: { code: 'AI_UNAVAILABLE' } })
@@ -178,6 +227,20 @@ export async function chatWithAi(req, res, next) {
       aiResult.reply += `\nTrang ${page}. ${aiResult.catalogHasMore === true ? `Bạn có thể hỏi trang ${page + 1}.` : aiResult.catalogHasMore === false ? 'Không còn trang tiếp theo trong kết quả đã tìm.' : 'Một phần kết quả tìm kiếm chưa khả dụng.'}`
     }
     if (!privilegedQuestion && !isOrderQuestion) aiBrainService.recordConversationTurn(userKey, { userQuery: query, aiReply: aiResult.reply, intent: aiResult.intent, products: aiResult.products })
+    if (req.user) {
+      // Lưu lịch sử không được làm hỏng câu trả lời: lỗi lưu chỉ được báo bằng historySaved=false.
+      // Tra cứu quản trị chứa dữ liệu người khác nên chỉ lưu dấu vết, không lưu nội dung.
+      try {
+        aiResult.conversationId = await saveTurn(req.user.id, conversation.conversationId, {
+          query, reply: aiResult.reply, intent: aiResult.intent, products: aiResult.products,
+          suggestions: aiResult.suggestions, pagination: aiResult.pagination, sensitive: adminQuestion,
+        })
+        aiResult.historySaved = true
+      } catch {
+        aiResult.conversationId = conversation.conversationId
+        aiResult.historySaved = false
+      }
+    }
     aiResult.brain = {
       learnedFacts: brain.profile.learnedFacts, preferredStyles: brain.profile.preferredStyles,
       location: brain.profile.location, stats: brain.stats, newlyLearned, consultantInsights,

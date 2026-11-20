@@ -6,6 +6,11 @@ import {
   recordAiBrainFeedback,
   resetAiBrain,
 } from '../controllers/ai.controller.js'
+import {
+  getConversationMessages,
+  listConversations,
+  removeConversation,
+} from '../controllers/ai-conversations.controller.js'
 
 const router = Router()
 
@@ -14,6 +19,16 @@ const router = Router()
  * POST /api/v1/ai/chat
  */
 router.post('/chat', (req, res, next) => req.headers.authorization ? authenticate(req, res, next) : next(), chatWithAi)
+
+/**
+ * Lịch sử trò chuyện của tài khoản đăng nhập
+ * GET    /api/v1/ai/conversations
+ * GET    /api/v1/ai/conversations/:id/messages
+ * DELETE /api/v1/ai/conversations/:id
+ */
+router.get('/conversations', authenticate, listConversations)
+router.get('/conversations/:id/messages', authenticate, getConversationMessages)
+router.delete('/conversations/:id', authenticate, removeConversation)
 
 /**
  * Lấy dữ liệu trí nhớ & sở thích mà AI đã học về người dùng

@@ -786,6 +786,38 @@ export async function syncCart(userId, items) {
 }
 
 /**
+ * Lịch sử trò chuyện Nova AI qua Data API nội bộ.
+ */
+export async function listAiConversations(userId, { limit = 20, offset = 0 } = {}) {
+  return await callDataApi(`/internal/v1/ai/conversations?userId=${encodeURIComponent(userId)}&limit=${limit}&offset=${offset}`)
+}
+
+export async function createAiConversation(userId, title) {
+  return await callDataApi('/internal/v1/ai/conversations', {
+    method: 'POST',
+    body: { userId, title },
+  })
+}
+
+export async function getAiConversationMessages(userId, conversationId, { limit = 50, beforeId = null } = {}) {
+  const before = beforeId ? `&beforeId=${encodeURIComponent(beforeId)}` : ''
+  return await callDataApi(`/internal/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages?userId=${encodeURIComponent(userId)}&limit=${limit}${before}`)
+}
+
+export async function appendAiConversationMessages(userId, conversationId, messages) {
+  return await callDataApi(`/internal/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    body: { userId, messages },
+  })
+}
+
+export async function deleteAiConversation(userId, conversationId) {
+  return await callDataApi(`/internal/v1/ai/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  })
+}
+
+/**
  * Quản lý phiên đăng nhập (Sessions) và đổi mật khẩu qua Data API nội bộ.
  */
 export async function createSession(userId, tokenHash, expiresAt) {

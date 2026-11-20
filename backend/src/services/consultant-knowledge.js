@@ -206,7 +206,9 @@ export function analyzeConsultantNeeds(queryText, previousBrainContext = {}) {
     text.includes('giá bao nhiêu') ||
     text.includes('ship về') ||
     text.includes('loại nào tốt hơn') ||
-    text.includes('bền không')
+    text.includes('bền không') ||
+    // Câu hỏi thuộc tính dạng "có màu đen không?", "còn hàng không?", "chất liệu gì vậy?"
+    /(?:^|\s)(?:màu|còn\s+hàng|hết\s+hàng|chất\s+liệu|kích\s+thước|trọng\s+lượng|xuất\s+xứ|bảo\s+hành)(?:\s|$).*(?:không|chưa|nào|gì|vậy|nhỉ)\s*\??\s*$/.test(text)
 
   if (isFollowUpPattern) {
     detectedNeeds.isFollowUp = true
