@@ -13,6 +13,7 @@ import cartRouter from './routes/cart.routes.js'
 import returnsRouter from './routes/returns.routes.js'
 import shippingRouter from './routes/shipping.routes.js'
 import chatRouter from './routes/chat.routes.js'
+import aiChatRouter from './routes/ai-chat.routes.js'
 import paymentsRouter from './routes/payments.routes.js'
 import settingsRouter from './routes/settings.routes.js'
 import marketingRouter from './routes/marketing.routes.js'
@@ -64,6 +65,7 @@ app.use(
   returnsRouter,
   shippingRouter,
   chatRouter,
+  aiChatRouter,
   paymentsRouter,
   marketingRouter,
   reportsRouter,
