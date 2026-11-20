@@ -128,6 +128,7 @@ try {
   assert.equal(store.conversations[0].title, 'Tìm tai nghe')
   assert.deepEqual(store.messages.map((m) => m.role), ['user', 'assistant'])
   assert.equal(store.messages[1].metadata.products[0].id, '1')
+  assert.deepEqual(store.messages[1].metadata.catalog, { page: 1, hasMore: false })
   assert.equal(providerRequest.generationConfig.temperature, 0.3)
   assert.equal(providerRequest.generationConfig.maxOutputTokens, 1024)
 

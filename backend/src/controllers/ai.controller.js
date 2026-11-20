@@ -233,7 +233,8 @@ export async function chatWithAi(req, res, next) {
       try {
         aiResult.conversationId = await saveTurn(req.user.id, conversation.conversationId, {
           query, reply: aiResult.reply, intent: aiResult.intent, products: aiResult.products,
-          suggestions: aiResult.suggestions, pagination: aiResult.pagination, sensitive: adminQuestion,
+          suggestions: aiResult.suggestions, pagination: aiResult.pagination,
+          catalogPage: aiResult.catalogPage, catalogHasMore: aiResult.catalogHasMore, sensitive: adminQuestion,
         })
         aiResult.historySaved = true
       } catch {

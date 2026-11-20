@@ -51,11 +51,13 @@ function buildTitle(query) {
   return Array.from(String(query).replace(/\s+/g, ' ').trim()).slice(0, 60).join('') || 'Cuộc trò chuyện mới'
 }
 
-function buildAssistantMetadata({ products, suggestions, pagination }) {
+function buildAssistantMetadata({ products, suggestions, pagination, catalogPage, catalogHasMore }) {
   const metadata = {}
   if (Array.isArray(products) && products.length) metadata.products = products.slice(0, 15)
   if (Array.isArray(suggestions) && suggestions.length) metadata.suggestions = suggestions.slice(0, 6)
   if (pagination) metadata.pagination = pagination
+  // Phân trang kết quả tìm sản phẩm, để giao diện dựng lại nút "Xem trang N" khi mở lại cuộc trò chuyện.
+  if (Number.isSafeInteger(catalogPage) && typeof catalogHasMore === 'boolean') metadata.catalog = { page: catalogPage, hasMore: catalogHasMore }
   if (!Object.keys(metadata).length) return null
   return Buffer.byteLength(JSON.stringify(metadata), 'utf8') <= MAX_METADATA_BYTES ? metadata : null
 }
@@ -65,7 +67,7 @@ function buildAssistantMetadata({ products, suggestions, pagination }) {
  * `sensitive` dùng cho tra cứu quản trị: dữ liệu tài khoản của người khác không được ghi lại.
  * Trả conversationId đã lưu.
  */
-export async function saveTurn(userId, conversationId, { query, reply, intent, products, suggestions, pagination, sensitive = false }) {
+export async function saveTurn(userId, conversationId, { query, reply, intent, products, suggestions, pagination, catalogPage, catalogHasMore, sensitive = false }) {
   const messages = sensitive
     ? [
         { role: 'user', content: REDACTED_TEXT, metadata: { redacted: true } },
@@ -73,7 +75,7 @@ export async function saveTurn(userId, conversationId, { query, reply, intent, p
       ]
     : [
         { role: 'user', content: query },
-        { role: 'assistant', content: reply.slice(0, 8000), intent, metadata: buildAssistantMetadata({ products, suggestions, pagination }) },
+        { role: 'assistant', content: reply.slice(0, 8000), intent, metadata: buildAssistantMetadata({ products, suggestions, pagination, catalogPage, catalogHasMore }) },
       ]
   const title = sensitive ? 'Tra cứu quản trị' : buildTitle(query)
 
