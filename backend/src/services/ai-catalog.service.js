@@ -121,15 +121,22 @@ export async function findCatalogProducts(query, page = 1) {
       if (product && product.id != null) unique.set(String(product.id), product)
     }
   }
+  // Khớp không dấu nên "nghe" cũng khớp danh mục "Công nghệ". Giữ sản phẩm khi tên khớp ít nhất một từ,
+  // hoặc danh mục/shop khớp đủ mọi từ (tìm theo tên shop, danh mục). Tránh trả thẻ sản phẩm không liên quan.
   let products = [...unique.values()].map((product) => {
-    const text = normalize([product.name, product.categoryName, product.shopName].join(' '))
-    return { product, score: words.length ? words.filter(([word]) => text.includes(word)).length : 1 }
-  }).filter((item) => item.score > 0)
+    const nameText = normalize(product.name)
+    const allText = normalize([product.name, product.categoryName, product.shopName].join(' '))
+    const nameMatches = words.filter(([word]) => nameText.includes(word)).length
+    const allMatches = words.filter(([word]) => allText.includes(word)).length
+    const keep = !words.length || nameMatches > 0 || allMatches === words.length
+    return { product, keep, score: words.length ? allMatches + nameMatches : 1 }
+  }).filter((item) => item.keep)
   const sortValue = SORT_FIELDS[filters.sort]
   products.sort((a, b) => b.score - a.score || (sortValue ? sortValue(a.product) - sortValue(b.product) : 0))
   products = products.map((item) => item.product)
   const partial = successful.length < results.length
-  const hasMore = successful.some(result => offset + result.value.products.length < result.value.total) ? true : partial ? null : false
+  // Đã lọc bỏ kết quả không liên quan nên không còn trang nào để xem tiếp nếu danh sách rỗng.
+  const hasMore = !products.length ? false : successful.some(result => offset + result.value.products.length < result.value.total) ? true : partial ? null : false
   return { products, available: successful.length > 0, partial, hasMore, filters }
 }
 

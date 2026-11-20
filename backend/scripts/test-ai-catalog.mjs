@@ -11,7 +11,7 @@ const dataApi = http.createServer((req, res) => {
   if (failing.has(q)) return res.writeHead(503).end(JSON.stringify({ success: false, message: 'Tạm ngưng' }))
   const offset = Number(url.searchParams.get('offset'))
   const products = q === 'tai' || q === 'nghe'
-    ? [{ id: '201', name: 'Tai nghe thật', categoryName: 'Điện tử' }]
+    ? [{ id: '201', name: 'Tai nghe thật', categoryName: 'Điện tử' }, ...(q === 'nghe' ? [{ id: '202', name: 'Chuột không dây', categoryName: 'Điện tử & Công nghệ' }] : [])]
     : q === 'balo' ? [{ id: String(offset + 1), name: 'Balo kiểm thử', categoryName: 'Túi' }] : []
   return res.end(JSON.stringify({ success: true, data: { products, total: q === 'balo' ? 1002 : products.length } }))
 })
