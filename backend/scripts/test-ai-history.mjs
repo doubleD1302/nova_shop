@@ -67,7 +67,8 @@ const dataApi = http.createServer((req, res) => {
       productRequests.push(Object.fromEntries(url.searchParams))
       const products = url.searchParams.get('ids') === '1'
         ? [{ id: '1', name: 'Tai nghe kiểm thử', price: 199000, categoryName: 'Điện tử', shopName: 'Shop A', stock: 7, rating: 4.5, sold: 20, variants: [{ id: '11', name: 'Đen', attributes: { color: 'Đen' }, price: 199000, stock: 7 }] }]
-        : [{ id: '1', name: 'Tai nghe kiểm thử', price: 199000, categoryName: 'Điện tử', images: [], stock: 7 }]
+        : url.searchParams.get('location') ? []
+          : [{ id: '1', name: 'Tai nghe kiểm thử', price: 199000, categoryName: 'Điện tử', images: [], stock: 7, location: 'TP. Hồ Chí Minh' }]
       return sendJson(res, 200, { success: true, data: { products, total: products.length } })
     }
     if (url.pathname === '/internal/v1/orders') {
@@ -208,6 +209,18 @@ try {
   productRequests.length = 0
   await chat('có mẫu rẻ hơn không', ids.buyer)
   assert.ok(productRequests.some((request) => request.q === 'tai') && productRequests.every((request) => request.sort === 'price-asc'))
+
+  // 9b. Địa điểm là ưu tiên mềm: không có ở Hà Nội thì gợi ý nơi khác và Nova được dặn nói rõ
+  productRequests.length = 0
+  const relaxed = await chat('Tìm tai nghe ở Hà Nội', ids.buyer, { newConversation: true })
+  assert.equal(relaxed.body.data.catalogLocationRelaxed, true)
+  assert.equal(relaxed.body.data.products[0].location, 'TP. Hồ Chí Minh')
+  assert.ok(productRequests.some((request) => request.location === 'Hà Nội') && productRequests.some((request) => !request.location))
+  assert.ok(promptOf().includes('KHÔNG có sản phẩm khớp ở đó') && promptOf().includes('Hà Nội'))
+  // "tai nghe khác" giữ khu vực và giá của câu trước
+  productRequests.length = 0
+  await chat('có tai nghe khác không', ids.buyer)
+  assert.ok(productRequests.some((request) => request.location === 'Hà Nội'))
 
   // 10. Đơn hàng của người mua: theo mã, theo trạng thái, đúng nhãn tiếng Việt
   const byCode = await chat('Đơn NOVA1ABC đến đâu rồi?', ids.buyer)

@@ -14,6 +14,7 @@ function toProductContext(product) {
     originalPrice: product.originalPrice ?? null,
     category: product.categoryName,
     shop: product.shopName,
+    location: product.location,
     rating: product.rating,
     sold: product.sold,
     stock: product.stock,
@@ -40,6 +41,11 @@ function describeFilters(filters = {}) {
   else if (filters.minPrice !== undefined) parts.push(`giá từ ${formatVnd(filters.minPrice)} trở lên`)
   if (filters.sort) parts.push(`sắp xếp theo ${SORT_LABELS[filters.sort] || filters.sort}`)
   if (filters.freeship) parts.push('chỉ sản phẩm miễn phí vận chuyển')
+  if (filters.location) {
+    parts.push(filters.locationRelaxed
+      ? `khách muốn nhận ở ${filters.location} nhưng KHÔNG có sản phẩm khớp ở đó; danh sách dưới đây là sản phẩm cùng loại ở khu vực khác. Hãy nói rõ điều này và nêu nơi gửi hàng (trường location) của từng sản phẩm bạn giới thiệu`
+      : `chỉ các shop ở ${filters.location}`)
+  }
   return parts.length ? `=== BỘ LỌC ĐÃ ÁP DỤNG KHI TÌM SẢN PHẨM ===\n${parts.join('; ')}\n\n` : ''
 }
 
@@ -129,6 +135,8 @@ CÁC NGUYÊN TẮC BẮT BUỘC KHI TƯ VẤN:
 - Khi khách hỏi màu, size, loại hoặc còn hàng, đối chiếu mục "variants" của sản phẩm: có thì nêu đúng tên biến thể, giá và tồn kho; không có thì nói rõ ShopNova chưa có biến thể đó.
 - Danh sách sản phẩm đã được lọc theo bộ lọc (giá, sắp xếp) nếu có. Nếu danh sách rỗng, nói rõ chưa có sản phẩm khớp tiêu chí và gợi ý nới khoảng giá hoặc đổi từ khóa; không bịa sản phẩm.
 - Nếu câu hỏi mơ hồ và không có sản phẩm đang được bàn tới, hỏi lại đúng một câu ngắn thay vì đoán.
+- Chỉ nói về các sản phẩm có trong danh sách được cung cấp. Không viết kiểu "danh mục hiện có gồm…" hay "ShopNova chưa bán…" như thể đã xem toàn bộ danh mục; hãy nói "trong kết quả Nova tìm được".
+- Chỉ giới thiệu sản phẩm thực sự đúng loại khách hỏi. Nếu có sản phẩm đúng loại nhưng khác điều kiện (khu vực, giá), hãy giới thiệu và nói rõ điểm khác thay vì chỉ trả lời là không có.
 1. GHI NHỚ LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ: Đọc kỹ các lượt hỏi - đáp đã có ở trên. Nếu câu hỏi hiện tại là câu hỏi tiếp nối (ví dụ: "có màu đen không?", "giá bao nhiêu?", "có chống nước không?", "so với cái kia thì sao?"), hãy kế thừa ngay sản phẩm và thông tin ở lượt trước. TUYỆT ĐỐI KHÔNG bắt khách nhắc lại từ đầu và KHÔNG hỏi lại ngân sách/size/địa chỉ đã được khách cung cấp.
 2. TRẢ LỜI NGẮN GỌN, ĐÚNG TRỌNG TÂM & LOGIC: Không chào hỏi rườm rà. Đi thẳng vào câu trả lời giải quyết chính xác điều khách muốn ở câu hỏi đó. Dung lượng lý tưởng: 70 - 150 từ, cô đọng, sắc bén, lập luận chặt chẽ.
 3. CƠ SỞ KIẾN THỨC CHUYÊN MÔN TƯ VẤN VIÊN:

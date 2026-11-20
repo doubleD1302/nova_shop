@@ -10,6 +10,8 @@ const STOP_WORDS = new Set([
   'giam', 'mien', 'phi', 'van', 'chuyen', 'it', 'thieu', 'lon', 'nho', 'vnd', 'tr',
   // Lời nối tiếp hội thoại.
   'khac', 'them', 'tuong', 'goi', 'xuat', 'gioi', 'thieu', 'cung', 'nua', 'cai', 'nay', 'kia',
+  // Cụm chỉ địa điểm nhận hàng (đã đổi thành bộ lọc).
+  'khu', 'vuc',
 ])
 const normalize = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd')
 
@@ -29,9 +31,37 @@ function toVnd(numberText, unit, fraction) {
   return vnd >= 1000 && vnd <= 1000000000 ? vnd : null
 }
 
+// Địa điểm hay gặp. Data API so khớp một phần với tỉnh/thành của shop nên dùng tên không có "TP.".
+const LOCATIONS = [
+  ['Hà Nội', 'ha noi|hanoi'],
+  ['Hồ Chí Minh', 'ho chi minh|tp ?hcm|tphcm|hcm|sai gon'],
+  ['Đà Nẵng', 'da nang'],
+  ['Hải Phòng', 'hai phong'],
+  ['Cần Thơ', 'can tho'],
+].map(([name, words]) => [name, new RegExp(`(?:\\b(?:khu vuc|o|tai|gan|giao ve|giao den|noi nhan)\\s+)?\\b(?:${words})\\b`)])
+
+/**
+ * Tách địa điểm khỏi câu hỏi. `rest` là câu đã bỏ cụm địa điểm (cắt theo vị trí ký tự nên giữ nguyên dấu của phần còn lại).
+ */
+export function splitLocation(query) {
+  const chars = [...String(query).normalize('NFC')]
+  const flat = chars.map((char) => {
+    const plain = char.length === 1 ? normalize(char) : ' '
+    return plain.length === 1 ? plain : ' '
+  }).join('')
+  for (const [location, pattern] of LOCATIONS) {
+    const match = pattern.exec(flat)
+    if (match) {
+      const end = match.index + match[0].length
+      return { location, rest: chars.map((char, index) => (index >= match.index && index < end ? ' ' : char)).join('') }
+    }
+  }
+  return { location: null, rest: String(query) }
+}
+
 /**
  * Hiểu giá, kiểu sắp xếp và điều kiện giao hàng từ câu hỏi để Data API lọc đúng thay vì chỉ khớp từ khóa.
- * Trả về các khóa không rỗng trong { minPrice, maxPrice, sort, freeship }.
+ * Trả về các khóa không rỗng trong { minPrice, maxPrice, sort, freeship, location }.
  */
 export function parseSearchFilters(query) {
   const text = normalize(query)
@@ -74,17 +104,25 @@ export function parseSearchFilters(query) {
   else if (/\b(?:moi nhat|hang moi|moi ve)\b/.test(text)) filters.sort = 'newest'
 
   if (/\b(?:freeship|free ship|mien phi van chuyen|mien phi ship)\b/.test(text)) filters.freeship = true
+  const { location } = splitLocation(query)
+  if (location) filters.location = location
   return filters
 }
 
 /**
- * Từ khóa tên sản phẩm: bỏ từ phổ thông, số tiền và đơn vị, tối đa 3 từ khác nhau.
+ * Từ khóa tên sản phẩm theo thứ tự trong câu: bỏ từ phổ thông, số tiền, đơn vị và cụm địa điểm; tối đa 5 từ khác nhau.
+ * Mỗi phần tử là [dạng không dấu, dạng gốc].
  */
 export function extractSearchTerms(query) {
-  return [...new Map((String(query).match(/[\p{L}\p{N}]+/gu) || [])
-    .map((word) => [normalize(word), word])
-    .filter(([word]) => word.length >= 2 && !/^\d/.test(word) && !STOP_WORDS.has(word))).entries()]
-    .slice(0, 3)
+  const seen = new Set()
+  const terms = []
+  for (const word of splitLocation(query).rest.match(/[\p{L}\p{N}]+/gu) || []) {
+    const key = normalize(word)
+    if (key.length < 2 || /^\d/.test(key) || STOP_WORDS.has(key) || seen.has(key)) continue
+    seen.add(key)
+    terms.push([key, word])
+  }
+  return terms.slice(0, 5)
 }
 
 const SORT_FIELDS = {
@@ -94,50 +132,88 @@ const SORT_FIELDS = {
   popular: (product) => -(Number(product.sold) || 0),
 }
 
-export async function findCatalogProducts(query, page = 1) {
-  const words = extractSearchTerms(query)
-  const filters = parseSearchFilters(query)
-  const hasFilters = Object.keys(filters).length > 0
-  if (!words.length && !hasFilters) return { products: [], available: null, partial: false, hasMore: null, filters }
-  const offset = (page - 1) * 5
+// Tiếng Việt viết từng âm tiết ("sơ mi", "tai nghe"), nên tìm theo cụm trước rồi mới tới từng từ.
+function buildSearches(terms) {
+  const words = terms.map(([, word]) => word)
+  const phrases = []
+  if (words.length >= 3) phrases.push(words.slice(0, 3).join(' '))
+  if (words.length >= 2) phrases.push(words.slice(words.length >= 3 ? 1 : 0, 3).join(' '))
+  return [...new Set([...phrases, ...words])].slice(0, 4)
+}
 
-  const params = new URLSearchParams({ limit: '5', offset: String(offset) })
-  for (const key of ['minPrice', 'maxPrice', 'sort']) if (filters[key] !== undefined) params.set(key, String(filters[key]))
-  if (filters.freeship) params.set('freeship', '1')
+// So khớp theo nguyên từ (không phải chuỗi con) để "mi" không khớp "gaming", "ao" không khớp "thao".
+const tokensOf = (text) => new Set(normalize(text).match(/[a-z0-9]+/g) || [])
+// Câu ngắn (tới 3 từ) phải khớp đủ; câu dài có từ mô tả không nằm trong tên ("công sở") thì cho thiếu một phần.
+const requiredMatches = (count) => (count <= 3 ? count : Math.ceil(count * 0.6))
 
-  // Mỗi từ tìm qua API danh mục, thay vì chỉ quét trang đầu không lọc. Không có từ khóa nhưng có bộ lọc: một truy vấn chỉ theo bộ lọc.
-  const searches = words.length ? words.map(([, word]) => word) : [null]
-  const results = await Promise.allSettled(searches.map(async (word) => {
-    const wordParams = new URLSearchParams(params)
-    if (word) wordParams.set('q', word)
-    const data = await callDataApi(`/internal/v1/products?${wordParams}`)
+async function searchProducts(searches, baseParams, location) {
+  return Promise.allSettled(searches.map(async (query) => {
+    const params = new URLSearchParams(baseParams)
+    if (query) params.set('q', query)
+    if (location) params.set('location', location)
+    const data = await callDataApi(`/internal/v1/products?${params}`)
     if (!Array.isArray(data?.products) || !Number.isSafeInteger(data.total) || data.total < 0) throw new Error('Invalid catalog response')
     return data
   }))
-  const successful = results.filter((result) => result.status === 'fulfilled')
+}
+
+// Gộp kết quả các truy vấn, giữ sản phẩm thực sự đúng loại: tên khớp đủ số từ cần thiết, hoặc danh mục/shop khớp đủ mọi từ
+// (tìm theo tên shop, danh mục). Tránh trả thẻ sản phẩm không liên quan.
+function pickRelevant(results, terms, sortValue) {
   const unique = new Map()
-  for (const result of successful) {
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
     for (const product of result.value.products) {
       if (product && product.id != null) unique.set(String(product.id), product)
     }
   }
-  // Khớp không dấu nên "nghe" cũng khớp danh mục "Công nghệ". Giữ sản phẩm khi tên khớp ít nhất một từ,
-  // hoặc danh mục/shop khớp đủ mọi từ (tìm theo tên shop, danh mục). Tránh trả thẻ sản phẩm không liên quan.
-  let products = [...unique.values()].map((product) => {
-    const nameText = normalize(product.name)
-    const allText = normalize([product.name, product.categoryName, product.shopName].join(' '))
-    const nameMatches = words.filter(([word]) => nameText.includes(word)).length
-    const allMatches = words.filter(([word]) => allText.includes(word)).length
-    const keep = !words.length || nameMatches > 0 || allMatches === words.length
-    return { product, keep, score: words.length ? allMatches + nameMatches : 1 }
+  const scored = [...unique.values()].map((product) => {
+    const nameTokens = tokensOf(product.name)
+    const allTokens = tokensOf([product.name, product.categoryName, product.shopName].join(' '))
+    const nameMatches = terms.filter(([key]) => nameTokens.has(key)).length
+    const allMatches = terms.filter(([key]) => allTokens.has(key)).length
+    const keep = !terms.length || nameMatches >= requiredMatches(terms.length) || allMatches === terms.length
+    return { product, keep, score: terms.length ? allMatches + nameMatches : 1 }
   }).filter((item) => item.keep)
+  scored.sort((a, b) => b.score - a.score || (sortValue ? sortValue(a.product) - sortValue(b.product) : 0))
+  return scored.map((item) => item.product)
+}
+
+export async function findCatalogProducts(query, page = 1) {
+  const terms = extractSearchTerms(query)
+  const filters = parseSearchFilters(query)
+  const hasFilters = Object.keys(filters).length > 0
+  if (!terms.length && !hasFilters) return { products: [], available: null, partial: false, hasMore: null, filters }
+  const offset = (page - 1) * 5
+
+  const baseParams = new URLSearchParams({ limit: '5', offset: String(offset) })
+  for (const key of ['minPrice', 'maxPrice', 'sort']) if (filters[key] !== undefined) baseParams.set(key, String(filters[key]))
+  if (filters.freeship) baseParams.set('freeship', '1')
+
+  // Không có từ khóa nhưng có bộ lọc: một truy vấn chỉ theo bộ lọc.
+  const searches = terms.length ? buildSearches(terms) : [null]
   const sortValue = SORT_FIELDS[filters.sort]
-  products.sort((a, b) => b.score - a.score || (sortValue ? sortValue(a.product) - sortValue(b.product) : 0))
-  products = products.map((item) => item.product)
+  let results = await searchProducts(searches, baseParams, filters.location)
+  let products = pickRelevant(results, terms, sortValue)
+  let locationRelaxed = false
+
+  // Địa điểm là ưu tiên, không phải điều kiện bắt buộc: trang đầu không có sản phẩm ở nơi khách muốn
+  // thì gợi ý cùng loại ở khu vực khác và đánh dấu để Nova nói rõ điều đó.
+  if (filters.location && !products.length && results.some((result) => result.status === 'fulfilled')) {
+    const relaxed = await searchProducts(searches, baseParams, null)
+    const relaxedProducts = pickRelevant(relaxed, terms, sortValue)
+    if (relaxedProducts.length) {
+      results = relaxed
+      products = relaxedProducts
+      locationRelaxed = true
+    }
+  }
+
+  const successful = results.filter((result) => result.status === 'fulfilled')
   const partial = successful.length < results.length
   // Đã lọc bỏ kết quả không liên quan nên không còn trang nào để xem tiếp nếu danh sách rỗng.
-  const hasMore = !products.length ? false : successful.some(result => offset + result.value.products.length < result.value.total) ? true : partial ? null : false
-  return { products, available: successful.length > 0, partial, hasMore, filters }
+  const hasMore = !products.length ? false : successful.some((result) => offset + result.value.products.length < result.value.total) ? true : partial ? null : false
+  return { products, available: successful.length > 0, partial, hasMore, filters: locationRelaxed ? { ...filters, locationRelaxed: true } : filters }
 }
 
 /**

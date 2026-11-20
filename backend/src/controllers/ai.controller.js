@@ -154,7 +154,9 @@ export async function chatWithAi(req, res, next) {
 
       if (wantsProducts) {
         // Câu như "gợi ý thêm", "rẻ hơn không" không có tên sản phẩm: dùng lại câu tìm sản phẩm gần nhất.
-        const priorProductQuestion = isPageFollowUp || extractSearchTerms(searchQuery).length > 0 ? '' : lastProductQuestion(allTurns)
+        // "áo khác", "thêm mẫu nữa" nhắc lại loại hàng nhưng vẫn muốn giữ giá, khu vực của câu trước.
+        const wantsMore = /(?:^|\s)(?:khác|nữa|thêm|tương tự)(?:\s|$)/i.test(searchQuery)
+        const priorProductQuestion = isPageFollowUp || (extractSearchTerms(searchQuery).length > 0 && !wantsMore) ? '' : lastProductQuestion(allTurns)
         const catalog = await findCatalogProducts(priorProductQuestion ? `${priorProductQuestion} ${searchQuery}` : searchQuery, page)
         const products = catalog.products
         catalogAvailable = catalog.available
@@ -204,10 +206,11 @@ export async function chatWithAi(req, res, next) {
         catalogPartial,
         catalogPage: page,
         catalogHasMore,
+        catalogLocationRelaxed: searchFilters.locationRelaxed === true,
         products: ranked.map((product) => ({
           id: product.id, name: product.name, price: product.price,
           originalPrice: product.originalPrice, rating: product.rating, sold: product.sold,
-          mall: product.shopMall, imageUrl: product.images?.[0]?.url, categoryName: product.categoryName,
+          mall: product.shopMall, imageUrl: product.images?.[0]?.url, categoryName: product.categoryName, location: product.location,
         })),
         suggestions: consultantInsights?.suggestedPrompts || (wantsProducts ? [
           '✨ Gợi ý thêm sản phẩm tương tự',
