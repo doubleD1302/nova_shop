@@ -308,6 +308,13 @@ body {
 .nova-history-note { margin: 8px 0; color: #8B7566; font-size: 11px; line-height: 1.7; }
 .nova-history-error { color: #B3402F; }
 .nova-load-older { display: flex; margin: 0 auto 18px; }
+.nova-product-context { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; padding: 2px 4px 2px 12px; border: 1px solid #E6D5C2; border-radius: 9px; background: #FAF6F0; color: #80513B; font-size: 11px; }
+.nova-product-context-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nova-product-context-clear { min-width: 28px; min-height: 28px; flex-shrink: 0; }
+.nova-ask-product { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border-top: 1px solid #EEE5DA; background: #FAF6F0; color: #8B7566; font-size: 12px; }
+.nova-ask-product button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #D8C8B7; border-radius: 9px; background: #FFFCF7; color: #80513B; font-weight: 600; cursor: pointer; }
+.nova-ask-product button:hover { background: #F5EFE7; }
+.nova-ask-product button:focus-visible { outline: 2px solid #BD6E49; outline-offset: 2px; }
 .nova-guest-note { margin-top: 10px; color: #8B7566; font-size: 11px; }
 .nova-guest-note a { color: #80513B; font-weight: 600; text-decoration: underline; }
 @media (min-width: 1024px) {

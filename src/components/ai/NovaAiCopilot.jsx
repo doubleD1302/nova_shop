@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { IconArrowRight, IconCart, IconCheck, IconClose, IconExpand, IconHistory, IconMic, IconPackage, IconPlus, IconSearch, IconSend, IconThumbsDown, IconThumbsUp, IconTrash } from '../ui/Icons'
 import { useCart } from '../../context/CartContext'
 import { useAuth } from '../../context/AuthContext'
@@ -76,6 +76,13 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   const [hasMoreOlder, setHasMoreOlder] = useState(false)
   const conversationRef = useRef(null)
   const startNewRef = useRef(false)
+  // Sản phẩm khách đang hỏi (mở từ trang chi tiết sản phẩm). Backend dùng productId để nạp dữ liệu thật của sản phẩm đó.
+  const [productContext, setProductContext] = useState(null)
+  const productContextRef = useRef(null)
+  productContextRef.current = productContext
+  // Rời trang sản phẩm thì bỏ ngữ cảnh sản phẩm để không gắn nhầm vào câu hỏi khác.
+  const { pathname } = useLocation()
+  useEffect(() => { setProductContext(null) }, [pathname])
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const skipScrollRef = useRef(false)
@@ -89,6 +96,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
     setShowHistory(false)
     setHistoryError('')
     setHasMoreOlder(false)
+    setProductContext(null)
     conversationRef.current = null
     startNewRef.current = false
   }, [sessionKey])
@@ -114,6 +122,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
       setHasMoreOlder(Boolean(data?.hasMore))
       conversationRef.current = String(data.conversation.id)
       startNewRef.current = false
+      setProductContext(null)
       setShowHistory(false)
     } catch (error) {
       if (requestedSession === sessionRef.current) setHistoryError(error.message)
@@ -189,6 +198,10 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   useEffect(() => {
     const handleOpenEvent = (e) => {
       setIsOpen(true)
+      setShowHistory(false)
+      // Mở từ trang sản phẩm: ghi nhớ sản phẩm để các câu hỏi sau gắn đúng sản phẩm đó.
+      // Chỉ nhận ID số như Backend yêu cầu; ID lạ sẽ làm cả yêu cầu bị từ chối.
+      if (/^[1-9]\d{0,19}$/.test(String(e?.detail?.productId ?? ''))) setProductContext({ id: String(e.detail.productId), name: e.detail.productName || 'sản phẩm này' })
       inputRef.current?.focus()
       if (e?.detail?.query) {
         setTimeout(() => handleSendMessage(e.detail.query), 150)
@@ -245,6 +258,7 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
       const context = { history: recentHistory }
       if (user && conversationRef.current) context.conversationId = conversationRef.current
       if (user && startNewRef.current) context.newConversation = true
+      if (productContextRef.current) context.productId = productContextRef.current.id
       const response = await apiSendAiMessage(text, context)
       if (requestedSession !== sessionRef.current) return
       const aiData = response?.data || {}
@@ -639,6 +653,14 @@ export default function NovaAiCopilot({ initialOpen = false, fullPage = false })
   function renderInputBar() {
     return (
       <div className="nova-composer">
+        {productContext ? (
+          <div className="nova-product-context">
+            <span className="nova-product-context-name">Đang hỏi về: {productContext.name}</span>
+            <button type="button" onClick={() => setProductContext(null)} aria-label="Bỏ ngữ cảnh sản phẩm" className="nova-icon-button nova-product-context-clear">
+              <IconClose className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
         <form onSubmit={(event) => { event.preventDefault(); handleSendMessage() }} className="nova-input-wrap">
           <input
             ref={inputRef}

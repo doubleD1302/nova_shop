@@ -29,7 +29,7 @@ Tài khoản đã đăng nhập có lịch sử lưu trong database qua Data API
 | Endpoint | Mô tả |
 |---|---|
 | `GET /api/v1/ai/conversations?limit=&offset=` | Danh sách cuộc trò chuyện (limit 1–50, mặc định 20). `data.conversations[]` gồm `id, title, messageCount, lastMessageAt, createdAt`; `data.pagination` gồm `limit, offset, total, hasMore`. |
-| `GET /api/v1/ai/conversations/:id/messages?limit=&beforeId=` | Tối đa `limit` (1–100, mặc định 50) tin gần nhất, cũ → mới, kèm `hasMore`. `beforeId` là id tin cũ nhất đang có để tải trang cũ hơn. Mỗi tin có `id, role (user/assistant), content, intent, metadata, createdAt`; `metadata` của tin assistant có thể có `products`, `suggestions`, `pagination` để dựng lại giao diện. |
+| `GET /api/v1/ai/conversations/:id/messages?limit=&beforeId=` | Tối đa `limit` (1–100, mặc định 50) tin gần nhất, cũ → mới, kèm `hasMore`. `beforeId` là id tin cũ nhất đang có để tải trang cũ hơn. Mỗi tin có `id, role (user/assistant), content, intent, metadata, createdAt`; `metadata` của tin assistant có thể có `products`, `suggestions`, `pagination`, `catalog` để dựng lại giao diện. |
 | `DELETE /api/v1/ai/conversations/:id` | Xóa cuộc trò chuyện và toàn bộ tin nhắn. |
 
 Cả ba yêu cầu Bearer token (`401` nếu thiếu), `400 VALIDATION_ERROR` cho tham số sai và `404 CONVERSATION_NOT_FOUND` khi cuộc trò chuyện không tồn tại hoặc thuộc tài khoản khác. `DELETE /ai/brain/reset` chỉ đặt lại hồ sơ sở thích, không xóa lịch sử.
@@ -51,4 +51,5 @@ Cả hai chỉ hiện lịch sử khi đã đăng nhập; khách thấy lời nh
 - Mở Nova: tải danh sách cuộc trò chuyện và tự mở lại cuộc gần nhất nếu còn trong 12 giờ, cùng quy tắc với Backend. Lượt gửi sau luôn kèm `context.conversationId`.
 - "Cuộc trò chuyện mới" xóa màn hình và gửi `context.newConversation: true` ở lượt kế tiếp. Trên app, mục này không còn đặt lại ký ức của Nova; việc đó chuyển sang mục "Xóa ký ức của Nova".
 - Lịch sử: mở lại (dựng lại thẻ sản phẩm từ `metadata.products`), xóa sau khi xác nhận, "Xem tin cũ hơn" khi `hasMore`. Nếu cuộc trò chuyện đã bị xóa ở nơi khác (`CONVERSATION_NOT_FOUND`), giao diện báo và lần gửi sau mở cuộc mới.
-- `context.productId` đã được Backend hỗ trợ nhưng chưa có màn hình nào gửi; cần nút "Hỏi Nova về sản phẩm này" ở trang chi tiết sản phẩm.
+- Hỏi về sản phẩm đang xem: trang chi tiết sản phẩm (web: nút "Hỏi Nova về sản phẩm này" gửi sự kiện `open-nova-ai` kèm `productId`; app: nút Nova AI truyền `productId` vào `NovaAIScreen`) làm Nova gửi `context.productId` ở mọi tin cho tới khi khách bấm bỏ ngữ cảnh, và hiện dòng "Đang hỏi về…". Chỉ gửi khi ID là số nguyên dương như Backend yêu cầu (ID dữ liệu mẫu dạng `p01` bị bỏ qua, vì Backend từ chối cả yêu cầu nếu ID sai dạng). Web tự bỏ ngữ cảnh khi chuyển trang.
+- Phân trang: `metadata.catalog` (`{ page, hasMore }`) của tin trả lời tìm sản phẩm cho phép app dựng lại nút "Xem trang N" khi mở lại cuộc trò chuyện (chỉ ở câu trả lời cuối). Web không hiển thị nút trang ở cả tin mới lẫn tin đã lưu.

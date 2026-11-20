@@ -140,6 +140,16 @@ export default function ProductDetailPage() {
             }}
           />
         </div>
+        <div className="nova-ask-product">
+          <span>Cần tư vấn về màu, size hay tồn kho của sản phẩm này?</span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-nova-ai', { detail: { productId: product.id, productName: product.name } }))}
+          >
+            <img src="/images/nova-mark.svg" alt="" className="h-4 w-4" />
+            Hỏi Nova về sản phẩm này
+          </button>
+        </div>
         <ShopCard
           shop={shop}
           onFollow={onFollow}
