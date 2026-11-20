@@ -524,9 +524,10 @@ export async function apiGetAiBrainProfile() {
 }
 
 export async function apiSendAiBrainFeedback(feedbackData) {
+  // apiRequest đã tự mã hóa JSON; truyền object, không truyền chuỗi đã mã hóa.
   const response = await apiRequest('/ai/brain/feedback', {
     method: 'POST',
-    body: JSON.stringify(feedbackData),
+    body: feedbackData,
   })
   if (!response.ok) return null
   return response.json()
