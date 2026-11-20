@@ -34,3 +34,7 @@ Giới hạn: `content` của `user` ≤ 4.000 ký tự, của `assistant` ≤ 8
 ## Kiểm tra
 
 `node scripts/test-ai-chat.mjs` tại `data-api/` chạy các câu SQL của controller trên SQLite trong bộ nhớ (không cần MySQL, không đụng database dev). Bài này kiểm tra hợp đồng, chủ sở hữu, giới hạn số tin/số cuộc và việc xóa kèm tin nhắn, **không** chứng nhận cú pháp trên MySQL/TiDB thật: cần chạy migration trên môi trường dev/test đã xác định rồi thử một lượt lưu/đọc/xóa trước khi dùng thật.
+
+## Kết quả trên TiDB dev
+
+Ngày 20/11/2026 migration `2026-11-20-ai-chat-history.sql` đã áp dụng vào TiDB dev `shopnova_dev` (TiDB v8.5.3 serverless, chưa phải MySQL 8) bằng tài khoản quản trị; hai bảng và hai khóa ngoại được tạo, `users.id` là `bigint unsigned` nên khớp. Sau đó chạy chính code Data API trên database này với một cuộc trò chuyện tạm của một tài khoản buyer có sẵn: tạo, lưu hai tin (cột JSON `metadata` đọc lại đúng), đọc, liệt kê, tài khoản khác nhận 404, xóa. Bản ghi tạm đã xóa hết. Chưa thử: truy cập đồng thời cùng một cuộc trò chuyện, khóa `FOR UPDATE` dưới tải, và đường Backend → Gemini thật.
