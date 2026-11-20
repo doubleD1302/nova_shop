@@ -21,6 +21,7 @@ import '../../widgets/common/nova_assets.dart';
 /// - GET    /api/v1/ai/brain/profile
 /// - POST   /api/v1/ai/brain/feedback
 /// - DELETE /api/v1/ai/brain/reset
+/// - GET    /api/v1/ai/conversations, GET .../:id/messages, DELETE .../:id (lịch sử trò chuyện)
 class NovaAIScreen extends StatefulWidget {
   final bool isStandalone;
   final String? initialQuery;
@@ -72,8 +73,17 @@ class _NovaAIScreenState extends State<NovaAIScreen>
       '${AuthService().currentUser?.id ?? 'guest'}:${AuthService().currentUser?.role ?? 'guest'}';
   List<_AiChatMessage> get _messages => _sessionMessages;
 
+  // Cuộc trò chuyện đang mở trên server (chỉ tài khoản đăng nhập). _startNewConversation bắt Backend tạo cuộc mới
+  // vì mặc định Backend nối tiếp cuộc gần nhất trong 12 giờ.
+  static String? _conversationId;
+  static bool _startNewConversation = false;
+  bool _hasMoreOlder = false;
+  bool _historyBusy = false;
+
   static void resetSessionForTest() {
     _sessionMessages.clear();
+    _conversationId = null;
+    _startNewConversation = false;
   }
 
   @override
@@ -82,11 +92,14 @@ class _NovaAIScreenState extends State<NovaAIScreen>
     _httpClient = widget.httpClient ?? http.Client();
     if (_sessionOwner != _currentOwner) {
       _sessionMessages.clear();
+      _conversationId = null;
+      _startNewConversation = false;
       _sessionOwner = _currentOwner;
     }
     AuthService().addListener(_onAuthChanged);
 
     _loadBrainProfile();
+    _restoreLatestConversation();
 
     if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,6 +124,9 @@ class _NovaAIScreenState extends State<NovaAIScreen>
     if (!mounted) return;
     setState(() {
       _sessionMessages.clear();
+      _conversationId = null;
+      _startNewConversation = false;
+      _hasMoreOlder = false;
       _isThinking = false;
       _learnedFacts = [];
       _preferredStyles = [];
@@ -119,6 +135,218 @@ class _NovaAIScreenState extends State<NovaAIScreen>
       _acceptedRecommendations = 0;
     });
     _loadBrainProfile();
+    _restoreLatestConversation();
+  }
+
+  // ---- Lịch sử trò chuyện: GET/DELETE /api/v1/ai/conversations ----
+
+  Map<String, String>? _historyHeaders() {
+    final token = AuthService().token;
+    if (token == null) return null;
+    return {'Accept': 'application/json', 'Authorization': 'Bearer $token'};
+  }
+
+  String _formatSavedTime(String? iso) {
+    final date = DateTime.tryParse(iso ?? '')?.toLocal();
+    if (date == null) return '';
+    final clock =
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return clock;
+    }
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')} $clock';
+  }
+
+  /// Tin đã lưu trên server → tin nhắn của giao diện; thẻ sản phẩm lấy từ metadata.
+  _AiChatMessage _savedToMessage(Map<String, dynamic> saved) {
+    final isUser = saved['role'] == 'user';
+    final metadata = saved['metadata'];
+    final rawProducts = metadata is Map ? metadata['products'] : null;
+    final products = (rawProducts is List ? rawProducts : const [])
+        .whereType<Map>()
+        .map((p) {
+          final map = Map<String, dynamic>.from(p);
+          map['_sourceBaseUrl'] = ApiConfig.baseUrl;
+          map['imageUrl'] = _resolveProductImageUrl(map['imageUrl']?.toString());
+          return map;
+        })
+        .toList();
+    return _AiChatMessage(
+      id: 'srv_${saved['id']}',
+      serverId: saved['id']?.toString(),
+      isUser: isUser,
+      text: saved['content']?.toString() ?? '',
+      time: _formatSavedTime(saved['createdAt']?.toString()),
+      products: isUser ? null : products,
+    );
+  }
+
+  /// Mở lại cuộc gần nhất nếu còn trong 12 giờ, giống cách Backend nối tiếp cuộc trò chuyện.
+  Future<void> _restoreLatestConversation() async {
+    final headers = _historyHeaders();
+    if (headers == null ||
+        _sessionMessages.isNotEmpty ||
+        _conversationId != null ||
+        _startNewConversation) {
+      return;
+    }
+    final owner = _currentOwner;
+    try {
+      final res = await _httpClient
+          .get(Uri.parse('${ApiConfig.aiConversationsUrl}?limit=1'), headers: headers)
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200 || !mounted || owner != _currentOwner) return;
+      final data = jsonDecode(utf8.decode(res.bodyBytes))['data'];
+      final list = data is Map ? data['conversations'] : null;
+      if (list is! List || list.isEmpty || list.first is! Map) return;
+      final latest = Map<String, dynamic>.from(list.first as Map);
+      final last = DateTime.tryParse(latest['lastMessageAt']?.toString() ?? '');
+      final isRecent =
+          last != null && DateTime.now().difference(last) < const Duration(hours: 12);
+      if (isRecent &&
+          _sessionMessages.isEmpty &&
+          _conversationId == null &&
+          !_startNewConversation) {
+        await _openConversation(latest['id'].toString());
+      }
+    } catch (_) {}
+  }
+
+  /// Tải tối đa 50 tin gần nhất của một cuộc trò chuyện và thay nội dung đang hiển thị.
+  Future<bool> _openConversation(String id) async {
+    final headers = _historyHeaders();
+    if (headers == null) return false;
+    final owner = _currentOwner;
+    setState(() => _historyBusy = true);
+    try {
+      final res = await _httpClient
+          .get(
+            Uri.parse('${ApiConfig.aiConversationsUrl}/$id/messages?limit=50'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 10));
+      if (owner != _currentOwner || !mounted) return false;
+      if (res.statusCode != 200) return false;
+      final data = jsonDecode(utf8.decode(res.bodyBytes))['data'];
+      final saved = (data['messages'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((m) => _savedToMessage(Map<String, dynamic>.from(m)))
+          .toList();
+      setState(() {
+        _sessionMessages
+          ..clear()
+          ..addAll(saved);
+        _conversationId = id;
+        _startNewConversation = false;
+        _hasMoreOlder = data['hasMore'] == true;
+        _feedbackGivenMap.clear();
+      });
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (mounted) setState(() => _historyBusy = false);
+    }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final headers = _historyHeaders();
+    final id = _conversationId;
+    final oldest = _messages.firstWhere(
+      (m) => m.serverId != null,
+      orElse: () => _AiChatMessage(id: '', isUser: false, text: ''),
+    );
+    if (headers == null || id == null || oldest.serverId == null || _historyBusy) {
+      return;
+    }
+    setState(() => _historyBusy = true);
+    try {
+      final res = await _httpClient
+          .get(
+            Uri.parse(
+              '${ApiConfig.aiConversationsUrl}/$id/messages?limit=50&beforeId=${oldest.serverId}',
+            ),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200 || !mounted || id != _conversationId) return;
+      final data = jsonDecode(utf8.decode(res.bodyBytes))['data'];
+      final older = (data['messages'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((m) => _savedToMessage(Map<String, dynamic>.from(m)))
+          .toList();
+      setState(() {
+        _sessionMessages.insertAll(0, older);
+        _hasMoreOlder = data['hasMore'] == true;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không tải được tin cũ hơn.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _historyBusy = false);
+    }
+  }
+
+  /// Bắt đầu cuộc trò chuyện mới: chỉ xóa màn hình, không đụng tới ký ức Nova đã học.
+  void _startFreshConversation() {
+    if (_isThinking) return;
+    setState(() {
+      _sessionMessages.clear();
+      _conversationId = null;
+      _startNewConversation = _isLoggedIn;
+      _hasMoreOlder = false;
+      _feedbackGivenMap.clear();
+    });
+  }
+
+  bool get _isLoggedIn => AuthService().token != null;
+
+  Future<bool> _deleteConversation(String id) async {
+    final headers = _historyHeaders();
+    if (headers == null) return false;
+    try {
+      final res = await _httpClient
+          .delete(Uri.parse('${ApiConfig.aiConversationsUrl}/$id'), headers: headers)
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return false;
+      if (_conversationId == id && mounted) _startFreshConversation();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showHistorySheet() {
+    final headers = _historyHeaders();
+    if (headers == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => _ConversationHistorySheet(
+        httpClient: _httpClient,
+        headers: headers,
+        activeId: _conversationId,
+        formatTime: _formatSavedTime,
+        onOpen: (id) async {
+          final opened = await _openConversation(id);
+          if (sheetContext.mounted) Navigator.pop(sheetContext);
+          if (opened) _scrollToBottom();
+        },
+        onNew: () {
+          _startFreshConversation();
+          Navigator.pop(sheetContext);
+        },
+        onDelete: _deleteConversation,
+      ),
+    );
   }
 
   /// Tải hồ sơ bộ não AI thực tế từ Backend: GET /api/v1/ai/brain/profile
@@ -372,11 +600,15 @@ class _NovaAIScreenState extends State<NovaAIScreen>
           .map((m) => {'isUser': m.isUser, 'text': m.text})
           .toList();
 
+      // Đã đăng nhập: Backend lấy ngữ cảnh từ lịch sử đã lưu, chỉ cần nói rõ cuộc nào (hoặc yêu cầu cuộc mới).
       final requestBody = jsonEncode({
         'message': query,
         'context': {
           'role': AuthService().currentUser?.role ?? 'buyer',
           'history': recentHistory,
+          if (_isLoggedIn && _conversationId != null)
+            'conversationId': _conversationId,
+          if (_isLoggedIn && _startNewConversation) 'newConversation': true,
         },
         'history': recentHistory,
       });
@@ -469,6 +701,14 @@ class _NovaAIScreenState extends State<NovaAIScreen>
               ? ['Xem trang $nextPageNum']
               : const [];
 
+          final savedConversationId = data['conversationId']?.toString();
+          if (_isLoggedIn &&
+              savedConversationId != null &&
+              requestOwner == _currentOwner) {
+            _conversationId = savedConversationId;
+            _startNewConversation = false;
+          }
+
           // Cập nhật dữ liệu AI Brain từ response
           final brain = data['brain'] as Map<String, dynamic>?;
           List<String> newlyLearned = [];
@@ -511,9 +751,18 @@ class _NovaAIScreenState extends State<NovaAIScreen>
           );
         }
       } else {
-        final serverMsg =
-            decoded['message']?.toString() ??
-            'Nova AI hiện không khả dụng. Bạn vui lòng thử lại sau.';
+        // Cuộc trò chuyện đã bị xóa ở nơi khác: lần gửi sau sẽ mở cuộc mới.
+        final conversationGone =
+            decoded['error'] is Map &&
+            decoded['error']['code'] == 'CONVERSATION_NOT_FOUND';
+        if (conversationGone) {
+          _conversationId = null;
+          _startNewConversation = true;
+        }
+        final serverMsg = conversationGone
+            ? 'Cuộc trò chuyện này không còn tồn tại. Bạn hãy gửi lại câu hỏi để bắt đầu cuộc trò chuyện mới.'
+            : decoded['message']?.toString() ??
+                  'Nova AI hiện không khả dụng. Bạn vui lòng thử lại sau.';
         aiResponse = _AiChatMessage(
           id: 'ai_err_${DateTime.now().millisecondsSinceEpoch}',
           isUser: false,
@@ -590,6 +839,12 @@ class _NovaAIScreenState extends State<NovaAIScreen>
               ),
             ),
           ),
+          if (_isLoggedIn)
+            IconButton(
+              tooltip: 'Lịch sử trò chuyện',
+              onPressed: _showHistorySheet,
+              icon: const Icon(Icons.history_rounded, size: 21),
+            ),
           if (_messages.isNotEmpty ||
               _learnedFacts.isNotEmpty ||
               _preferredStyles.isNotEmpty ||
@@ -605,6 +860,9 @@ class _NovaAIScreenState extends State<NovaAIScreen>
                 if (value == 'context') {
                   _showBrainProfileModal();
                 }
+                if (value == 'new') {
+                  _startFreshConversation();
+                }
                 if (value == 'reset') {
                   _resetBrainProfile();
                 }
@@ -616,8 +874,15 @@ class _NovaAIScreenState extends State<NovaAIScreen>
                 ),
                 if (_messages.isNotEmpty)
                   const PopupMenuItem(
-                    value: 'reset',
+                    value: 'new',
                     child: Text('Cuộc trò chuyện mới'),
+                  ),
+                if (_messages.isNotEmpty ||
+                    _learnedFacts.isNotEmpty ||
+                    _preferredStyles.isNotEmpty)
+                  const PopupMenuItem(
+                    value: 'reset',
+                    child: Text('Xóa ký ức của Nova'),
                   ),
               ],
             ),
@@ -639,8 +904,20 @@ class _NovaAIScreenState extends State<NovaAIScreen>
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
-                      itemCount: _messages.length + (_isThinking ? 1 : 0),
-                      itemBuilder: (context, index) {
+                      itemCount:
+                          _messages.length +
+                          (_isThinking ? 1 : 0) +
+                          (_hasMoreOlder ? 1 : 0),
+                      itemBuilder: (context, rawIndex) {
+                        if (_hasMoreOlder && rawIndex == 0) {
+                          return Center(
+                            child: TextButton(
+                              onPressed: _historyBusy ? null : _loadOlderMessages,
+                              child: const Text('Xem tin cũ hơn'),
+                            ),
+                          );
+                        }
+                        final index = _hasMoreOlder ? rawIndex - 1 : rawIndex;
                         if (index == _messages.length) {
                           return _buildThinkingBubble();
                         }
@@ -1491,8 +1768,187 @@ class _NovaAIScreenState extends State<NovaAIScreen>
   }
 }
 
+/// Danh sách cuộc trò chuyện đã lưu: mở lại, xóa hoặc bắt đầu cuộc mới.
+class _ConversationHistorySheet extends StatefulWidget {
+  final http.Client httpClient;
+  final Map<String, String> headers;
+  final String? activeId;
+  final String Function(String?) formatTime;
+  final Future<void> Function(String id) onOpen;
+  final VoidCallback onNew;
+  final Future<bool> Function(String id) onDelete;
+
+  const _ConversationHistorySheet({
+    required this.httpClient,
+    required this.headers,
+    required this.activeId,
+    required this.formatTime,
+    required this.onOpen,
+    required this.onNew,
+    required this.onDelete,
+  });
+
+  @override
+  State<_ConversationHistorySheet> createState() =>
+      _ConversationHistorySheetState();
+}
+
+class _ConversationHistorySheetState extends State<_ConversationHistorySheet> {
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await widget.httpClient
+          .get(
+            Uri.parse('${ApiConfig.aiConversationsUrl}?limit=30'),
+            headers: widget.headers,
+          )
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      if (res.statusCode != 200) {
+        setState(() {
+          _loading = false;
+          _error = 'Không tải được lịch sử trò chuyện.';
+        });
+        return;
+      }
+      final list = jsonDecode(utf8.decode(res.bodyBytes))['data']['conversations'];
+      setState(() {
+        _items = (list as List<dynamic>)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Không tải được lịch sử trò chuyện.';
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa cuộc trò chuyện?'),
+        content: Text('"${item['title']}" sẽ bị xóa và không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final deleted = await widget.onDelete(item['id'].toString());
+    if (!mounted) return;
+    if (deleted) {
+      setState(() => _items.removeWhere((e) => e['id'] == item['id']));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không xóa được cuộc trò chuyện.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Text(
+                'Lịch sử trò chuyện',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: OutlinedButton.icon(
+                onPressed: widget.onNew,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Cuộc trò chuyện mới'),
+              ),
+            ),
+            Flexible(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _error != null
+                  ? Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(_error!, textAlign: TextAlign.center),
+                    )
+                  : _items.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Chưa có cuộc trò chuyện nào được lưu.',
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) {
+                        final item = _items[index];
+                        final id = item['id'].toString();
+                        return ListTile(
+                          selected: id == widget.activeId,
+                          title: Text(
+                            item['title']?.toString() ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${widget.formatTime(item['lastMessageAt']?.toString())} · ${item['messageCount']} tin',
+                          ),
+                          onTap: () => widget.onOpen(id),
+                          trailing: IconButton(
+                            tooltip: 'Xóa cuộc trò chuyện',
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            onPressed: () => _confirmDelete(item),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AiChatMessage {
   final String id;
+  final String? serverId;
   final bool isUser;
   final String text;
   final String? time;
@@ -1506,6 +1962,7 @@ class _AiChatMessage {
 
   _AiChatMessage({
     required this.id,
+    this.serverId,
     required this.isUser,
     required this.text,
     this.time,

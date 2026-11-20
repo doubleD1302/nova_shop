@@ -151,4 +151,5 @@ class ApiConfig {
   static String get aiBrainProfileUrl => '$baseUrl/api/v1/ai/brain/profile';
   static String get aiBrainFeedbackUrl => '$baseUrl/api/v1/ai/brain/feedback';
   static String get aiBrainResetUrl => '$baseUrl/api/v1/ai/brain/reset';
+  static String get aiConversationsUrl => '$baseUrl/api/v1/ai/conversations';
 }
